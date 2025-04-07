@@ -1,8 +1,10 @@
 #!/bin/bash
+source /opt/intel/oneapi/setvars.sh intel64
 FILE_NUMBER=$1
 echo "File number is $FILE_NUMBER"
-GCC_PATH=/usr/bin/gcc
-CLANG_PATH=/usr/bin/clang
+GCC_PATH=/local/home/kchopra/.gcclocal/bin/gcc
+CLANG_PATH=/local/home/kchopra/llvm-project/build/bin/clang
+ICC_PATH=/opt/intel/oneapi/compiler/2023.2.4/linux/bin/icx
 compileGCC() {
     # This function compiles the code with GCC
     # $1 is the number
@@ -12,6 +14,30 @@ compileGCC() {
     $GCC_PATH -o gcc_bin_O$2/prog_$1 obj/generated_code_$1.o obj/variable_definitions_$1.o -O$2
 }
 
+compileICX() {
+    # This function compiles the code with ICC
+    # $1 is the number
+    # $2 is the optimization level
+    $ICC_PATH -c main_code/generated_code_$1.c -o obj/generated_code_$1.o -O$2
+    $ICC_PATH -c definitions/variable_definitions_$1.c -o obj/variable_definitions_$1.o -O$2
+    $ICC_PATH -o icc_bin_O$2/prog_$1 obj/generated_code_$1.o obj/variable_definitions_$1.o -O$2
+}
+compileICXInlinable(){
+    # This function compiles the code with ICC
+    # $1 is the number
+    # $2 is the optimization level
+    $ICC_PATH -O$2 -o icc_bin_O$2/prog_inlinable_$1 inlinable/stat_resolvable_$1.c
+}
+compileICX $1 0
+compileICX $1 1
+compileICX $1 2
+compileICX $1 3
+compileICX $1 fast
+compileICXInlinable $1 0
+compileICXInlinable $1 1
+compileICXInlinable $1 2
+compileICXInlinable $1 3
+compileICXInlinable $1 fast
 compileGCCInlinable(){
     # This function compiles the code with GCC
     # $1 is the number
@@ -64,6 +90,8 @@ runBinaries() {
     ./clang_bin_O$2/prog_$1 > clang_bin_O$2/output_$1.txt
     ./gcc_bin_O$2/prog_inlinable_$1 > gcc_bin_O$2/output_inlinable_$1.txt
     ./clang_bin_O$2/prog_inlinable_$1 > clang_bin_O$2/output_inlinable_$1.txt
+    ./icc_bin_O$2/prog_$1 > icc_bin_O$2/output_$1.txt
+    ./icc_bin_O$2/prog_inlinable_$1 > icc_bin_O$2/output_inlinable_$1.txt
 }
 
 runBinaries $1 0
@@ -108,8 +136,19 @@ checkGCCOutput() {
 }
 checkClangOutput(){
     check clang_bin_O$2/output_$1.txt gold/chronological_values_$1.csv
-    check gcc_bin_O$2/output_$1.txt gold/chronological_values_$1.csv
+    check clang_bin_O$2/output_inlinable_$1.txt gold/chronological_values_$1.csv
 }
+
+checkICCOutput(){
+    check icc_bin_O$2/output_$1.txt gold/chronological_values_$1.csv
+    check icc_bin_O$2/output_inlinable_$1.txt gold/chronological_values_$1.csv
+}
+
+checkICCOutput $1 0
+checkICCOutput $1 1
+checkICCOutput $1 2
+checkICCOutput $1 3
+checkICCOutput $1 fast
 
 checkGCCOutput $1 0
 checkGCCOutput $1 1

@@ -1,8 +1,7 @@
 #include <bits/stdc++.h>
 #include "better_graph.hpp"
-#include"z3++.h"
-#include <optional>
 #include "params.hpp"
+#include"z3++.h"
 using VarIndex = int;
 using BasicBlockNo = int;
 z3::expr atMostKZeroes(z3::context& ctx, const std::vector<z3::expr>& vec, int k, int val) {
@@ -130,6 +129,7 @@ z3::expr makeInitialisationsInteresting(z3::context& c)
     }
     return atMostKZeroes(c, allVars, NUM_VARS/2, 0);
 }
+
 class BB{
     public:
     BasicBlockNo blockno;
@@ -139,27 +139,12 @@ class BB{
     std::vector<BasicBlockNo> blockTargets;
     std::vector<VarIndex> conditionalVariables;
     public:
-        BB(BasicBlockNo blockno, const std::set<BasicBlockNo>& graphTargets) : blockno(blockno)
+        BB(BasicBlockNo blockno, std::map<VarIndex, std::vector<VarIndex>> statementMappings, std::vector<VarIndex> assignmentOrder, std::vector<BasicBlockNo> blockTargets, std::vector<VarIndex> conditionalVariables) : blockno(blockno), statementMappings(statementMappings), assignmentOrder(assignmentOrder), blockTargets(blockTargets), conditionalVariables(conditionalVariables)
         {
-            numStatements = ASSIGNMENTS_PER_BB;
-            assignmentOrder = sampleKDistinct(NUM_VARS, ASSIGNMENTS_PER_BB);
+            numStatements = statementMappings.size();
             int statementIndex = 0;
             for(auto varIndex : assignmentOrder)
             {
-                statementMappings[varIndex] = sampleKDistinct(NUM_VARS, VARIABLES_PER_ASSIGNMENT_STATEMENT);
-
-                //check every element present in vector is less than NUM_VARS
-                for(auto var: statementMappings[varIndex])
-                {
-                    if(var >= NUM_VARS)
-                    {
-                        throw std::invalid_argument("Error: variable index out of bounds");
-                    }
-                }
-                // if(std::find(statementMappings[varIndex].begin(), statementMappings[varIndex].end(), varIndex) == statementMappings[varIndex].end())
-                // {
-                //     statementMappings[varIndex].push_back(varIndex);
-                // }
                 for(int i = 0; i < statementMappings[varIndex].size(); i++)
                 {
                     std::string coefficientKey =    getCoefficientName(blockno, statementIndex, i);
@@ -170,26 +155,6 @@ class BB{
                 statementIndex++;
                 //sample a key from the vector assignmentOrder and add it to conditionalVariables
             }
-            conditionalVariables = assignmentOrder;
-            std::cout<<"size of conditional variables: "<<conditionalVariables.size()<<std::endl;
-            std::cout<<NUM_VARIABLES_IN_CONDITIONAL<<std::endl;
-            //now sample another random variable and add it to the conditionalVariables
-            for(int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL - assignmentOrder.size(); i++)
-            {
-                int randomVariable = std::rand() % NUM_VARS;
-                while(std::find(conditionalVariables.begin(), conditionalVariables.end(), randomVariable) != conditionalVariables.end())
-                {
-                    randomVariable = std::rand() % NUM_VARS;
-                }
-                conditionalVariables.push_back(randomVariable);
-            }
-            std::cout<<"size of conditional variables: "<<conditionalVariables.size()<<std::endl;
-
-            std::vector<BasicBlockNo> targets;
-            for(auto target: graphTargets)
-            {
-                blockTargets.push_back(target);
-            }
             if(blockTargets.size() > 1)
             {
                 std::random_device rd;
@@ -197,12 +162,20 @@ class BB{
                 std::shuffle(blockTargets.begin(), blockTargets.end(), gen);
                 for(int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL; i++)
                 {
-                    std::string coefficientKey = generateConditionalCoefficientName(blockno, 0, i);
-                    parameters[coefficientKey] = std::nullopt;
+                    parameters[generateConditionalCoefficientName(blockno, 0, i)] = std::nullopt;
                 }
                 std::string constantKey = generateConditionalConstantName(blockno, blockTargets[0]);
                 parameters[constantKey] = std::nullopt;
             }
+        }
+        void reset()
+        {
+            parameters.clear();
+            statementMappings.clear();
+            assignmentOrder.clear();
+            blockTargets.clear();
+            conditionalVariables.clear();
+            numStatements = 0;
         }
         std::string generateCode() const
         {
@@ -300,16 +273,13 @@ class BB{
                 for (int i = 0; i < dependencies.size(); i++)
                 {
                     vars.push_back(c.int_const((getVarName(dependencies[i]) + "_" + std::to_string(versions[getVarName(dependencies[i])])).c_str()));
-                    solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
                     coeffs.push_back(c.int_const((getCoefficientName(blockno, statementIndex, i)).c_str()));
-                    solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                     parameters[getCoefficientName(blockno, statementIndex, i)] = std::nullopt;
                     terms.push_back(coeffs.back() * vars.back()); // a_i * var_i
                 }
                 terms.push_back(c.int_const((generateConstantName(blockno, statementIndex)).c_str()));
                 parameters[generateConstantName(blockno, statementIndex)] = std::nullopt;
                 coeffs.push_back(c.int_const((generateConstantName(blockno, statementIndex)).c_str()));
-                solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                 z3::expr sum = terms[0];
                 z3::expr term_constraint = (terms[0] <= UPPER_BOUND) && (terms[0] >= LOWER_BOUND);
                 if(enableSafetyChecks) solver.add(term_constraint);
@@ -332,7 +302,8 @@ class BB{
             //now, we need to generate the conditional constraint
             // std::cout<<blockTargets.size()<<std::endl;
             // std::cout<<"Target: "<<target<<std::endl;
-            if(blockTargets.size() > 1){
+            if(blockTargets.size() > 1)
+            {
                 std::vector<z3::expr> terms;
                 // Define integer variables and coefficients
                 std::vector<z3::expr> vars;
@@ -341,9 +312,7 @@ class BB{
                 for(auto i: conditionalVariables)
                 {
                     vars.push_back(c.int_const((getVarName(i) + "_" + std::to_string(versions[getVarName(i)])).c_str()));
-                    solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
                     coeffs.push_back(c.int_const((generateConditionalCoefficientName(blockno, 0, ctr)).c_str()));
-                    solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                     parameters[generateConditionalCoefficientName(blockno, 0, ctr)] = std::nullopt;
                     terms.push_back(coeffs.back() * vars.back()); 
                     ++ctr;
@@ -352,7 +321,6 @@ class BB{
                 terms.push_back(c.int_const((generateConditionalConstantName(blockno, blockTargets[0])).c_str()));
                 parameters[generateConditionalConstantName(blockno, blockTargets[0])] = std::nullopt;
                 coeffs.push_back(c.int_const((generateConditionalConstantName(blockno, blockTargets[0])).c_str()));
-                solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                 z3::expr sum = terms[0];
                 z3::expr term_constraint = (terms[0] <= UPPER_BOUND) && (terms[0] >= LOWER_BOUND);
                 if(enableSafetyChecks) solver.add(term_constraint);
@@ -378,6 +346,84 @@ class BB{
         }
 };
 
+std::vector<BB> parse_basic_blocks(const std::string& code) {
+    std::regex label_regex(R"(BB(\d+):)");
+    std::regex assign_regex(R"((var_\d+)\s*=\s*([^;]+);)");
+    std::regex var_use_regex(R"(var_(\d+))");
+    std::regex if_goto_regex(R"(if\s*\((.*)\)\s*goto\s+BB(\d+);)");
+    std::regex goto_regex(R"(goto\s+BB(\d+);)");
+
+    std::vector<BB> blocks;
+    std::stringstream ss(code);
+    std::string line;
+    bool in_block = false;
+    int blockno = -1;
+    int numStatements = 0;
+    std::map<VarIndex, std::vector<VarIndex>> statementMappings;
+    std::vector<VarIndex> assignmentOrder;
+    std::vector<BasicBlockNo> blockTargets;
+    std::vector<VarIndex> conditionalVariables;
+    BB current_block(blockno, statementMappings, assignmentOrder, blockTargets, conditionalVariables);
+    while (std::getline(ss, line)) {
+        std::smatch match;
+
+        // Start of a new block
+        if (std::regex_search(line, match, label_regex)) {
+            if (in_block) {
+                blocks.push_back(current_block);
+                current_block.reset();
+            }
+            blockno = std::stoi(match[1]);
+            current_block.blockno = blockno;
+            numStatements = 0;
+            in_block = true;
+            continue;
+        }
+
+        // Parse assignment
+        if (std::regex_search(line, match, assign_regex)) {
+            std::string lhs = match[1];
+            std::string rhs = match[2];
+
+            VarIndex lhs_idx = std::stoi(lhs.substr(4));
+            current_block.assignmentOrder.push_back(lhs_idx);
+            current_block.numStatements++;
+
+            std::vector<VarIndex> rhs_vars;
+            std::sregex_iterator it(rhs.begin(), rhs.end(), var_use_regex), end;
+            while (it != end) {
+                rhs_vars.push_back(std::stoi((*it)[1]));
+                ++it;
+            }
+
+            current_block.statementMappings[lhs_idx] = rhs_vars;
+        }
+
+        // Parse if-goto
+        if (std::regex_search(line, match, if_goto_regex)) {
+            BasicBlockNo target = std::stoi(match[2]);
+            current_block.blockTargets.push_back(target);
+
+            // Extract variables from condition
+            std::string cond_expr = match[1];
+            std::sregex_iterator it(cond_expr.begin(), cond_expr.end(), var_use_regex), end;
+            while (it != end) {
+                VarIndex var_idx = std::stoi((*it)[1]);
+                current_block.conditionalVariables.push_back(var_idx);
+                ++it;
+            }
+        }
+
+        // Parse unconditional goto
+        else if (std::regex_search(line, match, goto_regex)) {
+            BasicBlockNo target = std::stoi(match[1]);
+            current_block.blockTargets.push_back(target);
+        }
+    }
+    blocks.push_back(current_block);
+
+    return blocks;
+}
 void extractParametersFromModel(z3::model &model, z3::context &ctx)
 {
     for (const auto& param : parameters) {
@@ -536,41 +582,84 @@ void generateErrorCode(const std::string& filename, const std::vector<BB>& basic
     outputFile.close();
     std::cout << "Statically resolvable code has been written to '" << filename << "'." << std::endl;
 }
-int main(int argc, char** argv)
-{
-    //program should have a command line argument which we will store in an integer sample_number
-    int sample_number = 0;
-    if (argc > 1) {
-        sample_number = std::stoi(argv[1]);
-    }
-    else
-    {
-        std::cout << "Please provide a sample number as a command line argument." << std::endl;
-        return 1;
-    }
-    z3::set_param("parallel.enable", true);
+// Example usage:
+int main() {
+    std::string code = R"(  // Same code from earlier
+BB0:
+printf("BB0\n");
+    var_1 = -4 * var_2 + -3 * var_7 + -2147483648;
+    if (0 * var_1 + -597465834 * var_7 + 2147483647 >= 0) goto BB11;
+    goto BB3;
 
-    int  nodes = NODES; // Number of nodes
-    Graph g(nodes);
-    g.generate_graph();
+BB1:
+printf("BB1\n");
+    var_3 = 1575456495 * var_7 + -1638577024 * var_1 + 960338473;
+    goto BB10;
 
-    std::vector<std::set<int>> adjacency_list = g.adj;
-    std::vector<int> sample_walk = {};
-    if(enableConsistentWalks)
-    {
-        sample_walk = g.sample_consistent_walk(0, nodes - 1, 100);
-    }
-    else
-    {
-        sample_walk = g.sample_walk(0, nodes - 1, 100);
-    }
-    g.print_graph();
-    std::vector<BB> basicBlocks;
-    for(int i = 0; i < nodes; i++)
-    {
-        BB bb(i, adjacency_list[i]);
-        basicBlocks.push_back(bb);
-    }
+BB2:
+printf("BB2\n");
+    var_2 = -2 * var_2 + -1 * var_0 + -357913932;
+    if (0 * var_2 + -2034053477 * var_7 + 2147483647 >= 0) goto BB7;
+    goto BB9;
+
+BB3:
+printf("BB3\n");
+    var_1 = -1 * var_1 + -1 * var_0 + -2147483643;
+    goto BB8;
+
+BB4:
+printf("BB4\n");
+    var_5 = 10932893 * var_3 + -268324472 * var_4 + 979309140;
+    goto BB1;
+
+BB5:
+printf("BB5\n");
+    var_2 = -1 * var_5 + -2 * var_2 + -5;
+    if (-1 * var_2 + 1 * var_4 + -3 >= 0) goto BB2;
+    goto BB8;
+
+BB6:
+printf("BB6\n");
+    var_7 = -1 * var_3 + -1 * var_6 + -1;
+    if (-2 * var_7 + 2147483645 * var_5 + 2147483647 >= 0) goto BB5;
+    goto BB10;
+
+BB7:
+printf("BB7\n");
+    var_2 = 766110937 * var_7 + 627275073 * var_1 + 401303148;
+    if (632624147 * var_2 + 1198784455 * var_4 + 1812525776 >= 0) goto BB10;
+    goto BB4;
+
+BB8:
+printf("BB8\n");
+    var_0 = -1073741823 * var_1 + -1 * var_2 + -1073741822;
+    if (1 * var_0 + -1 * var_5 + 715827843 >= 0) goto BB5;
+    goto BB11;
+
+BB9:
+printf("BB9\n");
+    var_0 = -1 * var_1 + -1 * var_5 + -2147483648;
+    goto BB6;
+
+BB10:
+printf("BB10\n");
+    var_4 = 1254158763 * var_2 + -562722259 * var_3 + -1984886679;
+    goto BB11;
+
+BB11:
+printf("BB11\n");
+    var_1 = -1 * var_2 + -1 * var_1 + -1;
+    printf("%d,%d,%d,%d,%d,%d,%d,%d", var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7);
+    return 0;
+)";
+
+    std::vector<BB> basicBlocks = parse_basic_blocks(code);
+    NODES = basicBlocks.size();
+    ASSIGNMENTS_PER_BB = basicBlocks[0].numStatements;
+    NUM_VARIABLES_IN_CONDITIONAL = basicBlocks[0].conditionalVariables.size();
+    VARIABLES_PER_ASSIGNMENT_STATEMENT = basicBlocks[0].statementMappings.begin()->second.size();
+    // std::vector<int> sample_walk = {0, 2, 3, 2, 4, 3, 1, 6, 3, 1, 6, 3, 1, 9};
+    std::vector<int> sample_walk = {0, 3, 8, 5, 8, 5, 8, 5, 2, 9, 6, 5, 8, 11};
     z3::context c;
     z3::solver solver(c);
     solver.add(makeInitialisationsInteresting(c));
@@ -583,56 +672,8 @@ int main(int argc, char** argv)
     }
     basicBlocks[sample_walk[sample_walk.size() - 1]].generateConstraints(-1, solver, c, versions);
     //dump solver query yo another file
-    //dump graph and basic blocks to a file
-    std::ofstream graphFile("graphs/graph_" + std::to_string(sample_number) + ".txt");
-    for (int i = 0; i < nodes; i++) {
-        graphFile << i << ": ";
-        for (const auto& target : adjacency_list[i]) {
-            graphFile << target << ",";
-        }
-        graphFile << '\n';
-    }
-    graphFile.close();
-    std::cout << "Graph has been written to 'graph_" + std::to_string(sample_number) + ".txt'." << std::endl;
-    //write sample_walk to a file
-    std::ofstream sampleWalkFile("walks/sample_walk_" + std::to_string(sample_number) + ".txt");
-    for (const auto& node : sample_walk) {
-        sampleWalkFile << node << ",";
-    }
-    sampleWalkFile << std::endl;
-    sampleWalkFile.close();
-    std::ofstream basicBlocksFile("basic_blocks/basic_blocks_" + std::to_string(sample_number) + ".txt");
-    std::cout << "Sample walk has been written to 'sample_walk_" + std::to_string(sample_number) + ".txt'." << std::endl;
-    basicBlocksFile << "Basic Blocks "<< std::endl;
-    for (const auto& bb : basicBlocks) {
-        basicBlocksFile << bb.blockno << ": ";
-        int statementIndex = 0;
-        for (const auto& [varIndex, dependencies] : bb.statementMappings) {
-            basicBlocksFile<<varIndex << " = ";
-            for (size_t i = 0; i < dependencies.size(); ++i) {
-                basicBlocksFile << getCoefficientName(bb.blockno, statementIndex, i) << " * " << getVarName(dependencies[i]);
-                if (i < dependencies.size() - 1) {
-                    basicBlocksFile << ","; // Example operation
-                }
-            }
-            ++statementIndex;
-            basicBlocksFile << "," << generateConstantName(bb.blockno, statementIndex) << ";" << std::endl;
-        }
-        basicBlocksFile << "Conditional Variables: ";
-        for (const auto& var : bb.conditionalVariables) {
-            basicBlocksFile << var << ",";
-        }
-        basicBlocksFile << std::endl;
-        basicBlocksFile << "Targets: ";
-        for (const auto& target : bb.blockTargets) {
-            basicBlocksFile<< target << ",";
-        }
-        basicBlocksFile << std::endl;
-        basicBlocksFile << "Code: " << bb.generateCode() << std::endl;
-        basicBlocksFile << std::endl; 
-    }
-    basicBlocksFile.close();
-    std::ofstream outputSMTFile("smt_queries/solver_query_basic_" + std::to_string(sample_number) + ".smt2");
+    int sample_number = 1;
+    std::ofstream outputSMTFile("solver_query_reparse.smt2");
     outputSMTFile << solver.to_smt2();
     outputSMTFile.close();
     if (solver.check() == z3::sat) {
@@ -648,11 +689,7 @@ int main(int argc, char** argv)
         dumpChronologicalValuesToCSV("gold/chronological_values_" + std::to_string(sample_number) + ".csv", m, c, versions);
         generateStaticallyResolvableCode("inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c);
 
-        //dump model to a file
-        std::ofstream modelFile("models/model_" + std::to_string(sample_number) + ".txt");
-        modelFile << m << std::endl;
-        modelFile.close();
-        std::cout << "Model has been written to 'model_" + std::to_string(sample_number) + ".txt'." << std::endl;
+        std::cout << "Model:\n" << m << std::endl;
     } else {
         std::cout << "UNSATISFIABLE" << std::endl;
 

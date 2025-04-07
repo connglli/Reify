@@ -1,11 +1,12 @@
-const int NUM_VARS = 5;
+#pragma once
+int NUM_VARS = 8;
 const int UPPER_BOUND = INT_MAX;
 const int LOWER_BOUND = INT_MIN;
-const int ASSIGNMENTS_PER_BB = 3;
-const int VARIABLES_PER_ASSIGNMENT_STATEMENT = 2;
-const int NUM_VARIABLES_IN_CONDITIONAL = 3;
-const int NODES = 8;
-const bool enableConsistentWalks = true; 
+int ASSIGNMENTS_PER_BB = 2;
+int VARIABLES_PER_ASSIGNMENT_STATEMENT = 2;
+int NUM_VARIABLES_IN_CONDITIONAL = 2;
+int NODES = 10;
+bool enableConsistentWalks = false; 
 /**
 Consistent means that after a tipping point, from the same node, exactly one outward edge is traversed. 
 For example,

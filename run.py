@@ -23,6 +23,7 @@ def run_with_timeout(executable, number, timeout=60):
     except Exception as e:
         print(f"Error occurred: {e}")
 counter = 0
+subprocess.run(["source", "/opt/intel/oneapi/setvars.sh", "intel64"], shell=True, executable="/bin/bash")
 while(True):
     print(counter)
     run_with_timeout("./exe", counter)

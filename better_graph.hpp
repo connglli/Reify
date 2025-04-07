@@ -4,7 +4,6 @@
 #include <ctime>
 #include <set>
 #include <queue>
-
 class Graph {
 public:
     int nodes;
