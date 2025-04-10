@@ -13,6 +13,11 @@ def run_with_timeout(executable, number, timeout=60):
                 if exit_code != 1:
                     print("Running ./link.sh" + str(number))
                     process = subprocess.Popen(["./link.sh", str(number)])
+                    #close shell script after it finishes
+                    process.wait()
+                    print("Shell script completed successfully.")
+                else:
+                    print("Process failed with exit code:", exit_code)
                 return
             time.sleep(1) 
         print("Process timed out. Sending user interrupt (SIGINT).")
@@ -23,7 +28,7 @@ def run_with_timeout(executable, number, timeout=60):
     except Exception as e:
         print(f"Error occurred: {e}")
 counter = 0
-subprocess.run(["source", "/opt/intel/oneapi/setvars.sh", "intel64"], shell=True, executable="/bin/bash")
+# subprocess.run(["source", "/opt/intel/oneapi/setvars.sh", "intel64"], shell=True, executable="/bin/bash")
 while(True):
     print(counter)
     run_with_timeout("./exe", counter)

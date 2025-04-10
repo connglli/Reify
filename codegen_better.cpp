@@ -3,6 +3,9 @@
 #include"z3++.h"
 #include <optional>
 #include "params.hpp"
+#include <signal.h>
+#include <unistd.h>
+bool isFormulaSatisfiable = false;
 using VarIndex = int;
 using BasicBlockNo = int;
 z3::expr atMostKZeroes(z3::context& ctx, const std::vector<z3::expr>& vec, int k, int val) {
@@ -474,7 +477,7 @@ void dumpChronologicalValuesToCSV(const std::string& filename, z3::model &model,
     outputFile.close();
     std::cout << "Chronological values have been written to '" << filename << "'." << std::endl;
 }
-void generateStaticallyResolvableCode(const std::string& filename, const std::vector<BB>& basicBlocks, const std::unordered_map<std::string, int>& versions, z3::model &model, z3::context &ctx) {
+void generateStaticallyResolvableCode(const std::string& filename, const std::vector<BB>& basicBlocks, const std::unordered_map<std::string, int>& versions, z3::model &model, z3::context &ctx, bool statMod = true) {
     std::ofstream outputFile(filename);
 
     // Add necessary includes
@@ -483,7 +486,11 @@ void generateStaticallyResolvableCode(const std::string& filename, const std::ve
     // Declare and define variables
     for (int i = 0; i < NUM_VARS; ++i) {
         std::string varName = "var_" + std::to_string(i) + "_0";
-        outputFile << "static int var_" << i << " = ";
+        if(statMod)
+        {
+            outputFile << "static ";
+        }
+        outputFile << "int var_" << i << " = ";
 
         // Query the Z3 model for the variable's value
         z3::expr varExpr = ctx.int_const(varName.c_str());
@@ -536,8 +543,23 @@ void generateErrorCode(const std::string& filename, const std::vector<BB>& basic
     outputFile.close();
     std::cout << "Statically resolvable code has been written to '" << filename << "'." << std::endl;
 }
+
+//write a signal handler to handle SIGINT and SIGTERM signals
+void signalHandler(int signum) {
+    std::cout << "Interrupt signal (" << signum << ") received.\n";
+    if(isFormulaSatisfiable)
+    {
+        return;
+    }
+    else
+    {
+        std::cout << "Exiting gracefully..." << std::endl;
+        exit(signum);
+    }
+}
 int main(int argc, char** argv)
 {
+    std::signal(SIGINT, signalHandler);
     //program should have a command line argument which we will store in an integer sample_number
     int sample_number = 0;
     if (argc > 1) {
@@ -632,11 +654,15 @@ int main(int argc, char** argv)
         basicBlocksFile << std::endl; 
     }
     basicBlocksFile.close();
+    std::cout << "Basic blocks have been written to 'basic_blocks_" + std::to_string(sample_number) + ".txt'." << std::endl;
     std::ofstream outputSMTFile("smt_queries/solver_query_basic_" + std::to_string(sample_number) + ".smt2");
     outputSMTFile << solver.to_smt2();
     outputSMTFile.close();
     if (solver.check() == z3::sat) {
+        
+        isFormulaSatisfiable = true;
         std::cout << "SATISFIABLE" << std::endl;
+        // usleep(50000000);
         z3::model m = solver.get_model();
         extractParametersFromModel(m, c);
         //print all version numbrs in the map versions to the console
@@ -646,8 +672,8 @@ int main(int argc, char** argv)
         }
         dumpVariableDefinitions("definitions/variable_definitions_" + std::to_string(sample_number) + ".c", m, c);
         dumpChronologicalValuesToCSV("gold/chronological_values_" + std::to_string(sample_number) + ".csv", m, c, versions);
-        generateStaticallyResolvableCode("inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c);
-
+        generateStaticallyResolvableCode("static_inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, true);
+        generateStaticallyResolvableCode("inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, true);
         //dump model to a file
         std::ofstream modelFile("models/model_" + std::to_string(sample_number) + ".txt");
         modelFile << m << std::endl;
