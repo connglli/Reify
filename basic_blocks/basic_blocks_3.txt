@@ -1,0 +1,107 @@
+Basic Blocks 
+0: 1 = a_0_0_0 * var_5,a_0_0_1 * var_4,a_0_1;
+2 = a_0_1_0 * var_0,a_0_1_1 * var_2,a_0_2;
+Conditional Variables: 2,1,
+Targets: 3,6,
+Code: BB0:
+    var_1 = 1064838998 * var_5 + 53744551 * var_4 + 639541045;
+    var_2 = -2100073990 * var_0 + -107893829 * var_2 + -3307180;
+    if (504591657 * var_2 + -511225616 * var_1 + -1005817616 >= 0) goto BB3;
+    goto BB6;
+
+
+1: 1 = a_1_0_0 * var_3,a_1_0_1 * var_5,a_1_1;
+2 = a_1_1_0 * var_3,a_1_1_1 * var_6,a_1_2;
+Conditional Variables: 1,2,
+Targets: 8,
+Code: BB1:
+    var_1 = 1288512947 * var_3 + 812330639 * var_5 + 311190640;
+    var_2 = -216631854 * var_3 + -433396697 * var_6 + -1267094467;
+    goto BB8;
+
+
+2: 1 = a_2_0_0 * var_2,a_2_0_1 * var_0,a_2_1;
+3 = a_2_1_0 * var_0,a_2_1_1 * var_5,a_2_2;
+Conditional Variables: 3,1,
+Targets: 3,8,
+Code: BB2:
+    var_1 = -1222317695 * var_2 + -1812565906 * var_0 + -1925577460;
+    var_3 = 1863107771 * var_0 + -1486833767 * var_5 + 280327008;
+    if (261729571 * var_3 + -1020814840 * var_1 + 2146218320 >= 0) goto BB3;
+    goto BB8;
+
+
+3: 3 = a_3_0_0 * var_6,a_3_0_1 * var_1,a_3_1;
+7 = a_3_1_0 * var_0,a_3_1_1 * var_4,a_3_2;
+Conditional Variables: 7,3,
+Targets: 2,9,
+Code: BB3:
+    var_3 = -149169345 * var_6 + -411752780 * var_1 + 1252119119;
+    var_7 = -1191875206 * var_0 + 2008785872 * var_4 + -1782143690;
+    if (-857842508 * var_7 + 53598546 * var_3 + 979317251 >= 0) goto BB2;
+    goto BB9;
+
+
+4: 0 = a_4_0_0 * var_6,a_4_0_1 * var_7,a_4_1;
+1 = a_4_1_0 * var_7,a_4_1_1 * var_5,a_4_2;
+Conditional Variables: 1,0,
+Targets: 3,
+Code: BB4:
+    var_0 = -788521846 * var_6 + 1888083782 * var_7 + 291887181;
+    var_1 = -811502876 * var_7 + 833181156 * var_5 + 1914163382;
+    goto BB3;
+
+
+5: 2 = a_5_0_0 * var_3,a_5_0_1 * var_7,a_5_1;
+3 = a_5_1_0 * var_2,a_5_1_1 * var_5,a_5_2;
+Conditional Variables: 3,2,
+Targets: 7,9,
+Code: BB5:
+    var_2 = 1672890244 * var_3 + 804753848 * var_7 + -1236002432;
+    var_3 = 1858873145 * var_2 + 159843424 * var_5 + -445010197;
+    if (1853785579 * var_3 + -1838334740 * var_2 + 1372989827 >= 0) goto BB7;
+    goto BB9;
+
+
+6: 0 = a_6_0_0 * var_7,a_6_0_1 * var_6,a_6_1;
+5 = a_6_1_0 * var_3,a_6_1_1 * var_4,a_6_2;
+Conditional Variables: 5,0,
+Targets: 5,
+Code: BB6:
+    var_0 = -983218242 * var_7 + 34515129 * var_6 + -1650907078;
+    var_5 = 868388978 * var_3 + 552567304 * var_4 + 590449458;
+    goto BB5;
+
+
+7: 2 = a_7_0_0 * var_3,a_7_0_1 * var_0,a_7_1;
+5 = a_7_1_0 * var_3,a_7_1_1 * var_4,a_7_2;
+Conditional Variables: 5,2,
+Targets: 5,3,
+Code: BB7:
+    var_2 = -231140456 * var_3 + -580283520 * var_0 + -664028727;
+    var_5 = 621757149 * var_3 + -1292216997 * var_4 + -1110548500;
+    if (247673712 * var_5 + 496491431 * var_2 + -1969579048 >= 0) goto BB5;
+    goto BB3;
+
+
+8: 2 = a_8_0_0 * var_6,a_8_0_1 * var_0,a_8_1;
+6 = a_8_1_0 * var_0,a_8_1_1 * var_4,a_8_2;
+Conditional Variables: 2,6,
+Targets: 7,
+Code: BB8:
+    var_2 = -1413949594 * var_6 + 799981166 * var_0 + -659306208;
+    var_6 = 1865361627 * var_0 + 28312361 * var_4 + -420029100;
+    goto BB7;
+
+
+9: 1 = a_9_0_0 * var_0,a_9_0_1 * var_5,a_9_1;
+7 = a_9_1_0 * var_0,a_9_1_1 * var_5,a_9_2;
+Conditional Variables: 1,7,
+Targets: 
+Code: BB9:
+    var_1 = 2084221654 * var_0 + 390017608 * var_5 + -1513142657;
+    var_7 = -77951445 * var_0 + 424386393 * var_5 + 1169876794;
+    printf("%d,%d,%d,%d,%d,%d,%d,%d", var_0, var_1, var_2, var_3, var_4, var_5, var_6, var_7);
+    return 0;
+
+

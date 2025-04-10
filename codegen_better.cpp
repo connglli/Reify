@@ -5,6 +5,7 @@
 #include "params.hpp"
 #include <signal.h>
 #include <unistd.h>
+std::ofstream logFile;
 bool isFormulaSatisfiable = false;
 using VarIndex = int;
 using BasicBlockNo = int;
@@ -174,8 +175,8 @@ class BB{
                 //sample a key from the vector assignmentOrder and add it to conditionalVariables
             }
             conditionalVariables = assignmentOrder;
-            std::cout<<"size of conditional variables: "<<conditionalVariables.size()<<std::endl;
-            std::cout<<NUM_VARIABLES_IN_CONDITIONAL<<std::endl;
+            logFile<<"size of conditional variables: "<<conditionalVariables.size()<<'\n';
+            logFile<<NUM_VARIABLES_IN_CONDITIONAL<<'\n';
             //now sample another random variable and add it to the conditionalVariables
             for(int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL - assignmentOrder.size(); i++)
             {
@@ -186,7 +187,7 @@ class BB{
                 }
                 conditionalVariables.push_back(randomVariable);
             }
-            std::cout<<"size of conditional variables: "<<conditionalVariables.size()<<std::endl;
+            logFile<<"size of conditional variables: "<<conditionalVariables.size()<<'\n';
 
             std::vector<BasicBlockNo> targets;
             for(auto target: graphTargets)
@@ -333,8 +334,8 @@ class BB{
                 statementIndex++;
             }
             //now, we need to generate the conditional constraint
-            // std::cout<<blockTargets.size()<<std::endl;
-            // std::cout<<"Target: "<<target<<std::endl;
+            // logFile<<blockTargets.size()<<'\n';
+            // logFile<<"Target: "<<target<<'\n';
             if(blockTargets.size() > 1){
                 std::vector<z3::expr> terms;
                 // Define integer variables and coefficients
@@ -394,12 +395,12 @@ void extractParametersFromModel(z3::model &model, z3::context &ctx)
                 int int_value;
                 if (Z3_get_numeral_int(ctx, value, &int_value)) {
                     parameters[name] = int_value;
-                    std::cout << "Parameter " << name << " is in the model with value: " 
-                              << int_value << std::endl;
+                    logFile << "Parameter " << name << " is in the model with value: " 
+                              << int_value << '\n';
                 }
             }
         } else {
-            std::cout << "Parameter " << name << " is not explicitly defined in the model\n";
+            logFile << "Parameter " << name << " is not explicitly defined in the model\n";
         }
     }
 
@@ -435,7 +436,7 @@ void dumpVariableDefinitions(const std::string& filename, z3::model &model, z3::
     }
 
     outputFile.close();
-    std::cout << "Variable definitions have been written to '" << filename << "'." << std::endl;
+    logFile << "Variable definitions have been written to '" << filename << "'." << '\n';
 }
 void dumpChronologicalValuesToCSV(const std::string& filename, z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions) {
     std::ofstream outputFile(filename);
@@ -475,7 +476,7 @@ void dumpChronologicalValuesToCSV(const std::string& filename, z3::model &model,
         }
     }
     outputFile.close();
-    std::cout << "Chronological values have been written to '" << filename << "'." << std::endl;
+    logFile << "Chronological values have been written to '" << filename << "'." << '\n';
 }
 void generateStaticallyResolvableCode(const std::string& filename, const std::vector<BB>& basicBlocks, const std::unordered_map<std::string, int>& versions, z3::model &model, z3::context &ctx, bool statMod = true) {
     std::ofstream outputFile(filename);
@@ -514,11 +515,11 @@ void generateStaticallyResolvableCode(const std::string& filename, const std::ve
     outputFile << "int main() {\n";
     // Generate the code for each basic block
     for (const auto& bb : basicBlocks) {
-        outputFile << bb.generateCode() << std::endl;
+        outputFile << bb.generateCode() << '\n';
     }
     outputFile << "}\n";
     outputFile.close();
-    std::cout << "Statically resolvable code has been written to '" << filename << "'." << std::endl;
+    logFile << "Statically resolvable code has been written to '" << filename << "'." << '\n';
 }
 void generateErrorCode(const std::string& filename, const std::vector<BB>& basicBlocks, const std::unordered_map<std::string, int>& versions, z3::context &ctx) {
     std::ofstream outputFile(filename);
@@ -537,29 +538,47 @@ void generateErrorCode(const std::string& filename, const std::vector<BB>& basic
     outputFile << "int main() {\n";
     // Generate the code for each basic block
     for (const auto& bb : basicBlocks) {
-        outputFile << bb.generateCode() << std::endl;
+        outputFile << bb.generateCode() << '\n';
     }
     outputFile << "}\n";
     outputFile.close();
-    std::cout << "Statically resolvable code has been written to '" << filename << "'." << std::endl;
 }
 
+void generateMainCode(std::vector<BB> basicBlocks, const std::string& filename, z3::model &model, z3::context &ctx)
+{
+    // std::ofstream outputFile("main_code/generated_code_" + std::to_string(sample_number) + ".c");
+    std::ofstream outputFile(filename);
+    outputFile << "#include <stdio.h>\n\n";
+    for (int i = 0; i < NUM_VARS; ++i)
+    {
+        outputFile << "extern int var_" << i << ";\n";
+    }
+    outputFile << "\n";
+    outputFile << "int main() {\n";
+
+    for (auto bb : basicBlocks) {
+        outputFile << bb.generateCode() << '\n';
+    }
+    outputFile << "}\n";
+    outputFile.close();
+
+}
 //write a signal handler to handle SIGINT and SIGTERM signals
 void signalHandler(int signum) {
-    std::cout << "Interrupt signal (" << signum << ") received.\n";
+    logFile << "Interrupt signal (" << signum << ") received.\n";
     if(isFormulaSatisfiable)
     {
         return;
     }
     else
     {
-        std::cout << "Exiting gracefully..." << std::endl;
+        logFile << "Exiting gracefully..." << '\n';
         exit(signum);
     }
 }
 int main(int argc, char** argv)
 {
-    std::signal(SIGINT, signalHandler);
+    
     //program should have a command line argument which we will store in an integer sample_number
     int sample_number = 0;
     if (argc > 1) {
@@ -567,9 +586,14 @@ int main(int argc, char** argv)
     }
     else
     {
-        std::cout << "Please provide a sample number as a command line argument." << std::endl;
         return 1;
     }
+    logFile = std::ofstream("logs/log_" + std::to_string(sample_number) + ".txt");
+    std::signal(SIGINT, signalHandler);
+    std::signal(SIGTERM, signalHandler);
+    std::signal(SIGKILL, signalHandler);
+
+    logFile << "Sample number: " << sample_number << '\n';
     z3::set_param("parallel.enable", true);
 
     int  nodes = NODES; // Number of nodes
@@ -586,7 +610,7 @@ int main(int argc, char** argv)
     {
         sample_walk = g.sample_walk(0, nodes - 1, 100);
     }
-    g.print_graph();
+    // g.print_graph();
     std::vector<BB> basicBlocks;
     for(int i = 0; i < nodes; i++)
     {
@@ -615,17 +639,17 @@ int main(int argc, char** argv)
         graphFile << '\n';
     }
     graphFile.close();
-    std::cout << "Graph has been written to 'graph_" + std::to_string(sample_number) + ".txt'." << std::endl;
+    logFile << "Graph has been written to 'graph_" + std::to_string(sample_number) + ".txt'." << '\n';
     //write sample_walk to a file
     std::ofstream sampleWalkFile("walks/sample_walk_" + std::to_string(sample_number) + ".txt");
     for (const auto& node : sample_walk) {
         sampleWalkFile << node << ",";
     }
-    sampleWalkFile << std::endl;
+    sampleWalkFile << '\n';
     sampleWalkFile.close();
     std::ofstream basicBlocksFile("basic_blocks/basic_blocks_" + std::to_string(sample_number) + ".txt");
-    std::cout << "Sample walk has been written to 'sample_walk_" + std::to_string(sample_number) + ".txt'." << std::endl;
-    basicBlocksFile << "Basic Blocks "<< std::endl;
+    logFile <<"Sample walk has been written to 'sample_walk_" + std::to_string(sample_number) + ".txt'." << '\n';
+    basicBlocksFile << "Basic Blocks "<< '\n';
     for (const auto& bb : basicBlocks) {
         basicBlocksFile << bb.blockno << ": ";
         int statementIndex = 0;
@@ -638,77 +662,61 @@ int main(int argc, char** argv)
                 }
             }
             ++statementIndex;
-            basicBlocksFile << "," << generateConstantName(bb.blockno, statementIndex) << ";" << std::endl;
+            basicBlocksFile << "," << generateConstantName(bb.blockno, statementIndex) << ";" << '\n';
         }
         basicBlocksFile << "Conditional Variables: ";
         for (const auto& var : bb.conditionalVariables) {
             basicBlocksFile << var << ",";
         }
-        basicBlocksFile << std::endl;
+        basicBlocksFile << '\n';
         basicBlocksFile << "Targets: ";
         for (const auto& target : bb.blockTargets) {
             basicBlocksFile<< target << ",";
         }
-        basicBlocksFile << std::endl;
-        basicBlocksFile << "Code: " << bb.generateCode() << std::endl;
-        basicBlocksFile << std::endl; 
+        basicBlocksFile << '\n';
+        basicBlocksFile << "Code: " << bb.generateCode() << '\n';
+        basicBlocksFile << '\n'; 
     }
     basicBlocksFile.close();
-    std::cout << "Basic blocks have been written to 'basic_blocks_" + std::to_string(sample_number) + ".txt'." << std::endl;
+    logFile << "Basic blocks have been written to 'basic_blocks_" + std::to_string(sample_number) + ".txt'." << '\n';
     std::ofstream outputSMTFile("smt_queries/solver_query_basic_" + std::to_string(sample_number) + ".smt2");
     outputSMTFile << solver.to_smt2();
     outputSMTFile.close();
     if (solver.check() == z3::sat) {
         
         isFormulaSatisfiable = true;
-        std::cout << "SATISFIABLE" << std::endl;
+        logFile << "SATISFIABLE" << '\n';
         // usleep(50000000);
         z3::model m = solver.get_model();
         extractParametersFromModel(m, c);
         //print all version numbrs in the map versions to the console
-        std::cout << "Versions:\n";
+        logFile << "Versions:\n";
         for (const auto& version : versions) {
-            std::cout << version.first << ": " << version.second << std::endl;
+            logFile << version.first << ": " << version.second << '\n';
         }
         dumpVariableDefinitions("definitions/variable_definitions_" + std::to_string(sample_number) + ".c", m, c);
+        generateMainCode(basicBlocks, "main_code/generated_code_" + std::to_string(sample_number) + ".c", m, c);
         dumpChronologicalValuesToCSV("gold/chronological_values_" + std::to_string(sample_number) + ".csv", m, c, versions);
         generateStaticallyResolvableCode("static_inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, true);
-        generateStaticallyResolvableCode("inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, true);
+        generateStaticallyResolvableCode("inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, false);
         //dump model to a file
         std::ofstream modelFile("models/model_" + std::to_string(sample_number) + ".txt");
-        modelFile << m << std::endl;
+        modelFile << m << '\n';
         modelFile.close();
-        std::cout << "Model has been written to 'model_" + std::to_string(sample_number) + ".txt'." << std::endl;
+        logFile << "Model has been written to 'model_" + std::to_string(sample_number) + ".txt'." << '\n';
     } else {
-        std::cout << "UNSATISFIABLE" << std::endl;
-
-        // std::cout << "Solver output:\n" << solver.to_smt2() << std::endl;
-        //output the generated code to a file
+        logFile << "UNSATISFIABLE" << '\n';
         generateErrorCode("error/error_code_" + std::to_string(sample_number) + ".c", basicBlocks, versions, c);
-        std::cout << "Generated code has been written to 'stat_resolvable.c'." << std::endl;
+        logFile << "Generated code has been written to 'stat_resolvable.c'." << '\n';
         exit(1);
     }
-    z3::expr_vector assertions = solver.assertions();
-    std::cout << "Method 1 - Z3 assertions:\n" << assertions << std::endl;
+    // z3::expr_vector assertions = solver.assertions();
+    // logFile << "Method 1 - Z3 assertions:\n" << assertions << '\n';
     for(auto x: sample_walk)
     {
-        std::cout<<x<<", ";
+        logFile<<x<<", ";
     }
-    std::ofstream outputFile("main_code/generated_code_" + std::to_string(sample_number) + ".c");
-    outputFile << "#include <stdio.h>\n\n";
-    for (int i = 0; i < NUM_VARS; ++i)
-    {
-        outputFile << "extern int var_" << i << ";\n";
-    }
-    outputFile << "\n";
-    outputFile << "int main() {\n";
-
-    for (auto bb : basicBlocks) {
-        outputFile << bb.generateCode() << std::endl;
-    }
-    outputFile << "}\n";
-    outputFile.close();
     // Dump the generated code to a file
-    std::cout << "C code has been generated and written to 'generated_code.c'." << std::endl;
+    logFile << "C code has been generated and written to 'generated_code.c'." << '\n';
     return 0;
 }

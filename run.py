@@ -4,27 +4,30 @@ import signal
 
 def run_with_timeout(executable, number, timeout=60):
     try:
-        process = subprocess.Popen([executable, str(number)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        #link stdout to stdout of run.py
+        process = subprocess.Popen([executable, str(number)])
         start_time = time.time()
+        isProcessCompleted = False
+        exit_code = None
         while time.time() - start_time < timeout:
             if process.poll() is not None: 
-                print("Process completed successfully.")
+                isProcessCompleted = True
+                print("Process completed.")
                 exit_code = process.returncode
-                if exit_code != 1:
-                    print("Running ./link.sh" + str(number))
-                    process = subprocess.Popen(["./link.sh", str(number)])
-                    #close shell script after it finishes
-                    process.wait()
-                    print("Shell script completed successfully.")
-                else:
-                    print("Process failed with exit code:", exit_code)
-                return
-            time.sleep(1) 
-        print("Process timed out. Sending user interrupt (SIGINT).")
-        process.send_signal(signal.SIGINT)
-        process.wait()  # Ensure it properly terminates
-        exit_code = process.returncode
-        print(f"Process exited with code: {exit_code}")
+                break
+            time.sleep(1)
+        if(not isProcessCompleted):
+            print("Process timed out. Sending user interrupt (SIGINT).")
+            process.send_signal(signal.SIGINT)
+            process.wait()
+            exit_code = process.returncode
+            print(f"Process exited with code: {exit_code}")
+        else:
+            if exit_code != 1:
+                print("Running ./link.sh" + str(number))
+                process = subprocess.Popen(["./link.sh", str(number)])
+                process.wait()
+                print("Shell script completed successfully.")
     except Exception as e:
         print(f"Error occurred: {e}")
 counter = 0
