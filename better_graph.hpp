@@ -182,8 +182,6 @@ public:
     
                 // If the node had outdegree 2 and now has visited both, lock to the last one
                 if (neighbors.size() == 2 && visited_neighbors[current_node].size() == 2) {
-                    // auto it = visited_neighbors[current_node].begin();
-                    std::cout<<"Locked neighbor: "<<next_node<<" for node: "<<current_node<<std::endl;
                     locked_neighbor[current_node] = next_node; // Lock to the first visited neighbor
                 }
     

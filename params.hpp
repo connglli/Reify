@@ -2,6 +2,8 @@
 int NUM_VARS = 8;
 const int UPPER_BOUND = INT_MAX;
 const int LOWER_BOUND = INT_MIN;
+const int LOWER_INIT_BOUND = -100;
+const int UPPER_INIT_BOUND = 100;
 int ASSIGNMENTS_PER_BB = 2;
 int VARIABLES_PER_ASSIGNMENT_STATEMENT = 2;
 int NUM_VARIABLES_IN_CONDITIONAL = 2;
@@ -18,3 +20,4 @@ There will be no edge interleaving.
 const bool enableSafetyChecks = true;
 const bool enableInterestingCoefficients = true;
 const bool enableInterestingInitialisations = true;
+const bool enablePreInitialisations = true;

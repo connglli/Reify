@@ -133,7 +133,6 @@ z3::expr makeInitialisationsInteresting(z3::context& c)
     {
         allVars.push_back(c.int_const((getVarName(i)+ "_0").c_str()));
     }
-    //let's assign each variable a random value between -100 and 10
     return atMostKZeroes(c, allVars, NUM_VARS/2, 0);
 }
 class BB{
@@ -408,6 +407,11 @@ void extractParametersFromModel(z3::model &model, z3::context &ctx)
 
 }
 
+std::string variableInitialisationBlock(z3::model &model, z3::context &ctx, bool statMod = true) {
+    std::stringstream code;
+    //we assign random values between -100 and 100 to the version 0 of these variables in the solvers and then see if the model is satisfiable
+    for(int i = 0; )
+}
 void dumpVariableDefinitions(const std::string& filename, z3::model &model, z3::context &ctx) {
     std::ofstream outputFile(filename);
 

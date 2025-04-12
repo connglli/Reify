@@ -22,4 +22,4 @@ def instrument_basic_blocks(filename):
         f.writelines(output_lines)
 
 # Example usage:
-instrument_basic_blocks('small.c')
+instrument_basic_blocks('checkUB.c')
