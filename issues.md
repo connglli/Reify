@@ -1,0 +1,1 @@
+multiple initialisations: all coefficients are kind of the same :(

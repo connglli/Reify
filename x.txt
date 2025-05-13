@@ -1,0 +1,87 @@
+std::string generateCode(std::unordered_map<std::string, std::optional<int>> &local_parameters) const
+        {
+            std::ostringstream code;
+
+            // Generate the label for the basic block
+            code << generateLabelName(blockno) << ":\n";
+            if(needPassCounter)
+            {
+                code << generatePassCounterName(blockno) << "++;\n";
+            }
+            // code<< "    printf(\"starting off at "<<generateLabelName(blockno)<<"\\n\");\n";
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<int> dist(LOWER_BOUND, UPPER_BOUND);
+            int statementIndex = 0;
+            for (const auto& [varIndex, dependencies] : statementMappings)
+            {
+                code << "    " << getVarName(varIndex) << " = ";
+                for (size_t i = 0; i < dependencies.size(); ++i)
+                {
+                    // Look up the coefficient in the local_parameters map
+                    std::string coefficientKey = getCoefficientName(blockno, statementIndex, i);
+                    int coefficient;
+                    if (local_parameters.find(coefficientKey) != local_parameters.end() && local_parameters[coefficientKey].has_value())
+                    {
+                        coefficient = local_parameters[coefficientKey].value();
+                    }
+                    else
+                    {
+                        coefficient = dist(gen); 
+                        local_parameters[coefficientKey] = coefficient; // Store it in local_parameters
+                    }
+
+                    // Multiply the dependency by the coefficient
+                    code << coefficient << " * " << getVarName(dependencies[i]);
+                    if (i < dependencies.size() - 1)
+                    {
+                        code << " + "; // Example operation
+                    }
+                }
+
+                // Add a constant term
+                std::string constantKey = generateConstantName(blockno, statementIndex);
+                int constant;
+                if (local_parameters.find(constantKey) != local_parameters.end() && local_parameters[constantKey].has_value())
+                {
+                    constant = local_parameters[constantKey].value();
+                }
+                else
+                {
+                    constant = dist(gen); 
+                    local_parameters[constantKey] = constant; 
+                }
+                code << " + " << constant << ";\n";
+
+                ++statementIndex;
+            }
+            if(needPassCounter)
+            {
+                for(auto passCounterValue: passCounterValues)
+                {
+                    code << "    if(" << generatePassCounterName(blockno) << " == " << passCounterValue.first << " && " << generateWalkTypeVariable() << " == " << passCounterValue.second << ") goto " << generateLabelName(NODES - 1) << ";\n";
+                }
+            }
+            if(blockTargets.size() > 1)
+            {
+                code << generateConditionalConstraint(blockno, blockTargets[0], conditionalVariables, local_parameters);
+                code << generateUnconditionalGoto(blockTargets[1]);
+            }
+            else if(blockTargets.size() == 1)
+            {
+                code << generateUnconditionalGoto(blockTargets[0]);
+            }
+            else 
+            {
+                code << "    computeChecksum(";
+                for (int i = 0; i < NUM_VARS; ++i) {
+                    code << getVarName(i);
+                    if (i < NUM_VARS - 1) {
+                        code << ",";
+                    }
+                }
+                code << ");\n";
+                
+            }
+            return code.str();
+        }

@@ -1,0 +1,7 @@
+> rebuild compiler with new configuration flags
+> keep testing random initialisation
+> configure stuff on more servers
+> set up bisection workflow
+> integrate interprocedures and checksums
+> bitshift and operation level safety wrappers
+> don't freak out

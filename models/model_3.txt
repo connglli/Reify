@@ -1,0 +1,90 @@
+(define-fun var_12_2 () Int
+  (- 2147483648))
+(define-fun var_2_0 () Int
+  375)
+(define-fun a_29_0 () Int
+  (- 2146629360))
+(define-fun a_9_0_1 () Int
+  (- 1))
+(define-fun b_3_0_3 () Int
+  (- 1))
+(define-fun var_3_0 () Int
+  894)
+(define-fun a_0_0 () Int
+  (- 2147321909))
+(define-fun b_9_0_2 () Int
+  (- 1024))
+(define-fun a_3_0_1 () Int
+  (- 3))
+(define-fun var_4_0 () Int
+  997)
+(define-fun b_3_29 () Int
+  173196)
+(define-fun var_2_1 () Int
+  53896)
+(define-fun b_9_0_1 () Int
+  (- 1024))
+(define-fun var_1_0 () Int
+  (- 6))
+(define-fun var_12_1 () Int
+  (- 1336))
+(define-fun var_5_0 () Int
+  729)
+(define-fun a_28_0 () Int
+  (- 1))
+(define-fun b_3_0_1 () Int
+  (- 1))
+(define-fun var_8_1 () Int
+  (- 2147483648))
+(define-fun var_6_0 () Int
+  170)
+(define-fun a_3_0 () Int
+  (- 2147483281))
+(define-fun b_9_3 () Int
+  1482434)
+(define-fun var_7_0 () Int
+  851)
+(define-fun a_3_0_0 () Int
+  (- 6))
+(define-fun a_29_0_1 () Int
+  (- 2))
+(define-fun b_3_0_0 () Int
+  (- 1))
+(define-fun var_8_0 () Int
+  871)
+(define-fun var_9_0 () Int
+  158)
+(define-fun b_9_0_0 () Int
+  (- 1))
+(define-fun a_29_0_0 () Int
+  (- 1024))
+(define-fun a_9_0 () Int
+  (- 33))
+(define-fun a_9_0_0 () Int
+  (- 1))
+(define-fun var_10_0 () Int
+  400)
+(define-fun var_11_0 () Int
+  178)
+(define-fun b_3_0_2 () Int
+  (- 1024))
+(define-fun var_12_0 () Int
+  (- 53))
+(define-fun b_9_0_3 () Int
+  (- 1))
+(define-fun a_28_0_0 () Int
+  (- 1))
+(define-fun var_13_0 () Int
+  452)
+(define-fun a_28_0_1 () Int
+  (- 1024))
+(define-fun a_0_0_1 () Int
+  (- 1024))
+(define-fun a_0_0_0 () Int
+  (- 1))
+(define-fun var_14_0 () Int
+  (- 437))
+(define-fun var_0_0 () Int
+  (- 406))
+(define-fun var_0_1 () Int
+  (- 2147483647))

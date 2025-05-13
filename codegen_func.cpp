@@ -37,13 +37,21 @@ std::vector<int> sampleKDistinct(int n, int k) {
     return std::vector<int>(numbers.begin(), numbers.begin() + k);
 }
 //MOTIVATION: We need to generate a pass counter name for the block in case we end up in a consistent walk with a loop which never reaches the end node
-std::string generatePassCounterName()
+std::string generatePassCounterName(int blockno)
 {
-    return "pass_counter";
+    return "pass_counter_" + std::to_string(blockno);
+}
+std::string generateWalkTypeVariable()
+{
+    return "walk_type";
 }
 std::string getVarName(int varIndex)
 {
     return "var_" + std::to_string(varIndex);
+}
+std::string getVarNameForWalk(int walk_init_index, int varIndex)
+{
+    return "var_" + std::to_string(varIndex) + "_walk_" + std::to_string(walk_init_index);
 }
 std::string getCoefficientName(int blockno, int statementIndex, int statementSubIndex)
 {
@@ -127,7 +135,7 @@ z3::expr makeCoefficientsInteresting(const std::vector<z3::expr>& coeffs, z3::co
     }
     return atMostKZeroes(c, coeffs, coeffs.size()/2, 0);
 }
-z3::expr addRandomInitialisations(z3::context& c)
+z3::expr addRandomInitialisations(int walk_init_index, z3::context& c)
 {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -136,16 +144,16 @@ z3::expr addRandomInitialisations(z3::context& c)
     z3::expr allAssignedConstraint = c.bool_val(true);
     for (int i = 0; i < NUM_VARS; i++) 
     {
-        allVars.push_back(c.int_const((getVarName(i)+ "_0").c_str()));
+        allVars.push_back(c.int_const((getVarNameForWalk(walk_init_index, i)+ "_0").c_str()));
         z3::expr randomInit = c.bool_val(true);
-        if (parameters.find(getVarName(i)) != parameters.end() && parameters[getVarName(i)].has_value())
+        if (parameters.find(getVarNameForWalk(walk_init_index, i)) != parameters.end() && parameters[getVarNameForWalk(walk_init_index, i)].has_value())
         {
-            randomInit = (allVars[i] == parameters[getVarName(i)].value());
+            randomInit = (allVars[i] == parameters[getVarNameForWalk(walk_init_index, i)].value());
         }
         else
         {
             int randomValue = dist(gen);
-            parameters[getVarName(i)] = randomValue;
+            parameters[getVarNameForWalk(walk_init_index, i)] = randomValue;
             randomInit = (allVars[i] == randomValue);
         }
         allAssignedConstraint = allAssignedConstraint && randomInit;
@@ -162,7 +170,7 @@ z3::expr boundCoefficients(z3::context& c, const std::vector<z3::expr>& coeffs)
     }
     return allAssignedConstraint;
 }
-z3::expr makeInitialisationsInteresting(z3::context& c)
+z3::expr makeInitialisationsInteresting(z3::context& c, int walk_init_index)
 {
     if(!enableInterestingInitialisations)
     {
@@ -171,7 +179,7 @@ z3::expr makeInitialisationsInteresting(z3::context& c)
     std::vector<z3::expr> allVars;
     for (int i = 0; i < NUM_VARS; i++) 
     {
-        allVars.push_back(c.int_const((getVarName(i)+ "_0").c_str()));
+        allVars.push_back(c.int_const((getVarNameForWalk(walk_init_index, i)+ "_0").c_str()));
     }
     //let's assign each variable a random value between -100 and 10
     return atMostKZeroes(c, allVars, NUM_VARS/2, 0);
@@ -185,7 +193,7 @@ class BB{
     std::vector<BasicBlockNo> blockTargets;
     std::vector<VarIndex> conditionalVariables;
     bool needPassCounter = false;
-    int passCounterValue = 0;
+    std::vector<std::pair<int, int>> passCounterValues;
     public:
         BB(BasicBlockNo blockno, const std::set<BasicBlockNo>& graphTargets) : blockno(blockno), needPassCounter(false)
         {
@@ -252,10 +260,10 @@ class BB{
                 parameters[constantKey] = std::nullopt;
             }
         }
-        void setPassCounter(int value)
+        void setPassCounter(int value, int walkno)
         {
             needPassCounter = true;
-            passCounterValue = value;
+            passCounterValues.push_back(std::make_pair(value, walkno));
         }
         std::string generateCode() const
         {
@@ -265,7 +273,7 @@ class BB{
             code << generateLabelName(blockno) << ":\n";
             if(needPassCounter)
             {
-                code << generatePassCounterName() << "++;\n";
+                code << generatePassCounterName(blockno) << "++;\n";
             }
             // code<< "    printf(\"starting off at "<<generateLabelName(blockno)<<"\\n\");\n";
             std::random_device rd;
@@ -316,10 +324,10 @@ class BB{
             }
             if(needPassCounter)
             {
-                code << "    if(" << generatePassCounterName() << " >= " << passCounterValue << ")\n";
-                code << "    {\n";
-                code << "        goto " << generateLabelName(NODES - 1) << ";\n";
-                code << "    }\n";
+                for(auto passCounterValue: passCounterValues)
+                {
+                    code << "    if(" << generatePassCounterName(blockno) << " == " << passCounterValue.first << " && " << generateWalkTypeVariable() << " == " << passCounterValue.second << ") goto " << generateLabelName(NODES - 1) << ";\n";
+                }
             }
             if(blockTargets.size() > 1)
             {
@@ -332,28 +340,22 @@ class BB{
             }
             else 
             {
-                code << "    printf(\"";
+                code << "    computeChecksum(";
                 for (int i = 0; i < NUM_VARS; ++i) {
-                    code << "%d";
+                    code << getVarName(i);
                     if (i < NUM_VARS - 1) {
                         code << ",";
                     }
                 }
-                code << "\", ";
-                for (int i = 0; i < NUM_VARS; ++i) {
-                    code << getVarName(i);
-                    if (i < NUM_VARS - 1) {
-                        code << ", ";
-                    }
-                }
                 code << ");\n";
-                code << "    return 0;\n";
+                
             }
             return code.str();
         }
-        void generateConstraints(int target,  z3::solver& solver, z3::context& c, std::unordered_map<std::string, int>& versions)
+        z3::expr generateConstraints(int target,  z3::solver& solver, z3::context& c, std::unordered_map<std::string, int>& versions, int walk_init_index)
         {
             //check if all subexpressions are free of Undefined Behaviour
+            z3::expr finalGeneratedConstraint = c.bool_val(true);
             int statementIndex = 0;
             for (const auto& [varIndex, dependencies] : statementMappings)
             {
@@ -363,34 +365,50 @@ class BB{
                 std::vector<z3::expr> coeffs;
                 for (int i = 0; i < dependencies.size(); i++)
                 {
-                    vars.push_back(c.int_const((getVarName(dependencies[i]) + "_" + std::to_string(versions[getVarName(dependencies[i])])).c_str()));
-                    solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
+                    vars.push_back(c.int_const((getVarNameForWalk(walk_init_index, dependencies[i]) + "_" + std::to_string(versions[getVarNameForWalk(walk_init_index,dependencies[i])])).c_str()));
+                    // solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
+                    finalGeneratedConstraint = finalGeneratedConstraint && (vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
                     coeffs.push_back(c.int_const((getCoefficientName(blockno, statementIndex, i)).c_str()));
                     parameters[getCoefficientName(blockno, statementIndex, i)] = std::nullopt;
                     terms.push_back(coeffs.back() * vars.back()); // a_i * var_i
                 }
-                solver.add(boundCoefficients(c, coeffs));
+                // solver.add(boundCoefficients(c, coeffs));
+                finalGeneratedConstraint = finalGeneratedConstraint && boundCoefficients(c, coeffs);
                 terms.push_back(c.int_const((generateConstantName(blockno, statementIndex)).c_str()));
                 parameters[generateConstantName(blockno, statementIndex)] = std::nullopt;
                 coeffs.push_back(c.int_const((generateConstantName(blockno, statementIndex)).c_str()));
-                solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
+                // solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
+                finalGeneratedConstraint = finalGeneratedConstraint && (coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                 z3::expr sum = terms[0];
                 z3::expr term_constraint = (terms[0] <= UPPER_BOUND) && (terms[0] >= LOWER_BOUND);
                 if(enableSafetyChecks) solver.add(term_constraint);
                 for (int i = 1; i < terms.size(); i++) {
                     z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-                    if(enableSafetyChecks) solver.add(constraint);
+                    if(enableSafetyChecks) {
+                        // solver.add(constraint);
+                        finalGeneratedConstraint = finalGeneratedConstraint && constraint;
+                    }
                     sum = sum + terms[i];
                     term_constraint = (terms[i] <= UPPER_BOUND) && (terms[i] >= LOWER_BOUND);
-                    if(enableSafetyChecks) solver.add(term_constraint);
+                    if(enableSafetyChecks) {
+                        // solver.add(term_constraint);
+                        finalGeneratedConstraint = finalGeneratedConstraint && term_constraint;
+                    }
                 }
                 z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-                if(enableSafetyChecks) solver.add(constraint);
-                versions[getVarName(varIndex)]++;
-                z3::expr assignment = c.int_const((getVarName(varIndex) + "_" + std::to_string(versions[getVarName(varIndex)])).c_str());
+                if(enableSafetyChecks) 
+                {
+                    // solver.add(constraint);
+                    finalGeneratedConstraint = finalGeneratedConstraint && constraint;
+                }
+
+                versions[getVarNameForWalk(walk_init_index,varIndex)]++;
+                z3::expr assignment = c.int_const((getVarNameForWalk(walk_init_index,varIndex) + "_" + std::to_string(versions[getVarNameForWalk(walk_init_index,varIndex)])).c_str());
                 constraint = (assignment == sum);
-                solver.add(constraint);
-                solver.add(makeCoefficientsInteresting(coeffs, c));
+                // solver.add(constraint);
+                finalGeneratedConstraint = finalGeneratedConstraint && constraint;
+                // solver.add(makeCoefficientsInteresting(coeffs, c));
+                finalGeneratedConstraint = finalGeneratedConstraint && makeCoefficientsInteresting(coeffs, c);
                 statementIndex++;
             }
             //now, we need to generate the conditional constraint
@@ -404,32 +422,49 @@ class BB{
                 int ctr = 0;
                 for(auto i: conditionalVariables)
                 {
-                    vars.push_back(c.int_const((getVarName(i) + "_" + std::to_string(versions[getVarName(i)])).c_str()));
-                    solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
+                    vars.push_back(c.int_const((getVarNameForWalk(walk_init_index,i) + "_" + std::to_string(versions[getVarNameForWalk(walk_init_index,i)])).c_str()));
+                    // solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
+                    finalGeneratedConstraint = finalGeneratedConstraint && (vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
                     coeffs.push_back(c.int_const((generateConditionalCoefficientName(blockno, 0, ctr)).c_str()));
                     // solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                     parameters[generateConditionalCoefficientName(blockno, 0, ctr)] = std::nullopt;
                     terms.push_back(coeffs.back() * vars.back()); 
                     ++ctr;
                 }
-                solver.add(boundCoefficients(c, coeffs));
-                solver.add(makeCoefficientsInteresting(coeffs, c));
+                // solver.add(boundCoefficients(c, coeffs));
+                // solver.add(makeCoefficientsInteresting(coeffs, c));
+                finalGeneratedConstraint = finalGeneratedConstraint && boundCoefficients(c, coeffs);
+                finalGeneratedConstraint = finalGeneratedConstraint && makeCoefficientsInteresting(coeffs, c);
                 terms.push_back(c.int_const((generateConditionalConstantName(blockno, blockTargets[0])).c_str()));
                 parameters[generateConditionalConstantName(blockno, blockTargets[0])] = std::nullopt;
                 coeffs.push_back(c.int_const((generateConditionalConstantName(blockno, blockTargets[0])).c_str()));
-                solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
+                // solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
+                finalGeneratedConstraint = finalGeneratedConstraint && (coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
                 z3::expr sum = terms[0];
                 z3::expr term_constraint = (terms[0] <= UPPER_BOUND) && (terms[0] >= LOWER_BOUND);
-                if(enableSafetyChecks) solver.add(term_constraint);
+                if(enableSafetyChecks) {
+                    // solver.add(term_constraint);
+                    finalGeneratedConstraint = finalGeneratedConstraint && term_constraint;
+                }
                 for (int i = 1; i < terms.size(); i++) {
                     z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-                    if(enableSafetyChecks) solver.add(constraint);
+                    if(enableSafetyChecks) 
+                    {
+                        // solver.add(constraint);
+                        finalGeneratedConstraint = finalGeneratedConstraint && constraint;
+                    }
                     sum = sum + terms[i];
                     term_constraint = (terms[i] <= UPPER_BOUND) && (terms[i] >= LOWER_BOUND);
-                    if(enableSafetyChecks) solver.add(term_constraint);
+                    if(enableSafetyChecks) {
+                        // solver.add(term_constraint);
+                        finalGeneratedConstraint = finalGeneratedConstraint && term_constraint;
+                    }
                 }
                 z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-                if(enableSafetyChecks) solver.add(constraint);
+                if(enableSafetyChecks) {
+                    // solver.add(constraint);
+                    finalGeneratedConstraint = finalGeneratedConstraint && constraint;
+                }
                 if(target == blockTargets[0])
                 {
                     constraint = (sum >= 0);
@@ -438,9 +473,13 @@ class BB{
                 {
                     constraint = (sum < 0);
                 }
-                solver.add(constraint);
+
+                // solver.add(constraint);
+                finalGeneratedConstraint = finalGeneratedConstraint && constraint;
             }
+            return finalGeneratedConstraint;
         }
+
 };
 
 void extractParametersFromModel(z3::model &model, z3::context &ctx)
@@ -466,172 +505,80 @@ void extractParametersFromModel(z3::model &model, z3::context &ctx)
     }
 
 }
-
-void dumpVariableDefinitions(const std::string& filename, z3::model &model, z3::context &ctx) {
-    std::ofstream outputFile(filename);
-
-    // Add necessary includes
-    outputFile << "#include <stdio.h>\n\n";
-
-    // Declare and define variables
-    for (int i = 0; i < NUM_VARS; ++i) {
-        std::string varName = "var_" + std::to_string(i) + "_0";
-        outputFile << "int var_" << i << " = ";
-
-        // Query the Z3 model for the variable's value
-        z3::expr varExpr = ctx.int_const(varName.c_str());
-        if (model.has_interp(varExpr.decl())) {
-            z3::expr value = model.get_const_interp(varExpr.decl());
-            if (value.is_numeral()) {
-                int intValue;
-                if (Z3_get_numeral_int(ctx, value, &intValue)) {
-                    outputFile << intValue << "; // Initial value from Z3 model\n";
-                } else {
-                    outputFile << "0; // Default value (failed to extract value)\n";
-                }
-            } else {
-                outputFile << "0; // Default value (non-numeral value)\n";
-            }
-        } else {
-            outputFile << "0; // Default value (not in model)\n";
-        }
-    }
-    outputFile << "int "<< generatePassCounterName() << " = 0;\n";
-    outputFile << "\n";
-    outputFile.close();
-    logFile << "Variable definitions have been written to '" << filename << "'." << '\n';
-}
-void dumpChronologicalValuesToCSV(const std::string& filename, z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions) {
-    std::ofstream outputFile(filename);
-    // Query the Z3 model for the values of the variables in chronological order
-    for (int i = 0; i < NUM_VARS; ++i) {
-        int version = 0;
-        try{
-            version = versions.at("var_" + std::to_string(i));
-        }
-        catch(const std::out_of_range& e)
-        {
-            version = 0;
-        }
-        std::string varName = "var_" + std::to_string(i) + "_" + std::to_string(version);
-
-        // Query the Z3 model for the variable's value
-        z3::expr varExpr = ctx.int_const(varName.c_str());
-        if (model.has_interp(varExpr.decl())) {
-            z3::expr value = model.get_const_interp(varExpr.decl());
-            if (value.is_numeral()) {
-                int intValue;
-                if (Z3_get_numeral_int(ctx, value, &intValue)) {
-                    outputFile << intValue; // Write the value to the CSV
-                } else {
-                    outputFile << "ERROR"; // Failed to extract value
-                }
-            } else {
-                outputFile << "NON_NUMERAL"; // Non-numeral value
-            }
-        } else {
-            outputFile << "NOT_IN_MODEL"; // Variable not in the model
-        }
-
-        // Add a comma if it's not the last variable
-        if (i < NUM_VARS - 1) {
-            outputFile << ",";
-        }
-    }
-    outputFile.close();
-    logFile << "Chronological values have been written to '" << filename << "'." << '\n';
-}
-void generateStaticallyResolvableCode(const std::string& filename, const std::vector<BB>& basicBlocks, const std::unordered_map<std::string, int>& versions, z3::model &model, z3::context &ctx, bool statMod = true) {
-    std::ofstream outputFile(filename);
-
-    // Add necessary includes
-    outputFile << "#include <stdio.h>\n\n";
-
-    // Declare and define variables
-    for (int i = 0; i < NUM_VARS; ++i) {
-        std::string varName = "var_" + std::to_string(i) + "_0";
-        if(statMod)
-        {
-            outputFile << "static ";
-        }
-        outputFile << "int var_" << i << " = ";
-
-        // Query the Z3 model for the variable's value
-        z3::expr varExpr = ctx.int_const(varName.c_str());
-        if (model.has_interp(varExpr.decl())) {
-            z3::expr value = model.get_const_interp(varExpr.decl());
-            if (value.is_numeral()) {
-                int intValue;
-                if (Z3_get_numeral_int(ctx, value, &intValue)) {
-                    outputFile << intValue << "; // Initial value from Z3 model\n";
-                } else {
-                    outputFile << "0; // Default value (failed to extract value)\n";
-                }
-            } else {
-                outputFile << "0; // Default value (non-numeral value)\n";
-            }
-        } else {
-            outputFile << "0; // Default value (not in model)\n";
-        }
-    }
-    outputFile << "\n";
-    if(statMod)
-    {
-        outputFile << "static ";
-    }
-    outputFile << "int " << generatePassCounterName() << " = 0;\n";
-    outputFile << "int main() {\n";
-    // Generate the code for each basic block
-    for (const auto& bb : basicBlocks) {
-        outputFile << bb.generateCode() << '\n';
-    }
-    outputFile << "}\n";
-    outputFile.close();
-    logFile << "Statically resolvable code has been written to '" << filename << "'." << '\n';
-}
-void generateErrorCode(const std::string& filename, const std::vector<BB>& basicBlocks, const std::unordered_map<std::string, int>& versions, z3::context &ctx) {
-    std::ofstream outputFile(filename);
-
-    // Add necessary includes
-    outputFile << "#include <stdio.h>\n\n";
-
-    // Declare and define variables
-    for (int i = 0; i < NUM_VARS; ++i) {
-        std::string varName = "var_" + std::to_string(i) + "_0";
-        outputFile << "static int var_" << i << " = 0;\n"; // Default value
-
-        // Query the Z3 model for the variable's value
-    }
-    outputFile << "\n";
-    outputFile << "int main() {\n";
-    // Generate the code for each basic block
-    for (const auto& bb : basicBlocks) {
-        outputFile << bb.generateCode() << '\n';
-    }
-    outputFile << "}\n";
-    outputFile.close();
-}
-
-void generateMainCode(std::vector<BB> basicBlocks, const std::string& filename, z3::model &model, z3::context &ctx)
+z3::expr getAllNonVariablesFromModel(z3::model &model, z3::context &ctx)
 {
-    // std::ofstream outputFile("main_code/generated_code_" + std::to_string(sample_number) + ".c");
-    std::ofstream outputFile(filename);
-    outputFile << "#include <stdio.h>\n\n";
-    for (int i = 0; i < NUM_VARS; ++i)
-    {
-        outputFile << "extern int var_" << i << ";\n";
+    z3::expr fixAllNonVariables = ctx.bool_val(true);
+    for (const auto& param : parameters) {
+        const std::string& name = param.first;
+        if(name.substr(0, 3) == "var" || name.substr(0, 4) == "init")
+        {
+            continue;
+        }
+        if (model.has_interp(ctx.int_const(name.c_str()).decl())) {
+            z3::expr value = model.get_const_interp(ctx.int_const(name.c_str()).decl());
+            fixAllNonVariables = fixAllNonVariables && (ctx.int_const(name.c_str()) == value);
+        }
     }
-    outputFile << "extern int " << generatePassCounterName() << ";\n";
-    outputFile << "\n";
-    outputFile << "int main() {\n";
+    return fixAllNonVariables;
+}
 
-    for (auto bb : basicBlocks) {
-        outputFile << bb.generateCode() << '\n';
+
+void dumpCodeToFile(std::vector<BB> basicBlocks, const std::string& filename, const std::string& code, const std::vector<std::vector<int>> &initialisations) 
+{
+    std::ofstream outputFile(filename);
+    // first let's define a function that computes a checksum over var_1, var_2, ..., var_n where n is the number of variables
+    outputFile << "#include <stdio.h>\n";
+    outputFile << "#include <stdint.h>\n";
+    outputFile << "const int mod = 1000000007;\n";
+    outputFile << "static uint32_t crc32_tab[256];\nstatic uint32_t crc32_context = 0xFFFFFFFFUL;\nstatic void crc32_gentab (void)\n{\tuint32_t crc;\tconst uint32_t poly = 0xEDB88320UL;\tint i, j;\n\tfor (i = 0; i < 256; i++) {\t\tcrc = i;\t\tfor (j = 8; j > 0; j--) {\t\t\tif (crc & 1) {\t\t\t\tcrc = (crc >> 1) ^ poly;\t\t\t} else {\t\t\t\tcrc >>= 1;\t\t\t}\t\t}\t\tcrc32_tab[i] = crc;\t}\n}\n\nstatic void crc32_byte (uint8_t b) {\tcrc32_context = ((crc32_context >> 8) & 0x00FFFFFF) ^ crc32_tab[(crc32_context ^ b) & 0xFF];\n}\n\nstatic void crc32_4bytes (uint32_t val)\n{\tcrc32_byte ((val>>0) & 0xff);\tcrc32_byte ((val>>8) & 0xff);\tcrc32_byte ((val>>16) & 0xff);\tcrc32_byte ((val>>24) & 0xff);\n}\n";
+    outputFile << "void computeChecksum(\n";
+    for(int i = 0; i < NUM_VARS; i++)
+    {
+        outputFile << "int " << getVarName(i);
+        if(i != NUM_VARS - 1)
+        {
+            outputFile << ", ";
+        }
+    }
+    outputFile << ")\n";
+    outputFile << "{\n";
+    //unroll the loop for computing checksum
+    for(int i = 0; i < NUM_VARS; i++)
+    {
+        outputFile << "    crc32_4bytes(" << getVarName(i) << ");\n";
     }
     outputFile << "}\n";
-    outputFile.close();
+    outputFile <<  "void gotoFunction(";
+    for(int i = 0; i < NUM_VARS; i++)
+    {
+        outputFile << "int " << getVarName(i);
+        
+            outputFile << ", ";
+    }
+    outputFile << "int walk_type)\n";
+    outputFile << "{\n";
+    for (int i = 0; i < NODES; i++) {
+        outputFile << "    " << basicBlocks[i].generateCode();
+    }
+    outputFile << "}\n";
+    outputFile << "int main() {\n";
+    outputFile << "crc32_gentab();\n";
+    for(int i = 0; i < initialisations.size(); i++)
+    {
+        outputFile << "gotoFunction(";
 
-}
+        for(int j = 0; j < NUM_VARS; j++)
+        {
+            outputFile << initialisations[i][j] << ", ";
+        }
+        outputFile << i << ");\n";
+    }
+    outputFile << "    printf(\"%d\", crc32_context);\n";
+    outputFile << "    return 0;\n";
+    outputFile << "}\n";
+    outputFile.close();
+    logFile << "Code has been written to " << filename << '\n';    
+    }
 //write a signal handler to handle SIGINT and SIGTERM signals
 void signalHandler(int signum) {
     logFile << "Interrupt signal (" << signum << ") received.\n";
@@ -650,6 +597,45 @@ void sigKillHandler(int signum) {
         logFile << "Exiting ON SIGKILL..." << '\n';
         logFile.close();
         exit(signum);
+}
+std::string generateInitialisationName(int walk_ctr, int initialisation_ctr, int var_index)
+{
+    return "init_" + std::to_string(walk_ctr) + "_" + std::to_string(initialisation_ctr) + "_" + std::to_string(var_index);
+}
+z3::expr generateInitialisationEqualityConstraints(int walk_ctr, int initialisation_ctr, z3::context& c)
+{
+    int walk_init_index = walk_ctr * NUMBER_OF_INITIALISATIONS_OF_EACH_WALK + initialisation_ctr;
+    z3::expr allAssignedConstraint = c.bool_val(true);
+    for (int i = 0; i < NUM_VARS; i++) 
+    {
+        allAssignedConstraint = allAssignedConstraint && (c.int_const((getVarNameForWalk(walk_init_index, i)+ "_0").c_str()) == c.int_const((generateInitialisationName(walk_ctr, initialisation_ctr, i)).c_str()));
+        parameters[generateInitialisationName(walk_ctr, initialisation_ctr, i)] = std::nullopt;
+    }
+    return allAssignedConstraint;
+}
+z3::expr generateInitialisationBoundnessConstraints(int walk_ctr, int initialisation_ctr, z3::context& c)
+{
+    z3::expr allAssignedConstraint = c.bool_val(true);
+    for (int i = 0; i < NUM_VARS; i++) 
+    {
+        z3::expr boundedValue =  c.int_const((generateInitialisationName(walk_ctr, initialisation_ctr, i)).c_str());
+        allAssignedConstraint = allAssignedConstraint && (boundedValue >= LOWER_INIT_BOUND && boundedValue <= UPPER_INIT_BOUND);
+    }
+    return allAssignedConstraint;
+}
+z3::expr generateDifferentInitialisationConstraints(int walk_ctr, int initialisation_ctr_1, int initialisation_ctr_2, z3::context& c)
+{
+    //there should be atlease NUM_VAR/2 variables which are not equal in both initialisations
+
+    std::vector<z3::expr> differentInitialisationConstraints;
+    for (int i = 0; i < NUM_VARS; i++) 
+    {
+        z3::expr boundedValue1 =  c.int_const((generateInitialisationName(walk_ctr, initialisation_ctr_1, i)).c_str());
+        z3::expr boundedValue2 =  c.int_const((generateInitialisationName(walk_ctr, initialisation_ctr_2, i)).c_str());
+        differentInitialisationConstraints.push_back(z3::ite(boundedValue1 != boundedValue2, c.int_val(1), c.int_val(0)));
+    }
+    z3::expr differentInitialisationConstraint = atMostKZeroes(c, differentInitialisationConstraints, min(2, NUM_VARS/2), 0);
+    return differentInitialisationConstraint;
 }
 int main(int argc, char** argv)
 {
@@ -680,136 +666,153 @@ int main(int argc, char** argv)
         BB bb(i, adjacency_list[i]);
         basicBlocks.push_back(bb);
     }
-    std::vector<int> sample_walk = {};
+    std::cout<<"generated graph successfully\n";
+
+    g.print_graph();
+
+    
+    std::vector<std::vector<int>> sample_walks = {};
     if(enableConsistentWalks)
     {
-        sample_walk = g.sample_consistent_walk(0, nodes - 1, 100);
+        sample_walks = g.get_k_distinct_walks(0, nodes - 1, NUMBER_OF_DISTINCT_WALKS);
     }
     else
     {
-        sample_walk = g.sample_walk(0, nodes - 1, 100);
+        sample_walks = g.get_k_distinct_consistent_walks(0, nodes - 1, NUMBER_OF_DISTINCT_WALKS);
     }
-    // g.print_graph();
-    if(sample_walk[sample_walk.size() - 1] != NODES - 1)
+    for (auto sample_walk : sample_walks)
     {
-        // modify the basic block at the end of the sample walk to have pass counter equal to the number of times that basic block has been visited
-        int passCounter = 0;
-        for(int i = 0; i < sample_walk.size(); i++)
+        logFile << "Sample walk: ";
+        for(auto x: sample_walk)
         {
-            if(sample_walk[i] == sample_walk[sample_walk.size() - 1])
-            {
-                passCounter++;
-            }
+            logFile << x<<", ";
         }
-        basicBlocks[sample_walk[sample_walk.size() - 1]].setPassCounter(passCounter);
-        parameters[generatePassCounterName()] = passCounter;
-        sample_walk.push_back(NODES - 1);
-        logFile << "Sample walk has been modified to end at the last node." << '\n';
+        logFile << std::endl;
     }
-    
+    int walk_ctr = 0;
+    for(auto& sample_walk: sample_walks)
+    {
+        if(sample_walk[sample_walk.size() - 1] != NODES - 1)
+        {
+            // modify the basic block at the end of the sample walk to have pass counter equal to the number of times that basic block has been visited
+            int passCounter = 0;
+            for(int i = 0; i < sample_walk.size(); i++)
+            {
+                if(sample_walk[i] == sample_walk[sample_walk.size() - 1])
+                {
+                    passCounter++;
+                }
+            }
+            basicBlocks[sample_walk[sample_walk.size() - 1]].setPassCounter(passCounter, walk_ctr);
+            parameters[generatePassCounterName(sample_walk[sample_walk.size() - 1])] = passCounter;
+            sample_walk.push_back(NODES - 1);
+            logFile << "Sample walk has been modified to end at the last node." << '\n';
+        }
+        walk_ctr++;
+    }
+    std::cout<<"generated sample walks successfully\n";
     z3::context c;
     z3::solver solver(c);
-    solver.add(makeInitialisationsInteresting(c));
-    if(enableRandomInitialisations)
-    {
-        solver.add(addRandomInitialisations(c));
-    }
-    std::unordered_map<std::string, int> versions;
-    for(int i = 0; i < sample_walk.size() - 1; i++)
-    {
-        int current_bb = sample_walk[i];
-        int next_bb = sample_walk[i + 1];
-        basicBlocks[current_bb].generateConstraints(next_bb, solver, c, versions);
-    }
-    basicBlocks[sample_walk[sample_walk.size() - 1]].generateConstraints(-1, solver, c, versions);
-    //dump solver query yo another file
-    //dump graph and basic blocks to a file
-    // std::ofstream graphFile("graphs/graph_" + std::to_string(sample_number) + ".txt");
-    // for (int i = 0; i < nodes; i++) {
-    //     graphFile << i << ": ";
-    //     for (const auto& target : adjacency_list[i]) {
-    //         graphFile << target << ",";
-    //     }
-    //     graphFile << '\n';
-    // }
-    // graphFile.close();
-    // logFile << "Graph has been written to 'graph_" + std::to_string(sample_number) + ".txt'." << '\n';
-    //write sample_walk to a file
-    // std::ofstream sampleWalkFile("walks/sample_walk_" + std::to_string(sample_number) + ".txt");
-    // for (const auto& node : sample_walk) {
-    //     sampleWalkFile << node << ",";
-    // }
-    // sampleWalkFile << '\n';
-    // sampleWalkFile.close();
-    // std::ofstream basicBlocksFile("basic_blocks/basic_blocks_" + std::to_string(sample_number) + ".txt");
-    // logFile <<"Sample walk has been written to 'sample_walk_" + std::to_string(sample_number) + ".txt'." << '\n';
-    // basicBlocksFile << "Basic Blocks "<< '\n';
-    // for (const auto& bb : basicBlocks) {
-    //     basicBlocksFile << bb.blockno << ": ";
-    //     int statementIndex = 0;
-    //     for (const auto& [varIndex, dependencies] : bb.statementMappings) {
-    //         basicBlocksFile<<varIndex << " = ";
-    //         for (size_t i = 0; i < dependencies.size(); ++i) {
-    //             basicBlocksFile << getCoefficientName(bb.blockno, statementIndex, i) << " * " << getVarName(dependencies[i]);
-    //             if (i < dependencies.size() - 1) {
-    //                 basicBlocksFile << ","; // Example operation
-    //             }
-    //         }
-    //         ++statementIndex;
-    //         basicBlocksFile << "," << generateConstantName(bb.blockno, statementIndex) << ";" << '\n';
-    //     }
-    //     basicBlocksFile << "Conditional Variables: ";
-    //     for (const auto& var : bb.conditionalVariables) {
-    //         basicBlocksFile << var << ",";
-    //     }
-    //     basicBlocksFile << '\n';
-    //     basicBlocksFile << "Targets: ";
-    //     for (const auto& target : bb.blockTargets) {
-    //         basicBlocksFile<< target << ",";
-    //     }
-    //     basicBlocksFile << '\n';
-    //     basicBlocksFile << "Code: " << bb.generateCode() << '\n';
-    //     basicBlocksFile << '\n'; 
-    // }
-    // basicBlocksFile.close();
-    logFile << "Basic blocks have been written to 'basic_blocks_" + std::to_string(sample_number) + ".txt'." << '\n';
-    std::ofstream outputSMTFile("smt_queries/solver_query_basic_" + std::to_string(sample_number) + ".smt2");
-    outputSMTFile << solver.to_smt2();
-    outputSMTFile.close();
-    //
-    if (solver.check() == z3::sat) {
+    z3::expr previous_coefficients_constraint = c.bool_val(true);
+    z3::expr previous_initialisations_constraint = c.bool_val(true);
+    std::vector<std::vector<int>> initialisations;
+    walk_ctr = 0;
+    for (auto& sample_walk : sample_walks){
+        //add common constraints for all initialisations
         
-        isFormulaSatisfiable = true;
-        logFile << "SATISFIABLE" << '\n';
-        // usleep(50000000);
-        z3::model m = solver.get_model();
-        extractParametersFromModel(m, c);
-        //print all version numbrs in the map versions to the console
-        logFile << "Versions:\n";
-        for (const auto& version : versions) {
-            logFile << version.first << ": " << version.second << '\n';
+
+        // we now model initialisations as uninterpreted constants, and have a constrain like  (var_0 == init_0_0 && var_1 == init_0_1 && ... && var_n == init_0_n) => this_walk_taken_constraint
+        // where init_i_j is the initialisation of variable j in the ith sample walk
+        // we also need to add a constraint that the initialisation of each variable is between LOWER_INIT_BOUND and UPPER_INIT_BOUND
+        // and that the initialisation of each variable is not equal to 0
+        for(int i = 0; i< NUMBER_OF_INITIALISATIONS_OF_EACH_WALK; i++)
+        {   
+            std::unordered_map<std::string, int> versions;
+            int walk_init_index = walk_ctr * NUMBER_OF_INITIALISATIONS_OF_EACH_WALK + i;
+            z3::expr this_walk_taken_constraint = c.bool_val(true);
+            for(int j = 0; j < sample_walk.size() - 1; j++)
+            {
+                int current_bb = sample_walk[j];
+                int next_bb = sample_walk[j + 1];
+                this_walk_taken_constraint = this_walk_taken_constraint && basicBlocks[current_bb].generateConstraints(next_bb, solver, c, versions, walk_init_index);
+            }
+            this_walk_taken_constraint = this_walk_taken_constraint && basicBlocks[sample_walk[sample_walk.size() - 1]].generateConstraints(-1, solver, c, versions, walk_init_index); 
+            z3::expr antecedent_constraint = generateInitialisationBoundnessConstraints(walk_ctr, i, c) && generateInitialisationEqualityConstraints(walk_ctr, i, c);
+            solver.add(antecedent_constraint && this_walk_taken_constraint);
+            for(int j = i + 1; j < NUMBER_OF_INITIALISATIONS_OF_EACH_WALK; j++)
+            {
+                if(i != j)
+                {
+                    solver.add(generateDifferentInitialisationConstraints(walk_ctr, i, j, c));
+                }
+            }
         }
-        dumpVariableDefinitions("definitions/variable_definitions_" + std::to_string(sample_number) + ".c", m, c);
-        generateMainCode(basicBlocks, "main_code/generated_code_" + std::to_string(sample_number) + ".c", m, c);
-        dumpChronologicalValuesToCSV("gold/chronological_values_" + std::to_string(sample_number) + ".csv", m, c, versions);
-        generateStaticallyResolvableCode("static_inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, true);
-        generateStaticallyResolvableCode("inlinable/stat_resolvable_" + std::to_string(sample_number) + ".c", basicBlocks, versions, m, c, false);
-        //dump model to a file
-        std::ofstream modelFile("models/model_" + std::to_string(sample_number) + ".txt");
-        modelFile << m << '\n';
-        modelFile.close();
-        logFile << "Model has been written to 'model_" + std::to_string(sample_number) + ".txt'." << '\n';
+        walk_ctr++;
+    }
+    logFile << "Query:\n" << solver.assertions() << std::endl;
+
+    std::cout<<"added all constraints successfully\n";
+
+    //now check if the formula is satisfiable
+    if (solver.check() == z3::sat) {
+        isFormulaSatisfiable = true;
+        logFile << "Formula is satisfiable"<<std::endl;
+        z3::model model = solver.get_model();
+        extractParametersFromModel(model, c);
+        //print the model
+        // logFile << "Model:\n" << model << std::endl;
+        // logFile << "Query:\n" << solver.assertions() << std::endl;
+        // z3::expr fixAllNonVariables = getAllNonVariablesFromModel(model, c);
+        // z3::expr fixAllInitialVariables = getInitialVariablesFromModel(model, c);
+        // solver.add(fixAllNonVariables);
+        // solver.add(fixAllInitialVariables);
+        if (solver.check() == z3::sat) {
+            logFile << "Model is satisfiable\n";
+            model = solver.get_model();
+            extractParametersFromModel(model, c);
+            for(int i = 0; i < sample_walks.size(); i++)
+            {
+                for(int j = 0; j < NUMBER_OF_INITIALISATIONS_OF_EACH_WALK; j++)
+                {
+                    std::vector<int> initialisation;
+                    for(int k = 0; k < NUM_VARS; k++)
+                    {
+                        try{
+                            initialisation.push_back(parameters[generateInitialisationName(i, j, k)].value());
+                        }
+                        catch(const std::exception& e)
+                        {
+                            // logFile << "Error: " << e.what() << '\n';
+                            //push a random value between LOWER_INIT_BOUND and UPPER_INIT_BOUND
+                            std::random_device rd;
+                            std::mt19937 gen(rd());
+                            std::uniform_int_distribution<int> dist(LOWER_INIT_BOUND, UPPER_INIT_BOUND);
+                            initialisation.push_back(dist(gen));
+                        }
+                    }
+                    initialisations.push_back(initialisation);
+                }
+            }
+        }
     } else {
-        logFile << "UNSATISFIABLE" << '\n';
-        generateErrorCode("error/error_code_" + std::to_string(sample_number) + ".c", basicBlocks, versions, c);
-        logFile << "Generated code has been written to 'stat_resolvable.c'." << '\n';
+
+        logFile << "Formula is unsatisfiable\n";
+        logFile << "Query:\n" << solver.assertions() << std::endl;
         exit(1);
     }
+    // Dump the generated code to a file
+    std::string filename = "inlinable/generated_code_" + std::to_string(sample_number) + ".c";
+    dumpCodeToFile(basicBlocks, filename, "", initialisations);
     // z3::expr_vector assertions = solver.assertions();
     // logFile << "Method 1 - Z3 assertions:\n" << assertions << '\n';
-    for(auto x: sample_walk)
+    for (auto sample_walk : sample_walks)
     {
-        logFile << x<<", ";
+        logFile << "Sample walk: ";
+        for(auto x: sample_walk)
+        {
+            logFile << x<<", ";
+        }
+        logFile << '\n';
     }
     // Dump the generated code to a file
     logFile << "C code has been generated and written to 'generated_code.c'." << '\n';

@@ -194,6 +194,97 @@ public:
     
         return walk;
     }
+    std::vector<std::vector<int>> sample_k_disjoint_walks_and_backpatch_graph(int start, int end, int k) {
+        //k paths must only have the start and end node in common
+        //for others, we make random connections between the nodes in order to make them disjoint
+        std::vector<std::vector<int>> walks; 
+        int tries = 0;
+        std::set<int> non_visited_nodes;
+        for(int i = 0; i < nodes; i++)
+        {
+            non_visited_nodes.insert(i);
+        }
+        while (walks.size() < k && tries < 1000) {
+           
+            std::vector<int> walk ;
+            //let's sample a walk from the unvisited nodes
+            int current_node = start;
+            int num_nodes_in_walk = 0;
+            walk.push_back(current_node);
+            //look for a neighbour in the unvisited nodes, if not, then we create a new edge after arbitrarily choosing a node from the unvisited nodes
+            while(current_node != end || num_nodes_in_walk >= 50*nodes)
+            {
+                const std::set<int>& neighbors = adj[current_node];
+                //check if any of the current node's neighbours are in the unvisited nodes
+                std::set<int> unvisited_neighbors;
+                for(auto neighbor: neighbors)
+                {
+                    if(non_visited_nodes.find(neighbor) != non_visited_nodes.end())
+                    {
+                        unvisited_neighbors.insert(neighbor);
+                    }
+                }   
+                if(unvisited_neighbors.size() > 0)
+                {
+                    auto it = unvisited_neighbors.begin();
+                    std::advance(it, rand() % unvisited_neighbors.size()); // Random step
+                    current_node = *it;
+                }
+                else
+                {
+                    //choose a random node from the unvisited nodes
+                    auto it = non_visited_nodes.begin();
+                    std::advance(it, rand() % non_visited_nodes.size()); // Random step
+                    adj[current_node].insert(*it);
+                    current_node = *it;
+                }
+                walk.push_back(current_node);
+                num_nodes_in_walk++;
+            }
+            // remove all the nodes in the walk from the non_visited_nodes set
+            for(auto node: non_visited_nodes)
+            {
+                if(node != start && node != end)
+                {
+                    non_visited_nodes.erase(node);
+                }
+            }
+            //add the walk to the set of walks
+            if(walk.size() > 1)
+            {
+                walks.push_back(walk);
+            }
+            tries++;
+        }
+        return walks;
+    }
+    std::vector<std::vector<int>> get_k_distinct_walks(int start, int end, int k) {
+        std::set<std::vector<int>> walks;
+        int tries = 0;
+        while (walks.size() < k && tries < 1000) {
+            std::vector<int> walk = sample_walk(start, end);
+            if (walk.size() > 1) {
+                walks.insert(walk);
+            }
+            tries++;
+        }
+        std::vector<std::vector<int>> result(walks.begin(), walks.end());
+        return result;    
+    }
+
+    std::vector<std::vector<int>> get_k_distinct_consistent_walks(int start, int end, int k) {
+        std::set<std::vector<int>> walks;
+        int tries = 0;
+        while (walks.size() < k && tries < 1000) {
+            std::vector<int> walk = sample_consistent_walk(start, end);
+            if (walk.size() > 1) {
+                walks.insert(walk);
+            }
+            tries++;
+        }
+        std::vector<std::vector<int>> result(walks.begin(), walks.end());
+        return result;    
+    }
     void print_graph() {
         for (int i = 0; i < nodes; i++) {
             std::cout << "Node " << i << " -> ";

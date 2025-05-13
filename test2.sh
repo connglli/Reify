@@ -1,5 +1,5 @@
 #!/bin/bash
-GCC_PATH=/local/home/kchopra/.gcclocal/bin/gcc
+GCC_PATH=gcc
 CLANG_PATH=/local/home/kchopra/llvm-project/build/bin/clang
 for f in generated_code_*.c ; do
   i=`echo $f | tr -d -c 0-9`

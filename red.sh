@@ -1,7 +1,7 @@
 #!/bin/bash
 BADCC1=()
-BADCC3=()
-BADCC2=("/local/home/kchopra/compilers/bin/gcc -O1")
+BADCC3=("gcc -O1" "gcc -O2" "gcc -Os")
+BADCC2=()
 MODE=("-m64")
 #!/usr/bin/env bash
 
@@ -11,7 +11,7 @@ MODE=("-m64")
 #BADCC3=() # wrong results
 #MODE=-m64
 
-readonly GOODCC=()
+readonly GOODCC=("gcc -O0")
 readonly TIMEOUTCC=30
 readonly TIMEOUTEXE=1
 readonly TIMEOUTEXEBAD=1
@@ -21,7 +21,7 @@ readonly USE_COMPCERT=false
 readonly USE_CLANG_UBSAN=true
 readonly USE_CLANG_MSAN=true
 
-readonly CFILE=small.c
+readonly CFILE=static_bug.c
 readonly CSMITH_INC="-I/local/suz-local/software/local/include"
 readonly CFLAG="-o t"
 readonly CLANGFC="clang -w -m64 -O0 -fwrapv -ftrapv -fsanitize=undefined,address"
@@ -190,6 +190,11 @@ for cc in "${BADCC1[@]}" ; do
    
   # compile
   (timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >out2.txt 2>&1) >& /dev/null
+  ret = $?
+  if [ $ret != 0 ] ; then
+    echo "compilation failed with $cc"
+   exit 1
+  fi
   if ! grep -q 'internal compiler error' out2.txt && \
   ! grep -q 'internal error:' out2.txt && \
   ! grep -q 'PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT' out2.txt && \
@@ -208,18 +213,15 @@ for cc in "${BADCC2[@]}" ; do
   timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >& /dev/null
   ret=$?
   echo "ret = $ret"
-  if [ $ret -ne 137 ] ; then
-   
+  if [ $ret -ne 0 ] ; then
    exit 1
-  else
-    exit 0
   fi
    
   # execute
   (timeout -s 9 $TIMEOUTEXE ./t >out2.txt 2>&1) >&/dev/null
   ret=$?
   if [ $ret -ne 137 ] ; then
-    echo "execution failed"
+    echo "execution failed with $cc"
    exit 1
   fi
  done
@@ -233,6 +235,7 @@ for cc in "${BADCC3[@]}" ; do
   timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >& /dev/null
   ret=$?
   if [ $ret != 0 ] ; then
+    echo "compilation failed with $cc"
    exit 1
   fi
    
@@ -243,7 +246,8 @@ for cc in "${BADCC3[@]}" ; do
     echo "execution failed"
    exit 1
   fi
-   
+  # cat out2.txt
+  # cat out0.txt
   # compare with reference: out0.txt
   if diff -q out0.txt out2.txt >/dev/null ; then
    exit 1

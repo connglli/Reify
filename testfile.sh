@@ -1,7 +1,7 @@
 #!/bin/bash
-GCC_PATH=gcc
+GCC_PATH=/local/home/kchopra/compilers/bin/gcc
 CLANG_PATH=/local/home/kchopra/llvm-project/build/bin/clang
-for f in *.c ; do
+f=$1
   echo $f
 #  echo "O3"
   timeout -s 9 10 $GCC_PATH -O3 $f #>& /dev/null
@@ -11,7 +11,7 @@ for f in *.c ; do
   timeout -s 9 3 ./a.out >& out2.txt #>& /dev/null
 #  echo
   if ! diff -q out1.txt out2.txt ; then
-    echo "BUG"
+    echo "BUG at O3"
   fi
   timeout -s 9 10 $GCC_PATH -O3 $f #>& /dev/null
   timeout -s 9 3 ./a.out >& out1.txt #>& /dev/null
@@ -20,7 +20,7 @@ for f in *.c ; do
   timeout -s 9 3 ./a.out >& out2.txt #>& /dev/null
 #  echo
   if ! diff -q out1.txt out2.txt ; then
-    echo "BUG"
+    echo "BUG at GCC O0 vs O3"
   fi
   timeout -s 9 10 $CLANG_PATH -O3 $f #>& /dev/null
   timeout -s 9 3 ./a.out >& out1.txt #>& /dev/null
@@ -29,7 +29,7 @@ for f in *.c ; do
   timeout -s 9 3 ./a.out >& out2.txt #>& /dev/null
 #  echo
   if ! diff -q out1.txt out2.txt ; then
-    echo "BUG"
+    echo "BUG at CLANG O0 vs O3"
   fi
 #  echo
 #  echo "O2"
@@ -40,7 +40,7 @@ for f in *.c ; do
   timeout -s 9 3 ./a.out >& out2.txt #>& /dev/null
 #  echo
   if ! diff -q out1.txt out2.txt ; then
-    echo "BUG"
+    echo "BUG at O2"
   fi
 #  echo
 #  echo "Os"
@@ -51,7 +51,7 @@ for f in *.c ; do
   timeout -s 9 3 ./a.out >& out2.txt #>& /dev/null
 #  echo
   if ! diff -q out1.txt out2.txt ; then
-    echo "BUG"
+    echo "BUG at Os"
   fi
 #  echo
 #  echo "O1"
@@ -62,9 +62,5 @@ for f in *.c ; do
   timeout -s 9 3 ./a.out >& out2.txt #>& /dev/null
 #  echo
   if ! diff -q out1.txt out2.txt ; then
-    echo "BUG"
+    echo "BUG at O1"
   fi
-#  echo
-#  echo
-#  echo
-done

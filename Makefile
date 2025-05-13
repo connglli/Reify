@@ -33,13 +33,13 @@ directories:
 	mkdir -p gcc_bin_O0 gcc_bin_O1 gcc_bin_O2 gcc_bin_O3 gcc_bin_Ofast gcc_bin_Os
 	mkdir -p clang_bin_O0 clang_bin_O1 clang_bin_O2 clang_bin_O3 clang_bin_Ofast clang_bin_Os
 
-codegen:
+codegen: codegen.cpp run.py params.hpp
 	make clean
 	make directories
 	./compile.sh codegen_better.cpp
 	python3 run.py
 
-codegen_init:
+codegen_init: codegen_init.cpp run.py params.hpp
 	make clean
 	make directories
 	./compile.sh codegen_init.cpp

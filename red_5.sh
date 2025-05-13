@@ -1,7 +1,7 @@
 #!/bin/bash
 BADCC1=()
-BADCC3=()
-BADCC2=("/local/home/kchopra/compilers/bin/gcc -O1")
+BADCC3=("gcc -O1" "gcc -O2" "gcc -Os")
+BADCC2=()
 MODE=("-m64")
 #!/usr/bin/env bash
 
@@ -11,17 +11,17 @@ MODE=("-m64")
 #BADCC3=() # wrong results
 #MODE=-m64
 
-readonly GOODCC=()
-readonly TIMEOUTCC=30
+readonly GOODCC=("gcc -O0")
+readonly TIMEOUTCC=3
 readonly TIMEOUTEXE=1
 readonly TIMEOUTEXEBAD=1
 readonly TIMEOUTCCOMP=10
 # flag to control whether to use CompCert to validate the test program.
 readonly USE_COMPCERT=false
 readonly USE_CLANG_UBSAN=true
-readonly USE_CLANG_MSAN=true
+readonly USE_CLANG_MSAN=false
 
-readonly CFILE=small.c
+readonly CFILE=static_bug.c
 readonly CSMITH_INC="-I/local/suz-local/software/local/include"
 readonly CFLAG="-o t"
 readonly CLANGFC="clang -w -m64 -O0 -fwrapv -ftrapv -fsanitize=undefined,address"
@@ -82,6 +82,7 @@ fi
 ###################################################
 # compcert first
 ###################################################
+echo "compcert first"
 if $USE_COMPCERT ; then
  timeout -s 9 $TIMEOUTCCOMP ccomp -interp -fall . $CFILE >& /dev/null
  ret=$?
@@ -93,6 +94,7 @@ fi
 ###################################################
 # clang memory sanitizer
 ###################################################
+echo "clang memory sanitizer"
 if ${USE_CLANG_MSAN} ; then
  readonly TEMP_EXE="temp.exe"
  timeout -s 9 $TIMEOUTCC $CLANG_MEM_SANITIZER $CFILE -o $TEMP_EXE > /dev/null
@@ -121,6 +123,7 @@ fi
 # @clangfc @ -O0 to check for undefined behavior
 ###################################################
 
+echo "clang -O0 to check for undefined behavior"
 if ${USE_CLANG_UBSAN} ; then
  rm -f ./t ./out*.txt
  timeout -s 9 $TIMEOUTCC $CLANGFC $CFLAG $CFILE > /dev/null
@@ -150,13 +153,17 @@ fi
 
 
 #for cc in "${GOODCC[@]}" ; do
+#for ((i=0; i < ${#GOODCC[@]} ; ++i )) ; do
+echo "good ones"
 for ((i=0; i < ${#GOODCC[@]} ; ++i )) ; do
  cc=${GOODCC[$i]}
  rm -f ./t ./out1.txt
   
  timeout -s 9 $TIMEOUTCC $cc $CFLAG $CFILE >& /dev/null
  ret=$?
+ 
  if [ $ret != 0 ] ; then
+    echo "compilation failed with $cc"
   exit 1
  fi
   
@@ -164,6 +171,7 @@ for ((i=0; i < ${#GOODCC[@]} ; ++i )) ; do
  (timeout -s 9 $TIMEOUTEXE ./t >out1.txt 2>&1) >&/dev/null
  ret=$?
  if [ $ret != 0 ] ; then
+    echo "execution failed with $cc"
     echo "execution failed"
   exit 1
  fi
@@ -184,19 +192,27 @@ done
 # iterate over the bad ones
 #############################
 
+echo "bad ones"
 for cc in "${BADCC1[@]}" ; do
  for mode in "${MODE[@]}" ; do
   rm -f ./t ./out2.txt
    
   # compile
+  echo "running $cc $CFLAG $mode $CFILE"
   (timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >out2.txt 2>&1) >& /dev/null
-  if ! grep -q 'internal compiler error' out2.txt && \
-  ! grep -q 'internal error:' out2.txt && \
-  ! grep -q 'PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT' out2.txt && \
-  ! grep -q 'clang: error: linker command failed with exit code 1 (use -v to see invocation)' out2.txt
-  then
-   exit 1
+  ret=$?
+  echo "ret = $ret"
+  if [ $ret -ne 137 ] ; then
+    exit 1
+
   fi
+  # if ! grep -q 'internal compiler error' out2.txt && \
+  # ! grep -q 'internal error:' out2.txt && \
+  # ! grep -q 'PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT' out2.txt && \
+  # ! grep -q 'clang: error: linker command failed with exit code 1 (use -v to see invocation)' out2.txt
+  # then
+  #  exit 1
+  # fi
  done
 done
 
@@ -208,18 +224,15 @@ for cc in "${BADCC2[@]}" ; do
   timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >& /dev/null
   ret=$?
   echo "ret = $ret"
-  if [ $ret -ne 137 ] ; then
-   
+  if [ $ret -ne 0 ] ; then
    exit 1
-  else
-    exit 0
   fi
    
   # execute
   (timeout -s 9 $TIMEOUTEXE ./t >out2.txt 2>&1) >&/dev/null
   ret=$?
   if [ $ret -ne 137 ] ; then
-    echo "execution failed"
+    echo "execution failed with $cc"
    exit 1
   fi
  done
@@ -227,25 +240,16 @@ done
 
 for cc in "${BADCC3[@]}" ; do
  for mode in "${MODE[@]}" ; do
-  rm -f ./t ./out2.txt
-   
-  # compile
+  rm -f ./t ./out2.txt  # compile
   timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >& /dev/null
   ret=$?
   if [ $ret != 0 ] ; then
    exit 1
-  fi
-   
-  # execute
+  fi  # execute
   (timeout -s 9 $TIMEOUTEXE ./t >out2.txt 2>&1) >&/dev/null
   ret=$?
-  if [ $ret != 0 ] ; then
-    echo "execution failed"
-   exit 1
-  fi
-   
-  # compare with reference: out0.txt
-  if diff -q out0.txt out2.txt >/dev/null ; then
+  if [ $ret != 134 ] ; then
+    echo "execution failed with $cc"
    exit 1
   fi
  done
