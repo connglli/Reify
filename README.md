@@ -1,5 +1,5 @@
-1. You can fine tune the parameters for codegen in params.hpp : my idea right now is to spawn multiple processes with different sets of params and see if any could potentially trigger a bug
-2. After that, please update the path to Z3 (built from source) in your system in `compile.sh`, and then please run `./compile.sh codegen_better.cpp`
-2. In the script `link.sh`, please update the paths for gcc and clang on your system
-3. Please don't modify the existing directory structure
-5. Post all these tweaks, we can run `python3 run.py`, and the fuzzing process will start
+# PROCEDURE GENERATION
+
+1. The subdirectory which has the code for interprocedure generation is procedure_gen. The file that generates procedures is `codegen_procedure_generation.cpp`. I've added some comments that try to explain what each function does. Its hyperparameters are present in `params.hpp`. Again, I've briefly annotated that with comments as well. It depends on `better_graph.hpp` for graph initialisation and walk sampling. You can `make run` for codegen, followed by `make retouch` for cleanup (some files that are created are empty and this gets rid of them)
+
+2. The subdirectory which has the code for interprocedure generation is interprocedural_fuzz. The main file is `function_parser.cpp`, it essentially samples a bunch of procedures and their corresponding mappings from their directories and knits them to create interprocedural programs indefintiely (so you need to kill the process externally - it is quite fast, and I would probably recommend running it for 40 mins max on `/local/home` for a single process. It runs slower on `/zdata` so you can run it longer there). Hyperparams are in `params.hpp` in the same directory. If the procedures are named name.c, then the corresponding mapping must be named name_mapping, but the procedure generation already takes care of that. You can tailor the directories where the procedures and mappings are stored in the Makefile

@@ -1,27 +1,27 @@
 #!/bin/bash
 BADCC1=()
-BADCC3=("gcc -O1" "gcc -O2" "gcc -Os")
-BADCC2=()
+BADCC3=()
+BADCC2=("gcc -O3")
 MODE=("-m64")
 #!/usr/bin/env bash
 
 # need to configure this part
-#BADCC1=("clang-trunk -O3") # compilation failures
+#BADCC1=("clang-trunk -O3") # compilation 
 #BADCC2=() # exec failures
-#BADCC3=() # wrong results
+#BADCC3=() # wrong resultsfailures
 #MODE=-m64
 
 readonly GOODCC=("gcc -O0")
-readonly TIMEOUTCC=30
-readonly TIMEOUTEXE=1
-readonly TIMEOUTEXEBAD=1
-readonly TIMEOUTCCOMP=10
+readonly TIMEOUTCC=5
+readonly TIMEOUTEXE=10
+readonly TIMEOUTEXEBAD=10
+readonly TIMEOUTCCOMP=5
 # flag to control whether to use CompCert to validate the test program.
 readonly USE_COMPCERT=false
 readonly USE_CLANG_UBSAN=true
 readonly USE_CLANG_MSAN=true
 
-readonly CFILE=static_bug.c
+readonly CFILE=segfault.c
 readonly CSMITH_INC="-I/local/suz-local/software/local/include"
 readonly CFLAG="-o t"
 readonly CLANGFC="clang -w -m64 -O0 -fwrapv -ftrapv -fsanitize=undefined,address"
@@ -190,18 +190,18 @@ for cc in "${BADCC1[@]}" ; do
    
   # compile
   (timeout -s 9 $TIMEOUTCC $cc $CFLAG $mode $CFILE >out2.txt 2>&1) >& /dev/null
-  ret = $?
-  if [ $ret != 0 ] ; then
+  ret=$?
+  if [ $ret -ne 137 ] ; then
     echo "compilation failed with $cc"
    exit 1
   fi
-  if ! grep -q 'internal compiler error' out2.txt && \
-  ! grep -q 'internal error:' out2.txt && \
-  ! grep -q 'PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT' out2.txt && \
-  ! grep -q 'clang: error: linker command failed with exit code 1 (use -v to see invocation)' out2.txt
-  then
-   exit 1
-  fi
+  # if ! grep -q 'internal compiler error' out2.txt && \
+  # ! grep -q 'internal error:' out2.txt && \
+  # ! grep -q 'PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT' out2.txt && \
+  # ! grep -q 'clang: error: linker command failed with exit code 1 (use -v to see invocation)' out2.txt
+  # then
+  #  exit 1
+  # fi
  done
 done
 
@@ -220,7 +220,7 @@ for cc in "${BADCC2[@]}" ; do
   # execute
   (timeout -s 9 $TIMEOUTEXE ./t >out2.txt 2>&1) >&/dev/null
   ret=$?
-  if [ $ret -ne 137 ] ; then
+  if [ $ret -ne 139 ] ; then
     echo "execution failed with $cc"
    exit 1
   fi

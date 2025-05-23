@@ -12,6 +12,8 @@ clean:
 	find basic_blocks -type f -delete
 	find static_inlinable -type f -delete
 	find logs -type f -delete
+	find mappings -type f -delete
+	find procedures -type f -delete
 	find gcc_bin_O0 -type f -delete
 	find gcc_bin_O1 -type f -delete
 	find gcc_bin_O2 -type f -delete
