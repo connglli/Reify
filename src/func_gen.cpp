@@ -2,7 +2,7 @@
 #include "better_graph.hpp"
 #include"z3++.h"
 #include <optional>
-#include "params.hpp"
+#include "func_params.hpp"
 #include <signal.h>
 #include <unistd.h>
 // std::ofstream logFile;

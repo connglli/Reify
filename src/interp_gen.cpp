@@ -10,7 +10,7 @@
 #include <cassert>
 #include <random>
 #include <filesystem>
-#include "params.hpp"
+#include "interp_params.hpp"
 const int getWithinRange = INT32_MAX;
 std::vector<uint32_t> crc32_table(256);
 const std::string newProcedureDirectory = "new_procedure/";
@@ -85,6 +85,7 @@ std::string generateCodeForChecksumFunction(int checksumType = globalChecksumTyp
             code << "    context = context_free_crc32_byte(context, (val >> 24) & 0xFF);\n";
             code << "    return context;\n";
             code << "}\n";
+            break;
         default:
             assert(false && "Invalid checksum type");
     }

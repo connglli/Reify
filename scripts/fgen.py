@@ -120,7 +120,7 @@ def main(count=1_000_000):
     index = 0
     while index < count:
         print(index)
-        out = check_run("./exe", index, uuid_val)
+        out = check_run("./build/bin/fgen", index, uuid_val)
         if out:
             check_ubs(*out)
         index += 1
