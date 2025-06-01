@@ -1,6 +1,6 @@
 # GraphFuzz
 
-## Preriquests
+## Prerequisite
 
 Z3
 
