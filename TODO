@@ -1,0 +1,14 @@
+1. Use clang format
+2. Support structured if/loop
+3. Use an IR to unify our intermediate representations, either a DSL or just bit code. If we're using a DSL, we'd support multiple IR lowers (for example for C, LLVM IR, etc.). If we're using LLVM's bit code, directly use different backend.
+4. Better optimization passes support
+5. More UBs. Create a UB manager which traces multiple UBs (specifically their constraints) along generation. For example for each statement L we generated: `ubManager.trace(L); -> `
+	```
+	void UBManager::TraceAndGenerateUBConstraints(IR l) {
+		for (UBConstraintGen g : this->generators) {
+			// One of g may be our IntegerUBConstraintGen which collects under-/over-flow constrates for integers.
+			// The other one may be ArrayUBConstraintGen which collects UB constraints for arrays for example out-of-bounds access.
+			g.GenerateConstraint(L);
+		}
+	}
+	```
