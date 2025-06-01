@@ -325,7 +325,7 @@ class IfStatement: public Statement
         {
             for (auto& term : condition)
             {
-                if(! term.first.second)
+                if(! term.first.second && term.first.first != "pass_counter ")
                 {
                     //replace the coefficient with a call to the procedure
                     int coefficient = std::stoi(term.first.first);
