@@ -3,3 +3,5 @@ procedures/
 mappings/
 new_procedures/
 */__pycache__
+.idea
+.vscode
