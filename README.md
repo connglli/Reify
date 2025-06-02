@@ -13,18 +13,22 @@ make all
 # Build function generation target
 make fgen
 
-# Build inter-procedural program generation target
-make interpgen
+# Build program generation target
+make pgen
 ```
 
 ## Generate
 
 ```
 # Generate a set of functions
-make genfuncset
+make gen-func-set
 
-# Generate a set of programs supporting inter-procedural functions
-make geninterpset
+# Get a set of functions and check if they are UB-free or not
+make gen-func-set-checked
+
+# Generate a set of programs
+make gen-prog-set
+
 ```
 
 ## Fuzz
