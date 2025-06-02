@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2025-2025
+// Copyright (c) 2025
 //
 // Kavya Chopra (chopra.kavya04@gmail.com)
 // Cong Li (cong.li@inf.ethz.ch)
@@ -23,14 +23,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef GRAPHFUZZ_PARAMS_HPP
+#define GRAPHFUZZ_PARAMS_HPP
 
-#ifndef GRAPHFUZZ_PROG_PARAMS_H
-#define GRAPHFUZZ_PROG_PARAMS_H
+#include <string>
 
-const int PROCEDURE_DEPTH = 3;    // Number of procedures we want to knit together
-const int globalChecksumType = 0; // 0 for CRC32, 1 for simple checksum
-const int mod = 1000000007;
-const double replacementProbability =
-    0.5; // Probability of replacing a coefficient/constant with a call to another procedure
+static std::filesystem::path PROCEDURES_DIR = "procedures";
+static std::filesystem::path MAPPINGS_DIR = "mappings";
+static std::filesystem::path GEN_LOGS_DIR = "logs";
 
-#endif // GRAPHFUZZ_PROG_PARAMS_H
+static std::string GetProcedureName(std::string uuid, int sno) {
+  return "function_" + uuid + "_" + std::to_string(sno);
+}
+
+static std::filesystem::path GetProcedurePath(std::string uuid, int sno) {
+  return PROCEDURES_DIR / (GetProcedureName(uuid, sno) + ".c");
+}
+
+static std::filesystem::path GetMappingPath(std::string uuid, int sno) {
+  return MAPPINGS_DIR / (GetProcedureName(uuid, sno) + "_mapping");
+}
+
+static std::filesystem::path GetGenLogPath(std::string uuid, int sno, bool devnull = true) {
+  if (devnull) {
+    return std::filesystem::path("/dev/null");
+  } else {
+    return GEN_LOGS_DIR / (GetProcedureName(uuid, sno) + "_log");
+  }
+}
+
+#endif // GRAPHFUZZ_PARAMS_HPP

@@ -28,15 +28,20 @@
 #include <signal.h>
 #include <unistd.h>
 #include "better_graph.hpp"
+#include "cxxopts.hpp"
 #include "func_params.hpp"
+#include "params.hpp"
 #include "z3++.h"
 
-// std::ofstream logFile;
+std::ofstream logFile;
 std::ofstream outputFile;
 std::ofstream mappingFile;
-std::string mappingFileName;
-std::string outputFileName;
+std::filesystem::path logFileName;
+std::filesystem::path mappingFileName;
+std::filesystem::path outputFileName;
+
 static bool isFormulaSatisfiable = false;
+
 using VarIndex = int;
 using BasicBlockNo = int;
 
@@ -272,8 +277,7 @@ public:
       }
       conditionalVariables.push_back(randomVariable);
     }
-    // logFile <<"size of conditional variables:
-    // "<<conditionalVariables.size()<<'\n';
+    logFile << "size of conditional variables: " << conditionalVariables.size() << '\n';
 
     std::vector<BasicBlockNo> targets;
     for (auto target: graphTargets) {
@@ -362,7 +366,7 @@ public:
     if (needPassCounter) {
       code << "    if(" << generatePassCounterName() << " >= " << passCounterValue << ")\n";
       code << "    {\n";
-      code << "        goto " << generateLabelName(NODES - 1) << ";\n";
+      code << "        goto " << generateLabelName(NUM_NODES - 1) << ";\n";
       code << "    }\n";
     }
     if (blockTargets.size() > 1) {
@@ -442,8 +446,8 @@ public:
       statementIndex++;
     }
     // now, we need to generate the conditional constraint
-    // logFile <<blockTargets.size()<<'\n';
-    // logFile <<"Target: "<<target<<'\n';
+    logFile << blockTargets.size() << '\n';
+    logFile << "Target: " << target << '\n';
     if (blockTargets.size() > 1) {
       // same checks for conditional statements
       std::vector<z3::expr> terms;
@@ -503,13 +507,11 @@ void extractParametersFromModel(z3::model &model, z3::context &ctx) {
         int int_value;
         if (Z3_get_numeral_int(ctx, value, &int_value)) {
           parameters[name] = int_value;
-          // logFile <<"Parameter " << name << " is in the model with value: "
-          //    << int_value << '\n';
+          logFile << "Parameter " << name << " is in the model with value: " << int_value << '\n';
         }
       }
     } else {
-      // logFile <<"Parameter " << name << " is not explicitly defined in the
-      // model\n";
+      logFile << "Parameter " << name << " is not explicitly defined in the model\n";
     }
   }
 }
@@ -571,10 +573,10 @@ extractFinalVariableVersions(z3::model &model, z3::context &ctx, std::unordered_
 }
 
 void generateCodeForProcedure(
-    std::vector<BB> basicBlocks, z3::model &model, z3::context &ctx, int sample_number, std::string uuid
+    std::vector<BB> basicBlocks, z3::model &model, z3::context &ctx, int sno, std::string uuid
 ) {
   // outputFile << "#include <stdio.h>\n\n";
-  outputFile << "int function_" << uuid << "_" << std::to_string(sample_number) << "(";
+  outputFile << "int function_" << uuid << "_" << std::to_string(sno) << "(";
   for (int i = 0; i < NUM_VARS; ++i) {
     outputFile << "int " << getVarName(i);
     if (i < NUM_VARS - 1) {
@@ -624,7 +626,7 @@ void cleanupIfEmpty() {
 }
 
 void signalHandler(int signum) {
-  // logFile <<"Interrupt signal (" << signum << ") received.\n";
+  logFile << "Interrupt signal (" << signum << ") received.\n";
   if (isFormulaSatisfiable) {
     return;
   } else {
@@ -637,62 +639,90 @@ void signalHandler(int signum) {
     cleanupIfEmpty();
     exit(signum);
   }
-}
+};
 
-void sigKillHandler(int signum) {
-  if (isFormulaSatisfiable) {
-    return;
-  } else {
-    if (outputFile.is_open()) {
-      outputFile.close();
-    }
-    if (mappingFile.is_open()) {
-      mappingFile.close();
-    }
-    cleanupIfEmpty();
-    exit(signum);
-  }
-}
-
-void changeUUID(std::string &uuid) {
-  for (auto &c: uuid) {
-    if (!std::isalnum(c)) {
-      c = '_';
-    }
-  }
-}
-
-int main(int argc, char **argv) {
-  // program should have a command line argument which we will store in an
-  // integer sample_number
-  int sample_number = 0;
+struct CliOpts {
+  int sno;
   std::string uuid;
-  if (argc != 3) {
-    std::cout << "Usage: ./codegen_procedure_generation <sample_number> <uuid>" << std::endl;
+  bool verbose;
+};
+
+CliOpts parse_opts(int argc, char **argv) {
+  cxxopts::Options options("fgen");
+  // clang-format off
+  options.add_options()
+    ("uuid", "An UUID identifier", cxxopts::value<std::string>())
+    ("n,sno", "A sample number", cxxopts::value<int>())
+    ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+    ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
+  options.parse_positional("uuid");
+  options.positional_help("UUID");
+  // clang-format on
+
+  cxxopts::ParseResult args;
+  try {
+    args = options.parse(argc, argv);
+  } catch (cxxopts::exceptions::exception e) {
+    std::cerr << "Error: " << e.what() << std::endl;
     exit(1);
   }
 
-  if (argc > 2) {
-    sample_number = std::stoi(argv[1]);
-    uuid = argv[2];
-  } else {
-    return 1;
+  if (args.count("help")) {
+    std::cout << options.help() << std::endl;
+    exit(0);
   }
-  // replace uuid's non alphanumeric characters with underscore
-  changeUUID(uuid); // used a UUID so that i could throw everything from different runs
-                    // into the same directory without worrying about name clashes
-  // logFile = std::ofstream("logs/log_" + std::to_string(sample_number) +
-  // ".txt");
-  mappingFileName = "mappings/function_" + uuid + "_" + std::to_string(sample_number) + "_mapping";
-  outputFileName = "procedures/function_" + uuid + "_" + std::to_string(sample_number) + ".c";
+
+  int sno = -1;
+  if (!args.count("sno")) {
+    std::cerr << "Error: The sample number (--sno) is not given." << std::endl;
+    exit(1);
+  } else {
+    sno = args["sno"].as<int>();
+  }
+
+  std::string uuid;
+  if (!args.count("uuid")) {
+    std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
+    exit(1);
+  } else {
+    uuid = args["uuid"].as<std::string>();
+    // Replace uuid's non-alphanumeric characters with underscore
+    // used a UUID so that i could throw everything from different runs
+    // into the same directory without worrying about name clashes
+    std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
+  }
+
+  bool verbose;
+  if (args.count("verbose")) {
+    verbose = true;
+  } else {
+    verbose = false;
+  }
+
+  return {.sno = sno, .uuid = uuid, .verbose = verbose};
+}
+
+int main(int argc, char **argv) {
+  auto args = parse_opts(argc, argv);
+
+  int sno = args.sno;
+  std::string uuid = args.uuid;
+  bool verbose = args.verbose;
+
+  mappingFileName = GetMappingPath(uuid, sno);
   mappingFile = std::ofstream(mappingFileName);
+  outputFileName = GetProcedurePath(uuid, sno);
   outputFile = std::ofstream(outputFileName);
+  logFileName = GetGenLogPath(uuid, sno, /*devnull=*/!verbose);
+  logFile = std::ofstream(logFileName);
+
   std::signal(SIGINT, signalHandler);
-  std::signal(SIGTERM, sigKillHandler);
-  std::signal(SIGKILL, sigKillHandler);
+  std::signal(SIGTERM, signalHandler);
+  std::signal(SIGKILL, signalHandler);
+
   z3::set_param("parallel.enable", true);
 
-  int nodes = NODES; // Number of nodes
+  int nodes = NUM_NODES; // Number of nodes
   Graph g(nodes);
   g.generate_graph();
   std::vector<std::set<int>> adjacency_list = g.adj;
@@ -708,7 +738,7 @@ int main(int argc, char **argv) {
     sample_walk = g.sample_walk(0, nodes - 1, 100);
   }
   // g.print_graph();
-  if (sample_walk[sample_walk.size() - 1] != NODES - 1) {
+  if (sample_walk[sample_walk.size() - 1] != NUM_NODES - 1) {
     // this means that the last node is not the end node, probably because we're
     // going in a cycle, so we need to add a pass counter to the last node (as
     // if we're artificially creating an edge to the end node)
@@ -723,9 +753,8 @@ int main(int argc, char **argv) {
     }
     basicBlocks[sample_walk[sample_walk.size() - 1]].setPassCounter(passCounter);
     parameters[generatePassCounterName()] = passCounter;
-    sample_walk.push_back(NODES - 1);
-    // logFile <<"Sample walk has been modified to end at the last node." <<
-    // '\n';
+    sample_walk.push_back(NUM_NODES - 1);
+    logFile << "Sample walk has been modified to end at the last node." << '\n';
   }
 
   z3::context c;
@@ -747,28 +776,28 @@ int main(int argc, char **argv) {
   basicBlocks[sample_walk[sample_walk.size() - 1]].generateConstraints(-1, solver, c, versions);
   std::vector<int> initialisation;
   std::vector<int> final_variable_versions;
-  // logFile <<"Solver query: " << solver.to_smt2() << '\n';
+  logFile << "Solver query: " << solver.to_smt2() << '\n';
 
   if (solver.check() == z3::unsat) {
-    // logFile <<"UNSAT\n";
+    logFile << "UNSAT\n";
     // remove the output file and mapping file from the filesystem because no
     // model was found
     outputFile.close();
     mappingFile.close();
     std::remove((outputFileName).c_str());
     std::remove((mappingFileName).c_str());
-    // logFile.close();
+    logFile.close();
     return 1;
   } else {
     isFormulaSatisfiable = true;
-    // logFile <<"SAT\n";
+    logFile << "SAT\n";
     z3::model model = solver.get_model();
-    // logFile <<"Model: " << model << '\n';
+    logFile << "Model: " << model << '\n';
 
     extractParametersFromModel(model, c);
     initialisation = extractInitialisationsFromModel(model, c);
     final_variable_versions = extractFinalVariableVersions(model, c, versions);
-    generateCodeForProcedure(basicBlocks, model, c, sample_number, uuid);
+    generateCodeForProcedure(basicBlocks, model, c, sno, uuid);
     outputFile.close();
     appendMappingToFile(initialisation, final_variable_versions);
   }
@@ -793,14 +822,14 @@ int main(int argc, char **argv) {
     solver.add(differentInitialisationConstraint(initialisation, c)); // ensure that the initialisation is sufficiently
                                                                       // different from the previous one
     if (solver.check() == z3::unsat) {
-      // logFile <<"UNSAT\n";
+      logFile << "UNSAT\n";
       outputFile.close();
       mappingFile.close();
-      // logFile.close();
+      logFile.close();
       return 1;
     } else {
       isFormulaSatisfiable = true;
-      // logFile <<"SAT\n";
+      logFile << "SAT\n";
       z3::model model = solver.get_model();
       extractParametersFromModel(model, c);
       initialisation = extractInitialisationsFromModel(model, c);
@@ -810,6 +839,6 @@ int main(int argc, char **argv) {
   }
   outputFile.close();
   mappingFile.close();
-  // logFile.close();
+  logFile.close();
   return 0;
 }

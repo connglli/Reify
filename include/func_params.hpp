@@ -24,17 +24,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+#ifndef GRAPHFUZZ_FUNC_PARAMS_H
+#define GRAPHFUZZ_FUNC_PARAMS_H
 
 int NUM_VARS = 8;
-const int UPPER_BOUND = INT_MAX; // upper bound for the results of expression and subexpression evaluation
-const int LOWER_BOUND = INT_MIN; // lower bound for the results of expression and subexpression evaluation
-const int LOWER_INIT_BOUND = INT_MIN; // lower bound for the initialisation of variables
-const int UPPER_INIT_BOUND = INT_MAX; // upper bound for the initialisation of variables
-int ASSIGNMENTS_PER_BB = 1; // the number of assignment statements in a basic block
+const int UPPER_BOUND = INT_MAX;            // upper bound for the results of expression and subexpression evaluation
+const int LOWER_BOUND = INT_MIN;            // lower bound for the results of expression and subexpression evaluation
+const int LOWER_INIT_BOUND = INT_MIN;       // lower bound for the initialisation of variables
+const int UPPER_INIT_BOUND = INT_MAX;       // upper bound for the initialisation of variables
+int ASSIGNMENTS_PER_BB = 1;                 // the number of assignment statements in a basic block
 int VARIABLES_PER_ASSIGNMENT_STATEMENT = 2; // the number of variables in each assignment statement
-int NUM_VARIABLES_IN_CONDITIONAL = 4; // the number of variables in each conditional statement
-int NODES = 10; // Number of nodes in the graph
+int NUM_VARIABLES_IN_CONDITIONAL = 4;       // the number of variables in each conditional statement
+int NUM_NODES = 10;                         // Number of nodes in the graph
 bool enableConsistentWalks = true;
 /**
 Consistent means that after a tipping point, from the same node, exactly one outward edge is traversed.
@@ -56,7 +57,7 @@ the same set of coefficients. I would recommend to either have a reasonably high
 NUMBER_OF_INITIALISATIONS_OF_EACH_WALK and set this to false, or set this to true and set
 NUMBER_OF_INITIALISATIONS_OF_EACH_WALK = 1;
 */
-const int BITSHIFT_BY = 6; // not used for procedure gen, but tried an experiment with bitwise operations
+const int BITSHIFT_BY = 6;        // not used for procedure gen, but tried an experiment with bitwise operations
 const int BITWIDTH_DATATYPE = 32; // not used for procedure gen, but tried an experiment with bitwise operations
 const int MODULO_PRIME = 1000000007;
 const int LOWER_COEFF_BOUND =
@@ -65,3 +66,5 @@ const int UPPER_COEFF_BOUND =
     1000; // upper bound for coefficients. added to make quadratic integer arithmetic more tractable for the solver
 const int NUMBER_OF_INITIALISATIONS_OF_EACH_WALK =
     3; // the number of different initialisation sets we want the solver to find for a given procedure
+
+#endif // GRAPHFUZZ_FUNC_PARAMS_H

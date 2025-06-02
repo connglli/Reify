@@ -80,11 +80,11 @@ def get_simple_program(func_name, func_code, func_args):
     )
 
 
-def get_func_map_files(fuuid, findex):
+def get_func_map_files(fuuid, fsano):
     fuuid_ = fuuid.replace('-', '_')
     return (
-        PROCEDURES_DIR / f"function_{fuuid_}_{findex}.c",
-        MAPPINGS_DIR / f"function_{fuuid_}_{findex}_mapping"
+        PROCEDURES_DIR / f"function_{fuuid_}_{fsano}.c",
+        MAPPINGS_DIR / f"function_{fuuid_}_{fsano}_mapping"
     )
 
 

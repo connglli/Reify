@@ -23,7 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+#ifndef GRAPHFUZZ_BETTER_GRAPH_HPP
+#define GRAPHFUZZ_BETTER_GRAPH_HPP
 
 #include <cstdlib>
 #include <ctime>
@@ -184,7 +185,7 @@ public:
     walk.push_back(current_node);
 
     std::map<int, std::set<int>> visited_neighbors; // Tracks visited neighbors for each node
-    std::map<int, int> locked_neighbor; // Locks a node to one of its neighbors once both are visited
+    std::map<int, int> locked_neighbor;             // Locks a node to one of its neighbors once both are visited
 
     int steps = 0;
     while (current_node != end && steps < max_steps) {
@@ -315,3 +316,5 @@ public:
     }
   }
 };
+
+#endif // GRAPHFUZZ_BETTER_GRAPH_HPP

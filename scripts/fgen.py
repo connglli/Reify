@@ -73,9 +73,15 @@ def check_ubs(func_path, map_path):
             print(f'Skip: PEXE ERROR ({e.returncode}): {out}')
 
 
-def gen_func(exec, index, uuid_val, timeout=60):
-    # Link stdout to stdout of run.py
-    process = subprocess.Popen([exec, str(index), uuid_val], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
+    process = subprocess.Popen(
+        [
+            exec, "-n", str(sano), "-v", uuid_val
+        ] if verbose else [
+            exec, "-n", str(sano), uuid_val
+        ],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
     st_time = time.time()
     completed = False
     exit_code = None
@@ -105,18 +111,18 @@ def gen_func(exec, index, uuid_val, timeout=60):
 
 
 def main(limit, check, timeout):
-    func_uuid, func_index = str(uuid.uuid4()), 0
+    func_uuid, func_sano = str(uuid.uuid4()), 0
     print(f"UUID={func_uuid}")
-    while func_index < limit:
-        print(f"[{func_index}]: Generate ...", end=" ")
-        succ = gen_func("./build/bin/fgen", func_index, func_uuid, timeout)
+    while func_sano < limit:
+        print(f"[{func_sano}]: Generate ...", end=" ")
+        succ = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check)
         if succ:
             print("Succeeded")
         if check and succ:
-            print(f"[{func_index}]: CheckUBs ...", end=" ")
-            check_ubs(*get_func_map_files(func_uuid, func_index))
+            print(f"[{func_sano}]: CheckUBs ...", end=" ")
+            check_ubs(*get_func_map_files(func_uuid, func_sano))
             print("NO UBs")
-        func_index += 1
+        func_sano += 1
 
 
 if __name__ == '__main__':

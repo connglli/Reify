@@ -44,6 +44,7 @@ pgen: $(OBJ_DIR)/interp_gen.o
 
 PROCEDURE_DIR        := procedures
 MAPPING_DIR          := mappings
+LOGGINGS_DIR         := logs
 NEW_PROCEDURE_DIR    := new_procedures
 
 gen-func-set: fgen
@@ -51,7 +52,7 @@ gen-func-set: fgen
 	@python3 scripts/fgen.py
 
 gen-func-set-checked: fgen
-	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
+	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
 	@python3 scripts/fgen.py --check
 
 gen-prog-set: pgen
@@ -64,5 +65,5 @@ gen-prog-set: pgen
 ########################################################################
 
 clean:
-	rm -rf $(BUILD_DIR) $(NEW_PROCEDURE_DIR) $(PROCEDURE_DIR) $(MAPPING_DIR)
+	rm -rf $(BUILD_DIR) $(NEW_PROCEDURE_DIR) $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
 
