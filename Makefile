@@ -17,13 +17,13 @@ BIN_DIR := $(BUILD_DIR)/bin
 CXXFLAGS := -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR)
 LDFLAGS := -lz3 -lpthread
 
-.PHONY: all clean genfunc geninterp genintrap
+.PHONY: all clean gen-func-set gen-prog-set
 
 ########################################################################
 ## Buliding Targets
 ########################################################################
 
-all: fgen interpgen
+all: fgen pgen
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(OBJ_DIR)
@@ -33,33 +33,31 @@ fgen: $(OBJ_DIR)/func_gen.o
 	@mkdir -p $(BIN_DIR)
 	$(CXX) -o $(BIN_DIR)/fgen $^ $(LDFLAGS) 
 
-interpgen: $(OBJ_DIR)/interp_gen.o
+pgen: $(OBJ_DIR)/interp_gen.o
 	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $(BIN_DIR)/interpgen $^ $(LDFLAGS) 
+	$(CXX) -o $(BIN_DIR)/pgen $^ $(LDFLAGS) 
 
-intrapgen: $(OBJ_DIR)/intrap_gen.o
-	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $(BIN_DIR)/intrapgen $^ $(LDFLAGS) 
 
 ########################################################################
 ## Generation Targets
 ########################################################################
 
-NEW_PROCEDURE_DIR := new_procedures
-PROCEDURE_DIR := procedures
-MAPPING_DIR   := mappings
+PROCEDURE_DIR        := procedures
+MAPPING_DIR          := mappings
+NEW_PROCEDURE_DIR    := new_procedures
 
-genfuncset: fgen
+gen-func-set: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
 	@python3 scripts/fgen.py
 
-geninterpset: interpgen
+gen-func-set-checked: fgen
+	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
+	@python3 scripts/fgen.py --check
+
+gen-prog-set: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
 	@python3 scripts/retouch.py  # cleanup
-	$(BIN_DIR)/interpgen $(PROCEDURE_DIR) $(MAPPING_DIR) $(shell uuidgen)
-
-genintrapset: intrapgen
-	@echo "Not implemented yet"
+	$(BIN_DIR)/pgen $(PROCEDURE_DIR) $(MAPPING_DIR) $(shell uuidgen)
 
 ########################################################################
 ## Other Targets
