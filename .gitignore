@@ -2,3 +2,4 @@ build/
 procedures/
 mappings/
 new_procedures/
+*/__pycache__
