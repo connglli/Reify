@@ -24,12 +24,12 @@
 // SOFTWARE.
 
 #include <bits/stdc++.h>
+#include <csignal>
 #include <optional>
-#include <signal.h>
 #include <unistd.h>
-#include "better_graph.hpp"
 #include "cxxopts.hpp"
 #include "func_params.hpp"
+#include "lib/graph.hpp"
 #include "params.hpp"
 #include "z3++.h"
 
@@ -724,20 +724,20 @@ int main(int argc, char **argv) {
 
   int nodes = NUM_NODES; // Number of nodes
   Graph g(nodes);
-  g.generate_graph();
-  std::vector<std::set<int>> adjacency_list = g.adj;
+  g.Generate();
+  std::vector<std::set<int>> adjTab = g.GetAdjTab();
   std::vector<BB> basicBlocks;
   for (int i = 0; i < nodes; i++) {
-    BB bb(i, adjacency_list[i]);
+    BB bb(i, adjTab[i]);
     basicBlocks.push_back(bb);
   }
   std::vector<int> sample_walk = {};
   if (enableConsistentWalks) {
-    sample_walk = g.sample_consistent_walk(0, nodes - 1, 100);
+    sample_walk = g.SampleConsistentWalk(0, nodes - 1, 100);
   } else {
-    sample_walk = g.sample_walk(0, nodes - 1, 100);
+    sample_walk = g.SampleWalk(0, nodes - 1, 100);
   }
-  // g.print_graph();
+  // g.PrintGraph();
   if (sample_walk[sample_walk.size() - 1] != NUM_NODES - 1) {
     // this means that the last node is not the end node, probably because we're
     // going in a cycle, so we need to add a pass counter to the last node (as
