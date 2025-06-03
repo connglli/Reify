@@ -25,7 +25,7 @@
 
 #include <bits/stdc++.h>
 #include <csignal>
-#include <strstream>
+#include <sstream>
 #include <unistd.h>
 #include "cxxopts.hpp"
 #include "global.hpp"
@@ -45,7 +45,7 @@ std::filesystem::path outputFileName;
 static bool isFormulaSatisfiable = false;
 
 std::string generateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation) {
-  std::ostrstream mapping;
+  std::ostringstream mapping;
   for (auto x: initialisation) {
     mapping << x << ",";
   }

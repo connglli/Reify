@@ -26,7 +26,7 @@
 
 #include "lib/function.hpp"
 #include <random>
-#include <strstream>
+#include <sstream>
 #include "global.hpp"
 #include "lib/naming.hpp"
 #include "lib/utils.hpp"
@@ -201,7 +201,7 @@ std::vector<int> Func::ExtractFinalizationsFromModel(
 ///////////////////////////////////////////////////////////////////
 
 std::string Func::GenerateCode(int sno, std::string uuid) {
-  std::ostrstream code;
+  std::ostringstream code;
   code << "int function_" << uuid << "_" << std::to_string(sno) << "(";
   for (int i = 0; i < numVars; ++i) {
     code << "int " << getVarName(i);

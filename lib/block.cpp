@@ -152,13 +152,11 @@ z3::expr BB::boundCoefficients(z3::context &c, const std::vector<z3::expr> &coef
 void BB::GenerateConstraints(
     int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
 ) {
-  std::cout << "Processing " << blockno << std::endl << std::flush;
   // TODO: Remove redundant code
 
   // Ensure all terms in each variable definition are free of Undefined Behaviour
   int statementIndex = 0;
   for (const auto &[varIndex, dependencies]: statementMappings) {
-    std::cout << "Processing " << blockno << "," << statementIndex << std::endl;
     std::string varName = getVarName(varIndex);
 
     // Define integer variables and coefficients
@@ -227,8 +225,6 @@ void BB::GenerateConstraints(
   if (blockTargets.size() <= 1) {
     return;
   }
-
-  std::cout << "Processing " << blockno << "," << "cond" << std::endl;
 
   // Now, we need to generate the conditional constraint
   // Define integer variables and coefficients
