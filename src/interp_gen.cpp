@@ -25,17 +25,18 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
 #include <sstream>
-#include <stdint.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "interp_params.hpp"
+
+#include "global.hpp"
 
 const int getWithinRange = INT32_MAX;
 std::vector<uint32_t> crc32_table(256);
@@ -168,10 +169,10 @@ static uint32_t computeStatelessChecksum(std::vector<int> initialisation, int ch
     case 1: {
       long checksum = 0;
       for (auto i: initialisation) {
-        checksum = (checksum + (long) i) % (long) mod;
-        checksum = (checksum + (long) mod) % (long) mod;
+        checksum = (checksum + (long) i) % (long) CHECKSUM_MOD;
+        checksum = (checksum + (long) CHECKSUM_MOD) % (long) CHECKSUM_MOD;
       }
-      checksum = (checksum + (long) mod) % (long) mod;
+      checksum = (checksum + (long) CHECKSUM_MOD) % (long) CHECKSUM_MOD;
       return checksum;
     }
     default: {
@@ -240,7 +241,7 @@ public:
         }
         Coefficient coeff = token;
         Variable var = "1";
-        bool is_mutated = false; // Placeholder for mutation check
+        bool is_mutated = false;                             // Placeholder for mutation check
         RHSExpression.push_back({{token, is_mutated}, "1"}); // Default coefficient of 1
       }
     }
@@ -324,7 +325,7 @@ public:
         }
         Coefficient coeff = token;
         Variable var = "1";
-        bool is_mutated = false; // Placeholder for mutation check
+        bool is_mutated = false;                         // Placeholder for mutation check
         condition.push_back({{token, is_mutated}, "1"}); // Default coefficient of 1
       }
     }

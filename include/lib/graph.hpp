@@ -26,7 +26,6 @@
 #ifndef GRAPHFUZZ_GRAPH_HPP
 #define GRAPHFUZZ_GRAPH_HPP
 
-#include <map>
 #include <set>
 #include <vector>
 
@@ -36,8 +35,6 @@ public:
   explicit Graph(int n) : nodes(n), adj(n) {}
 
   int NumNodes() const { return nodes; }
-
-  std::vector<std::set<int>> GetAdjTab() const { return adj; }
 
   const std::set<int> &GetAdj(int i) const { return adj[i]; }
 

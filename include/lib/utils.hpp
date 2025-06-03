@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2025-2025
+// Copyright (c) 2025
 //
 // Kavya Chopra (chopra.kavya04@gmail.com)
 // Cong Li (cong.li@inf.ethz.ch)
@@ -23,14 +23,44 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//
+// Created by congli on 6/3/25.
+//
 
-#ifndef GRAPHFUZZ_PROG_PARAMS_H
-#define GRAPHFUZZ_PROG_PARAMS_H
+#ifndef GRAPHFUZZ_UTILS_HPP
+#define GRAPHFUZZ_UTILS_HPP
 
-const int PROCEDURE_DEPTH = 3;    // Number of procedures we want to knit together
-const int globalChecksumType = 0; // 0 for CRC32, 1 for simple checksum
-const int mod = 1000000007;
-const double replacementProbability =
-    0.5; // Probability of replacing a coefficient/constant with a call to another procedure
+#include <algorithm>
+#include <random>
+#include <vector>
+#include "z3++.h"
 
-#endif // GRAPHFUZZ_PROG_PARAMS_H
+static z3::expr atMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k, int val) {
+  z3::expr_vector zero_constraints(ctx);
+
+  for (const auto &expr: vec) {
+    zero_constraints.push_back(z3::ite(expr == val, ctx.int_val(1), ctx.int_val(0)));
+  }
+
+  z3::expr sum_zeros = sum(zero_constraints);
+  return sum_zeros <= k;
+}
+
+static std::vector<int> sampleKDistinct(int n, int k) {
+  n -= 1;
+  if (k > n + 1) {
+    throw std::invalid_argument("Error: k must be at most n + 1 to sample k distinct numbers.");
+  }
+  std::vector<int> numbers(n + 1);
+  for (int i = 0; i <= n; ++i) {
+    numbers[i] = i;
+  }
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::shuffle(numbers.begin(), numbers.end(), gen);
+
+  return std::vector<int>(numbers.begin(), numbers.begin() + k);
+}
+
+
+#endif // GRAPHFUZZ_UTILS_HPP
