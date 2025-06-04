@@ -97,16 +97,16 @@ def get_simple_program(func_name, func_code, func_args):
     )
 
 
-def get_func_map_files(fuuid, fsano):
+def get_func_map_files(fuuid, fsano, procedures_dir=PROCEDURES_DIR, mappings_dir=MAPPINGS_DIR):
     fuuid_ = fuuid.replace('-', '_')
     return (
-        PROCEDURES_DIR / f"function_{fuuid_}_{fsano}.c",
-        MAPPINGS_DIR / f"function_{fuuid_}_{fsano}_mapping"
+        procedures_dir / f"function_{fuuid_}_{fsano}.c",
+        mappings_dir / f"function_{fuuid_}_{fsano}_mapping"
     )
 
 
-def get_map_file_for_func_file(func_path):
-    return MAPPINGS_DIR / f"{Path(func_path).stem}_mapping"
+def get_map_file_for_func_file(func_path, mappings_dir=MAPPINGS_DIR):
+    return mappings_dir / f"{Path(func_path).stem}_mapping"
 
 
 def parse_mapping(map_path):

@@ -27,62 +27,11 @@ import subprocess
 import time
 import uuid
 from argparse import ArgumentParser
-from pathlib import Path
 from subprocess import CalledProcessError
 
-from params import get_simple_program, get_func_map_files, parse_mapping
+from params import get_func_map_files
+from ubchk import check_ubs
 from utils import run_proc
-
-
-def check_ubs(func_path, map_path):
-    func_code, func_name = func_path.read_text(), func_path.stem
-    tmp_c_path, tmp_o_path = Path('/tmp/a.c'), Path('/tmp/a.o')
-    for map_ind, (func_args, _) in enumerate(parse_mapping(map_path)):
-        tmp_c_path.write_text(get_simple_program(func_name, func_code, func_args))
-        try:
-            run_proc(
-                [
-                    'gcc',
-                    '-fno-tree-slsr', '-fno-ivopts', '-fsanitize=undefined',
-                    '-o', str(tmp_o_path),
-                    str(tmp_c_path)
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=True, timeout=60  # allow 60s to compile
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"Skip {map_ind}: PCMP ERROR ({e.returncode}): {e.stdout.decode('utf-8')}")
-            continue
-        except subprocess.TimeoutExpired:
-            print(f'Skip {map_ind}: PCMP HANG (.): timeout')
-            continue
-        try:
-            p = run_proc([
-                str(tmp_o_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=True, timeout=120  # allow 120s to execute
-            )
-            out = p.stdout.decode('utf-8') or "<no output>"
-            if "runtime error: " in out:
-                print(f'UBs FOUND ({p.returncode}): {out}')
-                print("===========================================")
-                print(tmp_c_path.read_text())
-                print("===========================================")
-                exit(1)
-        except subprocess.CalledProcessError as e:
-            out = e.stdout.decode('utf-8') or "<no output>"
-            if "runtime error: " in out:
-                print(f'UBs FOUND ({e.returncode}): {out}')
-                print("===========================================")
-                print(tmp_c_path.read_text())
-                print("===========================================")
-                exit(1)
-            print(f'Skip {map_ind}: PEXE ERROR ({e.returncode}): {out}')
-        except subprocess.TimeoutExpired:
-            print(f'Skip {map_ind}: PEXE HANG (.): timeout')
-            continue
 
 
 def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
@@ -100,10 +49,10 @@ def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
         ed_time = time.time()
         return True, ed_time - st_time
     except CalledProcessError as e:
-        print(f"Skip: PGEN ERROR ({e.returncode}): {e.stdout.decode('utf-8')}")
+        print(f"GEN ERROR ({e.returncode}): {e.stdout.decode('utf-8') or '<no output>'}")
         return False, None
     except subprocess.TimeoutExpired:
-        print(f"Skip: PGEN HANG (.): timeout")
+        print(f"GEN HANG (.): generation timeout (>{timeout}s)")
         return False, None
 
 
