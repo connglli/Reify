@@ -1,48 +1,65 @@
+import signal
 import subprocess
 import time
 import uuid
-import signal
 from pathlib import Path
 
 MAIN_TEMPLATE = """
+#include <stdint.h>
 #include <stdarg.h>
-unsigned int g[256];
-int ac, i, ad;
-void ax(unsigned int *a){{
-  unsigned int c = 3988292384;
-  for (unsigned int d = 0; d < 256; d++){{
-    unsigned int aj = d;
-    for (int j = 8; j; j--)
-      if (aj & 1)
-        aj = aj >> 1 ^ c;
-      else
-        aj >>= 1;
-    a[d] = aj;
-  }}
+#include <stdio.h>
+// We won't have more than 20 arguments, so use 20 here
+#define __COUNT_ARGS__(...) \\
+    __COUNT_ARGS_IMPL__(__VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+#define __COUNT_ARGS_IMPL__(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, N, ...) N
+uint32_t g[256];
+int32_t uint32_to_int32(uint32_t u){{
+    return u%2147483647;
 }}
-unsigned int ak(unsigned int as, unsigned char b){{ return as >> 8 ^ g[(as ^ b) & 255]; }}
-unsigned int at(unsigned int as, unsigned int e){{
-  as = ak(as, e);
-  as = ak(as, e >> 8);
-  as = ak(as, e >> 16);
-  as = ak(as, e >> 24);
-  return as;
+void generate_crc32_table(uint32_t* crc32_table) {{
+    const uint32_t poly = 0xEDB88320UL;
+    for (uint32_t i = 0; i < 256; i++) {{
+        uint32_t crc = i;
+        for (int j = 8; j > 0; j--) {{
+            if (crc & 1) {{
+                crc = (crc >> 1) ^ poly;
+            }} else {{
+                crc >>= 1;
+            }}
+        }}
+        crc32_table[i] = crc;
+    }}
 }}
-int computeStatelessChecksum(int av, ...){{
-  va_list args;
-  va_start(args, av);
-  unsigned int aa = 4294967295;
-  for (int d = 0; d < av; ++d) {{
-    int ab = va_arg(args, int);
-    aa = at(aa, ab);
-  }}
-  aa = aa ^ 4294967295;
-  return aa;
+uint32_t context_free_crc32_byte(uint32_t context, uint8_t b) {{
+    return ((context >> 8) & 0x00FFFFFF) ^ g[(context ^ b) & 0xFF];
 }}
+uint32_t context_free_crc32_4bytes(uint32_t context, uint32_t val) {{
+    context = context_free_crc32_byte(context, (val >> 0) & 0xFF);
+    context = context_free_crc32_byte(context, (val >> 8) & 0xFF);
+    context = context_free_crc32_byte(context, (val >> 16) & 0xFF);
+    context = context_free_crc32_byte(context, (val >> 24) & 0xFF);
+    return context;
+}}
+int computeStatelessChecksumImpl(int num_args, ...)
+{{
+    va_list args;
+    va_start(args, num_args);
+    uint32_t checksum = 0xFFFFFFFFUL;
+    for (int i = 0; i < num_args; ++i) {{
+        int arg = va_arg(args, int);
+        checksum = context_free_crc32_4bytes(checksum, arg);
+    }}
+    checksum = uint32_to_int32(checksum ^ 0xFFFFFFFFUL);
+    va_end(args);
+    return checksum;
+}}
+// These are hacks as procedure_gen did not count the number of arguments ...
+#define computeStatelessChecksum(...) \\
+    computeStatelessChecksumImpl(__COUNT_ARGS__(__VA_ARGS__), __VA_ARGS__)
 {proc_code}
 int main(int argc, int* argv[]) {{
-    ax(g);
-    {proc_name}({proc_args});
+    generate_crc32_table(g);
+    printf("%d", {proc_name}({proc_args}));
     return 0;
 }}
 """
@@ -53,8 +70,9 @@ def check_ubs(fname, mname):
     proc_code = fpath.read_text()
     proc_name = fpath.stem
     for mm in mpath.read_text().splitlines():
+        tmp_c, tmp_o = '/tmp/a.c', '/tmp/a.o'
         proc_args = mm.split(' : ')[0].rstrip(',')
-        Path('/tmp/a.c').write_text(
+        Path(tmp_c).write_text(
             MAIN_TEMPLATE.format(
                 proc_code=proc_code,
                 proc_name=proc_name,
@@ -62,12 +80,15 @@ def check_ubs(fname, mname):
             )
         )
         try:
-            subprocess.run(['gcc', '-fno-tree-slsr', '-fno-ivopts', '-fsanitize=undefined', '-o', '/tmp/a.o', '/tmp/a.c'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+            subprocess.run(
+                ['gcc', '-fno-tree-slsr', '-fno-ivopts', '-fsanitize=undefined', '-o', tmp_o, tmp_c],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True
+            )
         except subprocess.CalledProcessError as e:
             print(f'Skip: PCMP ERROR ({e.returncode}): {e.stdout}')
             return
         try:
-            p = subprocess.run(['/tmp/a.o'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+            p = subprocess.run([tmp_o], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
         except subprocess.CalledProcessError as e:
             out = e.stdout.decode('utf-8')
             if "runtime error: " in out:
@@ -88,17 +109,15 @@ def check_run(exec, index, uuid_val, timeout=60):
     process = subprocess.Popen([exec, str(index), uuid_val], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     start_time = time.time()
     isProcessCompleted = False
-    exit_code = None
-    output = None
     while time.time() - start_time < timeout:
-        if process.poll() is not None: 
+        if process.poll() is not None:
             isProcessCompleted = True
             exit_code = process.returncode
             output, _ = process.communicate()
             output = output.decode('utf-8')
             if exit_code == 1:
                 print(f"Skip PGEN ERROR ({exit_code}): {output}")
-                return None
+                return False
             break
         time.sleep(1)
     if not isProcessCompleted:
@@ -109,22 +128,23 @@ def check_run(exec, index, uuid_val, timeout=60):
         if process.poll() is None:
             process.kill()
         process.wait()
-        exit_code = process.returncode
         print(f"Skip PGEN ERROR (timeout)")
-        return None
-    return output.splitlines()
+        return False
+    return True
 
 
-def main(count=1_000_000):
+def main(count=None, check=False):
     uuid_val = str(uuid.uuid4())
     index = 0
-    while index < count:
+    while (count is None) or (index < count):
         print(index)
-        out = check_run("./build/bin/fgen", index, uuid_val)
-        if out:
-            check_ubs(*out)
+        succ = check_run("./build/bin/fgen", index, uuid_val)
+        if check and succ:
+            fuuid_, fsano = uuid_val.replace('-', '_'), index
+            check_ubs(f"./procedures/function_{fuuid_}_{fsano}.c", f"./mappings/function_{fuuid_}_{fsano}_mapping")
         index += 1
 
 
 if __name__ == '__main__':
-    main(1_000)
+    # By default, generate unlimited functions without any UB checks
+    main(None, False)
