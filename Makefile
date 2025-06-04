@@ -76,6 +76,11 @@ gen-prog-set: pgen
 	@python3 scripts/retouch.py  # cleanup
 	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) $(shell uuidgen)
 
+gen-prog-set-check: pgen
+	@mkdir -p $(NEW_PROCEDURE_DIR)
+	@python3 scripts/retouch.py  # cleanup
+	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit 10000 --debug $(shell uuidgen)
+
 ########################################################################
 ## Other Targets
 ########################################################################

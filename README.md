@@ -10,10 +10,10 @@ Z3
 # Build all targets
 make all
 
-# Build function generation target
+# Build the function generation target
 make fgen
 
-# Build program generation target
+# Build the program generation target
 make pgen
 ```
 
@@ -24,11 +24,19 @@ make pgen
 make gen-func-set
 
 # Get a set of functions and check if they are UB-free or not
-make gen-func-set-checked
+make gen-func-set-check-ub
 
 # Generate a set of programs
 make gen-prog-set
 
+# Get a set of programs with checksum checks added
+make gen-prog-set-check
+
+# Check UB-freeness of the generated functions and their mappings
+python3 scripts/ubchk.py <func_dir> <map_dir>
+
+# Check UB-freeness of the generated programs and their mappings
+python3 scripts/ubchk.py <prog_dir>
 ```
 
 ## Fuzz

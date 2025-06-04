@@ -77,6 +77,12 @@ def check_ubs_once(c_file):
         print(f'CMP HANG (.): {out}')
     elif ub_res == UBChkRes.EXE_ERROR:
         print(f'EXE ERROR ({retc}): {out}')
+        if "Checksum not equal" in out:
+            print(f'Func : {c_file.absolute()}')
+            print("`````````````````````````````")
+            print(c_file.read_text())
+            print("`````````````````````````````")
+            exit(1)
     elif ub_res == UBChkRes.EXE_HANG:
         print(f'EXE HANG (.): {out}')
     elif ub_res == UBChkRes.UB_FREE:

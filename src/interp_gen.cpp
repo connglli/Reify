@@ -271,17 +271,17 @@ public:
         // replace the coefficient with a call to the procedure
         int coefficient = std::stoi(term.first);
         int checksum = computeStatelessChecksum(finalization);
-        std::string replacement = procedureName + "(";
+        std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + procedureName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
         }
         replacement += std::to_string(initialisation[initialisation.size() - 1]);
-        replacement += ")";
-        long diff = (long) coefficient - (long) checksum; // To avoid UBs
-        if (diff >= (long) INT32_MIN && diff <= (long) INT32_MAX) {
+        replacement += "))";
+        long long diff = (long long) coefficient - (long long) checksum; // To avoid UBs
+        if (diff >= (long long) INT32_MIN && diff <= (long long) INT32_MAX) {
           term.first = replacement + " + " + std::to_string(diff);
         } else {
-          term.first = "(long)" + replacement + " + " + std::to_string(diff) + "L";
+          term.first = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
         }
         term.third = true;
         return true;
@@ -333,17 +333,18 @@ public:
         // replace the coefficient with a call to the procedure
         int coefficient = std::stoi(term.first);
         int checksum = computeStatelessChecksum(finalization);
-        std::string replacement = procedureName + "(";
+        std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + procedureName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
         }
         replacement += std::to_string(initialisation[initialisation.size() - 1]);
-        replacement += ")";
-        long diff = (long) coefficient - (long) checksum;
-        if (diff >= (long) INT32_MIN && diff <= (long) INT32_MAX) {
+        replacement += "))";
+        long long diff = (long long) coefficient - (long long) checksum;
+        if (diff >= (long long) INT32_MIN && diff <= (long long) INT32_MAX) {
           term.first = replacement + " + " + std::to_string(diff);
         } else {
-          term.first = "(long)" + replacement + " + " + std::to_string(diff) + "L";
+          assert((int)((long long)checksum + diff) == coefficient && "Not same");
+          term.first = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
         }
         term.third = true;
         return true;
@@ -385,8 +386,12 @@ public:
     // Parse the procedure
     while (std::getline(procedureFile, line)) {
       if (line.find("if") != std::string::npos) {
-        statements.push_back(std::make_unique<IfStatement>(line));
-        total_num_coefficients += statements.back()->getNumCoefficients();
+        if (line.find("pass_counter") != std::string::npos) {
+          statements.push_back(std::make_unique<FluffStatement>(line));
+        } else {
+          statements.push_back(std::make_unique<IfStatement>(line));
+          total_num_coefficients += statements.back()->getNumCoefficients();
+        }
       } else if (line.find("int") != std::string::npos) {
         if (line.find("pass_counter") != std::string::npos) {
           statements.push_back(std::make_unique<FluffStatement>(line));
@@ -450,12 +455,10 @@ public:
     std::uniform_real_distribution<> dis(0, 1);
     auto probability = dis(gen);
     int trials = 1000;
-    // sample a statement from the list of statements until you get an IF
-    // statement
+    // Sample a statement from the list of statements for replacement
     while (true && trials > 0) {
       int index = rand() % statements.size();
-      // Idea: 80% of the replacements should be in the IF statements, and 20%
-      // in the assignment statements
+      // Idea: 80% of the replacements should be in the IF statements, and 20%  in the assignment statements
       if (statements[index]->getType() == Statement::Type::IF && probability < 0.8) {
         if (statements[index]->replaceCoefficient(procedureName, initialisation, finalization)) {
           return true;
@@ -492,14 +495,19 @@ public:
 };
 
 void generateCodeForInterproceduralBlock(
-    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool staticModifier = false,
-    int checksumType = CHECKSUM_TYPE
-) {
+    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false, bool staticModifier = false,
+    int checksumType = CHECKSUM_TYPE) {
   std::ofstream outFile(filename);
   outFile << "#include <stdint.h>\n";
   outFile << "#include <stdio.h>\n";
   outFile << "#include <stdarg.h>\n";
   outFile << generateCodeForChecksumFunction(checksumType);
+  if (debug) {
+    outFile << "#include <assert.h>\n";
+    outFile << "static inline int check_checksum(int expected, int actual) { assert(expected==actual && \"Checksum not equal\"); return actual; }\n";
+  } else {
+    outFile << "#define check_checksum(expected, actual) (actual)\n";
+  }
   outFile << "\n";
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -526,15 +534,16 @@ void generateCodeForInterproceduralBlock(
   std::vector<int> initialisation;
   std::vector<int> finalization;
   procedures[0].getMapping(initialisation, finalization);
-  outFile << "printf(\"%d,\", " << procedures[0].getName() << "(";
+  int checksum = computeStatelessChecksum(finalization);
+  outFile << "    printf(\"%d,\", check_checksum(" << checksum << ", " << procedures[0].getName() << "(";
   for (int i = 0; i < initialisation.size(); ++i) {
     outFile << initialisation[i];
     if (i != initialisation.size() - 1) {
       outFile << ", ";
     }
   }
-  outFile << "));\n";
-  outFile << "return 0;\n";
+  outFile << ")));\n";
+  outFile << "    return 0;\n";
   outFile << "}\n";
   outFile.close();
   // std::cout << "Code generated successfully in " << filename << std::endl;
@@ -546,6 +555,7 @@ struct CliOpts {
   std::string mappings;
   std::string uuid;
   int limits;
+  bool debug;
 };
 
 CliOpts parseCliOpts(int argc, char **argv) {
@@ -556,6 +566,7 @@ CliOpts parseCliOpts(int argc, char **argv) {
     ("p,procedures", "The directory saving the seed procedures", cxxopts::value<std::string>())
     ("m,mappings", "The directory saving the mappings for the the seed procedures", cxxopts::value<std::string>())
     ("l,limit", "The number of new procedures to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
+    ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
     ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
   options.parse_positional("uuid");
   options.positional_help("UUID");
@@ -607,7 +618,12 @@ CliOpts parseCliOpts(int argc, char **argv) {
     limit = args["limit"].as<int>();
   }
 
-  return {.procedures = procedures, .mappings = mappings, .uuid = uuid, .limits = limit};
+  bool debug = false;
+  if (args.count("debug")) {
+      debug = true;
+  }
+
+  return {.procedures = procedures, .mappings = mappings, .uuid = uuid, .limits = limit, .debug = debug};
 }
 
 int main(int argc, char *argv[]) {
@@ -617,6 +633,7 @@ int main(int argc, char *argv[]) {
   std::filesystem::path mappingDirectory(cliOpts.mappings);
   std::string new_procedure_uuid = cliOpts.uuid;
   int generateLimit = cliOpts.limits;
+  bool enableDebug = cliOpts.debug;
 
   // Read all files from procedureDirectory
   std::vector<std::filesystem::path> allProcFiles;
@@ -634,6 +651,7 @@ int main(int argc, char *argv[]) {
   selProcedures.resize(PROCEDURE_DEPTH);
 
   for (int sampNo = 0; generateLimit == 0 || sampNo < generateLimit; ++sampNo) {
+    std::cout << "[" << sampNo << "] Generating ... " << std::endl;
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, allProcFiles.size() - 1);
@@ -658,9 +676,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
       std::filesystem::path procFile = *selProcFiles[i];
       std::filesystem::path mapFile = mappingDirectory / GetMappingNameForProcedureName(procFile.stem().string());
-      std::cout << "Opening procedure file: " << procFile << std::endl;
+      std::cout << "[" << sampNo << "] Opening procedure file: " << procFile << std::endl;
       std::ifstream procIFS(procFile);
-      std::cout << "Opening mapping file: " << mapFile << std::endl;
+      std::cout << "[" << sampNo << "] Opening mapping file: " << mapFile << std::endl;
       std::ifstream mapIFS(mapFile);
       if (!procIFS.is_open() || !mapIFS.is_open()) {
         std::cerr << "Error opening file: " << procFile.stem() << std::endl;
@@ -704,7 +722,7 @@ int main(int argc, char *argv[]) {
 
     // std::cout<< "Now generating code for interprocedural block" << std::endl;
     std::string newProcedureName = new_procedure_uuid + "_" + std::to_string(sampNo);
-    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + ".c"), selProcedures);
-    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, true);
+    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + ".c"), selProcedures, enableDebug);
+    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, enableDebug, true);
   }
 }
