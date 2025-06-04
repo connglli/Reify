@@ -69,7 +69,7 @@ gen-func-set: fgen
 
 gen-func-set-checked: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
-	@python3 scripts/fgen.py --check
+	@python3 scripts/fgen.py --check --limit 1_000_000
 
 gen-prog-set: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
