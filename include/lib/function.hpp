@@ -74,7 +74,7 @@ public:
 
   z3::expr AddRandomInitialisations(z3::context &c);
 
-  z3::expr DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c);
+  z3::expr DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) const;
 
   // Function to extract parameters from the model, so that we can store the
   // coefficients and constants that the solver found an interpretation for

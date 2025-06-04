@@ -272,9 +272,10 @@ int main(int argc, char **argv) {
 
     if (solver.check() == z3::unsat) {
       logFile << "UNSAT" << std::endl;
+      std::cout << "WARNING: UNSAT at " << i + 1 << "-th initialization" << std::endl;
       mappingFile.close();
       logFile.close();
-      return 1;
+      return 0; // There's no need to report an error to our caller
     }
 
     isFormulaSatisfiable = true;

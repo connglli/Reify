@@ -102,7 +102,7 @@ z3::expr Func::AddRandomInitialisations(z3::context &c) {
   return allAssignedConstraint;
 }
 
-z3::expr Func::DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) {
+z3::expr Func::DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) const {
   // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
   std::vector<z3::expr> differentInitialisationConstraints;
   for (int i = 0; i < numVars; i++) {
