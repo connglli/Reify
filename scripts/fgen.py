@@ -104,8 +104,7 @@ def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
         if process.poll() is None:
             process.kill()
         process.wait()
-        exit_code = process.returncode
-        print(f"Skip PGEN ERROR (0): timeout")
+        print(f"Skip PGEN ERROR (.): timeout")
         return False
     return True
 
@@ -114,12 +113,12 @@ def main(limit, check, timeout):
     func_uuid, func_sano = str(uuid.uuid4()), 0
     print(f"UUID={func_uuid}")
     while func_sano < limit:
-        print(f"[{func_sano}]: Generate ...", end=" ")
+        print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
         succ = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check)
         if succ:
             print("Succeeded")
         if check and succ:
-            print(f"[{func_sano}]: CheckUBs ...", end=" ")
+            print(f"[{func_sano}]: CheckUBs ...", end=" ", flush=True)
             check_ubs(*get_func_map_files(func_uuid, func_sano))
             print("NO UBs")
         func_sano += 1
