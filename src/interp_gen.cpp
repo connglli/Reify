@@ -396,6 +396,11 @@ class Procedure{
         while (std::getline(procedureFileName, line)) {
             if(line.find("if") != std::string::npos)
             {
+                if(line.find("pass_counter") != std::string::npos)
+                {
+                    statements.push_back(std::make_unique<FluffStatement>(line));
+                    continue;
+                }
                 statements.push_back(std::make_unique<IfStatement>(line));
                 total_num_coefficients += statements.back()->getNumCoefficients();
             }
