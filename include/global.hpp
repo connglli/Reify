@@ -91,23 +91,30 @@ static std::filesystem::path PROCEDURES_DIR = "procedures";
 static std::filesystem::path MAPPINGS_DIR = "mappings";
 static std::filesystem::path GEN_LOGS_DIR = "logs";
 
-static std::string GetProcedureName(std::string uuid, int sno) {
+static std::filesystem::path NEW_PROCEDURES_DIR = "new_procedures";
+
+static std::string GetProcedureName(const std::string &uuid, int sno) {
   return "function_" + uuid + "_" + std::to_string(sno);
 }
 
-static std::filesystem::path GetProcedurePath(std::string uuid, int sno) {
+static std::filesystem::path GetProcedurePath(const std::string &uuid, int sno) {
   return PROCEDURES_DIR / (GetProcedureName(uuid, sno) + ".c");
 }
 
-static std::filesystem::path GetMappingPath(std::string uuid, int sno) {
+static std::filesystem::path GetMappingPath(const std::string &uuid, int sno) {
   return MAPPINGS_DIR / (GetProcedureName(uuid, sno) + "_mapping");
 }
 
-static std::filesystem::path GetGenLogPath(std::string uuid, int sno, bool devnull = true) {
+static std::string GetMappingNameForProcedureName(const std::string &procedureName) {
+  return procedureName + "_mapping";
+}
+
+static std::filesystem::path GetGenLogPath(const std::string &uuid, int sno, bool devnull = true) {
   if (devnull) {
-    return std::filesystem::path("/dev/null");
+    return {"/dev/null"};
   } else {
     return GEN_LOGS_DIR / (GetProcedureName(uuid, sno) + "_log");
   }
 }
+
 #endif // GRAPHFUZZ_GLOBAL_HPP

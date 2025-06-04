@@ -74,7 +74,7 @@ gen-func-set-check-ubs: fgen
 gen-prog-set: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
 	@python3 scripts/retouch.py  # cleanup
-	$(BIN_DIR)/pgen $(PROCEDURE_DIR) $(MAPPING_DIR) $(shell uuidgen)
+	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) $(shell uuidgen)
 
 ########################################################################
 ## Other Targets

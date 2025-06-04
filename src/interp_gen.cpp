@@ -36,21 +36,16 @@
 #include <unordered_map>
 #include <vector>
 
+#include "cxxopts.hpp"
 #include "global.hpp"
+#include "lib/strutils.hpp"
 
+/////////////////////////////////////////////////
+///////// Checksum
+/////////////////////////////////////////////////
+///
 const int getWithinRange = INT32_MAX;
 std::vector<uint32_t> crc32_table(256);
-
-const std::string newProcedureDirectory = "new_procedure/";
-
-std::string trim(const std::string &str) {
-  size_t start = str.find_first_not_of(" \t\n\r");
-  if (start == std::string::npos) {
-    return ""; // String is all whitespace
-  }
-  size_t end = str.find_last_not_of(" \t\n\r");
-  return str.substr(start, end - start + 1);
-}
 
 void generate_crc32_table(std::vector<uint32_t> &crc32_table) {
   const uint32_t poly = 0xEDB88320UL;
@@ -189,7 +184,7 @@ public:
   virtual std::string generateCode() const = 0;
   virtual Type getType() const = 0;
   virtual bool
-  replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> final_value) = 0;
+  replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) = 0;
 
   virtual int getNumCoefficients() const { return 0; };
 
@@ -206,7 +201,7 @@ public:
 
   Type getType() const override { return Type::FLUFF; }
 
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> final_value) {
+  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
     return false;
   }
 };
@@ -215,15 +210,22 @@ using Coefficient = std::string;
 using Variable = std::string;
 using isCoefficientMutated = bool;
 
+template <typename T1, typename T2, typename T3>
+struct triple {
+  T1 first;
+  T2 second;
+  T3 third;
+};
+
 class AssignmentStatement : public Statement {
-  std::string variableLHS;
-  std::vector<std::pair<std::pair<Coefficient, isCoefficientMutated>, Variable>>
-      RHSExpression; // coefficient_value, is_mutated, variable
+  std::string lhsVar;
+  std::vector<triple<Coefficient, Variable, isCoefficientMutated>>
+      rhsTerms; // coefficient_value, is_mutated, variable
 
 public:
   AssignmentStatement(std::string statement) {
     size_t equalPos = statement.find('=');
-    variableLHS = statement.substr(0, equalPos);
+    lhsVar = statement.substr(0, equalPos);
     std::string rhs = statement.substr(equalPos + 1);
     std::stringstream ss(rhs);
     std::string token;
@@ -233,7 +235,7 @@ public:
         Coefficient coeff = token.substr(0, mulPos);
         Variable var = token.substr(mulPos + 1);
         bool is_mutated = false; // Placeholder for mutation check
-        RHSExpression.push_back({{coeff, is_mutated}, var});
+        rhsTerms.push_back({coeff, var, is_mutated});
       } else {
         mulPos = token.find(';');
         if (mulPos != std::string::npos) {
@@ -242,16 +244,16 @@ public:
         Coefficient coeff = token;
         Variable var = "1";
         bool is_mutated = false;                             // Placeholder for mutation check
-        RHSExpression.push_back({{token, is_mutated}, "1"}); // Default coefficient of 1
+        rhsTerms.push_back({coeff, var, is_mutated}); // Default coefficient of 1
       }
     }
   }
 
   std::string generateCode() const override {
-    std::string code = variableLHS + " = ";
-    for (size_t i = 0; i < RHSExpression.size(); ++i) {
-      code += "(" + RHSExpression[i].first.first + ") * " + RHSExpression[i].second;
-      if (i != RHSExpression.size() - 1) {
+    std::string code = lhsVar + " = ";
+    for (size_t i = 0; i < rhsTerms.size(); ++i) {
+      code += "(" + rhsTerms[i].first + ") * " + rhsTerms[i].second;
+      if (i != rhsTerms.size() - 1) {
         code += " + ";
       }
     }
@@ -261,38 +263,28 @@ public:
 
   Type getType() const override { return Type::ASSIGNMENT; }
 
-  int getNumCoefficients() const override { return RHSExpression.size(); }
+  int getNumCoefficients() const override { return rhsTerms.size(); }
 
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> final_value) {
-    for (auto &term: RHSExpression) {
-      if (!term.first.second) {
+  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
+    for (auto &term: rhsTerms) {
+      if (!term.third) {
         // replace the coefficient with a call to the procedure
-        int coefficient = std::stoi(term.first.first);
-        int checksum = computeStatelessChecksum(final_value);
+        int coefficient = std::stoi(term.first);
+        int checksum = computeStatelessChecksum(finalization);
         std::string replacement = procedureName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
         }
         replacement += std::to_string(initialisation[initialisation.size() - 1]);
-        replacement += ") + " + std::to_string(coefficient - checksum);
-        if ((long) coefficient - (long) checksum >= (long) INT32_MIN &&
-            (long) coefficient - (long) checksum <= (long) INT32_MAX) {
-          term.first.first = replacement;
-          term.first.second = true;
-          return true;
+        replacement += ")";
+        long diff = (long) coefficient - (long) checksum; // To avoid UBs
+        if (diff >= (long) INT32_MIN && diff <= (long) INT32_MAX) {
+          term.first = replacement + " + " + std::to_string(diff);
         } else {
-
-          std::string replacement = procedureName + "(";
-          for (int i = 0; i < initialisation.size() - 1; ++i) {
-            replacement += std::to_string(initialisation[i]) + ", ";
-          }
-          replacement += std::to_string(initialisation[initialisation.size() - 1]);
-          replacement += ")";
-          term.first.first = "(long)" + replacement + " + (long)" + std::to_string(coefficient) + " - (long) " +
-                             std::to_string(checksum);
-          term.first.second = true;
-          return true;
+          term.first = "(long)" + replacement + " + " + std::to_string(diff) + "L";
         }
+        term.third = true;
+        return true;
       }
     }
     return false;
@@ -300,7 +292,7 @@ public:
 };
 
 class IfStatement : public Statement {
-  std::vector<std::pair<std::pair<Coefficient, isCoefficientMutated>, Variable>> condition;
+  std::vector<triple<Coefficient, Variable, isCoefficientMutated>> condition;
   std::string gotoStatement;
 
 public:
@@ -317,7 +309,7 @@ public:
         Coefficient coeff = token.substr(0, mulPos);
         Variable var = token.substr(mulPos + 1);
         bool is_mutated = false; // Placeholder for mutation check
-        condition.push_back({{coeff, is_mutated}, var});
+        condition.push_back({coeff, var, is_mutated});
       } else {
         mulPos = token.find(">=");
         if (mulPos != std::string::npos) {
@@ -326,7 +318,7 @@ public:
         Coefficient coeff = token;
         Variable var = "1";
         bool is_mutated = false;                         // Placeholder for mutation check
-        condition.push_back({{token, is_mutated}, "1"}); // Default coefficient of 1
+        condition.push_back({coeff, var, is_mutated}); // Default coefficient of 1
       }
     }
     gotoStatement = statement.substr(closeParen + 1);
@@ -335,37 +327,26 @@ public:
   int getNumCoefficients() const { return condition.size(); }
 
   //
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> final_value) {
+  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
     for (auto &term: condition) {
-      if (!term.first.second && term.first.first != "pass_counter ") {
+      if (!term.third && term.first != "pass_counter ") {
         // replace the coefficient with a call to the procedure
-        int coefficient = std::stoi(term.first.first);
-        int checksum = computeStatelessChecksum(final_value);
+        int coefficient = std::stoi(term.first);
+        int checksum = computeStatelessChecksum(finalization);
         std::string replacement = procedureName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
         }
         replacement += std::to_string(initialisation[initialisation.size() - 1]);
-        replacement += ") + " + std::to_string(coefficient - checksum);
-        if ((long) coefficient - (long) checksum >= (long) INT32_MIN &&
-            (long) coefficient - (long) checksum <= (long) INT32_MAX) {
-          term.first.first = replacement;
-          term.first.second = true;
-          return true;
+        replacement += ")";
+        long diff = (long) coefficient - (long) checksum;
+        if (diff >= (long) INT32_MIN && diff <= (long) INT32_MAX) {
+          term.first = replacement + " + " + std::to_string(diff);
         } else {
-
-          std::string replacement = procedureName + "(";
-          for (int i = 0; i < initialisation.size() - 1; ++i) {
-            replacement += std::to_string(initialisation[i]) + ", ";
-          }
-          replacement += std::to_string(initialisation[initialisation.size() - 1]);
-
-          replacement += ")";
-          term.first.first = "(long)" + replacement + " + (long)" + std::to_string(coefficient) + " - (long) " +
-                             std::to_string(checksum);
-          term.first.second = true;
-          return true;
+          term.first = "(long)" + replacement + " + " + std::to_string(diff) + "L";
         }
+        term.third = true;
+        return true;
       }
     }
     return false;
@@ -374,7 +355,7 @@ public:
   std::string generateCode() const override {
     std::string code = "if (";
     for (size_t i = 0; i < condition.size(); ++i) {
-      code += "(" + condition[i].first.first + ") * " + condition[i].second;
+      code += "(" + condition[i].first + ") * " + condition[i].second;
       if (i != condition.size() - 1) {
         code += " + ";
       }
@@ -387,20 +368,22 @@ public:
 };
 
 class Procedure {
-public:
+private:
   std::string name;
   int num_input_vars;
   int total_num_coefficients = 0;
   std::unordered_map<std::string, int> parameters;
   std::vector<std::unique_ptr<Statement>> statements;
   std::vector<std::vector<int>> initialisations;
-  std::vector<std::vector<int>> final_values;
+  std::vector<std::vector<int>> finalizations;
 
+public:
   Procedure() {}
 
-  Procedure(std::ifstream &procedureFileName, std::ifstream &mappingFileName) {
+  Procedure(std::ifstream &procedureFile, std::ifstream &mappingFile) {
     std::string line;
-    while (std::getline(procedureFileName, line)) {
+    // Parse the procedure
+    while (std::getline(procedureFile, line)) {
       if (line.find("if") != std::string::npos) {
         statements.push_back(std::make_unique<IfStatement>(line));
         total_num_coefficients += statements.back()->getNumCoefficients();
@@ -439,57 +422,29 @@ public:
         statements.push_back(std::make_unique<FluffStatement>(line));
       }
     }
-    // sample mappings file
-    //  1,1,1,-429582,-2147483647, :
-    //  -40705420,2116681841,2122492187,-989376752,-2147483647,
-    //  1,1,1,-429582,-2147483647, :
-    //  -40705420,2116681841,2122492187,-989376752,-2147483647,
-    //  1,1,1,-429582,-2147483647, :
-    //  -40705420,2116681841,2122492187,-989376752,-2147483647, std::cout<<
-    //  "Reading mapping file: " << std::endl;
-    while (std::getline(mappingFileName, line)) {
-      // std::cout << "lINE IS"<<line << std::endl;
-      std::stringstream ss(line);
-      std::string token;
-      std::vector<int> mapping;
-      // split line at :, and store the first part in initialisations and the
-      // second part in final_values
-      std::getline(ss, token, ':');
-      std::stringstream ss1(token);
-      while (std::getline(ss1, token, ',')) {
-        if (!token.empty()) {
-          // std::cout << token << std::endl;
-          try {
-            mapping.push_back(std::stoi(token));
-          } catch (...) {
-            continue;
-          }
-        }
-      }
-      initialisations.push_back(mapping);
-      mapping.clear();
-      // now read the rest of the line
-      std::getline(ss, token, ':');
-      std::stringstream ss2(token);
-      while (std::getline(ss2, token, ',')) {
-        if (!token.empty()) {
-          // std::cout << token << std::endl;
-          try {
-            mapping.push_back(std::stoi(token));
-          } catch (...) {
-            continue;
-          }
-        }
-      }
-      // std::cout << "mapping founddd" << std::endl;
-      final_values.push_back(mapping);
+    // Parse its mapping
+    while (std::getline(mappingFile, line)) {
+      std::vector<std::string> iniFin = SplitStr(line, " : ", true);
+      assert(iniFin.size() == 2 && "invalid mapping line");
+
+      std::vector<std::string> ini = SplitStr(iniFin[0], ",", true);
+      std::vector<std::string> fin = SplitStr(iniFin[1], ",", true);
+      assert(ini.size() == fin.size() && "the size of initialisation and finalization is different");
+      
+      initialisations.push_back(std::vector<int>(ini.size()));
+      std::transform(ini.begin(), ini.end(), initialisations.back().begin(), [](const auto &s) -> int {
+        return std::stoi(s);
+      });
+      finalizations.push_back(std::vector<int>(fin.size()));
+      std::transform(fin.begin(), fin.end(), finalizations.back().begin(), [](const auto &s) -> int {
+        return std::stoi(s);
+      });
     }
-    // std::cout << "Read mapping file successfully" << std::endl;
   }
 
   std::string getName() const { return name; }
 
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> final_value) {
+  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0, 1);
@@ -502,11 +457,11 @@ public:
       // Idea: 80% of the replacements should be in the IF statements, and 20%
       // in the assignment statements
       if (statements[index]->getType() == Statement::Type::IF && probability < 0.8) {
-        if (statements[index]->replaceCoefficient(procedureName, initialisation, final_value)) {
+        if (statements[index]->replaceCoefficient(procedureName, initialisation, finalization)) {
           return true;
         }
       } else if (statements[index]->getType() == Statement::Type::ASSIGNMENT && probability > 0.8) {
-        if (statements[index]->replaceCoefficient(procedureName, initialisation, final_value)) {
+        if (statements[index]->replaceCoefficient(procedureName, initialisation, finalization)) {
           return true;
         }
       }
@@ -523,30 +478,21 @@ public:
     return code;
   }
 
-  void getMapping(std::vector<int> &foreign_initialisation, std::vector<int> &foreign_final_value) const {
+  void getMapping(std::vector<int> &foreign_initialisation, std::vector<int> &foreign_finalization) const {
     // sample a random index from initialisations list
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, initialisations.size() - 1);
     int index = dis(gen);
     foreign_initialisation = initialisations[index];
-    foreign_final_value = final_values[index];
+    foreign_finalization = finalizations[index];
   }
 
   int calculateNumCoefficientsToReplace() const { return total_num_coefficients * REPLACEMENT_PROBABILITY; }
 };
 
-std::string mappingForProcedure(std::string procedureName) {
-  // remove .c from the procedure name
-  size_t pos = procedureName.find(".c");
-  if (pos != std::string::npos) {
-    procedureName = procedureName.substr(0, pos);
-  }
-  return procedureName + "_mapping";
-}
-
 void generateCodeForInterproceduralBlock(
-    std::string filename, const std::vector<Procedure> &procedures, bool staticModifier = false,
+    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool staticModifier = false,
     int checksumType = CHECKSUM_TYPE
 ) {
   std::ofstream outFile(filename);
@@ -578,8 +524,8 @@ void generateCodeForInterproceduralBlock(
     outFile << "    generate_crc32_table(crc32_tab);\n";
   }
   std::vector<int> initialisation;
-  std::vector<int> final_value;
-  procedures[0].getMapping(initialisation, final_value);
+  std::vector<int> finalization;
+  procedures[0].getMapping(initialisation, finalization);
   outFile << "printf(\"%d,\", " << procedures[0].getName() << "(";
   for (int i = 0; i < initialisation.size(); ++i) {
     outFile << initialisation[i];
@@ -594,98 +540,171 @@ void generateCodeForInterproceduralBlock(
   // std::cout << "Code generated successfully in " << filename << std::endl;
 }
 
-int main(int argc, char *argv[]) {
-  if (argc != 4) {
-    std::cerr << "Usage: " << argv[0] << " <procedure_directory> <mapping_directory> <uuid>" << std::endl;
-    return 1;
+
+struct CliOpts {
+  std::string procedures;
+  std::string mappings;
+  std::string uuid;
+  int limits;
+};
+
+CliOpts parseCliOpts(int argc, char **argv) {
+  cxxopts::Options options("pgen");
+  // clang-format off
+  options.add_options()
+    ("uuid", "An UUID identifier", cxxopts::value<std::string>())
+    ("p,procedures", "The directory saving the seed procedures", cxxopts::value<std::string>())
+    ("m,mappings", "The directory saving the mappings for the the seed procedures", cxxopts::value<std::string>())
+    ("l,limit", "The number of new procedures to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
+    ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
+  options.parse_positional("uuid");
+  options.positional_help("UUID");
+  // clang-format on
+
+  cxxopts::ParseResult args;
+  try {
+    args = options.parse(argc, argv);
+  } catch (cxxopts::exceptions::exception &e) {
+    std::cerr << "Error: " << e.what() << std::endl;
+    exit(1);
   }
-  std::string str1(argv[1]);
-  std::string str2(argv[2]);
-  std::string procedureDirectory = str1;
-  std::string mappingDirectory = str2;
-  std::string new_procedure_uuid = argv[3];
-  std::string newProcedureDirectory = "new_procedures";
-  // read all files from procedureDirectory
-  std::ifstream procedureFileName(procedureDirectory);
-  std::vector<std::string> procedureFiles;
-  // open the directory and read all files
+
+  if (args.count("help")) {
+    std::cout << options.help() << std::endl;
+    exit(0);
+  }
+
+  std::string uuid;
+  if (!args.count("uuid")) {
+    std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
+    exit(1);
+  } else {
+    uuid = args["uuid"].as<std::string>();
+    // Replace uuid's non-alphanumeric characters with underscore
+    // used a UUID so that i could throw everything from different runs
+    // into the same directory without worrying about name clashes
+    std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
+  }
+
+  std::string procedures;
+  if (!args.count("procedures")) {
+    std::cerr << "Error: The procedures directory (--procedures) is not given." << std::endl;
+    exit(1);
+  } else {
+    procedures = args["procedures"].as<std::string>();
+  }
+
+  std::string mappings;
+  if (!args.count("mappings")) {
+    std::cerr << "Error: The mappings directory (--mappings) is not given." << std::endl;
+    exit(1);
+  } else {
+    mappings = args["mappings"].as<std::string>();
+  }
+
+  int limit = 0;
+  if (args.count("limit")) {
+    limit = args["limit"].as<int>();
+  }
+
+  return {.procedures = procedures, .mappings = mappings, .uuid = uuid, .limits = limit};
+}
+
+int main(int argc, char *argv[]) {
+  CliOpts cliOpts = parseCliOpts(argc, argv);
+
+  std::filesystem::path procedureDirectory(cliOpts.procedures);
+  std::filesystem::path mappingDirectory(cliOpts.mappings);
+  std::string new_procedure_uuid = cliOpts.uuid;
+  int generateLimit = cliOpts.limits;
+
+  // Read all files from procedureDirectory
+  std::vector<std::filesystem::path> allProcFiles;
+  // Open the directory and read all files
   for (const auto &entry: std::filesystem::directory_iterator(procedureDirectory)) {
     if (entry.is_regular_file()) {
-      procedureFiles.push_back(entry.path().string());
+      allProcFiles.push_back(entry.path());
     }
   }
+
   generate_crc32_table(crc32_table);
-  std::vector<std::string> selectedFiles;
-  selectedFiles.resize(PROCEDURE_DEPTH);
-  std::vector<Procedure> procedures;
-  procedures.resize(PROCEDURE_DEPTH);
-  int sample_ct = 0;
-  while (true) {
-    sample_ct++;
+  std::vector<std::filesystem::path *> selProcFiles;
+  selProcFiles.resize(PROCEDURE_DEPTH);
+  std::vector<Procedure> selProcedures;
+  selProcedures.resize(PROCEDURE_DEPTH);
+
+  for (int sampNo = 0; generateLimit == 0 || sampNo < generateLimit; ++sampNo) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, procedureFiles.size() - 1);
-    // choose the procedure files randomly
-    memset(selectedFiles.data(), 0, selectedFiles.size() * sizeof(std::string));
+    std::uniform_int_distribution<> dis(0, allProcFiles.size() - 1);
+
+    // Choose the procedure files randomly
+    // Fixed Unsafe memset(vector<string>, 0, sizeof(string)!!
+    // std::string saves its data in the heap. That said, clears the vector's internal data
+    // does not lead to the auto deletion of the string's internal data. Small string optimization does not
+    // work here as the path of each our procedure is indeed more than 25 characters.
+    memset(selProcFiles.data(), 0, selProcFiles.size() * sizeof(std::filesystem::path *));
     for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
       while (true) {
         int index = dis(gen);
-        if (std::find(selectedFiles.begin(), selectedFiles.end(), procedureFiles[index]) == selectedFiles.end()) {
-          selectedFiles[i] = (procedureFiles[index]);
+        if (std::find(selProcFiles.begin(), selProcFiles.end(), &allProcFiles[index]) == selProcFiles.end()) {
+          selProcFiles[i] = &allProcFiles[index];
           break;
         }
       }
     }
-    for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
-      std::string file = selectedFiles[i];
 
-      file = file.substr(file.find_last_of("/\\") + 1);
-      std::ifstream procedureFile(procedureDirectory + "/" + file);
-      std::ifstream mappingFile(mappingDirectory + "/" + mappingForProcedure(file));
-      std::cout << "Opening file: " << procedureDirectory + "/" + file << std::endl;
-      std::cout << "Opening file: " << mappingDirectory + "/" + mappingForProcedure(file) << std::endl;
-      if (!procedureFile.is_open() || !mappingFile.is_open()) {
-        std::cerr << "Error opening file: " << file << std::endl;
-        continue;
+    // Parse all selected procedure files
+    for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
+      std::filesystem::path procFile = *selProcFiles[i];
+      std::filesystem::path mapFile = mappingDirectory / GetMappingNameForProcedureName(procFile.stem().string());
+      std::cout << "Opening procedure file: " << procFile << std::endl;
+      std::ifstream procIFS(procFile);
+      std::cout << "Opening mapping file: " << mapFile << std::endl;
+      std::ifstream mapIFS(mapFile);
+      if (!procIFS.is_open() || !mapIFS.is_open()) {
+        std::cerr << "Error opening file: " << procFile.stem() << std::endl;
+        continue; // TODO: Continue??? The i-th procedure remains the one in the last sampling?
       }
-      procedures[i] = Procedure(procedureFile, mappingFile);
+      selProcedures[i] = Procedure(procIFS, mapIFS);
       // std::cout << "Procedure name: " << procedures[i].getName() <<
       // std::endl;
-      procedureFile.close();
-      mappingFile.close();
+      procIFS.close();
+      mapIFS.close();
     }
+
     std::vector<int> initialisation;
-    std::vector<int> final_value;
-    // now replace the mappings in the procedures with the calls to the other
-    // procedures
+    std::vector<int> finalization;
+    // Now replace the mappings in the procedures with the calls to the other procedures
     for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
-      int num_mappings_to_replace = procedures[i].calculateNumCoefficientsToReplace();
-      // std::cout << "Number of mappings to replace: " <<
-      // num_mappings_to_replace << std::endl;
-      // sample a procedure from i + 1 to PROCEDURE_DEPTH
-      std::random_device rd;
-      std::mt19937 gen(rd());
-      std::uniform_int_distribution<> dis(i + 1, PROCEDURE_DEPTH - 1);
       if (i == PROCEDURE_DEPTH - 1) {
         break;
       }
+      // Sample a procedure from i + 1 to PROCEDURE_DEPTH
+      std::random_device rd;
+      std::mt19937 gen(rd());
+      std::uniform_int_distribution<> dis(i + 1, PROCEDURE_DEPTH - 1);
+
+      // Calculate all replaceable coefficients
+      int num_mappings_to_replace = selProcedures[i].calculateNumCoefficientsToReplace();
+      // std::cout << "Number of mappings to replace: " << num_mappings_to_replace << std::endl;
+
+      // For each coefficient that can be replaced, we find a procedure to replace it
       for (int k = 0; k < num_mappings_to_replace; ++k) {
         int index = dis(gen);
-        procedures[index].getMapping(initialisation, final_value);
-        if (!procedures[i].replaceCoefficient(procedures[index].getName(), initialisation, final_value))
-          break;
+        selProcedures[index].getMapping(initialisation, finalization);
+        if (!selProcedures[i].replaceCoefficient(selProcedures[index].getName(), initialisation, finalization)) {
+          break; // TODO: break or continue? We can continue to the next, can't we?
+        }
         // std::cout<<"Replacing mapping for procedure: " <<
         // procedures[index].getName() << " in procedure: " <<
         // procedures[i].getName() << std::endl;
       }
     }
+
     // std::cout<< "Now generating code for interprocedural block" << std::endl;
-    generateCodeForInterproceduralBlock(
-        newProcedureDirectory + "/" + new_procedure_uuid + "_" + std::to_string(sample_ct) + ".c", procedures
-    );
-    generateCodeForInterproceduralBlock(
-        newProcedureDirectory + "/" + new_procedure_uuid + "_" + std::to_string(sample_ct) + "_static.c", procedures,
-        true
-    );
+    std::string newProcedureName = new_procedure_uuid + "_" + std::to_string(sampNo);
+    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + ".c"), selProcedures);
+    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, true);
   }
 }

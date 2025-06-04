@@ -21,7 +21,7 @@ def _ub_exists_in(txt):
     return "runtime error: " in txt
 
 
-def check_ubs_once(c_file, o_file='/tmp/a.out', cmp_tmo=60, exe_tmo=120):
+def _check_ubs(c_file, o_file='/tmp/a.out', cmp_tmo=60, exe_tmo=120):
     try:
         run_proc(
             [
@@ -58,12 +58,37 @@ def check_ubs_once(c_file, o_file='/tmp/a.out', cmp_tmo=60, exe_tmo=120):
         return UBChkRes.EXE_HANG, 0, f'execution timeout (>{exe_tmo}s)'
 
 
+def check_ubs_once(c_file):
+    ub_res, retc, out = _check_ubs(c_file)
+    if ub_res == UBChkRes.UB_FOUND:
+        print(f'****************************')
+        print(f'********* FOUND UB *********')
+        print(f'****************************')
+        print(f'Func : {c_file.absolute()}')
+        print(f'Retc : {retc}')
+        print(f'Mesg : {out}')
+        print("`````````````````````````````")
+        print(c_file.read_text())
+        print("`````````````````````````````")
+        exit(1)
+    elif ub_res == UBChkRes.CMP_ERROR:
+        print(f"CMP ERROR ({retc}): {out}")
+    elif ub_res == UBChkRes.CMP_HANG:
+        print(f'CMP HANG (.): {out}')
+    elif ub_res == UBChkRes.EXE_ERROR:
+        print(f'EXE ERROR ({retc}): {out}')
+    elif ub_res == UBChkRes.EXE_HANG:
+        print(f'EXE HANG (.): {out}')
+    elif ub_res == UBChkRes.UB_FREE:
+        pass
+
+
 def check_ubs(func_path, map_path):
     func_code, func_name = func_path.read_text(), func_path.stem
     tmp_c_path, tmp_o_path = Path('/tmp/a.c'), Path('/tmp/a.o')
     for map_ind, (func_args, _) in enumerate(parse_mapping(map_path)):
         tmp_c_path.write_text(get_simple_program(func_name, func_code, func_args))
-        ub_res, retc, out = check_ubs_once(tmp_c_path, o_file=str(tmp_o_path))
+        ub_res, retc, out = _check_ubs(tmp_c_path, o_file=str(tmp_o_path))
         if ub_res == UBChkRes.UB_FOUND:
             print(f'****************************')
             print(f'********* FOUND UB *********')
@@ -89,13 +114,18 @@ def check_ubs(func_path, map_path):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print("Usage: ubchk <procedure_dir> <mapping_dir>")
+    if len(sys.argv) != 2 and len(sys.argv) != 3:
+        print("Usage 1: ubchk <procedure_dir> <mapping_dir>")
+        print("Usage 2: ubchk <new_procedure_dir>")
         exit(1)
     proc_dir = Path(sys.argv[1])
-    map_dir = Path(sys.argv[2])
+    map_dir = Path(sys.argv[2]) if len(sys.argv) == 3 else None
     for func_file in proc_dir.iterdir():
         if not func_file.is_file(): continue
         print(f"Check {func_file.stem} ...")
-        map_file = get_map_file_for_func_file(func_file, mappings_dir=map_dir)
-        check_ubs(func_file, map_file)
+        if map_dir:
+            map_file = get_map_file_for_func_file(func_file, mappings_dir=map_dir)
+            check_ubs(func_file, map_file)
+        else:
+            check_ubs_once(func_file)
+
