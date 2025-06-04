@@ -1,11 +1,13 @@
 CXX := $(shell command -v g++ || command -v clang++)
 
+
 # Complain if we don't have any available compilers
 ifeq ($(CXX),)
 	$(error Neither g++ nor clang++ found! Please install one of them.)
 endif
 
 # TODO: Complain if our dependencies are not installed for example z3
+
 
 INC_DIR := include
 LIB_DIR := lib
@@ -27,7 +29,9 @@ LDFLAGS := -lz3 -lpthread
 LIB_SRC := $(wildcard $(LIB_DIR)/*.cpp)
 LIB_OBJ := $(patsubst $(LIB_DIR)/%.cpp,$(LIB_OBJ_DIR)/%.o,$(LIB_SRC))
 
+
 .PHONY: all clean lib gen-func-set gen-func-set-check-ubs gen-prog-set
+
 
 ########################################################################
 ## Building Targets
@@ -49,7 +53,7 @@ fgen: $(LIB_OBJ) $(OBJ_DIR)/func_gen.o
 	@mkdir -p $(BIN_DIR)
 	$(CXX) -o $(BIN_DIR)/fgen $^ $(LDFLAGS) 
 
-pgen: $(LIB_OBJ) $(OBJ_DIR)/interp_gen.o
+pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
 	@mkdir -p $(BIN_DIR)
 	$(CXX) -o $(BIN_DIR)/pgen $^ $(LDFLAGS) 
 
@@ -80,6 +84,7 @@ gen-prog-set-check: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
 	@python3 scripts/retouch.py  # cleanup
 	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit 10000 --debug $(shell uuidgen)
+
 
 ########################################################################
 ## Other Targets
