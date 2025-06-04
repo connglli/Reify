@@ -23,23 +23,24 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
-import signal
 import subprocess
 import time
 import uuid
 from argparse import ArgumentParser
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from params import get_simple_program, get_func_map_files, parse_mapping
+from utils import run_proc
 
 
 def check_ubs(func_path, map_path):
     func_code, func_name = func_path.read_text(), func_path.stem
     tmp_c_path, tmp_o_path = Path('/tmp/a.c'), Path('/tmp/a.o')
-    for func_args, _ in parse_mapping(map_path):
+    for map_ind, (func_args, _) in enumerate(parse_mapping(map_path)):
         tmp_c_path.write_text(get_simple_program(func_name, func_code, func_args))
         try:
-            subprocess.run(
+            run_proc(
                 [
                     'gcc',
                     '-fno-tree-slsr', '-fno-ivopts', '-fsanitize=undefined',
@@ -48,65 +49,62 @@ def check_ubs(func_path, map_path):
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                check=True
+                check=True, timeout=60  # allow 60s to compile
             )
         except subprocess.CalledProcessError as e:
-            print(f'Skip: PCMP ERROR ({e.returncode}): {e.stdout}')
+            print(f"Skip {map_ind}: PCMP ERROR ({e.returncode}): {e.stdout.decode('utf-8')}")
+            continue
+        except subprocess.TimeoutExpired:
+            print(f'Skip {map_ind}: PCMP HANG (.): timeout')
             continue
         try:
-            p = subprocess.run([
+            p = run_proc([
                 str(tmp_o_path)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                check=True
+                check=True, timeout=120  # allow 120s to execute
             )
             out = p.stdout.decode('utf-8') or "<no output>"
             if "runtime error: " in out:
                 print(f'UBs FOUND ({p.returncode}): {out}')
+                print("===========================================")
+                print(tmp_c_path.read_text())
+                print("===========================================")
                 exit(1)
         except subprocess.CalledProcessError as e:
             out = e.stdout.decode('utf-8') or "<no output>"
             if "runtime error: " in out:
                 print(f'UBs FOUND ({e.returncode}): {out}')
-                print(f"{proc_name}({proc_args})")
+                print("===========================================")
+                print(tmp_c_path.read_text())
+                print("===========================================")
                 exit(1)
-            print(f'Skip: PEXE ERROR ({e.returncode}): {out}')
+            print(f'Skip {map_ind}: PEXE ERROR ({e.returncode}): {out}')
+        except subprocess.TimeoutExpired:
+            print(f'Skip {map_ind}: PEXE HANG (.): timeout')
+            continue
 
 
 def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
-    process = subprocess.Popen(
-        [
-            exec, "-n", str(sano), "-v", uuid_val
-        ] if verbose else [
-            exec, "-n", str(sano), uuid_val
-        ],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    st_time = time.time()
-    completed = False
-    exit_code = None
-    while time.time() - st_time < timeout:
-        if process.poll() is not None:
-            completed = True
-            exit_code = process.returncode
-            output, _ = process.communicate()
-            output = output.decode('utf-8') or "<no output>"
-            if exit_code == 1:
-                print(f"Skip PGEN ERROR ({exit_code}): {output}")
-                return False
-            break
-        time.sleep(1)
-    if not completed:
-        process.send_signal(signal.SIGINT)
-        # Wait for the process to terminate and get the exit code
-        process.wait(timeout=30)
-        # If the process is not terminated, kill it
-        if process.poll() is None:
-            process.kill()
-        process.wait()
-        print(f"Skip PGEN ERROR (.): timeout")
-        return False
-    return True
+    try:
+        st_time = time.time()
+        run_proc(
+            [
+                exec, "-n", str(sano), "-v", uuid_val
+            ] if verbose else [
+                exec, "-n", str(sano), uuid_val
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            check=True, timeout=timeout
+        )
+        ed_time = time.time()
+        return True, ed_time - st_time
+    except CalledProcessError as e:
+        print(f"Skip: PGEN ERROR ({e.returncode}): {e.stdout.decode('utf-8')}")
+        return False, None
+    except subprocess.TimeoutExpired:
+        print(f"Skip: PGEN HANG (.): timeout")
+        return False, None
 
 
 def main(limit, check, timeout):
@@ -114,9 +112,9 @@ def main(limit, check, timeout):
     print(f"UUID={func_uuid}, limit={limit if limit is not None else '<INF>'}, check={check}, timeout={timeout}s")
     while limit is None or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
-        succ = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check)
+        succ, elapsed = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check)
         if succ:
-            print("Succeeded")
+            print(f"SUCC (time={elapsed}s)")
         if check and succ:
             print(f"[{func_sano}]: CheckUBs ...", end=" ", flush=True)
             check_ubs(*get_func_map_files(func_uuid, func_sano))

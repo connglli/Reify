@@ -67,7 +67,7 @@ gen-func-set: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
 	@python3 scripts/fgen.py
 
-gen-func-set-checked: fgen
+gen-func-set-check-ubs: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
 	@python3 scripts/fgen.py --check --limit 1_000_000
 
