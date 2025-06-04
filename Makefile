@@ -27,7 +27,7 @@ LDFLAGS := -lz3 -lpthread
 LIB_SRC := $(wildcard $(LIB_DIR)/*.cpp)
 LIB_OBJ := $(patsubst $(LIB_DIR)/%.cpp,$(LIB_OBJ_DIR)/%.o,$(LIB_SRC))
 
-.PHONY: all clean lib gen-func-set gen-prog-set
+.PHONY: all clean lib gen-func-set gen-func-set-check-ubs gen-prog-set
 
 ########################################################################
 ## Building Targets
