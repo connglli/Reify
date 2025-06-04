@@ -81,7 +81,7 @@ static uint32_t context_free_crc32_4bytes(uint32_t context, uint32_t val) {
   return context;
 }
 
-std::string generateCodeForChecksumFunction(int checksumType = globalChecksumType) {
+std::string generateCodeForChecksumFunction(int checksumType = CHECKSUM_TYPE) {
   std::stringstream code;
   // a C-style va-list function to take a variable number of arguments
   switch (checksumType) {
@@ -157,7 +157,7 @@ std::string generateCodeForChecksumFunction(int checksumType = globalChecksumTyp
   return code.str();
 }
 
-static uint32_t computeStatelessChecksum(std::vector<int> initialisation, int checksumType = globalChecksumType) {
+static uint32_t computeStatelessChecksum(std::vector<int> initialisation, int checksumType = CHECKSUM_TYPE) {
   switch (checksumType) {
     case 0: {
       uint32_t checksum = 0xFFFFFFFFUL;
@@ -169,10 +169,10 @@ static uint32_t computeStatelessChecksum(std::vector<int> initialisation, int ch
     case 1: {
       long checksum = 0;
       for (auto i: initialisation) {
-        checksum = (checksum + (long) i) % (long) CHECKSUM_MOD;
-        checksum = (checksum + (long) CHECKSUM_MOD) % (long) CHECKSUM_MOD;
+        checksum = (checksum + (long) i) % (long) CHECKSUM_MOD_PRM;
+        checksum = (checksum + (long) CHECKSUM_MOD_PRM) % (long) CHECKSUM_MOD_PRM;
       }
-      checksum = (checksum + (long) CHECKSUM_MOD) % (long) CHECKSUM_MOD;
+      checksum = (checksum + (long) CHECKSUM_MOD_PRM) % (long) CHECKSUM_MOD_PRM;
       return checksum;
     }
     default: {
@@ -533,7 +533,7 @@ public:
     foreign_final_value = final_values[index];
   }
 
-  int calculateNumCoefficientsToReplace() const { return total_num_coefficients * replacementProbability; }
+  int calculateNumCoefficientsToReplace() const { return total_num_coefficients * REPLACEMENT_PROBABILITY; }
 };
 
 std::string mappingForProcedure(std::string procedureName) {
@@ -547,7 +547,7 @@ std::string mappingForProcedure(std::string procedureName) {
 
 void generateCodeForInterproceduralBlock(
     std::string filename, const std::vector<Procedure> &procedures, bool staticModifier = false,
-    int checksumType = globalChecksumType
+    int checksumType = CHECKSUM_TYPE
 ) {
   std::ofstream outFile(filename);
   outFile << "#include <stdint.h>\n";

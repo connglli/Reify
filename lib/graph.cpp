@@ -33,7 +33,7 @@
 
 // Function to check if a node has a path to a given target
 bool Graph::HasPath(int start, int target) const {
-  std::vector<bool> visited(nodes, false);
+  std::vector<bool> visited(numNodes, false);
   std::queue<int> q;
   q.push(start);
   visited[start] = true;
@@ -43,7 +43,7 @@ bool Graph::HasPath(int start, int target) const {
     q.pop();
     if (curr == target)
       return true;
-    for (int neighbor: adj[curr]) {
+    for (int neighbor: adjTab[curr]) {
       if (!visited[neighbor]) {
         visited[neighbor] = true;
         q.push(neighbor);
@@ -56,20 +56,20 @@ bool Graph::HasPath(int start, int target) const {
 void Graph::Generate() {
   srand(time(0));
 
-  for (int i = 0; i < nodes - 1; i++) {
-    if (rand() % 2 == 0 || i == nodes - 2) {
-      int target = rand() % nodes;
+  for (int i = 0; i < numNodes - 1; i++) {
+    if (rand() % 2 == 0 || i == numNodes - 2) {
+      int target = rand() % numNodes;
       while (target == 0 || target == i)
-        target = rand() % nodes;
+        target = rand() % numNodes;
       addEdge(i, target);
     } else {
-      int target1 = rand() % nodes;
-      int target2 = rand() % nodes;
+      int target1 = rand() % numNodes;
+      int target2 = rand() % numNodes;
 
       while (target1 == 0 || target1 == i)
-        target1 = rand() % nodes;
+        target1 = rand() % numNodes;
       while (target2 == 0 || target2 == i || target2 == target1)
-        target2 = rand() % nodes;
+        target2 = rand() % numNodes;
 
       addEdge(i, target1);
       addEdge(i, target2);
@@ -84,13 +84,13 @@ void Graph::Generate() {
 
 std::vector<int> Graph::SampleWalk(int start, int end, int max_steps) {
   std::vector<int> walk;
-  max_steps = std::max(max_steps, 50 * nodes); // Ensure max_steps is at least 10 times the number of nodes
+  max_steps = std::max(max_steps, 50 * numNodes); // Ensure max_steps is at least 10 times the number of nodes
   int current_node = start;
   walk.push_back(current_node);
 
   int steps = 0;
   while (current_node != end && steps < max_steps) {
-    const std::set<int> &neighbors = adj[current_node];
+    const std::set<int> &neighbors = adjTab[current_node];
     if (neighbors.empty()) {
       break; // No more neighbors to move to
     }
@@ -110,7 +110,7 @@ std::vector<int> Graph::SampleWalk(int start, int end, int max_steps) {
 
 std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) {
   std::vector<int> walk;
-  max_steps = std::max(max_steps, 50 * nodes); // Ensure enough steps
+  max_steps = std::max(max_steps, 50 * numNodes); // Ensure enough steps
   int current_node = start;
   walk.push_back(current_node);
 
@@ -119,7 +119,7 @@ std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) 
 
   int steps = 0;
   while (current_node != end && steps < max_steps) {
-    const std::set<int> &neighbors = adj[current_node];
+    const std::set<int> &neighbors = adjTab[current_node];
     if (neighbors.empty()) {
       break; // No more neighbors to move to
     }
@@ -153,9 +153,9 @@ std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) 
 }
 
 void Graph::PrintGraph() {
-  for (int i = 0; i < nodes; i++) {
+  for (int i = 0; i < numNodes; i++) {
     std::cout << "Node " << i << " -> ";
-    for (int j: adj[i]) {
+    for (int j: adjTab[i]) {
       std::cout << j << " ";
     }
     std::cout << std::endl;
@@ -163,39 +163,39 @@ void Graph::PrintGraph() {
 }
 
 void Graph::addEdge(int u, int v) {
-  if (u != v && adj[u].size() < 2) { // Ensure outdegree <= 2
-    adj[u].insert(v);
+  if (u != v && adjTab[u].size() < 2) { // Ensure outdegree <= 2
+    adjTab[u].insert(v);
   }
 }
 
 void Graph::enforceReachabilityToLast() {
-  for (int i = nodes - 2; i >= 0; i--) {
-    if (!HasPath(i, nodes - 1)) {
+  for (int i = numNodes - 2; i >= 0; i--) {
+    if (!HasPath(i, numNodes - 1)) {
       std::vector<int> candidates;
-      for (int j = i + 1; j < nodes; j++) {
-        if (HasPath(j, nodes - 1)) {
+      for (int j = i + 1; j < numNodes; j++) {
+        if (HasPath(j, numNodes - 1)) {
           candidates.push_back(j);
         }
       }
       bool found = false;
       for (auto candidate: candidates) {
-        if (candidate == nodes - 1) {
+        if (candidate == numNodes - 1) {
           continue;
         }
-        if (adj[candidate].size() < 2) {
+        if (adjTab[candidate].size() < 2) {
           addEdge(i, candidate);
           found = true;
         }
       }
       if (!found) {
-        addEdge(i, nodes - 1);
+        addEdge(i, numNodes - 1);
       }
     }
   }
 }
 
 void Graph::enforceReachabilityFromStart() {
-  for (int i = 1; i < nodes; i++) {
+  for (int i = 1; i < numNodes; i++) {
     if (!HasPath(0, i)) {
       std::vector<int> candidates;
       for (int j = 0; j < i; j++) {
@@ -207,7 +207,7 @@ void Graph::enforceReachabilityFromStart() {
         if (candidate == 0) {
           continue;
         }
-        if (adj[candidate].size() < 2) {
+        if (adjTab[candidate].size() < 2) {
           addEdge(candidate, i);
         }
       }
@@ -225,7 +225,7 @@ std::vector<std::vector<int>> Graph::sampleKDisjointWalksAndBackpatchGraph(int s
   std::vector<std::vector<int>> walks;
   int tries = 0;
   std::set<int> non_visited_nodes;
-  for (int i = 0; i < nodes; i++) {
+  for (int i = 0; i < numNodes; i++) {
     non_visited_nodes.insert(i);
   }
   while (walks.size() < k && tries < 1000) {
@@ -237,8 +237,8 @@ std::vector<std::vector<int>> Graph::sampleKDisjointWalksAndBackpatchGraph(int s
     walk.push_back(current_node);
     // look for a neighbour in the unvisited nodes, if not, then we create a new edge after arbitrarily choosing a
     // node from the unvisited nodes
-    while (current_node != end || num_nodes_in_walk >= 50 * nodes) {
-      const std::set<int> &neighbors = adj[current_node];
+    while (current_node != end || num_nodes_in_walk >= 50 * numNodes) {
+      const std::set<int> &neighbors = adjTab[current_node];
       // check if any of the current node's neighbours are in the unvisited nodes
       std::set<int> unvisited_neighbors;
       for (auto neighbor: neighbors) {
@@ -254,7 +254,7 @@ std::vector<std::vector<int>> Graph::sampleKDisjointWalksAndBackpatchGraph(int s
         // choose a random node from the unvisited nodes
         auto it = non_visited_nodes.begin();
         std::advance(it, rand() % non_visited_nodes.size()); // Random step
-        adj[current_node].insert(*it);
+        adjTab[current_node].insert(*it);
         current_node = *it;
       }
       walk.push_back(current_node);

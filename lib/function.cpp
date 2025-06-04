@@ -25,9 +25,11 @@
 
 
 #include "lib/function.hpp"
+
 #include <random>
 #include <sstream>
 #include "global.hpp"
+
 #include "lib/naming.hpp"
 #include "lib/utils.hpp"
 
@@ -57,8 +59,8 @@ const std::vector<int> Func::SampleExec(int execStep, bool consistent) {
   // Modify the basic block at the end of the sample walk to have pass counter
   // equal to the number of times that basic block has been visited.
   int passCounter = std::count_if(sampleWalk.begin(), sampleWalk.end(), [=](auto n) { return n == stopNode; });
-  bbs[stopNode].setPassCounter(passCounter);
-  parameters[generatePassCounterName()] = passCounter;
+  bbs[stopNode].SetPassCounter(passCounter);
+  parameters[NamePassCounter()] = passCounter;
   sampleWalk.push_back(endNode);
   // logFile << "Sample walk has been modified to end at the last node." << std::endl;
   return sampleWalk;
@@ -69,15 +71,12 @@ const std::vector<int> Func::SampleExec(int execStep, bool consistent) {
 ///////////////////////////////////////////////////////////////////
 
 z3::expr Func::MakeInitialisationsInteresting(z3::context &c) const {
-  if (!enableInterestingInitialisations) {
-    return c.bool_val(true);
-  }
   std::vector<z3::expr> allVars;
   for (int i = 0; i < numVars; i++) {
-    allVars.push_back(c.int_const((getVarName(i) + "_0").c_str()));
+    allVars.push_back(c.int_const((NameVar(i) + "_0").c_str()));
   }
   // let's assign each variable a random value between -100 and 10
-  return atMostKZeroes(c, allVars, numVars / 2, 0);
+  return AtMostKZeroes(c, allVars, numVars / 2);
 }
 
 z3::expr Func::AddRandomInitialisations(z3::context &c) {
@@ -87,7 +86,7 @@ z3::expr Func::AddRandomInitialisations(z3::context &c) {
   std::vector<z3::expr> allVars;
   z3::expr allAssignedConstraint = c.bool_val(true);
   for (int i = 0; i < numVars; i++) {
-    std::string varName = getVarName(i);
+    std::string varName = NameVar(i);
     allVars.push_back(c.int_const((varName + "_0").c_str()));
     z3::expr randomInit = c.bool_val(true);
     if (ParamDefined(varName)) {
@@ -108,11 +107,11 @@ z3::expr Func::DifferentInitialisationConstraint(std::vector<int> initialisation
   std::vector<z3::expr> differentInitialisationConstraints;
   for (int i = 0; i < numVars; i++) {
     int boundedValue1 = initialisation[i];
-    z3::expr boundedValue2 = c.int_const((getVarName(i) + "_0").c_str());
+    z3::expr boundedValue2 = c.int_const((NameVar(i) + "_0").c_str());
     differentInitialisationConstraints.push_back(z3::ite(boundedValue1 != boundedValue2, c.int_val(1), c.int_val(0)));
   }
   z3::expr differentInitialisationConstraint =
-      atMostKZeroes(c, differentInitialisationConstraints, std::min(3, numVars / 2), 0);
+      AtMostKZeroes(c, differentInitialisationConstraints, std::min(3, numVars / 2));
   return differentInitialisationConstraint;
 }
 
@@ -144,7 +143,7 @@ void Func::ExtractParametersFromModel(z3::model &model, z3::context &ctx) {
 std::vector<int> Func::ExtractInitialisationsFromModel(z3::model &model, z3::context &ctx) const {
   std::vector<int> initialisations;
   for (int i = 0; i < numVars; i++) {
-    std::string varName = getVarName(i) + "_0";
+    std::string varName = NameVar(i) + "_0";
     z3::expr varExpr = ctx.int_const(varName.c_str());
     assert(model.has_interp(varExpr.decl()) && "Variable not found in model");
     if (model.has_interp(varExpr.decl())) {
@@ -174,7 +173,7 @@ std::vector<int> Func::ExtractFinalizationsFromModel(
 ) const {
   std::vector<int> finalisations;
   for (int i = 0; i < numVars; i++) {
-    std::string varName = getVarName(i) + "_" + std::to_string(versions[getVarName(i)]);
+    std::string varName = NameVar(i) + "_" + std::to_string(versions[NameVar(i)]);
     z3::expr varExpr = ctx.int_const(varName.c_str());
     assert(model.has_interp(varExpr.decl()) && "Variable not found in model");
     if (model.has_interp(varExpr.decl())) {
@@ -204,14 +203,14 @@ std::string Func::GenerateCode(int sno, std::string uuid) {
   std::ostringstream code;
   code << "int function_" << uuid << "_" << std::to_string(sno) << "(";
   for (int i = 0; i < numVars; ++i) {
-    code << "int " << getVarName(i);
+    code << "int " << NameVar(i);
     if (i < numVars - 1) {
       code << ", ";
     }
   }
   code << ")" << std::endl;
   code << "{" << std::endl;
-  code << "    int " << generatePassCounterName() << " = 0;" << std::endl;
+  code << "    int " << NamePassCounter() << " = 0;" << std::endl;
   for (const auto &bb: bbs) {
     code << bb.GenerateCode() << std::endl;
   }

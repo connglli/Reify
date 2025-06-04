@@ -31,9 +31,9 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <z3++.h>
 #include "lib/block.hpp"
 #include "lib/graph.hpp"
-#include "z3++.h"
 
 class BB;
 

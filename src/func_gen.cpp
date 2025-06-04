@@ -26,14 +26,12 @@
 #include <bits/stdc++.h>
 #include <csignal>
 #include <sstream>
-#include <unistd.h>
+#include <z3++.h>
 #include "cxxopts.hpp"
 #include "global.hpp"
 #include "lib/block.hpp"
 #include "lib/function.hpp"
 #include "lib/graph.hpp"
-#include "lib/naming.hpp"
-#include "z3++.h"
 
 std::ofstream logFile;
 std::ofstream outputFile;
@@ -41,6 +39,7 @@ std::ofstream mappingFile;
 std::filesystem::path logFileName;
 std::filesystem::path mappingFileName;
 std::filesystem::path outputFileName;
+
 
 static bool isFormulaSatisfiable = false;
 
@@ -175,13 +174,13 @@ int main(int argc, char **argv) {
 
   logFile << "==== Generation =============================" << std::endl;
 
-  Func f(NUM_NODES, NUM_VARS);
+  Func f(NUM_NODES_PER_FUNC, NUM_VARS_PER_FUNC);
   f.GenCFG();
 
   auto g = f.GetUdlyGraph();
   auto basicBlocks = f.GetBBs();
 
-  auto execution = f.SampleExec(100, enableConsistentWalks);
+  auto execution = f.SampleExec(100, ENABLE_CONSISTENT_WALKS);
   logFile << "Exec: ";
   for (int i: execution) {
     logFile << i << ",";
@@ -194,8 +193,10 @@ int main(int argc, char **argv) {
   logFile << "==== Initialization 0 =============================" << std::endl;
 
   // Let each parameter (coefficient or constant) interesting initially
-  solver.add(f.MakeInitialisationsInteresting(c));
-  if (enableRandomInitialisations) {
+  if (ENABLE_INTERESTING_INITS) {
+    solver.add(f.MakeInitialisationsInteresting(c));
+  }
+  if (ENABLE_RANDOM_INITS) {
     solver.add(f.AddRandomInitialisations(c));
   }
 
@@ -204,7 +205,7 @@ int main(int argc, char **argv) {
   // Generate UB constraint for each statement in the executed basic block
   std::unordered_map<std::string, int> versions; // SSA version for each definition
   for (int i = 0; i < execution.size() - 1; i++) {
-    logFile << "Constraint " << i << std::endl;
+    logFile << "Constraint BB#" << i << std::endl;
     int current_bb = execution[i];
     int next_bb = execution[i + 1];
     // Generate constraints for the current basic block so that
@@ -233,7 +234,6 @@ int main(int argc, char **argv) {
   z3::model model = solver.get_model();
   logFile << "Execution Model: " << model << std::endl;
 
-
   f.ExtractParametersFromModel(model, c);
   outputFile << f.GenerateCode(sno, uuid);
   outputFile.close();
@@ -247,8 +247,10 @@ int main(int argc, char **argv) {
   // same constraints, except this time - the solver would use the coefficients
   // and constants we already generated from the model.
   solver.reset();
-  solver.add(f.MakeInitialisationsInteresting(c));
-  if (enableRandomInitialisations) {
+  if (ENABLE_INTERESTING_INITS) {
+    solver.add(f.MakeInitialisationsInteresting(c));
+  }
+  if (ENABLE_RANDOM_INITS) {
     solver.add(f.AddRandomInitialisations(c));
   }
 
@@ -260,7 +262,7 @@ int main(int argc, char **argv) {
   }
   basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
-  for (int i = 0; i < NUMBER_OF_INITIALISATIONS_OF_EACH_WALK - 1; i++) {
+  for (int i = 0; i < NUM_INITS_PER_WALK - 1; i++) {
     logFile << "==== Initialization " << i + 1 << " =============================" << std::endl;
 
     // Ensure that the initialisation is sufficiently different from the previous one

@@ -31,37 +31,20 @@
 #include <set>
 #include <string>
 #include <vector>
-#include "global.hpp"
 #include "lib/function.hpp"
 #include "z3++.h"
-
-typedef int VarIndex;
 
 class Func;
 
 class BB {
 
 public:
-  Func &f;
-  int blockno;
-  int numStatements;
-  std::map<VarIndex, std::vector<VarIndex>> statementMappings;
-  std::vector<VarIndex> assignmentOrder;
-  std::vector<int> blockTargets;
-  std::vector<VarIndex> conditionalVariables;
-  // MOTIVATION: We need to generate a pass counter name for the block in case we
-  // end up in a consistent walk with a loop which never reaches the end node
-  bool needPassCounter = false;
-  int passCounterValue = 0;
-
-public:
-  BB(Func &f, int blockno, const std::set<int> &graphTargets) :
-      f(f), blockno(blockno), numStatements(ASSIGNMENTS_PER_BB),
-      blockTargets(graphTargets.begin(), graphTargets.end()) {}
+  BB(Func &f, int blkNo, const std::set<int> &successors) :
+      f(f), blkNo(blkNo), successors(successors.begin(), successors.end()) {}
 
   void Generate();
 
-  void setPassCounter(int value) {
+  void SetPassCounter(int value) {
     needPassCounter = true;
     passCounterValue = value;
   }
@@ -70,6 +53,10 @@ public:
   /////// Constraint Generation
   ///////////////////////////////////////////////////////////////////
 
+public:
+  void
+  GenerateConstraints(int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions);
+
 private:
   z3::expr createParameterExpr(std::string name, z3::context &ctx);
 
@@ -77,21 +64,31 @@ private:
 
   z3::expr boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs);
 
-public:
-  void
-  GenerateConstraints(int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions);
-
   ///////////////////////////////////////////////////////////////////
   /////// Code Generation
   ///////////////////////////////////////////////////////////////////
 
+public:
+  std::string GenerateCode() const;
+
 private:
-  std::string generateConditionalConstraint(int blockno, int target, std::vector<VarIndex> conditionalVariables) const;
+  std::string generateConditionalConstraint(int blockno, int target, std::vector<int> conditionalVariables) const;
 
   std::string generateUnconditionalGoto(int target) const;
 
-public:
-  std::string GenerateCode() const;
+private:
+  Func &f;                     // The residing function of this basic block
+  int blkNo;                   // The identifier of this basic block
+  std::vector<int> successors; // Successors of the basic block
+
+  std::vector<int> assignmentOrder;            // The order of the definition of each variable
+  std::map<int, std::vector<int>> defUsedVars; // The list of used variables for each defined variables
+  std::vector<int> condUsedVars;               // The list of used variables for the conditional
+
+  // MOTIVATION: We need to generate a pass counter name for the block in case we
+  // end up in a consistent walk with a loop which never reaches the end node
+  bool needPassCounter = false;
+  int passCounterValue = 0;
 };
 
 #endif // GRAPHFUZZ_BLOCK_HPP

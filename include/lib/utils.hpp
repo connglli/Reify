@@ -33,24 +33,20 @@
 #include <algorithm>
 #include <random>
 #include <vector>
-#include "z3++.h"
+#include <z3++.h>
 
-static z3::expr atMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k, int val) {
+static z3::expr AtMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k) {
   z3::expr_vector zero_constraints(ctx);
-
   for (const auto &expr: vec) {
-    zero_constraints.push_back(z3::ite(expr == val, ctx.int_val(1), ctx.int_val(0)));
+    zero_constraints.push_back(z3::ite(expr == 0, ctx.int_val(1), ctx.int_val(0)));
   }
-
   z3::expr sum_zeros = sum(zero_constraints);
   return sum_zeros <= k;
 }
 
-static std::vector<int> sampleKDistinct(int n, int k) {
+static std::vector<int> SampleKDistinct(int n, int k) {
   n -= 1;
-  if (k > n + 1) {
-    throw std::invalid_argument("Error: k must be at most n + 1 to sample k distinct numbers.");
-  }
+  assert(k <= n + 1 && "k must be at most n + 1 to sample k distinct numbers");
   std::vector<int> numbers(n + 1);
   for (int i = 0; i <= n; ++i) {
     numbers[i] = i;
@@ -58,7 +54,6 @@ static std::vector<int> sampleKDistinct(int n, int k) {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::shuffle(numbers.begin(), numbers.end(), gen);
-
   return std::vector<int>(numbers.begin(), numbers.begin() + k);
 }
 

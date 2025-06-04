@@ -32,11 +32,11 @@
 class Graph {
 
 public:
-  explicit Graph(int n) : nodes(n), adj(n) {}
+  explicit Graph(int n) : numNodes(n), adjTab(n) {}
 
-  int NumNodes() const { return nodes; }
+  int NumNodes() const { return numNodes; }
 
-  const std::set<int> &GetAdj(int i) const { return adj[i]; }
+  const std::set<int> &GetAdj(int i) const { return adjTab[i]; }
 
   // Generate the random graph
   void Generate();
@@ -67,8 +67,8 @@ private:
   std::vector<std::vector<int>> getKDistinctConsistentWalks(int start, int end, int k);
 
 private:
-  const int nodes;
-  std::vector<std::set<int>> adj; // Use set to avoid duplicate edges
+  const int numNodes;
+  std::vector<std::set<int>> adjTab; // Use set to avoid duplicate edges
 };
 
 #endif // GRAPHFUZZ_GRAPH_HPP
