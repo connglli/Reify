@@ -1,8 +1,8 @@
-CXX := $(shell command -v clang++ || command -v g++)
+CXX := $(shell command -v g++ || command -v clang++)
 
 # Complain if we don't have any available compilers
 ifeq ($(CXX),)
-	$(error Neither clang++ nor g++ found! Please install one of them.)
+	$(error Neither g++ nor clang++ found! Please install one of them.)
 endif
 
 # TODO: Complain if our dependencies are not installed for example z3
