@@ -43,7 +43,7 @@
 /////////////////////////////////////////////////
 ///////// Checksum
 /////////////////////////////////////////////////
-///
+
 const int getWithinRange = INT32_MAX;
 std::vector<uint32_t> crc32_table(256);
 
@@ -210,7 +210,7 @@ using Coefficient = std::string;
 using Variable = std::string;
 using isCoefficientMutated = bool;
 
-template <typename T1, typename T2, typename T3>
+template<typename T1, typename T2, typename T3>
 struct triple {
   T1 first;
   T2 second;
@@ -219,8 +219,7 @@ struct triple {
 
 class AssignmentStatement : public Statement {
   std::string lhsVar;
-  std::vector<triple<Coefficient, Variable, isCoefficientMutated>>
-      rhsTerms; // coefficient_value, is_mutated, variable
+  std::vector<triple<Coefficient, Variable, isCoefficientMutated>> rhsTerms; // coefficient_value, is_mutated, variable
 
 public:
   AssignmentStatement(std::string statement) {
@@ -243,7 +242,7 @@ public:
         }
         Coefficient coeff = token;
         Variable var = "1";
-        bool is_mutated = false;                             // Placeholder for mutation check
+        bool is_mutated = false;                      // Placeholder for mutation check
         rhsTerms.push_back({coeff, var, is_mutated}); // Default coefficient of 1
       }
     }
@@ -317,7 +316,7 @@ public:
         }
         Coefficient coeff = token;
         Variable var = "1";
-        bool is_mutated = false;                         // Placeholder for mutation check
+        bool is_mutated = false;                       // Placeholder for mutation check
         condition.push_back({coeff, var, is_mutated}); // Default coefficient of 1
       }
     }
@@ -343,7 +342,7 @@ public:
         if (diff >= (long long) INT32_MIN && diff <= (long long) INT32_MAX) {
           term.first = replacement + " + " + std::to_string(diff);
         } else {
-          assert((int)((long long)checksum + diff) == coefficient && "Not same");
+          assert((int) ((long long) checksum + diff) == coefficient && "Not same");
           term.first = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
         }
         term.third = true;
@@ -435,7 +434,7 @@ public:
       std::vector<std::string> ini = SplitStr(iniFin[0], ",", true);
       std::vector<std::string> fin = SplitStr(iniFin[1], ",", true);
       assert(ini.size() == fin.size() && "the size of initialisation and finalization is different");
-      
+
       initialisations.push_back(std::vector<int>(ini.size()));
       std::transform(ini.begin(), ini.end(), initialisations.back().begin(), [](const auto &s) -> int {
         return std::stoi(s);
@@ -495,8 +494,9 @@ public:
 };
 
 void generateCodeForInterproceduralBlock(
-    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false, bool staticModifier = false,
-    int checksumType = CHECKSUM_TYPE) {
+    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
+    bool staticModifier = false, int checksumType = CHECKSUM_TYPE
+) {
   std::ofstream outFile(filename);
   outFile << "#include <stdint.h>\n";
   outFile << "#include <stdio.h>\n";
@@ -504,7 +504,8 @@ void generateCodeForInterproceduralBlock(
   outFile << generateCodeForChecksumFunction(checksumType);
   if (debug) {
     outFile << "#include <assert.h>\n";
-    outFile << "static inline int check_checksum(int expected, int actual) { assert(expected==actual && \"Checksum not equal\"); return actual; }\n";
+    outFile << "static inline int check_checksum(int expected, int actual) { assert(expected==actual && \"Checksum not "
+               "equal\"); return actual; }\n";
   } else {
     outFile << "#define check_checksum(expected, actual) (actual)\n";
   }
@@ -548,7 +549,6 @@ void generateCodeForInterproceduralBlock(
   outFile.close();
   // std::cout << "Code generated successfully in " << filename << std::endl;
 }
-
 
 struct CliOpts {
   std::string procedures;
@@ -620,7 +620,7 @@ CliOpts parseCliOpts(int argc, char **argv) {
 
   bool debug = false;
   if (args.count("debug")) {
-      debug = true;
+    debug = true;
   }
 
   return {.procedures = procedures, .mappings = mappings, .uuid = uuid, .limits = limit, .debug = debug};
@@ -723,6 +723,8 @@ int main(int argc, char *argv[]) {
     // std::cout<< "Now generating code for interprocedural block" << std::endl;
     std::string newProcedureName = new_procedure_uuid + "_" + std::to_string(sampNo);
     generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + ".c"), selProcedures, enableDebug);
-    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, enableDebug, true);
+    generateCodeForInterproceduralBlock(
+        NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, enableDebug, true
+    );
   }
 }

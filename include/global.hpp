@@ -32,6 +32,7 @@
 ////////////////////////////////////////////////////////////
 ////// Block Generation
 ////////////////////////////////////////////////////////////
+
 #define UPPER_BOUND INT_MAX      // upper bound for the results of expression and subexpression evaluation
 #define LOWER_BOUND INT_MIN      // lower bound for the results of expression and subexpression evaluation
 #define LOWER_INIT_BOUND INT_MIN // lower bound for the initialisation of variables
@@ -101,19 +102,21 @@ static std::filesystem::path GetProcedurePath(const std::string &uuid, int sno) 
   return PROCEDURES_DIR / (GetProcedureName(uuid, sno) + ".c");
 }
 
-static std::filesystem::path GetMappingPath(const std::string &uuid, int sno) {
-  return MAPPINGS_DIR / (GetProcedureName(uuid, sno) + "_mapping");
-}
-
 static std::string GetMappingNameForProcedureName(const std::string &procedureName) {
   return procedureName + "_mapping";
 }
+
+static std::filesystem::path GetMappingPath(const std::string &uuid, int sno) {
+  return MAPPINGS_DIR / GetMappingNameForProcedureName(GetProcedureName(uuid, sno));
+}
+
+static std::string GetGenLogNameForProcedureName(const std::string &procedureName) { return procedureName + "_log"; }
 
 static std::filesystem::path GetGenLogPath(const std::string &uuid, int sno, bool devnull = true) {
   if (devnull) {
     return {"/dev/null"};
   } else {
-    return GEN_LOGS_DIR / (GetProcedureName(uuid, sno) + "_log");
+    return GEN_LOGS_DIR / GetGenLogNameForProcedureName(GetProcedureName(uuid, sno));
   }
 }
 
