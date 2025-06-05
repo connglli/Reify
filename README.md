@@ -23,14 +23,14 @@ make pgen
 # Generate a set of functions
 make gen-func-set
 
-# Get a set of functions and check if they are UB-free or not
-make gen-func-set-check-ub
+# Get FGEN_LIMIT (0 mean unlimited) functions and check if they are UB-free
+[FGEN_LIMIT=10000] make gen-func-set-check-ub
 
 # Generate a set of programs
 make gen-prog-set
 
-# Get a set of programs with checksum checks added
-make gen-prog-set-check
+# Get PGEN_LIMIT (0 means unlimited) programs and check if they are UB-free
+[PGEN_LIMIT=10000] make gen-prog-set-check
 
 # Check UB-freeness of the generated functions and their mappings
 python3 scripts/ubchk.py <func_dir> <map_dir>

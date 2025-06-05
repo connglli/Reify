@@ -59,7 +59,7 @@ def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
 def main(limit, check, timeout):
     func_uuid, func_sano = str(uuid.uuid4()), 0
     print(f"UUID={func_uuid}, limit={limit if limit is not None else '<INF>'}, check={check}, timeout={timeout}s")
-    while limit is None or func_sano < limit:
+    while limit == 0 or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
         succ, elapsed = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check)
         if succ:
@@ -74,7 +74,7 @@ def main(limit, check, timeout):
 if __name__ == '__main__':
     parser = ArgumentParser("fgen", description="Tool for generating a set of functions")
 
-    parser.add_argument("--limit", type=int, default=None, help="the number of functions to generate")
+    parser.add_argument("--limit", type=int, default=0, help="the number of functions to generate (0 for unlimited)")
     parser.add_argument("--check", action="store_true", default=False, help="enable UB check per generated function")
     parser.add_argument("--timeout", type=int, default=60, help="timeout (in seconds) for generating a program")
 

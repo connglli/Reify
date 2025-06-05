@@ -16,9 +16,9 @@ LIB_DIR := lib
 SRC_DIR := src
 RES_DIR := res
 
-BUILD_DIR := build
-BIN_DIR := $(BUILD_DIR)/bin
-OBJ_DIR := $(BUILD_DIR)/obj
+BUILD_DIR   := build
+BIN_DIR     := $(BUILD_DIR)/bin
+OBJ_DIR     := $(BUILD_DIR)/obj
 LIB_OBJ_DIR := $(OBJ_DIR)/lib
 
 
@@ -43,7 +43,7 @@ LIB_OBJ     := $(LIB_OBJ_CXX) $(LIB_OBJ_C)
 # code are transformed into plain text (string literal) in our generated
 # code. This is accomplished collaboratedly by the following script and
 # the code in checksum.{h,c}pp. Specifically, some macros shown below.
-CHKSUM_RES    := $(RES_DIR)/cchksum.txt
+CHKSUM_RES := $(RES_DIR)/cchksum.txt
 
 # Since make will replace all newlines and remove quotes, we should escape them
 CHKSUM_CODE_MACRO := STATELESS_CHECKSUM_CODE
@@ -54,14 +54,10 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 ## Building Flags
 ########################################################################
 
-ifdef NDEBUG
-	DBGFLAGS :=
-else
-	DBGFLAGS := -g
-endif
+DBGFLAGS := $(ifdef DEBUG,-g,)
 CXXFLAGS := $(DBGFALGS) -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR)
-CFLAGS := $(DBGFLAGS) -Wall -Wextra -std=c17 -O0
-LDFLAGS := -lz3 -lpthread
+CFLAGS   := $(DBGFLAGS) -Wall -Wextra -std=c17 -O0
+LDFLAGS  := -lz3 -lpthread
 
 
 .PHONY: all clean lib gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check
@@ -105,18 +101,23 @@ pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
 ## Generation Targets
 ########################################################################
 
-PROCEDURE_DIR        := procedures
-MAPPING_DIR          := mappings
-LOGGINGS_DIR         := logs
-NEW_PROCEDURE_DIR    := new_procedures
+PROCEDURE_DIR        ?= procedures
+MAPPING_DIR          ?= mappings
+LOGGINGS_DIR         ?= logs
+NEW_PROCEDURE_DIR    ?= new_procedures
+
+FGEN_LIMIT ?= 1000000
 
 gen-func-set: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
 	@python3 scripts/fgen.py
 
+
 gen-func-set-check-ubs: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
-	@python3 scripts/fgen.py --check --limit 1_000_000
+	@python3 scripts/fgen.py --check --limit $(FGEN_LIMIT)
+
+PGEN_LIMIT ?= 100000
 
 gen-prog-set: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
@@ -126,7 +127,8 @@ gen-prog-set: pgen
 gen-prog-set-check: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
 	@python3 scripts/retouch.py  # cleanup
-	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit 10000 --debug $(shell uuidgen)
+	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit $(PGEN_LIMIT) --debug $(shell uuidgen)
+	@python3 scripts/ubchk.py $(NEW_PROCEDURE_DIR)
 
 
 ########################################################################
