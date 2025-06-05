@@ -50,6 +50,8 @@ int StatelessChecksum::Compute(const std::vector<int> &values) {
   // clang-format on
 }
 
+std::string StatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }
+
 std::string StatelessChecksum::GetRawCode() {
 #ifndef STATELESS_CHECKSUM_CODE
   static_assert(false, "STATELESS_CHECKSUM_CODE is not defined");

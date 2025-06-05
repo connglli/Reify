@@ -34,6 +34,7 @@ class StatelessChecksum {
 
 public:
   static int Compute(const std::vector<int> &values);
+  static std::string GetComputeName();
   static std::string GetRawCode();
 
 private:

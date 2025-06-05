@@ -32,6 +32,7 @@
 #include <z3++.h>
 
 #include "global.hpp"
+#include "lib/chksum.hpp"
 #include "lib/naming.hpp"
 #include "lib/samputils.hpp"
 
@@ -397,7 +398,7 @@ std::string BB::GenerateCode() const {
   } else {
     // print the values of all the variables, separated by commas
     //  code << "    return 0;";
-    code << "    return computeStatelessChecksum(" << f.NumVars() << ",";
+    code << "    return " << StatelessChecksum::GetComputeName() << "(" << f.NumVars() << ",";
     for (int i = 0; i < f.NumVars(); ++i) {
       code << NameVar(i);
       if (i < f.NumVars() - 1) {
