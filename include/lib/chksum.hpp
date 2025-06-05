@@ -33,13 +33,11 @@
 class StatelessChecksum {
 
 public:
-  static void Initialize();
   static int Compute(const std::vector<int> &values);
   static std::string GetRawCode();
 
 private:
   StatelessChecksum() {}
 };
-
 
 #endif // GRAPHFUZZ_CHKSUM_HPP

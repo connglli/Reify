@@ -47,7 +47,7 @@ CHKSUM_RES    := $(RES_DIR)/cchksum.txt
 
 # Since make will replace all newlines and remove quotes, we should escape them
 CHKSUM_CODE_MACRO := STATELESS_CHECKSUM_CODE
-CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | sed 's/"/\\\\\\"/g'))"\"
+CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | sed 's/"/\\\\\\"/g'))\""
 
 
 ########################################################################

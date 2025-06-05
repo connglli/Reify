@@ -29,11 +29,7 @@
 #include <cstdint>
 #include <string>
 
-extern "C" uint32_t crc32_tab[256];
-extern "C" void generate_crc32_table(uint32_t *crc32_table);
 extern "C" int computeStatelessChecksum(int num_args, ...);
-
-void StatelessChecksum::Initialize() { generate_crc32_table(crc32_tab); }
 
 int StatelessChecksum::Compute(const std::vector<int> &values) {
   // This is a trick to call into a variadic function.

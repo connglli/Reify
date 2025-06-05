@@ -397,7 +397,7 @@ std::string BB::GenerateCode() const {
   } else {
     // print the values of all the variables, separated by commas
     //  code << "    return 0;";
-    code << "    return computeStatelessChecksum(";
+    code << "    return computeStatelessChecksum(" << f.NumVars() << ",";
     for (int i = 0; i < f.NumVars(); ++i) {
       code << NameVar(i);
       if (i < f.NumVars() - 1) {

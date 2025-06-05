@@ -269,14 +269,7 @@ public:
         statements.push_back(std::make_unique<FluffStatement>(line));
       } else if (line.find("return") != std::string::npos) {
         // End of the procedure
-        // modify the return computeStatelessChecksum function to take in
-        // num_input_vars as an argument
-        std::string newLine = "return computeStatelessChecksum(" + std::to_string(num_input_vars);
-        for (int i = 0; i < num_input_vars; ++i) {
-          newLine += ", var_" + std::to_string(i);
-        }
-        newLine += ");";
-        statements.push_back(std::make_unique<FluffStatement>(newLine));
+        statements.push_back(std::make_unique<FluffStatement>(line));
         // statements.push_back(std::make_unique<FluffStatement>(line));
       } else if (line.find("BB") != std::string::npos) {
         // Start a new basic block
@@ -393,7 +386,6 @@ void generateCodeForInterproceduralBlock(
     outFile << procedures[i].generateCode() << std::endl;
   }
   outFile << "int main() {" << std::endl;
-  outFile << "    generate_crc32_table(crc32_tab);" << std::endl;
   std::vector<int> initialisation;
   std::vector<int> finalization;
   procedures[0].getMapping(initialisation, finalization);
@@ -505,8 +497,6 @@ int main(int argc, char *argv[]) {
       allProcFiles.push_back(entry.path());
     }
   }
-
-  StatelessChecksum::Initialize();
 
   std::vector<std::filesystem::path *> selProcFiles;
   selProcFiles.resize(PROCEDURE_DEPTH);
