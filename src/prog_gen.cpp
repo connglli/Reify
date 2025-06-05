@@ -38,146 +38,11 @@
 
 #include "cxxopts.hpp"
 #include "global.hpp"
+#include "lib/chksum.hpp"
 #include "lib/strutils.hpp"
 
-/////////////////////////////////////////////////
-///////// Checksum
-/////////////////////////////////////////////////
-
-const int getWithinRange = INT32_MAX;
-std::vector<uint32_t> crc32_table(256);
-
-void generate_crc32_table(std::vector<uint32_t> &crc32_table) {
-  const uint32_t poly = 0xEDB88320UL;
-  for (uint32_t i = 0; i < 256; i++) {
-    uint32_t crc = i;
-    for (int j = 8; j > 0; j--) {
-      if (crc & 1) {
-        crc = (crc >> 1) ^ poly;
-      } else {
-        crc >>= 1;
-      }
-    }
-    crc32_table[i] = crc;
-  }
-}
-
-int32_t uint32_to_int32(uint32_t u) { return u % getWithinRange; }
-
-static uint32_t context_free_crc32_byte(uint32_t context, uint8_t b) {
-  return ((context >> 8) & 0x00FFFFFF) ^ crc32_table[(context ^ b) & 0xFF];
-}
-
-static uint32_t context_free_crc32_4bytes(uint32_t context, uint32_t val) {
-  context = context_free_crc32_byte(context, (val >> 0) & 0xFF);
-  context = context_free_crc32_byte(context, (val >> 8) & 0xFF);
-  context = context_free_crc32_byte(context, (val >> 16) & 0xFF);
-  context = context_free_crc32_byte(context, (val >> 24) & 0xFF);
-  return context;
-}
-
-std::string generateCodeForChecksumFunction(int checksumType = CHECKSUM_TYPE) {
-  std::stringstream code;
-  // a C-style va-list function to take a variable number of arguments
-  switch (checksumType) {
-    case 0:
-      code << "#include <string.h>\n";
-      code << "uint32_t crc32_tab[256];\n";
-      code << "int32_t uint32_to_int32(uint32_t u){\n";
-      code << "    return u%" << getWithinRange << ";\n";
-      code << "}\n";
-      code << "void generate_crc32_table(uint32_t* crc32_table) {\n";
-      code << "    const uint32_t poly = 0xEDB88320UL;\n";
-      code << "    for (uint32_t i = 0; i < 256; i++) {\n";
-      code << "        uint32_t crc = i;\n";
-      code << "        for (int j = 8; j > 0; j--) {\n";
-      code << "            if (crc & 1) {\n";
-      code << "                crc = (crc >> 1) ^ poly;\n";
-      code << "            } else {\n";
-      code << "                crc >>= 1;\n";
-      code << "            }\n";
-      code << "        }\n";
-      code << "        crc32_table[i] = crc;\n";
-      code << "    }\n";
-      code << "}\n";
-      code << "uint32_t context_free_crc32_byte(uint32_t context, uint8_t b) {\n";
-      code << "    return ((context >> 8) & 0x00FFFFFF) ^ crc32_tab[(context ^ "
-              "b) & 0xFF];\n";
-      code << "}\n";
-      code << "uint32_t context_free_crc32_4bytes(uint32_t context, uint32_t "
-              "val) {\n";
-      code << "    context = context_free_crc32_byte(context, (val >> 0) & "
-              "0xFF);\n";
-      code << "    context = context_free_crc32_byte(context, (val >> 8) & "
-              "0xFF);\n";
-      code << "    context = context_free_crc32_byte(context, (val >> 16) & "
-              "0xFF);\n";
-      code << "    context = context_free_crc32_byte(context, (val >> 24) & "
-              "0xFF);\n";
-      code << "    return context;\n";
-      code << "}\n";
-      break;
-    default:
-      assert(false && "Invalid checksum type");
-  }
-  code << "int computeStatelessChecksum(int num_args, ...)\n";
-  code << "{\n";
-  code << "    va_list args;\n";
-  code << "    va_start(args, num_args);\n";
-  switch (checksumType) {
-    case 0:
-      code << "    uint32_t checksum = 0xFFFFFFFFUL;\n";
-      code << "    for (int i = 0; i < num_args; ++i) {\n";
-      code << "        int arg = va_arg(args, int);\n";
-      code << "        checksum = context_free_crc32_4bytes(checksum, arg);\n";
-      code << "    }\n";
-      code << "    checksum = uint32_to_int32(checksum ^ 0xFFFFFFFFUL);\n";
-      break;
-    case 1:
-      code << "    int mod = 1000000007;\n";
-      code << "    long checksum = 0;\n";
-      code << "    for (int i = 0; i < num_args; ++i) {\n";
-      code << "        int arg = va_arg(args, int);\n";
-      code << "        checksum = (checksum + (long)arg) % (long)mod;\n";
-      code << "        checksum = (checksum + (long)mod) % (long)mod;\n";
-      code << "    }\n";
-      code << "    checksum = (checksum + (long)mod) % (long)mod;\n";
-      break;
-    default:
-      assert(false && "Invalid checksum type");
-  }
-  code << "    va_end(args);\n";
-  code << "    return checksum;\n";
-  code << "}\n";
-  return code.str();
-}
-
-static uint32_t computeStatelessChecksum(std::vector<int> initialisation, int checksumType = CHECKSUM_TYPE) {
-  switch (checksumType) {
-    case 0: {
-      uint32_t checksum = 0xFFFFFFFFUL;
-      for (size_t i = 0; i < initialisation.size(); ++i) {
-        checksum = context_free_crc32_4bytes(checksum, initialisation[i]);
-      }
-      return uint32_to_int32(checksum ^ 0xFFFFFFFFUL);
-    }
-    case 1: {
-      long checksum = 0;
-      for (auto i: initialisation) {
-        checksum = (checksum + (long) i) % (long) CHECKSUM_MOD_PRM;
-        checksum = (checksum + (long) CHECKSUM_MOD_PRM) % (long) CHECKSUM_MOD_PRM;
-      }
-      checksum = (checksum + (long) CHECKSUM_MOD_PRM) % (long) CHECKSUM_MOD_PRM;
-      return checksum;
-    }
-    default: {
-      assert(false && "Invalid checksum type");
-      return 0;
-    }
-  }
-}
-
 class Statement {
+
 public:
   enum class Type { ASSIGNMENT, IF, FLUFF };
   Type type;
@@ -269,7 +134,7 @@ public:
       if (!term.third) {
         // replace the coefficient with a call to the procedure
         int coefficient = std::stoi(term.first);
-        int checksum = computeStatelessChecksum(finalization);
+        int checksum = StatelessChecksum::Compute(finalization);
         std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + procedureName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
@@ -331,7 +196,7 @@ public:
       if (!term.third && term.first != "pass_counter ") {
         // replace the coefficient with a call to the procedure
         int coefficient = std::stoi(term.first);
-        int checksum = computeStatelessChecksum(finalization);
+        int checksum = StatelessChecksum::Compute(finalization);
         std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + procedureName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
@@ -495,13 +360,11 @@ public:
 
 void generateCodeForInterproceduralBlock(
     const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
-    bool staticModifier = false, int checksumType = CHECKSUM_TYPE
+    bool staticModifier = false
 ) {
   std::ofstream outFile(filename);
-  outFile << "#include <stdint.h>\n";
   outFile << "#include <stdio.h>\n";
-  outFile << "#include <stdarg.h>\n";
-  outFile << generateCodeForChecksumFunction(checksumType);
+  outFile << StatelessChecksum::GetRawCode();
   if (debug) {
     outFile << "#include <assert.h>\n";
     outFile << "static inline int check_checksum(int expected, int actual) { assert(expected==actual && \"Checksum not "
@@ -529,13 +392,11 @@ void generateCodeForInterproceduralBlock(
     outFile << procedures[i].generateCode() << "\n";
   }
   outFile << "int main() {\n";
-  if (checksumType == 0) {
-    outFile << "    generate_crc32_table(crc32_tab);\n";
-  }
+  outFile << "    generate_crc32_table(crc32_tab);\n";
   std::vector<int> initialisation;
   std::vector<int> finalization;
   procedures[0].getMapping(initialisation, finalization);
-  int checksum = computeStatelessChecksum(finalization);
+  int checksum = StatelessChecksum::Compute(finalization);
   outFile << "    printf(\"%d,\", check_checksum(" << checksum << ", " << procedures[0].getName() << "(";
   for (int i = 0; i < initialisation.size(); ++i) {
     outFile << initialisation[i];
@@ -644,7 +505,8 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  generate_crc32_table(crc32_table);
+  StatelessChecksum::Initialize();
+
   std::vector<std::filesystem::path *> selProcFiles;
   selProcFiles.resize(PROCEDURE_DEPTH);
   std::vector<Procedure> selProcedures;

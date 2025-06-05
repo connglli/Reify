@@ -81,8 +81,6 @@
 
 #define REPLACEMENT_PROBABILITY 0.5 // Probability of replacing a coefficient/constant with a call to another procedure
 #define PROCEDURE_DEPTH 3           // Number of procedures we want to knit together
-#define CHECKSUM_TYPE 0             // 0 for CRC32, 1 for simple checksum
-#define CHECKSUM_MOD_PRM 1000000007
 
 ////////////////////////////////////////////////////////////
 ////// Outputs
