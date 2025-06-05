@@ -59,7 +59,7 @@ ifdef NDEBUG
 else
 	DBGFLAGS := -g
 endif
-CXXFLAGS := $(DBGFALGS) -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR) -D$(CHKSUM_CODE_MACRO)=$(CHKSUM_CODE_VALUE)
+CXXFLAGS := $(DBGFALGS) -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR)
 CFLAGS := $(DBGFLAGS) -Wall -Wextra -std=c17 -O0
 LDFLAGS := -lz3 -lpthread
 
@@ -84,6 +84,11 @@ $(LIB_OBJ_DIR)/%.o: $(LIB_DIR)/%.c
 $(LIB_OBJ_DIR)/%.o: $(LIB_DIR)/%.cpp
 	@mkdir -p $(LIB_OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+# Compile checksum implementation specifically as it requires the macro
+$(LIB_OBJ_DIR)/chksum.o: $(LIB_DIR)/chksum.cpp
+	@mkdir -p $(LIB_OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -D$(CHKSUM_CODE_MACRO)=$(CHKSUM_CODE_VALUE) -o $@ -c $<
 
 lib: $(LIB_OBJ)
 
