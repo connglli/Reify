@@ -363,16 +363,17 @@ void generateCodeForInterproceduralBlock(
     bool staticModifier = false
 ) {
   std::ofstream outFile(filename);
-  outFile << "#include <stdio.h>\n";
-  outFile << StatelessChecksum::GetRawCode();
+  outFile << StatelessChecksum::GetRawCode() << std::endl;
+  outFile << "#include <stdio.h>" << std::endl;
   if (debug) {
-    outFile << "#include <assert.h>\n";
-    outFile << "static inline int check_checksum(int expected, int actual) { assert(expected==actual && \"Checksum not "
-               "equal\"); return actual; }\n";
+    outFile << "#include <assert.h>" << std::endl << std::endl;
+    outFile << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
+               "equal\"), (actual))"
+            << std::endl
+            << std::endl;
   } else {
-    outFile << "#define check_checksum(expected, actual) (actual)\n";
+    outFile << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
   }
-  outFile << "\n";
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_real_distribution<> dis(0, 1);
@@ -389,10 +390,10 @@ void generateCodeForInterproceduralBlock(
         outFile << "inline ";
       }
     }
-    outFile << procedures[i].generateCode() << "\n";
+    outFile << procedures[i].generateCode() << std::endl;
   }
-  outFile << "int main() {\n";
-  outFile << "    generate_crc32_table(crc32_tab);\n";
+  outFile << "int main() {" << std::endl;
+  outFile << "    generate_crc32_table(crc32_tab);" << std::endl;
   std::vector<int> initialisation;
   std::vector<int> finalization;
   procedures[0].getMapping(initialisation, finalization);
@@ -404,9 +405,9 @@ void generateCodeForInterproceduralBlock(
       outFile << ", ";
     }
   }
-  outFile << ")));\n";
-  outFile << "    return 0;\n";
-  outFile << "}\n";
+  outFile << ")));" << std::endl;
+  outFile << "    return 0;" << std::endl;
+  outFile << "}" << std::endl;
   outFile.close();
   // std::cout << "Code generated successfully in " << filename << std::endl;
 }
