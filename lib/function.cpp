@@ -31,7 +31,7 @@
 #include "global.hpp"
 
 #include "lib/naming.hpp"
-#include "lib/utils.hpp"
+#include "lib/samputils.hpp"
 
 void Func::GenCFG() {
   g.Generate();

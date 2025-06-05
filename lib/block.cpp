@@ -33,7 +33,7 @@
 
 #include "global.hpp"
 #include "lib/naming.hpp"
-#include "lib/utils.hpp"
+#include "lib/samputils.hpp"
 
 void BB::Generate() {
   // We define a variable for each statement using other variables
