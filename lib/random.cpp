@@ -23,34 +23,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_UTILS_HPP
-#define GRAPHFUZZ_UTILS_HPP
+#include "lib/random.hpp"
 
-#include <algorithm>
-#include <vector>
-#include <z3++.h>
-
-#include "random.hpp"
-
-static z3::expr AtMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k) {
-  z3::expr_vector zero_constraints(ctx);
-  for (const auto &expr: vec) {
-    zero_constraints.push_back(z3::ite(expr == 0, ctx.int_val(1), ctx.int_val(0)));
-  }
-  z3::expr sum_zeros = sum(zero_constraints);
-  return sum_zeros <= k;
+Random &Random::Get() {
+  static Random random_;
+  return random_;
 }
 
-static std::vector<int> SampleKDistinct(int n, int k) {
-  n -= 1;
-  assert(k <= n + 1 && "k must be at most n + 1 to sample k distinct numbers");
-  std::vector<int> numbers(n + 1);
-  for (int i = 0; i <= n; ++i) {
-    numbers[i] = i;
-  }
-  std::shuffle(numbers.begin(), numbers.end(), Random::Get().GetRNG());
-  return std::vector<int>(numbers.begin(), numbers.begin() + k);
-}
-
-
-#endif // GRAPHFUZZ_UTILS_HPP
+void Random::Seed(int s) { rng = std::mt19937(s); }

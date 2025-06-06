@@ -26,11 +26,11 @@
 
 #include "lib/function.hpp"
 
-#include <random>
 #include <sstream>
 #include "global.hpp"
 
 #include "lib/naming.hpp"
+#include "lib/random.hpp"
 #include "lib/samputils.hpp"
 
 void Func::GenCFG() {
@@ -41,7 +41,7 @@ void Func::GenCFG() {
   }
 }
 
-const std::vector<int> Func::SampleExec(int execStep, bool consistent) {
+std::vector<int> Func::SampleExec(int execStep, bool consistent) {
   std::vector<int> sampleWalk = {};
   int startNode = 0, endNode = numBBs - 1;
   if (consistent) {
@@ -80,9 +80,7 @@ z3::expr Func::MakeInitialisationsInteresting(z3::context &c) const {
 }
 
 z3::expr Func::AddRandomInitialisations(z3::context &c) {
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(LOWER_INIT_BOUND, UPPER_INIT_BOUND);
+  auto rand = Random::Get().Uniform(LOWER_INIT_BOUND, UPPER_INIT_BOUND);
   std::vector<z3::expr> allVars;
   z3::expr allAssignedConstraint = c.bool_val(true);
   for (int i = 0; i < numVars; i++) {
@@ -92,7 +90,7 @@ z3::expr Func::AddRandomInitialisations(z3::context &c) {
     if (ParamDefined(varName)) {
       randomInit = (allVars[i] == GetParamVal(varName));
     } else {
-      int randomValue = dist(gen);
+      int randomValue = rand();
       DefineParam(varName, randomValue);
       randomInit = (allVars[i] == randomValue);
     }
@@ -169,7 +167,7 @@ std::vector<int> Func::ExtractInitialisationsFromModel(z3::model &model, z3::con
 // decided to just store the final values of all the variables (at the end basic
 // block) instead of just the checksum
 std::vector<int> Func::ExtractFinalizationsFromModel(
-    z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
+  z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
 ) const {
   std::vector<int> finalisations;
   for (int i = 0; i < numVars; i++) {

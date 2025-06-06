@@ -23,6 +23,7 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+import random
 import subprocess
 import time
 import uuid
@@ -34,15 +35,16 @@ from ubchk import check_ubs
 from utils import run_proc
 
 
-def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
+def gen_func(exec, sano, uuid_val, timeout=60, verbose=False, seed=None):
     try:
         st_time = time.time()
+        cmd = [exec]
+        if verbose: cmd += ["-v"]
+        if seed:
+            cmd += ["-s", str(seed)]
+        cmd += ["-n", str(sano), uuid_val]
         run_proc(
-            [
-                exec, "-n", str(sano), "-v", uuid_val
-            ] if verbose else [
-                exec, "-n", str(sano), uuid_val
-            ],
+            cmd,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             check=True, timeout=timeout
         )
@@ -56,12 +58,17 @@ def gen_func(exec, sano, uuid_val, timeout=60, verbose=False):
         return False, None
 
 
-def main(limit, check, timeout):
+def main(limit, seed, check, timeout):
+    if seed >= 0:
+        random.seed(seed)
+        next_seed = lambda: random.randint(0, 2147483647)
+    else:
+        next_seed = lambda: None
     func_uuid, func_sano = str(uuid.uuid4()), 0
-    print(f"UUID={func_uuid}, limit={limit if limit is not None else '<INF>'}, check={check}, timeout={timeout}s")
+    print(f"UUID={func_uuid}, limit={limit if limit is not None else '<INF>'}, seed={seed if seed >= 0 else '<RND>'}, check={check}, timeout={timeout}s")
     while limit == 0 or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
-        succ, elapsed = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check)
+        succ, elapsed = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check, seed=next_seed())
         if succ:
             print(f"SUCC (time={elapsed}s)")
         if check and succ:
@@ -75,9 +82,10 @@ if __name__ == '__main__':
     parser = ArgumentParser("fgen", description="Tool for generating a set of functions")
 
     parser.add_argument("--limit", type=int, default=0, help="the number of functions to generate (0 for unlimited)")
+    parser.add_argument("--seed", type=int, default=-1, help="the seed for generation (negative for truly random)")
     parser.add_argument("--check", action="store_true", default=False, help="enable UB check per generated function")
     parser.add_argument("--timeout", type=int, default=60, help="timeout (in seconds) for generating a program")
 
     args = parser.parse_args()
 
-    main(args.limit, check=args.check, timeout=args.timeout)
+    main(args.limit, seed=args.seed, check=args.check, timeout=args.timeout)

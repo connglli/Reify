@@ -25,11 +25,11 @@
 
 #include "lib/graph.hpp"
 
-#include <cstdlib>
-#include <ctime>
 #include <iostream>
 #include <map>
 #include <queue>
+
+#include "lib/random.hpp"
 
 // Function to check if a node has a path to a given target
 bool Graph::HasPath(int start, int target) const {
@@ -54,22 +54,21 @@ bool Graph::HasPath(int start, int target) const {
 }
 
 void Graph::Generate() {
-  srand(time(0));
-
+  auto rand = Random::Get().Uniform(0, numNodes-1);
   for (int i = 0; i < numNodes - 1; i++) {
     if (rand() % 2 == 0 || i == numNodes - 2) {
-      int target = rand() % numNodes;
+      int target = rand();
       while (target == 0 || target == i)
-        target = rand() % numNodes;
+        target = rand();
       addEdge(i, target);
     } else {
-      int target1 = rand() % numNodes;
-      int target2 = rand() % numNodes;
+      int target1 = rand();
+      int target2 = rand();
 
       while (target1 == 0 || target1 == i)
-        target1 = rand() % numNodes;
+        target1 = rand();
       while (target2 == 0 || target2 == i || target2 == target1)
-        target2 = rand() % numNodes;
+        target2 = rand();
 
       addEdge(i, target1);
       addEdge(i, target2);
@@ -82,7 +81,9 @@ void Graph::Generate() {
   enforceReachabilityToLast();
 }
 
-std::vector<int> Graph::SampleWalk(int start, int end, int max_steps) {
+std::vector<int> Graph::SampleWalk(int start, int end, int max_steps) const {
+  auto rand = Random::Get().Uniform();
+
   std::vector<int> walk;
   max_steps = std::max(max_steps, 50 * numNodes); // Ensure max_steps is at least 10 times the number of nodes
   int current_node = start;
@@ -97,10 +98,11 @@ std::vector<int> Graph::SampleWalk(int start, int end, int max_steps) {
 
     // Randomly choose a neighbor to walk to
     auto it = neighbors.begin();
-    std::advance(it, rand() % neighbors.size()); // Random step
-    current_node = *it;
+    std::advance(it, rand() % neighbors.size()); // Advance random steps
 
+    current_node = *it;
     walk.push_back(current_node);
+
     steps++;
   }
 
@@ -108,7 +110,9 @@ std::vector<int> Graph::SampleWalk(int start, int end, int max_steps) {
   return walk;
 }
 
-std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) {
+std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) const {
+  auto rand = Random::Get().Uniform();
+
   std::vector<int> walk;
   max_steps = std::max(max_steps, 50 * numNodes); // Ensure enough steps
   int current_node = start;
@@ -131,7 +135,8 @@ std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) 
     } else {
       // Otherwise, randomly choose a neighbor
       auto it = neighbors.begin();
-      std::advance(it, rand() % neighbors.size()); // Random step
+      std::advance(it, rand() % neighbors.size()); // Advance random steps
+
       int next_node = *it;
 
       // Record the visit
@@ -146,24 +151,16 @@ std::vector<int> Graph::SampleConsistentWalk(int start, int end, int max_steps) 
     }
 
     walk.push_back(current_node);
+
     steps++;
   }
 
   return walk;
 }
 
-void Graph::PrintGraph() {
-  for (int i = 0; i < numNodes; i++) {
-    std::cout << "Node " << i << " -> ";
-    for (int j: adjTab[i]) {
-      std::cout << j << " ";
-    }
-    std::cout << std::endl;
-  }
-}
-
 void Graph::addEdge(int u, int v) {
-  if (u != v && adjTab[u].size() < 2) { // Ensure outdegree <= 2
+  if (u != v && adjTab[u].size() < 2) {
+    // Ensure outdegree <= 2
     adjTab[u].insert(v);
   }
 }
@@ -219,7 +216,9 @@ void Graph::enforceReachabilityFromStart() {
   }
 }
 
-std::vector<std::vector<int>> Graph::sampleKDisjointWalksAndBackpatchGraph(int start, int end, int k) {
+std::vector<std::vector<int>> Graph::SampleKDisjointWalksAndBackpatchGraph(int start, int end, int k) {
+  auto rand = Random::Get().Uniform();
+
   // k paths must only have the start and end node in common
   // for others, we make random connections between the nodes in order to make them disjoint
   std::vector<std::vector<int>> walks;
@@ -229,7 +228,6 @@ std::vector<std::vector<int>> Graph::sampleKDisjointWalksAndBackpatchGraph(int s
     non_visited_nodes.insert(i);
   }
   while (walks.size() < k && tries < 1000) {
-
     std::vector<int> walk;
     // let's sample a walk from the unvisited nodes
     int current_node = start;
@@ -275,7 +273,7 @@ std::vector<std::vector<int>> Graph::sampleKDisjointWalksAndBackpatchGraph(int s
   return walks;
 }
 
-std::vector<std::vector<int>> Graph::getKDistinctWalks(int start, int end, int k) {
+std::vector<std::vector<int>> Graph::GetKDistinctWalks(int start, int end, int k) const {
   std::set<std::vector<int>> walks;
   int tries = 0;
   while (walks.size() < k && tries < 1000) {
@@ -285,11 +283,10 @@ std::vector<std::vector<int>> Graph::getKDistinctWalks(int start, int end, int k
     }
     tries++;
   }
-  std::vector<std::vector<int>> result(walks.begin(), walks.end());
-  return result;
+  return std::vector<std::vector<int>>(walks.begin(), walks.end());
 }
 
-std::vector<std::vector<int>> Graph::getKDistinctConsistentWalks(int start, int end, int k) {
+std::vector<std::vector<int>> Graph::GetKDistinctConsistentWalks(int start, int end, int k) const {
   std::set<std::vector<int>> walks;
   int tries = 0;
   while (walks.size() < k && tries < 1000) {
@@ -299,6 +296,5 @@ std::vector<std::vector<int>> Graph::getKDistinctConsistentWalks(int start, int 
     }
     tries++;
   }
-  std::vector<std::vector<int>> result(walks.begin(), walks.end());
-  return result;
+  return std::vector<std::vector<int>>(walks.begin(), walks.end());
 }

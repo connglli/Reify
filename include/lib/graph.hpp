@@ -32,23 +32,29 @@
 class Graph {
 
 public:
-  explicit Graph(int n) : numNodes(n), adjTab(n) {}
+  explicit Graph(int n) :
+    numNodes(n), adjTab(n) {
+  }
 
-  int NumNodes() const { return numNodes; }
+  [[nodiscard]] int NumNodes() const { return numNodes; }
 
-  const std::set<int> &GetAdj(int i) const { return adjTab[i]; }
+  [[nodiscard]] const std::set<int> &GetAdj(int i) const { return adjTab[i]; }
 
   // Generate the random graph
   void Generate();
 
   // Check if a node has a path to a given target
-  bool HasPath(int start, int target) const;
+  [[nodiscard]] bool HasPath(int start, int target) const;
 
-  std::vector<int> SampleWalk(int start, int end, int max_steps = 100);
+  [[nodiscard]] std::vector<int> SampleWalk(int start, int end, int max_steps = 100) const;
 
-  std::vector<int> SampleConsistentWalk(int start, int end, int max_steps = 100);
+  [[nodiscard]] std::vector<int> SampleConsistentWalk(int start, int end, int max_steps = 100) const;
 
-  void PrintGraph();
+  [[nodiscard]] std::vector<std::vector<int>> SampleKDisjointWalksAndBackpatchGraph(int start, int end, int k);
+
+  [[nodiscard]] std::vector<std::vector<int>> GetKDistinctWalks(int start, int end, int k) const;
+
+  [[nodiscard]] std::vector<std::vector<int>> GetKDistinctConsistentWalks(int start, int end, int k) const;
 
 private:
   // Add an edge between node u and node v
@@ -59,12 +65,6 @@ private:
 
   // Ensure every node is reachable from 0 while keeping outdegree <= 2
   void enforceReachabilityFromStart();
-
-  std::vector<std::vector<int>> sampleKDisjointWalksAndBackpatchGraph(int start, int end, int k);
-
-  std::vector<std::vector<int>> getKDistinctWalks(int start, int end, int k);
-
-  std::vector<std::vector<int>> getKDistinctConsistentWalks(int start, int end, int k);
 
 private:
   const int numNodes;

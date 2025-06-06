@@ -32,6 +32,7 @@
 #include "lib/block.hpp"
 #include "lib/function.hpp"
 #include "lib/graph.hpp"
+#include "lib/random.hpp"
 
 std::ofstream logFile;
 std::ofstream outputFile;
@@ -56,7 +57,7 @@ std::string generateMapping(const std::vector<int> &initialisation, const std::v
   return mapping.str();
 }
 
-// write a signal handler to handle SIGINT and SIGTERM signals
+// Write a signal handler to handle SIGINT and SIGTERM signals
 void cleanupIfEmpty() {
   if (outputFile.is_open()) {
     outputFile.close();
@@ -91,73 +92,86 @@ void signalHandler(int signum) {
   }
 };
 
-struct CliOpts {
-  int sno;
+struct FunGenOpts {
   std::string uuid;
+  int sno;
   bool verbose;
+
+  static FunGenOpts Parse(int argc, char **argv) {
+    cxxopts::Options options("fgen");
+    // clang-format off
+    options.add_options()
+      ("uuid", "An UUID identifier as the primary identifier", cxxopts::value<std::string>())
+      ("n,sno", "A sample number as the second identifier", cxxopts::value<int>())
+      ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
+    options.parse_positional("uuid");
+    options.positional_help("UUID");
+    // clang-format on
+
+    cxxopts::ParseResult args;
+    try {
+      args = options.parse(argc, argv);
+    } catch (cxxopts::exceptions::exception &e) {
+      std::cerr << "Error: " << e.what() << std::endl;
+      exit(1);
+    }
+
+    if (args.count("help")) {
+      std::cout << options.help() << std::endl;
+      exit(0);
+    }
+
+    std::string uuid;
+    if (!args.count("uuid")) {
+      std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
+      exit(1);
+    } else {
+      uuid = args["uuid"].as<std::string>();
+      // Replace uuid's non-alphanumeric characters with underscore
+      // used a UUID so that i could throw everything from different runs
+      // into the same directory without worrying about name clashes
+      std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
+    }
+
+    int sno = -1;
+    if (!args.count("sno")) {
+      std::cerr << "Error: The sample number (--sno) is not given." << std::endl;
+      exit(1);
+    } else {
+      sno = args["sno"].as<int>();
+      if (sno < 0) {
+        std::cout << "Error: The sample number (--sno) must be non-negative." << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("seed")) {
+      int seed = args["seed"].as<int>();
+      if (seed >= 0) {
+        Random::Get().Seed(seed);
+      }
+    }
+
+    bool verbose;
+    if (args.count("verbose")) {
+      verbose = true;
+    } else {
+      verbose = false;
+    }
+
+    return {.uuid = uuid, .sno = sno, .verbose = verbose};
+  }
 };
 
-CliOpts parseCliOpts(int argc, char **argv) {
-  cxxopts::Options options("fgen");
-  // clang-format off
-  options.add_options()
-    ("uuid", "An UUID identifier", cxxopts::value<std::string>())
-    ("n,sno", "A sample number", cxxopts::value<int>())
-    ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
-    ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
-  options.parse_positional("uuid");
-  options.positional_help("UUID");
-  // clang-format on
-
-  cxxopts::ParseResult args;
-  try {
-    args = options.parse(argc, argv);
-  } catch (cxxopts::exceptions::exception &e) {
-    std::cerr << "Error: " << e.what() << std::endl;
-    exit(1);
-  }
-
-  if (args.count("help")) {
-    std::cout << options.help() << std::endl;
-    exit(0);
-  }
-
-  int sno = -1;
-  if (!args.count("sno")) {
-    std::cerr << "Error: The sample number (--sno) is not given." << std::endl;
-    exit(1);
-  } else {
-    sno = args["sno"].as<int>();
-  }
-
-  std::string uuid;
-  if (!args.count("uuid")) {
-    std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
-    exit(1);
-  } else {
-    uuid = args["uuid"].as<std::string>();
-    // Replace uuid's non-alphanumeric characters with underscore
-    // used a UUID so that i could throw everything from different runs
-    // into the same directory without worrying about name clashes
-    std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
-  }
-
-  bool verbose;
-  if (args.count("verbose")) {
-    verbose = true;
-  } else {
-    verbose = false;
-  }
-
-  return {.sno = sno, .uuid = uuid, .verbose = verbose};
-}
 
 int main(int argc, char **argv) {
-  auto args = parseCliOpts(argc, argv);
+  auto cliOpts = FunGenOpts::Parse(argc, argv);
 
-  int sno = args.sno;
-  std::string uuid = args.uuid;
-  bool verbose = args.verbose;
+  int sno = cliOpts.sno;
+  std::string uuid = cliOpts.uuid;
+  bool verbose = cliOpts.verbose;
 
   mappingFileName = GetMappingPath(uuid, sno);
   mappingFile = std::ofstream(mappingFileName);

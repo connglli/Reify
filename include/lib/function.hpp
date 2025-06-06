@@ -39,7 +39,9 @@ class BB;
 
 class Func {
 public:
-  explicit Func(int numBBs, int numVars) : numBBs(numBBs), g(numBBs), numVars(numVars) {}
+  explicit Func(int numBBs, int numVars) :
+    numBBs(numBBs), g(numBBs), numVars(numVars) {
+  }
 
   const auto &GetUdlyGraph() const { return g; }
 
@@ -51,7 +53,7 @@ public:
 
   void GenCFG();
 
-  const std::vector<int> SampleExec(int execStep, bool consistent);
+  std::vector<int> SampleExec(int execStep, bool consistent);
 
   ///////////////////////////////////////////////////////////////////
   /////// Constraint Initialization and Finalization
@@ -87,7 +89,7 @@ public:
   // decided to just store the final values of all the variables (at the end basic
   // block) instead of just the checksum
   std::vector<int> ExtractFinalizationsFromModel(
-      z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
+    z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
   ) const;
 
   ///////////////////////////////////////////////////////////////////
@@ -104,7 +106,7 @@ private:
   // TODO: Move parameters to each basic block
   int numVars; // The number of variables that the function can define
   std::unordered_map<std::string, std::optional<int>>
-      parameters; // Value of variables, coefficients or constants computed so far
+  parameters; // Value of variables, coefficients or constants computed so far
 };
 
 

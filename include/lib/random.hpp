@@ -23,34 +23,52 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_UTILS_HPP
-#define GRAPHFUZZ_UTILS_HPP
+#ifndef GRAPHFUZZ_RANDOM_HPP
+#define GRAPHFUZZ_RANDOM_HPP
 
-#include <algorithm>
-#include <vector>
-#include <z3++.h>
+#include <functional>
+#include <random>
 
-#include "random.hpp"
+class Random {
 
-static z3::expr AtMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k) {
-  z3::expr_vector zero_constraints(ctx);
-  for (const auto &expr: vec) {
-    zero_constraints.push_back(z3::ite(expr == 0, ctx.int_val(1), ctx.int_val(0)));
+public:
+  static Random &Get();
+
+public:
+  Random(const Random &) = delete;
+  Random &operator=(const Random &) = delete;
+
+  [[nodiscard]] auto &GetRNG() {
+    return rng;
   }
-  z3::expr sum_zeros = sum(zero_constraints);
-  return sum_zeros <= k;
-}
 
-static std::vector<int> SampleKDistinct(int n, int k) {
-  n -= 1;
-  assert(k <= n + 1 && "k must be at most n + 1 to sample k distinct numbers");
-  std::vector<int> numbers(n + 1);
-  for (int i = 0; i <= n; ++i) {
-    numbers[i] = i;
+  void Seed(int s);
+
+  template<typename Int = int>
+  [[nodiscard]] std::function<Int()> Uniform(Int min = 0, Int max = RAND_MAX) {
+    auto dist = std::uniform_int_distribution<Int>(min, max);
+    return [dist, this]() mutable -> Int {
+      int x = dist(this->rng);
+      return x;
+    };
   }
-  std::shuffle(numbers.begin(), numbers.end(), Random::Get().GetRNG());
-  return std::vector<int>(numbers.begin(), numbers.begin() + k);
-}
+
+  template<typename Real = double>
+  [[nodiscard]] std::function<Real()> UniformReal(Real min = 0., Real max = 1.) {
+    auto dist = std::uniform_real_distribution<Real>(min, max);
+    return [dist, this]() mutable -> Real {
+      int x = dist(this->rng);
+      return x;
+    };
+  }
+
+private:
+  Random() :
+    rng(std::random_device()()) {
+  }
+
+  std::mt19937 rng;
+};
 
 
-#endif // GRAPHFUZZ_UTILS_HPP
+#endif // GRAPHFUZZ_RANDOM_HPP

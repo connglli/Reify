@@ -30,7 +30,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <random>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -39,12 +38,14 @@
 #include "cxxopts.hpp"
 #include "global.hpp"
 #include "lib/chksum.hpp"
+#include "lib/random.hpp"
 #include "lib/strutils.hpp"
 
 class Statement {
 
 public:
   enum class Type { ASSIGNMENT, IF, FLUFF };
+
   Type type;
   virtual std::string generateCode() const = 0;
   virtual Type getType() const = 0;
@@ -60,7 +61,9 @@ class FluffStatement : public Statement {
   std::string code;
 
 public:
-  FluffStatement(std::string code) : code(code) {}
+  FluffStatement(std::string code) :
+    code(code) {
+  }
 
   std::string generateCode() const override { return code; }
 
@@ -243,7 +246,8 @@ private:
   std::vector<std::vector<int>> finalizations;
 
 public:
-  Procedure() {}
+  Procedure() {
+  }
 
   Procedure(std::ifstream &procedureFile, std::ifstream &mappingFile) {
     std::string line;
@@ -307,14 +311,12 @@ public:
   std::string getName() const { return name; }
 
   bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0, 1);
-    auto probability = dis(gen);
+    auto rand = Random::Get().Uniform(0, (int) statements.size() - 1);
+    auto probability = Random::Get().UniformReal()();
     int trials = 1000;
     // Sample a statement from the list of statements for replacement
-    while (true && trials > 0) {
-      int index = rand() % statements.size();
+    while (trials > 0) {
+      int index = rand();
       // Idea: 80% of the replacements should be in the IF statements, and 20%  in the assignment statements
       if (statements[index]->getType() == Statement::Type::IF && probability < 0.8) {
         if (statements[index]->replaceCoefficient(procedureName, initialisation, finalization)) {
@@ -340,10 +342,7 @@ public:
 
   void getMapping(std::vector<int> &foreign_initialisation, std::vector<int> &foreign_finalization) const {
     // sample a random index from initialisations list
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, initialisations.size() - 1);
-    int index = dis(gen);
+    int index = Random::Get().Uniform(0, (int) initialisations.size() - 1)();
     foreign_initialisation = initialisations[index];
     foreign_finalization = finalizations[index];
   }
@@ -352,8 +351,8 @@ public:
 };
 
 void generateCodeForInterproceduralBlock(
-    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
-    bool staticModifier = false
+  const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
+  bool staticModifier = false
 ) {
   std::ofstream outFile(filename);
   outFile << StatelessChecksum::GetRawCode() << std::endl;
@@ -361,18 +360,16 @@ void generateCodeForInterproceduralBlock(
   if (debug) {
     outFile << "#include <assert.h>" << std::endl << std::endl;
     outFile << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
-               "equal\"), (actual))"
-            << std::endl
-            << std::endl;
+        "equal\"), (actual))"
+        << std::endl
+        << std::endl;
   } else {
     outFile << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
   }
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<> dis(0, 1);
+  auto rand = Random::Get().UniformReal();
   for (int i = PROCEDURE_DEPTH - 1; i >= 0; --i) {
     // output inline with 60% probability
-    auto probability = dis(gen);
+    auto probability = rand();
     if (staticModifier) {
       outFile << "static ";
     }
@@ -404,84 +401,105 @@ void generateCodeForInterproceduralBlock(
   // std::cout << "Code generated successfully in " << filename << std::endl;
 }
 
-struct CliOpts {
+struct ProgGenOpts {
+  std::string uuid;
   std::string procedures;
   std::string mappings;
-  std::string uuid;
   int limits;
   bool debug;
+
+  static ProgGenOpts Parse(int argc, char **argv) {
+    cxxopts::Options options("pgen");
+    // clang-format off
+    options.add_options()
+      ("uuid", "An UUID identifier", cxxopts::value<std::string>())
+      ("p,procedures", "The directory saving the seed procedures", cxxopts::value<std::string>())
+      ("m,mappings", "The directory saving the mappings for the the seed procedures", cxxopts::value<std::string>())
+      ("l,limit", "The number of new procedures to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
+      ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
+    options.parse_positional("uuid");
+    options.positional_help("UUID");
+    // clang-format on
+
+    cxxopts::ParseResult args;
+    try {
+      args = options.parse(argc, argv);
+    } catch (cxxopts::exceptions::exception &e) {
+      std::cerr << "Error: " << e.what() << std::endl;
+      exit(1);
+    }
+
+    if (args.count("help")) {
+      std::cout << options.help() << std::endl;
+      exit(0);
+    }
+
+    std::string uuid;
+    if (!args.count("uuid")) {
+      std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
+      exit(1);
+    } else {
+      uuid = args["uuid"].as<std::string>();
+      // Replace uuid's non-alphanumeric characters with underscore
+      // used a UUID so that i could throw everything from different runs
+      // into the same directory without worrying about name clashes
+      std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
+    }
+
+    std::string procedures;
+    if (!args.count("procedures")) {
+      std::cerr << "Error: The procedures directory (--procedures) is not given." << std::endl;
+      exit(1);
+    } else {
+      procedures = args["procedures"].as<std::string>();
+      if (!std::filesystem::exists(procedures)) {
+        std::cerr << "Error: The procedures directory (--procedures) does not exist." << std::endl;
+        exit(1);
+      }
+    }
+
+    std::string mappings;
+    if (!args.count("mappings")) {
+      std::cerr << "Error: The mappings directory (--mappings) is not given." << std::endl;
+      exit(1);
+    } else {
+      mappings = args["mappings"].as<std::string>();
+      if (!std::filesystem::exists(mappings)) {
+        std::cerr << "Error: The mappings directory (--mappings) does not exist." << std::endl;
+        exit(1);
+      }
+    }
+
+    int limit = 0;
+    if (args.count("limit")) {
+      limit = args["limit"].as<int>();
+      if (limit <= 0) {
+        std::cerr << "Error: The limit (--limit) must be greater than or equal to 0." << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("seed")) {
+      int seed = args["seed"].as<int>();
+      if (seed >= 0) {
+        Random::Get().Seed(seed);
+      }
+    }
+
+    bool debug = false;
+    if (args.count("debug")) {
+      debug = true;
+    }
+
+    return {.uuid = uuid, .procedures = procedures, .mappings = mappings, .limits = limit, .debug = debug};
+  }
 };
 
-CliOpts parseCliOpts(int argc, char **argv) {
-  cxxopts::Options options("pgen");
-  // clang-format off
-  options.add_options()
-    ("uuid", "An UUID identifier", cxxopts::value<std::string>())
-    ("p,procedures", "The directory saving the seed procedures", cxxopts::value<std::string>())
-    ("m,mappings", "The directory saving the mappings for the the seed procedures", cxxopts::value<std::string>())
-    ("l,limit", "The number of new procedures to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
-    ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
-    ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
-  options.parse_positional("uuid");
-  options.positional_help("UUID");
-  // clang-format on
-
-  cxxopts::ParseResult args;
-  try {
-    args = options.parse(argc, argv);
-  } catch (cxxopts::exceptions::exception &e) {
-    std::cerr << "Error: " << e.what() << std::endl;
-    exit(1);
-  }
-
-  if (args.count("help")) {
-    std::cout << options.help() << std::endl;
-    exit(0);
-  }
-
-  std::string uuid;
-  if (!args.count("uuid")) {
-    std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
-    exit(1);
-  } else {
-    uuid = args["uuid"].as<std::string>();
-    // Replace uuid's non-alphanumeric characters with underscore
-    // used a UUID so that i could throw everything from different runs
-    // into the same directory without worrying about name clashes
-    std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
-  }
-
-  std::string procedures;
-  if (!args.count("procedures")) {
-    std::cerr << "Error: The procedures directory (--procedures) is not given." << std::endl;
-    exit(1);
-  } else {
-    procedures = args["procedures"].as<std::string>();
-  }
-
-  std::string mappings;
-  if (!args.count("mappings")) {
-    std::cerr << "Error: The mappings directory (--mappings) is not given." << std::endl;
-    exit(1);
-  } else {
-    mappings = args["mappings"].as<std::string>();
-  }
-
-  int limit = 0;
-  if (args.count("limit")) {
-    limit = args["limit"].as<int>();
-  }
-
-  bool debug = false;
-  if (args.count("debug")) {
-    debug = true;
-  }
-
-  return {.procedures = procedures, .mappings = mappings, .uuid = uuid, .limits = limit, .debug = debug};
-}
 
 int main(int argc, char *argv[]) {
-  CliOpts cliOpts = parseCliOpts(argc, argv);
+  auto cliOpts = ProgGenOpts::Parse(argc, argv);
 
   std::filesystem::path procedureDirectory(cliOpts.procedures);
   std::filesystem::path mappingDirectory(cliOpts.mappings);
@@ -505,9 +523,6 @@ int main(int argc, char *argv[]) {
 
   for (int sampNo = 0; generateLimit == 0 || sampNo < generateLimit; ++sampNo) {
     std::cout << "[" << sampNo << "] Generating ... " << std::endl;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, allProcFiles.size() - 1);
 
     // Choose the procedure files randomly
     // Fixed Unsafe memset(vector<string>, 0, sizeof(string)!!
@@ -515,9 +530,10 @@ int main(int argc, char *argv[]) {
     // does not lead to the auto deletion of the string's internal data. Small string optimization does not
     // work here as the path of each our procedure is indeed more than 25 characters.
     memset(selProcFiles.data(), 0, selProcFiles.size() * sizeof(std::filesystem::path *));
+    auto rand = Random::Get().Uniform(0, (int) allProcFiles.size() - 1);
     for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
       while (true) {
-        int index = dis(gen);
+        int index = rand();
         if (std::find(selProcFiles.begin(), selProcFiles.end(), &allProcFiles[index]) == selProcFiles.end()) {
           selProcFiles[i] = &allProcFiles[index];
           break;
@@ -552,9 +568,7 @@ int main(int argc, char *argv[]) {
         break;
       }
       // Sample a procedure from i + 1 to PROCEDURE_DEPTH
-      std::random_device rd;
-      std::mt19937 gen(rd());
-      std::uniform_int_distribution<> dis(i + 1, PROCEDURE_DEPTH - 1);
+      auto thisRand = Random::Get().Uniform(i + 1, PROCEDURE_DEPTH - 1);
 
       // Calculate all replaceable coefficients
       int num_mappings_to_replace = selProcedures[i].calculateNumCoefficientsToReplace();
@@ -562,7 +576,7 @@ int main(int argc, char *argv[]) {
 
       // For each coefficient that can be replaced, we find a procedure to replace it
       for (int k = 0; k < num_mappings_to_replace; ++k) {
-        int index = dis(gen);
+        int index = thisRand();
         selProcedures[index].getMapping(initialisation, finalization);
         if (!selProcedures[i].replaceCoefficient(selProcedures[index].getName(), initialisation, finalization)) {
           break; // TODO: break or continue? We can continue to the next, can't we?
@@ -577,7 +591,7 @@ int main(int argc, char *argv[]) {
     std::string newProcedureName = new_procedure_uuid + "_" + std::to_string(sampNo);
     generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + ".c"), selProcedures, enableDebug);
     generateCodeForInterproceduralBlock(
-        NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, enableDebug, true
+      NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, enableDebug, true
     );
   }
 }

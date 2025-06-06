@@ -54,10 +54,10 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 ## Building Flags
 ########################################################################
 
-DBGFLAGS := $(ifdef DEBUG,-g,)
-CXXFLAGS := $(DBGFALGS) -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR)
+DBGFLAGS := $(if $(DEBUG),-g,)
+CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR)
 CFLAGS   := $(DBGFLAGS) -Wall -Wextra -std=c17 -O0
-LDFLAGS  := -lz3 -lpthread
+LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread
 
 
 .PHONY: all clean lib gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check
@@ -106,28 +106,34 @@ MAPPING_DIR          ?= mappings
 LOGGINGS_DIR         ?= logs
 NEW_PROCEDURE_DIR    ?= new_procedures
 
+GEN_SEED ?= -1
+
+## Function Generation
+
 FGEN_LIMIT ?= 1000000
 
 gen-func-set: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
-	@python3 scripts/fgen.py
+	@python3 scripts/fgen.py --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
 
 
 gen-func-set-check-ubs: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
-	@python3 scripts/fgen.py --check --limit $(FGEN_LIMIT)
+	@python3 scripts/fgen.py --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
+
+## Program Generation
 
 PGEN_LIMIT ?= 100000
 
 gen-prog-set: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
 	@python3 scripts/retouch.py  # cleanup
-	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) $(shell uuidgen)
+	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(shell uuidgen)
 
 gen-prog-set-check: pgen
 	@mkdir -p $(NEW_PROCEDURE_DIR)
 	@python3 scripts/retouch.py  # cleanup
-	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit $(PGEN_LIMIT) --debug $(shell uuidgen)
+	$(BIN_DIR)/pgen --procedures $(PROCEDURE_DIR) --mappings $(MAPPING_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) --debug $(shell uuidgen)
 	@python3 scripts/ubchk.py $(NEW_PROCEDURE_DIR)
 
 

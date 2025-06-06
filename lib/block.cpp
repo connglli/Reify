@@ -25,18 +25,18 @@
 
 #include "lib/block.hpp"
 
-#include <iosfwd>
-#include <iostream>
-#include <random>
 #include <sstream>
 #include <z3++.h>
 
 #include "global.hpp"
 #include "lib/chksum.hpp"
 #include "lib/naming.hpp"
+#include "lib/random.hpp"
 #include "lib/samputils.hpp"
 
 void BB::Generate() {
+  auto rand = Random::Get().Uniform(0, f.NumVars() - 1);
+
   // We define a variable for each statement using other variables
   assignmentOrder = SampleKDistinct(f.NumVars(), NUM_ASSIGNMENTS_PER_BB);
   for (int stmtIndex = 0; stmtIndex < assignmentOrder.size(); stmtIndex++) {
@@ -71,9 +71,9 @@ void BB::Generate() {
   // let's refer to some variables defined in other basic blocks.
   condUsedVars = assignmentOrder;
   for (int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL - assignmentOrder.size(); i++) {
-    int randomVariable = std::rand() % f.NumVars();
+    int randomVariable = rand();
     while (std::find(condUsedVars.begin(), condUsedVars.end(), randomVariable) != condUsedVars.end()) {
-      randomVariable = std::rand() % f.NumVars();
+      randomVariable = rand();
     }
     condUsedVars.push_back(randomVariable);
   }
@@ -81,9 +81,7 @@ void BB::Generate() {
 
   // Define a specific target that our conditional controls
   if (successors.size() > 1) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::shuffle(successors.begin(), successors.end(), gen);
+    std::shuffle(successors.begin(), successors.end(), Random::Get().GetRNG());
     // Assign a coefficient to each variable contributing to the conditional
     for (int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL; i++) {
       // 0 is the statement index here (even I'm not sure why i chose
@@ -155,7 +153,7 @@ z3::expr BB::boundCoefficients(z3::context &c, const std::vector<z3::expr> &coef
 }
 
 void BB::GenerateConstraints(
-    int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
+  int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
 ) {
   // TODO: Remove redundant code
 
@@ -295,9 +293,7 @@ void BB::GenerateConstraints(
 
 std::string BB::generateConditionalConstraint(int blkNo, int target, std::vector<int> condUsedVars) const {
   std::ostringstream constraint;
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(LOWER_BOUND, UPPER_BOUND);
+  auto rand = Random::Get().Uniform(LOWER_BOUND, UPPER_BOUND);
   constraint << "    if (";
   int ctr = 0;
   for (auto i: condUsedVars) {
@@ -306,7 +302,7 @@ std::string BB::generateConditionalConstraint(int blkNo, int target, std::vector
     if (f.ParamDefined(coefficientKey)) {
       coefficient = f.GetParamVal(coefficientKey);
     } else {
-      coefficient = dist(gen);
+      coefficient = rand();
       f.DefineParam(coefficientKey, coefficient); // Store it in parameters
     }
     constraint << coefficient << " * " << NameVar(i);
@@ -318,7 +314,7 @@ std::string BB::generateConditionalConstraint(int blkNo, int target, std::vector
   if (f.ParamDefined(constantKey)) {
     constant = f.GetParamVal(constantKey);
   } else {
-    constant = dist(gen);
+    constant = rand();
     f.DefineParam(constantKey, constant);
   }
   constraint << constant;
@@ -346,9 +342,7 @@ std::string BB::GenerateCode() const {
   }
   // code<< "    printf(\"starting off at
   // "<<NameLabel(blkNo)<<"\\n\");\n";
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(LOWER_BOUND, UPPER_BOUND);
+  auto rand = Random::Get().Uniform(LOWER_BOUND, UPPER_BOUND);
   int stmtIndex = 0;
   for (const auto &[varIndex, dependencies]: defUsedVars) {
     code << "    " << NameVar(varIndex) << " = ";
@@ -363,7 +357,7 @@ std::string BB::GenerateCode() const {
         // assign a random value to these coefficients
         // TODO: Perhaps adding some checks to ensure that, if we are in the sampled execution,
         //       all our parameters should already be computed.
-        coefficient = dist(gen);
+        coefficient = rand();
         f.DefineParam(coefficientKey, coefficient); // Store it in parameters
       }
       // Multiply the dependency by the coefficient
@@ -378,7 +372,7 @@ std::string BB::GenerateCode() const {
     if (f.ParamDefined(constantKey)) {
       constant = f.GetParamVal(constantKey);
     } else {
-      constant = dist(gen);
+      constant = rand();
       f.DefineParam(constantKey, constant); // Store it in parameters
     }
     code << " + " << constant << ";" << std::endl;
