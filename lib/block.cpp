@@ -30,6 +30,7 @@
 
 #include "global.hpp"
 #include "lib/chksum.hpp"
+#include "lib/logger.hpp"
 #include "lib/naming.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
@@ -77,7 +78,7 @@ void BB::Generate() {
     }
     condUsedVars.push_back(randomVariable);
   }
-  // logFile << "size of conditional variables: " << condUsedVars.size() << std::endl;
+  Log::Get().Out() << "Size of conditional variables: " << condUsedVars.size() << std::endl;
 
   // Define a specific target that our conditional controls
   if (successors.size() > 1) {
@@ -227,8 +228,9 @@ void BB::GenerateConstraints(
     stmtIndex++;
   }
 
-  // logFile << successors.size() << std::endl;
-  // logFile << "Target: " << target << std::endl;
+  Log::Get().Out() << successors.size() << std::endl;
+  Log::Get().Out() << "Target: " << target << std::endl;
+
   if (successors.size() <= 1) {
     return;
   }

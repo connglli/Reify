@@ -23,38 +23,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "lib/chksum.hpp"
+#ifndef GRAPHFUZZ_LOGGER_H
+#define GRAPHFUZZ_LOGGER_H
 
-#include <cassert>
 #include <string>
+#include <ostream>
 
-extern "C" int computeStatelessChecksum(int num_args, ...);
+class Log {
 
-int StatelessChecksum::Compute(const std::vector<int> &values) {
-  // This is a trick to call into a variadic function.
-  // Suppose we can only handle to the maximum of 32 values.
-  assert(values.size() <= 32 && "Too many (>32) values provided to compute checksum");
-  static int args[32];
-  for (int i = 0; i < values.size(); i++) {
-    args[i] = values[i];
-  }
-  // clang-format off
-  return computeStatelessChecksum(
-      values.size(),
-      args[0],  args[1],  args[2],  args[3],  args[4],  args[5],  args[6],  args[7],
-      args[8],  args[9],  args[10], args[11], args[12], args[13], args[14], args[15],
-      args[16], args[17], args[18], args[19], args[20], args[21], args[22], args[23],
-      args[24], args[25], args[26], args[27], args[28], args[29], args[30], args[31]
-  );
-  // clang-format on
-}
+public:
+  static Log &Get();
+  ~Log();
 
-std::string StatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }
+  [[nodiscard]] std::basic_ostream<char> &Out() const;
+  void SetCout();
+  void SetFout(const std::string &file);
 
-std::string StatelessChecksum::GetRawCode() {
-#ifndef STATELESS_CHECKSUM_CODE
-  static_assert(false, "STATELESS_CHECKSUM_CODE is not defined");
-#else
-  return STATELESS_CHECKSUM_CODE;
-#endif
-}
+private:
+  Log();
+
+  // CAREFUL: Delete fout_ may lead out to a danger pointer
+  void deleteFoutSafely();
+
+private:
+  std::basic_ostream<char> *out;
+  std::basic_ofstream<char> *fout_;
+};
+
+#endif //GRAPHFUZZ_LOGGER_H

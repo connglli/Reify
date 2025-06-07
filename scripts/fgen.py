@@ -65,7 +65,10 @@ def main(limit, seed, check, timeout):
     else:
         next_seed = lambda: None
     func_uuid, func_sano = str(uuid.uuid4()), 0
-    print(f"UUID={func_uuid}, limit={limit if limit is not None else '<INF>'}, seed={seed if seed >= 0 else '<RND>'}, check={check}, timeout={timeout}s")
+    print(
+        f"UUID={func_uuid}, limit={limit if limit != 0 else '<INF>'}, "
+        f"seed={seed if seed >= 0 else '<RND>'}, check={check}, timeout={timeout}s"
+    )
     while limit == 0 or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
         succ, elapsed = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check, seed=next_seed())

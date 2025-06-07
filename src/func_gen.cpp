@@ -32,12 +32,11 @@
 #include "lib/block.hpp"
 #include "lib/function.hpp"
 #include "lib/graph.hpp"
+#include "lib/logger.hpp"
 #include "lib/random.hpp"
 
-std::ofstream logFile;
 std::ofstream outputFile;
 std::ofstream mappingFile;
-std::filesystem::path logFileName;
 std::filesystem::path mappingFileName;
 std::filesystem::path outputFileName;
 
@@ -77,7 +76,7 @@ void cleanupIfEmpty() {
 }
 
 void signalHandler(int signum) {
-  logFile << "Interrupt signal (" << signum << ") received.\n";
+  Log::Get().Out() << "Interrupt signal (" << signum << ") received." << std::endl;
   if (isFormulaSatisfiable) {
     return;
   } else {
@@ -165,7 +164,6 @@ struct FunGenOpts {
   }
 };
 
-
 int main(int argc, char **argv) {
   auto cliOpts = FunGenOpts::Parse(argc, argv);
 
@@ -177,8 +175,7 @@ int main(int argc, char **argv) {
   mappingFile = std::ofstream(mappingFileName);
   outputFileName = GetProcedurePath(uuid, sno);
   outputFile = std::ofstream(outputFileName);
-  logFileName = GetGenLogPath(uuid, sno, /*devnull=*/!verbose);
-  logFile = std::ofstream(logFileName);
+  Log::Get().SetFout(GetGenLogPath(uuid, sno, /*devnull=*/!verbose));
 
   std::signal(SIGINT, signalHandler);
   std::signal(SIGTERM, signalHandler);
@@ -186,7 +183,7 @@ int main(int argc, char **argv) {
 
   z3::set_param("parallel.enable", true);
 
-  logFile << "==== Generation =============================" << std::endl;
+  Log::Get().Out() << "==== Generation =============================" << std::endl;
 
   Func f(NUM_NODES_PER_FUNC, NUM_VARS_PER_FUNC);
   f.GenCFG();
@@ -195,16 +192,16 @@ int main(int argc, char **argv) {
   auto basicBlocks = f.GetBBs();
 
   auto execution = f.SampleExec(100, ENABLE_CONSISTENT_WALKS);
-  logFile << "Exec: ";
+  Log::Get().Out() << "Exec: ";
   for (int i: execution) {
-    logFile << i << ",";
+    Log::Get().Out() << i << ",";
   }
-  logFile << std::endl;
+  Log::Get().Out() << std::endl;
 
   z3::context c;
   z3::solver solver(c);
 
-  logFile << "==== Initialization 0 =============================" << std::endl;
+  Log::Get().Out() << "==== Initialization 0 =============================" << std::endl;
 
   // Let each parameter (coefficient or constant) interesting initially
   if (ENABLE_INTERESTING_INITS) {
@@ -214,12 +211,12 @@ int main(int argc, char **argv) {
     solver.add(f.AddRandomInitialisations(c));
   }
 
-  logFile << "Initialization SMT: " << solver.to_smt2() << std::endl;
+  Log::Get().Out() << "Initialization SMT: " << solver.to_smt2() << std::endl;
 
   // Generate UB constraint for each statement in the executed basic block
   std::unordered_map<std::string, int> versions; // SSA version for each definition
   for (int i = 0; i < execution.size() - 1; i++) {
-    logFile << "Constraint BB#" << i << std::endl;
+    Log::Get().Out() << "Constraint BB#" << i << std::endl;
     int current_bb = execution[i];
     int next_bb = execution[i + 1];
     // Generate constraints for the current basic block so that
@@ -229,24 +226,23 @@ int main(int argc, char **argv) {
   basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
   // Dump the SMT queries for debugging
-  logFile << "Execution SMT: " << solver.to_smt2() << std::endl;
+  Log::Get().Out() << "Execution SMT: " << solver.to_smt2() << std::endl;
 
   if (solver.check() == z3::unsat) {
-    logFile << "UNSAT" << std::endl;
+    Log::Get().Out() << "UNSAT" << std::endl;
     // Remove the output file and mapping file from the filesystem because no model was found
     outputFile.close();
     mappingFile.close();
     std::remove((outputFileName).c_str());
     std::remove((mappingFileName).c_str());
-    logFile.close();
     return 1;
   }
 
   isFormulaSatisfiable = true;
-  logFile << "SAT" << std::endl;
+  Log::Get().Out() << "SAT" << std::endl;
 
   z3::model model = solver.get_model();
-  logFile << "Execution Model: " << model << std::endl;
+  Log::Get().Out() << "Execution Model: " << model << std::endl;
 
   f.ExtractParametersFromModel(model, c);
   outputFile << f.GenerateCode(sno, uuid);
@@ -277,26 +273,25 @@ int main(int argc, char **argv) {
   basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
   for (int i = 0; i < NUM_INITS_PER_WALK - 1; i++) {
-    logFile << "==== Initialization " << i + 1 << " =============================" << std::endl;
+    Log::Get().Out() << "==== Initialization " << i + 1 << " =============================" << std::endl;
 
     // Ensure that the initialisation is sufficiently different from the previous one
     solver.add(f.DifferentInitialisationConstraint(initialisation, c));
 
-    logFile << "Execution SMT: " << solver.to_smt2() << std::endl;
+    Log::Get().Out() << "Execution SMT: " << solver.to_smt2() << std::endl;
 
     if (solver.check() == z3::unsat) {
-      logFile << "UNSAT" << std::endl;
+      Log::Get().Out() << "UNSAT" << std::endl;
       std::cout << "WARNING: UNSAT at " << i + 1 << "-th initialization" << std::endl;
       mappingFile.close();
-      logFile.close();
       return 0; // There's no need to report an error to our caller
     }
 
     isFormulaSatisfiable = true;
-    logFile << "SAT" << std::endl;
+    Log::Get().Out() << "SAT" << std::endl;
 
     model = solver.get_model();
-    logFile << "Execution Model: " << model << std::endl;
+    Log::Get().Out() << "Execution Model: " << model << std::endl;
 
     f.ExtractParametersFromModel(model, c);
     initialisation = f.ExtractInitialisationsFromModel(model, c);
@@ -305,7 +300,6 @@ int main(int argc, char **argv) {
   }
 
   mappingFile.close();
-  logFile.close();
 
   return 0;
 }

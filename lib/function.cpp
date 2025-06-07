@@ -27,8 +27,9 @@
 #include "lib/function.hpp"
 
 #include <sstream>
-#include "global.hpp"
 
+#include "global.hpp"
+#include "lib/logger.hpp"
 #include "lib/naming.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
@@ -62,7 +63,7 @@ std::vector<int> Func::SampleExec(int execStep, bool consistent) {
   bbs[stopNode].SetPassCounter(passCounter);
   parameters[NamePassCounter()] = passCounter;
   sampleWalk.push_back(endNode);
-  // logFile << "Sample walk has been modified to end at the last node." << std::endl;
+  Log::Get().Out() << "Sample walk has been modified to end at the last node." << std::endl;
   return sampleWalk;
 }
 
@@ -128,11 +129,11 @@ void Func::ExtractParametersFromModel(z3::model &model, z3::context &ctx) {
         int int_value;
         if (Z3_get_numeral_int(ctx, value, &int_value)) {
           parameters[name] = int_value;
-          // logFile << "Parameter " << name << " is in the model with value: " << int_value << std::endl;
+          Log::Get().Out() << "Parameter " << name << " is in the model with value: " << int_value << std::endl;
         }
       }
     } else {
-      // logFile << "Parameter " << name << " is not explicitly defined in the model" << std::endl;
+      Log::Get().Out() << "Parameter " << name << " is not explicitly defined in the model" << std::endl;
     }
   }
 }

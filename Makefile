@@ -116,7 +116,6 @@ gen-func-set: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR)
 	@python3 scripts/fgen.py --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
 
-
 gen-func-set-check-ubs: fgen
 	@mkdir -p $(PROCEDURE_DIR) $(MAPPING_DIR) $(LOGGINGS_DIR)
 	@python3 scripts/fgen.py --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
