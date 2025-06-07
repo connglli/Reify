@@ -41,54 +41,49 @@
 #include "lib/random.hpp"
 #include "lib/strutils.hpp"
 
+struct CVMTerm {
+  std::string coeff;
+  std::string var;
+  bool mutated = false;
+
+  std::string GenerateCode() const { return "(" + coeff + ") * " + var; };
+};
+
 class Statement {
 
 public:
   enum class Type { ASSIGNMENT, IF, FLUFF };
 
-  Type type;
-  virtual std::string generateCode() const = 0;
-  virtual Type getType() const = 0;
-  virtual bool
-  replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) = 0;
+public:
+  virtual std::string GenerateCode() const = 0;
+  virtual Type GetType() const = 0;
+  virtual bool RepFirstCoeff(std::string funcName, std::vector<int> initialisation, std::vector<int> finalization) = 0;
 
-  virtual int getNumCoefficients() const { return 0; };
-
-  // Statement() = default;
+  virtual int GetNumCoeffs() const { return 0; };
 };
 
-class FluffStatement : public Statement {
-  std::string code;
-
+class FluffStmt : public Statement {
 public:
-  FluffStatement(std::string code) : code(code) {}
+  FluffStmt(const std::string &stmt) : stmt(stmt) {}
 
-  std::string generateCode() const override { return code; }
+  std::string GenerateCode() const override { return stmt; }
 
-  Type getType() const override { return Type::FLUFF; }
+  Type GetType() const override { return Type::FLUFF; }
 
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
+  bool RepFirstCoeff(std::string funcName, std::vector<int> initialisation, std::vector<int> finalization) override {
     return false;
   }
+
+private:
+  std::string stmt;
 };
 
-using Coefficient = std::string;
-using Variable = std::string;
-using isCoefficientMutated = bool;
-
-template<typename T1, typename T2, typename T3>
-struct triple {
-  T1 first;
-  T2 second;
-  T3 third;
-};
-
-class AssignmentStatement : public Statement {
+class AssignStmt : public Statement {
   std::string lhsVar;
-  std::vector<triple<Coefficient, Variable, isCoefficientMutated>> rhsTerms; // coefficient_value, is_mutated, variable
+  std::vector<CVMTerm> rhsTerms; // coefficient_value, is_mutated, variable
 
 public:
-  AssignmentStatement(std::string statement) {
+  AssignStmt(const std::string &statement) {
     size_t equalPos = statement.find('=');
     lhsVar = statement.substr(0, equalPos);
     std::string rhs = statement.substr(equalPos + 1);
@@ -97,46 +92,36 @@ public:
     while (std::getline(ss, token, '+') || std::getline(ss, token, ';')) {
       size_t mulPos = token.find('*');
       if (mulPos != std::string::npos) {
-        Coefficient coeff = token.substr(0, mulPos);
-        Variable var = token.substr(mulPos + 1);
-        bool is_mutated = false; // Placeholder for mutation check
-        rhsTerms.push_back({coeff, var, is_mutated});
+        std::string coeff = token.substr(0, mulPos);
+        std::string var = token.substr(mulPos + 1);
+        rhsTerms.push_back({.coeff = coeff, .var = var, .mutated = false});
       } else {
         mulPos = token.find(';');
         if (mulPos != std::string::npos) {
           token = token.substr(0, mulPos);
         }
-        Coefficient coeff = token;
-        Variable var = "1";
-        bool is_mutated = false;                      // Placeholder for mutation check
-        rhsTerms.push_back({coeff, var, is_mutated}); // Default coefficient of 1
+        rhsTerms.push_back({.coeff = token, .var = "1", .mutated = false});
       }
     }
   }
 
-  std::string generateCode() const override {
-    std::string code = lhsVar + " = ";
-    for (size_t i = 0; i < rhsTerms.size(); ++i) {
-      code += "(" + rhsTerms[i].first + ") * " + rhsTerms[i].second;
-      if (i != rhsTerms.size() - 1) {
-        code += " + ";
-      }
-    }
-    code += ";";
-    return code;
+  std::string GenerateCode() const override {
+    std::vector<std::string> terms(rhsTerms.size());
+    std::transform(rhsTerms.begin(), rhsTerms.end(), terms.begin(), [](auto &c) { return c.GenerateCode(); });
+    return lhsVar + " = " + JoinStr(terms, " + ") + ";";
   }
 
-  Type getType() const override { return Type::ASSIGNMENT; }
+  Type GetType() const override { return Type::ASSIGNMENT; }
 
-  int getNumCoefficients() const override { return rhsTerms.size(); }
+  int GetNumCoeffs() const override { return rhsTerms.size(); }
 
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
+  bool RepFirstCoeff(std::string funcName, std::vector<int> initialisation, std::vector<int> finalization) {
     for (auto &term: rhsTerms) {
-      if (!term.third) {
-        // replace the coefficient with a call to the procedure
-        int coefficient = std::stoi(term.first);
+      if (!term.mutated) {
+        // replace the coefficient with a call to the function
+        int coefficient = std::stoi(term.coeff);
         int checksum = StatelessChecksum::Compute(finalization);
-        std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + procedureName + "(";
+        std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + funcName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
         }
@@ -144,11 +129,11 @@ public:
         replacement += "))";
         long long diff = (long long) coefficient - (long long) checksum; // To avoid UBs
         if (diff >= (long long) INT32_MIN && diff <= (long long) INT32_MAX) {
-          term.first = replacement + " + " + std::to_string(diff);
+          term.coeff = replacement + " + " + std::to_string(diff);
         } else {
-          term.first = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
+          term.coeff = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
         }
-        term.third = true;
+        term.mutated = true;
         return true;
       }
     }
@@ -156,12 +141,12 @@ public:
   }
 };
 
-class IfStatement : public Statement {
-  std::vector<triple<Coefficient, Variable, isCoefficientMutated>> condition;
-  std::string gotoStatement;
+class IfStmt : public Statement {
+  std::vector<CVMTerm> condTerms;
+  std::string gotoStmt;
 
 public:
-  IfStatement(std::string statement) {
+  IfStmt(std::string statement) {
     size_t ifPos = statement.find("if");
     size_t openParen = statement.find('(', ifPos);
     size_t closeParen = statement.find(')', openParen);
@@ -171,34 +156,27 @@ public:
     while (std::getline(ss, token, '+') || std::getline(ss, token, ';')) {
       size_t mulPos = token.find('*');
       if (mulPos != std::string::npos) {
-        Coefficient coeff = token.substr(0, mulPos);
-        Variable var = token.substr(mulPos + 1);
-        bool is_mutated = false; // Placeholder for mutation check
-        condition.push_back({coeff, var, is_mutated});
+        condTerms.push_back({token.substr(0, mulPos), token.substr(mulPos + 1), false});
       } else {
         mulPos = token.find(">=");
         if (mulPos != std::string::npos) {
           token = token.substr(0, mulPos);
         }
-        Coefficient coeff = token;
-        Variable var = "1";
-        bool is_mutated = false;                       // Placeholder for mutation check
-        condition.push_back({coeff, var, is_mutated}); // Default coefficient of 1
+        condTerms.push_back({token, "1", false}); // Default coefficient of 1
       }
     }
-    gotoStatement = statement.substr(closeParen + 1);
+    gotoStmt = statement.substr(closeParen + 1);
   }
 
-  int getNumCoefficients() const { return condition.size(); }
+  int GetNumCoeffs() const { return condTerms.size(); }
 
-  //
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
-    for (auto &term: condition) {
-      if (!term.third && term.first != "pass_counter ") {
-        // replace the coefficient with a call to the procedure
-        int coefficient = std::stoi(term.first);
+  bool RepFirstCoeff(std::string funcName, std::vector<int> initialisation, std::vector<int> finalization) {
+    for (auto &term: condTerms) {
+      if (!term.mutated && term.coeff != "pass_counter ") {
+        // replace the coefficient with a call to the function
+        int coefficient = std::stoi(term.coeff);
         int checksum = StatelessChecksum::Compute(finalization);
-        std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + procedureName + "(";
+        std::string replacement = "check_checksum(" + std::to_string(checksum) + ", " + funcName + "(";
         for (int i = 0; i < initialisation.size() - 1; ++i) {
           replacement += std::to_string(initialisation[i]) + ", ";
         }
@@ -206,87 +184,67 @@ public:
         replacement += "))";
         long long diff = (long long) coefficient - (long long) checksum;
         if (diff >= (long long) INT32_MIN && diff <= (long long) INT32_MAX) {
-          term.first = replacement + " + " + std::to_string(diff);
+          term.coeff = replacement + " + " + std::to_string(diff);
         } else {
           assert((int) ((long long) checksum + diff) == coefficient && "Not same");
-          term.first = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
+          term.coeff = "(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)";
         }
-        term.third = true;
+        term.mutated = true;
         return true;
       }
     }
     return false;
   }
 
-  std::string generateCode() const override {
-    std::string code = "if (";
-    for (size_t i = 0; i < condition.size(); ++i) {
-      code += "(" + condition[i].first + ") * " + condition[i].second;
-      if (i != condition.size() - 1) {
-        code += " + ";
-      }
-    }
-    code += " >= 0) " + gotoStatement;
-    return code;
+  std::string GenerateCode() const override {
+    std::vector<std::string> terms(condTerms.size());
+    std::transform(condTerms.begin(), condTerms.end(), terms.begin(), [](auto &c) { return c.GenerateCode(); });
+    return "if (" + JoinStr(terms, " + ") + " >= 0) " + gotoStmt;
   }
 
-  Type getType() const override { return Type::IF; }
+  Type GetType() const override { return Type::IF; }
 };
 
-class Procedure {
-private:
-  std::string name;
-  int num_input_vars;
-  int total_num_coefficients = 0;
-  std::unordered_map<std::string, int> parameters;
-  std::vector<std::unique_ptr<Statement>> statements;
-  std::vector<std::vector<int>> initialisations;
-  std::vector<std::vector<int>> finalizations;
+class Function {
 
 public:
-  Procedure() {}
+  explicit Function() {}
 
-  Procedure(std::ifstream &procedureFile, std::ifstream &mappingFile) {
+  Function(std::ifstream &funcFile, std::ifstream &mapFile) {
     std::string line;
-    // Parse the procedure
-    while (std::getline(procedureFile, line)) {
-      if (line.find("if") != std::string::npos) {
-        if (line.find("pass_counter") != std::string::npos) {
-          statements.push_back(std::make_unique<FluffStatement>(line));
-        } else {
-          statements.push_back(std::make_unique<IfStatement>(line));
-          total_num_coefficients += statements.back()->getNumCoefficients();
-        }
+    // Parse the func
+    while (std::getline(funcFile, line)) {
+      if (line.find("pass_counter") != std::string::npos) {
+        statements.push_back(std::make_unique<FluffStmt>(line));
+      } else if (line.find("if") != std::string::npos) {
+        statements.push_back(std::make_unique<IfStmt>(line));
+        numCoeffs += statements.back()->GetNumCoeffs();
       } else if (line.find("int") != std::string::npos) {
-        if (line.find("pass_counter") != std::string::npos) {
-          statements.push_back(std::make_unique<FluffStatement>(line));
-          continue;
-        }
         name = line.substr(line.find("int") + 4, line.find('(') - line.find("int") - 4);
         size_t start = line.find('(') + 1;
         size_t end = line.find(')');
         std::string params = line.substr(start, end - start);
-        num_input_vars = std::count(params.begin(), params.end(), ',') + 1;
-        statements.push_back(std::make_unique<FluffStatement>(line));
+        numInputVars = std::count(params.begin(), params.end(), ',') + 1;
+        statements.push_back(std::make_unique<FluffStmt>(line));
       } else if (line.find("return") != std::string::npos) {
-        // End of the procedure
-        statements.push_back(std::make_unique<FluffStatement>(line));
+        // End of the func
+        statements.push_back(std::make_unique<FluffStmt>(line));
         // statements.push_back(std::make_unique<FluffStatement>(line));
       } else if (line.find("BB") != std::string::npos) {
         // Start a new basic block
-        statements.push_back(std::make_unique<FluffStatement>(line));
+        statements.push_back(std::make_unique<FluffStmt>(line));
 
       } else if (line.find("=") != std::string::npos) {
         // Add statement to the current basic block
-        statements.push_back(std::make_unique<AssignmentStatement>(line));
-        total_num_coefficients += statements.back()->getNumCoefficients();
+        statements.push_back(std::make_unique<AssignStmt>(line));
+        numCoeffs += statements.back()->GetNumCoeffs();
       } else {
         // Add fluff statement
-        statements.push_back(std::make_unique<FluffStatement>(line));
+        statements.push_back(std::make_unique<FluffStmt>(line));
       }
     }
     // Parse its mapping
-    while (std::getline(mappingFile, line)) {
+    while (std::getline(mapFile, line)) {
       std::vector<std::string> iniFin = SplitStr(line, " : ", true);
       assert(iniFin.size() == 2 && "invalid mapping line");
 
@@ -307,7 +265,7 @@ public:
 
   std::string getName() const { return name; }
 
-  bool replaceCoefficient(std::string procedureName, std::vector<int> initialisation, std::vector<int> finalization) {
+  bool RepFirstCoeff(std::string funcName, std::vector<int> initialisation, std::vector<int> finalization) {
     auto rand = Random::Get().Uniform(0, (int) statements.size() - 1);
     auto probability = Random::Get().UniformReal()();
     int trials = 1000;
@@ -315,12 +273,12 @@ public:
     while (trials > 0) {
       int index = rand();
       // Idea: 80% of the replacements should be in the IF statements, and 20%  in the assignment statements
-      if (statements[index]->getType() == Statement::Type::IF && probability < 0.8) {
-        if (statements[index]->replaceCoefficient(procedureName, initialisation, finalization)) {
+      if (statements[index]->GetType() == Statement::Type::IF && probability < 0.8) {
+        if (statements[index]->RepFirstCoeff(funcName, initialisation, finalization)) {
           return true;
         }
-      } else if (statements[index]->getType() == Statement::Type::ASSIGNMENT && probability > 0.8) {
-        if (statements[index]->replaceCoefficient(procedureName, initialisation, finalization)) {
+      } else if (statements[index]->GetType() == Statement::Type::ASSIGNMENT && probability > 0.8) {
+        if (statements[index]->RepFirstCoeff(funcName, initialisation, finalization)) {
           return true;
         }
       }
@@ -332,7 +290,7 @@ public:
   std::string generateCode() const {
     std::string code;
     for (const auto &statement: statements) {
-      code += statement->generateCode() + "\n";
+      code += statement->GenerateCode() + "\n";
     }
     return code;
   }
@@ -344,59 +302,74 @@ public:
     foreign_finalization = finalizations[index];
   }
 
-  int calculateNumCoefficientsToReplace() const { return total_num_coefficients * REPLACEMENT_PROBABILITY; }
+  int calculateNumCoefficientsToReplace() const { return numCoeffs * REPLACEMENT_PROBABILITY; }
+
+private:
+  std::string name;
+  std::vector<std::unique_ptr<Statement>> statements;
+
+  int numInputVars;
+  int numCoeffs;
+  std::unordered_map<std::string, int> parameters;
+
+  std::vector<std::vector<int>> initialisations;
+  std::vector<std::vector<int>> finalizations;
 };
 
-void generateCodeForInterproceduralBlock(
-    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
-    bool staticModifier = false
-) {
-  std::ofstream outFile(filename);
-  outFile << StatelessChecksum::GetRawCode() << std::endl;
-  outFile << "#include <stdio.h>" << std::endl;
-  if (debug) {
-    outFile << "#include <assert.h>" << std::endl << std::endl;
-    outFile << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
-               "equal\"), (actual))"
-            << std::endl
-            << std::endl;
-  } else {
-    outFile << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
-  }
-  auto rand = Random::Get().UniformReal();
-  for (int i = FUNCTION_DEPTH - 1; i >= 0; --i) {
-    // output inline with 60% probability
-    auto probability = rand();
-    if (staticModifier) {
-      outFile << "static ";
+class Program {
+
+public:
+  static void GenerateCode(
+      const std::filesystem::path fileName, const std::vector<Function> &functions, bool debug = false,
+      bool staticModifier = false
+  ) {
+    std::ofstream outFile(fileName);
+    outFile << StatelessChecksum::GetRawCode() << std::endl;
+    outFile << "#include <stdio.h>" << std::endl;
+    if (debug) {
+      outFile << "#include <assert.h>" << std::endl << std::endl;
+      outFile << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
+                 "equal\"), (actual))"
+              << std::endl
+              << std::endl;
+    } else {
+      outFile << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
     }
-    if (probability < 0.6) {
-      if (!staticModifier) {
-        outFile << "static inline ";
-      } else {
-        outFile << "inline ";
+    auto rand = Random::Get().UniformReal();
+    for (int i = FUNCTION_DEPTH - 1; i >= 0; --i) {
+      // output inline with 60% probability
+      auto probability = rand();
+      if (staticModifier) {
+        outFile << "static ";
+      }
+      if (probability < 0.6) {
+        if (!staticModifier) {
+          outFile << "static inline ";
+        } else {
+          outFile << "inline ";
+        }
+      }
+      outFile << functions[i].generateCode() << std::endl;
+    }
+    outFile << "int main() {" << std::endl;
+    std::vector<int> initialisation;
+    std::vector<int> finalization;
+    functions[0].getMapping(initialisation, finalization);
+    int checksum = StatelessChecksum::Compute(finalization);
+    outFile << "    printf(\"%d,\", check_checksum(" << checksum << ", " << functions[0].getName() << "(";
+    for (int i = 0; i < initialisation.size(); ++i) {
+      outFile << initialisation[i];
+      if (i != initialisation.size() - 1) {
+        outFile << ", ";
       }
     }
-    outFile << procedures[i].generateCode() << std::endl;
+    outFile << ")));" << std::endl;
+    outFile << "    return 0;" << std::endl;
+    outFile << "}" << std::endl;
+    outFile.close();
+    // std::cout << "Code generated successfully in " << filename << std::endl;
   }
-  outFile << "int main() {" << std::endl;
-  std::vector<int> initialisation;
-  std::vector<int> finalization;
-  procedures[0].getMapping(initialisation, finalization);
-  int checksum = StatelessChecksum::Compute(finalization);
-  outFile << "    printf(\"%d,\", check_checksum(" << checksum << ", " << procedures[0].getName() << "(";
-  for (int i = 0; i < initialisation.size(); ++i) {
-    outFile << initialisation[i];
-    if (i != initialisation.size() - 1) {
-      outFile << ", ";
-    }
-  }
-  outFile << ")));" << std::endl;
-  outFile << "    return 0;" << std::endl;
-  outFile << "}" << std::endl;
-  outFile.close();
-  // std::cout << "Code generated successfully in " << filename << std::endl;
-}
+};
 
 struct ProgGenOpts {
   std::string uuid;
@@ -410,7 +383,7 @@ struct ProgGenOpts {
     options.add_options()
       ("uuid", "An UUID identifier", cxxopts::value<std::string>())
       ("i,input", "The directory saving the seed functions and mappings", cxxopts::value<std::string>())
-      ("l,limit", "The number of new procedures to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
+      ("l,limit", "The number of new programs to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
@@ -483,86 +456,90 @@ struct ProgGenOpts {
 int main(int argc, char *argv[]) {
   auto cliOpts = ProgGenOpts::Parse(argc, argv);
 
-  std::filesystem::path inputDirectory = cliOpts.input;
-  std::filesystem::path functionsDirectory(GetFunctionsDir(inputDirectory));
-  std::filesystem::path mappingsDirectory(GetMappingsDir(inputDirectory));
-  std::string new_procedure_uuid = cliOpts.uuid;
-  int generateLimit = cliOpts.limits;
+  std::string progUuid = cliOpts.uuid;
+
+  std::filesystem::path inputDir = cliOpts.input;
+  std::filesystem::path funcsDir(GetFunctionsDir(inputDir));
+
+  int genLimit = cliOpts.limits;
   bool enableDebug = cliOpts.debug;
 
-  // Read all files from functionsDirectory
-  std::vector<std::filesystem::path> allProcFiles;
+  // Read all files from funcsDir
+  std::vector<std::filesystem::path> allFuncPaths;
   // Open the directory and read all files
-  for (const auto &entry: std::filesystem::directory_iterator(functionsDirectory)) {
+  for (const auto &entry: std::filesystem::directory_iterator(funcsDir)) {
     if (entry.is_regular_file()) {
-      allProcFiles.push_back(entry.path());
+      allFuncPaths.push_back(entry.path());
     }
   }
 
-  std::vector<std::filesystem::path *> selProcFiles;
-  selProcFiles.resize(FUNCTION_DEPTH);
-  std::vector<Procedure> selProcedures;
-  selProcedures.resize(FUNCTION_DEPTH);
+  // Save the functions that we select for generating a program
+  std::vector<std::filesystem::path *> selFuncPaths;
+  selFuncPaths.resize(FUNCTION_DEPTH);
+  std::vector<Function> selFuncs;
+  selFuncs.resize(FUNCTION_DEPTH);
 
-  for (int sampNo = 0; generateLimit == 0 || sampNo < generateLimit; ++sampNo) {
-    std::cout << "[" << sampNo << "] Generating ... " << std::endl;
+  for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
+    std::string progName = progUuid + "_" + std::to_string(sampNo);
 
-    // Choose the procedure files randomly
+    std::cout << "[" << sampNo << "] Generating " << progName << "... " << std::endl;
+
+    // Choose the function files randomly
     // Fixed Unsafe memset(vector<string>, 0, sizeof(string)!!
     // std::string saves its data in the heap. That said, clears the vector's internal data
     // does not lead to the auto deletion of the string's internal data. Small string optimization does not
-    // work here as the path of each our procedure is indeed more than 25 characters.
-    memset(selProcFiles.data(), 0, selProcFiles.size() * sizeof(std::filesystem::path *));
-    auto rand = Random::Get().Uniform(0, (int) allProcFiles.size() - 1);
+    // work here as the path of each our function is indeed more than 25 characters.
+    memset(selFuncPaths.data(), 0, selFuncPaths.size() * sizeof(std::filesystem::path *));
+    auto rand = Random::Get().Uniform(0, (int) allFuncPaths.size() - 1);
     for (int i = 0; i < FUNCTION_DEPTH; ++i) {
       while (true) {
         int index = rand();
-        if (std::find(selProcFiles.begin(), selProcFiles.end(), &allProcFiles[index]) == selProcFiles.end()) {
-          selProcFiles[i] = &allProcFiles[index];
+        if (std::find(selFuncPaths.begin(), selFuncPaths.end(), &allFuncPaths[index]) == selFuncPaths.end()) {
+          selFuncPaths[i] = &allFuncPaths[index];
           break;
         }
       }
     }
 
-    // Parse all selected procedure files
+    // Parse all selected function files
     for (int i = 0; i < FUNCTION_DEPTH; ++i) {
-      std::filesystem::path procFile = *selProcFiles[i];
-      std::filesystem::path mapFile = GetMappingPathForFunctionPath(procFile);
-      std::cout << "[" << sampNo << "] Opening func#" << i << "'s function: " << procFile << std::endl;
-      std::ifstream procIFS(procFile);
+      std::filesystem::path funcFile = *selFuncPaths[i];
+      std::filesystem::path mapFile = GetMappingPathForFunctionPath(funcFile);
+      std::cout << "[" << sampNo << "] Opening func#" << i << "'s function: " << funcFile << std::endl;
+      std::ifstream funcIfs(funcFile);
       std::cout << "[" << sampNo << "] Opening func#" << i << "'s mapping: " << mapFile << std::endl;
-      std::ifstream mapIFS(mapFile);
-      if (!procIFS.is_open() || !mapIFS.is_open()) {
-        std::cerr << "Error opening file: " << procFile.stem() << std::endl;
+      std::ifstream mapIfs(mapFile);
+      if (!funcIfs.is_open() || !mapIfs.is_open()) {
+        std::cerr << "Error opening file: " << funcFile.stem() << std::endl;
         exit(1);
       }
-      selProcedures[i] = Procedure(procIFS, mapIFS);
-      procIFS.close();
-      mapIFS.close();
+      selFuncs[i] = Function(funcIfs, mapIfs);
+      funcIfs.close();
+      mapIfs.close();
     }
 
     std::vector<int> initialisation;
     std::vector<int> finalization;
-    // Now replace the mappings in the procedures with the calls to the other procedures
+    // Now replace the mappings in the functions with the calls to the other functions
     for (int i = 0; i < FUNCTION_DEPTH - 1; ++i) {
-      // Sample a procedure from i + 1 to PROCEDURE_DEPTH
+      // Sample a function from i + 1 to PROCEDURE_DEPTH
       auto thisRand = Random::Get().Uniform(i + 1, FUNCTION_DEPTH - 1);
 
       // Calculate all replaceable coefficients
-      int num_mappings_to_replace = selProcedures[i].calculateNumCoefficientsToReplace();
+      int num_mappings_to_replace = selFuncs[i].calculateNumCoefficientsToReplace();
 
       std::cout << "[" << sampNo << "] Replacing function"
-                << ": index=" << i << ", name=" << selProcFiles[i]->stem()
+                << ": index=" << i << ", name=" << selFuncPaths[i]->stem()
                 << ", num_replaceable=" << num_mappings_to_replace << std::endl;
 
-      // For each coefficient that can be replaced, we find a procedure to replace it
+      // For each coefficient that can be replaced, we find a function to replace it
       for (int k = 0; k < num_mappings_to_replace; ++k) {
         int j = thisRand();
-        selProcedures[j].getMapping(initialisation, finalization);
-        if (!selProcedures[i].replaceCoefficient(selProcedures[j].getName(), initialisation, finalization)) {
+        selFuncs[j].getMapping(initialisation, finalization);
+        if (!selFuncs[i].RepFirstCoeff(selFuncs[j].getName(), initialisation, finalization)) {
           break; // TODO: break or continue? We can continue to the next, can't we?
         }
-        std::cout << "[" << sampNo << "]   var#" << k << " -> func#" << j << ": " << selProcFiles[j]->stem()
+        std::cout << "[" << sampNo << "]   var#" << k << " -> func#" << j << ": " << selFuncPaths[j]->stem()
                   << std::endl;
       }
 
@@ -570,12 +547,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::cout << "[" << sampNo << "] Storing" << std::endl;
-    std::string newProcedureName = new_procedure_uuid + "_" + std::to_string(sampNo);
-    generateCodeForInterproceduralBlock(
-        GetProgramsDir(inputDirectory) / (newProcedureName + ".c"), selProcedures, enableDebug
-    );
-    generateCodeForInterproceduralBlock(
-        GetProgramsDir(inputDirectory) / (newProcedureName + "_static.c"), selProcedures, enableDebug, true
-    );
+    Program::GenerateCode(GetProgramsDir(inputDir) / (progName + ".c"), selFuncs, enableDebug);
+    Program::GenerateCode(GetProgramsDir(inputDir) / (progName + "_static.c"), selFuncs, enableDebug, true);
   }
 }
