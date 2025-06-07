@@ -48,7 +48,7 @@ public:
   [[nodiscard]] std::function<Int()> Uniform(Int min = 0, Int max = RAND_MAX) {
     auto dist = std::uniform_int_distribution<Int>(min, max);
     return [dist, this]() mutable -> Int {
-      int x = dist(this->rng);
+      Int x = dist(this->rng);
       return x;
     };
   }
@@ -57,7 +57,7 @@ public:
   [[nodiscard]] std::function<Real()> UniformReal(Real min = 0., Real max = 1.) {
     auto dist = std::uniform_real_distribution<Real>(min, max);
     return [dist, this]() mutable -> Real {
-      int x = dist(this->rng);
+      Real x = dist(this->rng);
       return x;
     };
   }
