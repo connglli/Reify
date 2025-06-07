@@ -38,11 +38,35 @@ int main(int argc, int* argv[]) {{
 }}
 """
 
-PROCEDURES_DIR = (Path(__file__).parent.parent / 'procedures').absolute()
-MAPPINGS_DIR = (Path(__file__).parent.parent / 'mappings').absolute()
+ROOT_DIR = Path(__file__).parent.parent.absolute()
 
-CHKSUM_FILE = (Path(__file__).parent.parent / 'res' / 'cchksum.txt').absolute()
+DEFAULT_OUTPUT_DIR = ROOT_DIR / 'generated'
+
+CHKSUM_FILE = ROOT_DIR / 'res' / 'cchksum.txt'
 CHKSUM_CODE = CHKSUM_FILE.read_text()
+
+
+def get_funcs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
+    return Path(gen_dir) / 'functions'
+
+
+def get_maps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
+    return Path(gen_dir) / 'mappings'
+
+
+def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+    fuuid_ = fuuid.replace('-', '_')
+    return (
+        get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c",
+        get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map"
+    )
+
+
+def get_map_file_for_func_file(func_path, mappings_dir=None):
+    if mappings_dir:
+        return Path(mappings_dir) / f"{Path(func_path).stem}.map"
+    else:
+        return get_maps_dir(func_path.parent.parent) / f"{Path(func_path).stem}.map"
 
 
 def get_simple_program(func_name, func_code, func_args):
@@ -52,18 +76,6 @@ def get_simple_program(func_name, func_code, func_args):
         func_name=func_name,
         func_args=", ".join(str(x) for x in func_args)
     )
-
-
-def get_func_map_files(fuuid, fsano, procedures_dir=PROCEDURES_DIR, mappings_dir=MAPPINGS_DIR):
-    fuuid_ = fuuid.replace('-', '_')
-    return (
-        procedures_dir / f"function_{fuuid_}_{fsano}.c",
-        mappings_dir / f"function_{fuuid_}_{fsano}_mapping"
-    )
-
-
-def get_map_file_for_func_file(func_path, mappings_dir=MAPPINGS_DIR):
-    return mappings_dir / f"{Path(func_path).stem}_mapping"
 
 
 def parse_mapping(map_path):

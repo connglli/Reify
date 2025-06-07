@@ -154,7 +154,7 @@ z3::expr BB::boundCoefficients(z3::context &c, const std::vector<z3::expr> &coef
 }
 
 void BB::GenerateConstraints(
-  int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
+    int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
 ) {
   // TODO: Remove redundant code
 

@@ -168,7 +168,7 @@ std::vector<int> Func::ExtractInitialisationsFromModel(z3::model &model, z3::con
 // decided to just store the final values of all the variables (at the end basic
 // block) instead of just the checksum
 std::vector<int> Func::ExtractFinalizationsFromModel(
-  z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
+    z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
 ) const {
   std::vector<int> finalisations;
   for (int i = 0; i < numVars; i++) {
@@ -198,9 +198,9 @@ std::vector<int> Func::ExtractFinalizationsFromModel(
 /////// Code Generation
 ///////////////////////////////////////////////////////////////////
 
-std::string Func::GenerateCode(int sno, std::string uuid) {
+std::string Func::GenerateCode(const std::string &sno, const std::string &uuid) {
   std::ostringstream code;
-  code << "int function_" << uuid << "_" << std::to_string(sno) << "(";
+  code << "int function_" << uuid << "_" << sno << "(";
   for (int i = 0; i < numVars; ++i) {
     code << "int " << NameVar(i);
     if (i < numVars - 1) {
@@ -215,4 +215,17 @@ std::string Func::GenerateCode(int sno, std::string uuid) {
   }
   code << "}" << std::endl;
   return code.str();
+}
+
+std::string Func::GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation) {
+  std::ostringstream mapping;
+  for (auto x: initialisation) {
+    mapping << x << ",";
+  }
+  mapping << " : ";
+  for (auto x: finalisation) {
+    mapping << x << ",";
+  }
+  mapping << std::endl;
+  return mapping.str();
 }

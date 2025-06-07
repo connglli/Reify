@@ -8,13 +8,13 @@ Z3
 
 ```sh
 # Build all targets
-make all
+[DEBUG=true] make all
 
 # Build the function generation target
-make fgen
+[DEBUG=true] make fgen
 
 # Build the program generation target
-make pgen
+[DEBUG=true] make pgen
 ```
 
 ## Generate
@@ -24,13 +24,13 @@ make pgen
 make gen-func-set
 
 # Get FGEN_LIMIT (0 mean unlimited) functions and check if they are UB-free
-[FGEN_LIMIT=10000] make gen-func-set-check-ub
+[OUTPUT_DIR=/path/to/output] [FGEN_LIMIT=10000] [GEN_SEED=0] make gen-func-set-check-ub
 
 # Generate a set of programs
 make gen-prog-set
 
 # Get PGEN_LIMIT (0 means unlimited) programs and check if they are UB-free
-[PGEN_LIMIT=10000] make gen-prog-set-check
+[INPUT_DIR=/path/to/functions] [PGEN_LIMIT=10000] [GEN_SEED=0] make gen-prog-set-check
 
 # Check UB-freeness of the generated functions and their mappings
 python3 scripts/ubchk.py <func_dir> <map_dir>

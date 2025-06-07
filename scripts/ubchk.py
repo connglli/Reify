@@ -121,12 +121,12 @@ def check_ubs(func_path, map_path):
 
 if __name__ == '__main__':
     if len(sys.argv) != 2 and len(sys.argv) != 3:
-        print("Usage 1: ubchk <procedure_dir> <mapping_dir>")
-        print("Usage 2: ubchk <new_procedure_dir>")
+        print("Usage 1: ubchk <functions_dir> <mappings_dir>")
+        print("Usage 2: ubchk <programs_dir>")
         exit(1)
-    proc_dir = Path(sys.argv[1])
+    func_dir = Path(sys.argv[1])
     map_dir = Path(sys.argv[2]) if len(sys.argv) == 3 else None
-    for func_file in proc_dir.iterdir():
+    for func_file in func_dir.iterdir():
         if not func_file.is_file(): continue
         print(f"Check {func_file.stem} ...")
         if map_dir:
@@ -134,4 +134,3 @@ if __name__ == '__main__':
             check_ubs(func_file, map_file)
         else:
             check_ubs_once(func_file)
-

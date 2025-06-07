@@ -1,8 +1,5 @@
 build/
-logs/
-procedures/
-mappings/
-new_procedures/
+generated/
 */__pycache__
 .idea
 .vscode

@@ -61,9 +61,7 @@ class FluffStatement : public Statement {
   std::string code;
 
 public:
-  FluffStatement(std::string code) :
-    code(code) {
-  }
+  FluffStatement(std::string code) : code(code) {}
 
   std::string generateCode() const override { return code; }
 
@@ -246,8 +244,7 @@ private:
   std::vector<std::vector<int>> finalizations;
 
 public:
-  Procedure() {
-  }
+  Procedure() {}
 
   Procedure(std::ifstream &procedureFile, std::ifstream &mappingFile) {
     std::string line;
@@ -351,8 +348,8 @@ public:
 };
 
 void generateCodeForInterproceduralBlock(
-  const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
-  bool staticModifier = false
+    const std::filesystem::path filename, const std::vector<Procedure> &procedures, bool debug = false,
+    bool staticModifier = false
 ) {
   std::ofstream outFile(filename);
   outFile << StatelessChecksum::GetRawCode() << std::endl;
@@ -360,14 +357,14 @@ void generateCodeForInterproceduralBlock(
   if (debug) {
     outFile << "#include <assert.h>" << std::endl << std::endl;
     outFile << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
-        "equal\"), (actual))"
-        << std::endl
-        << std::endl;
+               "equal\"), (actual))"
+            << std::endl
+            << std::endl;
   } else {
     outFile << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
   }
   auto rand = Random::Get().UniformReal();
-  for (int i = PROCEDURE_DEPTH - 1; i >= 0; --i) {
+  for (int i = FUNCTION_DEPTH - 1; i >= 0; --i) {
     // output inline with 60% probability
     auto probability = rand();
     if (staticModifier) {
@@ -403,8 +400,7 @@ void generateCodeForInterproceduralBlock(
 
 struct ProgGenOpts {
   std::string uuid;
-  std::string procedures;
-  std::string mappings;
+  std::string input;
   int limits;
   bool debug;
 
@@ -413,8 +409,7 @@ struct ProgGenOpts {
     // clang-format off
     options.add_options()
       ("uuid", "An UUID identifier", cxxopts::value<std::string>())
-      ("p,procedures", "The directory saving the seed procedures", cxxopts::value<std::string>())
-      ("m,mappings", "The directory saving the mappings for the the seed procedures", cxxopts::value<std::string>())
+      ("i,input", "The directory saving the seed functions and mappings", cxxopts::value<std::string>())
       ("l,limit", "The number of new procedures to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -448,26 +443,14 @@ struct ProgGenOpts {
       std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
     }
 
-    std::string procedures;
-    if (!args.count("procedures")) {
-      std::cerr << "Error: The procedures directory (--procedures) is not given." << std::endl;
+    std::string input;
+    if (!args.count("input")) {
+      std::cerr << "Error: The input directory (--input) is not given." << std::endl;
       exit(1);
     } else {
-      procedures = args["procedures"].as<std::string>();
-      if (!std::filesystem::exists(procedures)) {
-        std::cerr << "Error: The procedures directory (--procedures) does not exist." << std::endl;
-        exit(1);
-      }
-    }
-
-    std::string mappings;
-    if (!args.count("mappings")) {
-      std::cerr << "Error: The mappings directory (--mappings) is not given." << std::endl;
-      exit(1);
-    } else {
-      mappings = args["mappings"].as<std::string>();
-      if (!std::filesystem::exists(mappings)) {
-        std::cerr << "Error: The mappings directory (--mappings) does not exist." << std::endl;
+      input = args["input"].as<std::string>();
+      if (!std::filesystem::exists(input)) {
+        std::cerr << "Error: The input directory (--input) does not exist." << std::endl;
         exit(1);
       }
     }
@@ -475,7 +458,7 @@ struct ProgGenOpts {
     int limit = 0;
     if (args.count("limit")) {
       limit = args["limit"].as<int>();
-      if (limit <= 0) {
+      if (limit < 0) {
         std::cerr << "Error: The limit (--limit) must be greater than or equal to 0." << std::endl;
         exit(1);
       }
@@ -493,33 +476,33 @@ struct ProgGenOpts {
       debug = true;
     }
 
-    return {.uuid = uuid, .procedures = procedures, .mappings = mappings, .limits = limit, .debug = debug};
+    return {.uuid = uuid, .input = input, .limits = limit, .debug = debug};
   }
 };
-
 
 int main(int argc, char *argv[]) {
   auto cliOpts = ProgGenOpts::Parse(argc, argv);
 
-  std::filesystem::path procedureDirectory(cliOpts.procedures);
-  std::filesystem::path mappingDirectory(cliOpts.mappings);
+  std::filesystem::path inputDirectory = cliOpts.input;
+  std::filesystem::path functionsDirectory(GetFunctionsDir(inputDirectory));
+  std::filesystem::path mappingsDirectory(GetMappingsDir(inputDirectory));
   std::string new_procedure_uuid = cliOpts.uuid;
   int generateLimit = cliOpts.limits;
   bool enableDebug = cliOpts.debug;
 
-  // Read all files from procedureDirectory
+  // Read all files from functionsDirectory
   std::vector<std::filesystem::path> allProcFiles;
   // Open the directory and read all files
-  for (const auto &entry: std::filesystem::directory_iterator(procedureDirectory)) {
+  for (const auto &entry: std::filesystem::directory_iterator(functionsDirectory)) {
     if (entry.is_regular_file()) {
       allProcFiles.push_back(entry.path());
     }
   }
 
   std::vector<std::filesystem::path *> selProcFiles;
-  selProcFiles.resize(PROCEDURE_DEPTH);
+  selProcFiles.resize(FUNCTION_DEPTH);
   std::vector<Procedure> selProcedures;
-  selProcedures.resize(PROCEDURE_DEPTH);
+  selProcedures.resize(FUNCTION_DEPTH);
 
   for (int sampNo = 0; generateLimit == 0 || sampNo < generateLimit; ++sampNo) {
     std::cout << "[" << sampNo << "] Generating ... " << std::endl;
@@ -531,7 +514,7 @@ int main(int argc, char *argv[]) {
     // work here as the path of each our procedure is indeed more than 25 characters.
     memset(selProcFiles.data(), 0, selProcFiles.size() * sizeof(std::filesystem::path *));
     auto rand = Random::Get().Uniform(0, (int) allProcFiles.size() - 1);
-    for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
+    for (int i = 0; i < FUNCTION_DEPTH; ++i) {
       while (true) {
         int index = rand();
         if (std::find(selProcFiles.begin(), selProcFiles.end(), &allProcFiles[index]) == selProcFiles.end()) {
@@ -542,20 +525,18 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse all selected procedure files
-    for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
+    for (int i = 0; i < FUNCTION_DEPTH; ++i) {
       std::filesystem::path procFile = *selProcFiles[i];
-      std::filesystem::path mapFile = mappingDirectory / GetMappingNameForProcedureName(procFile.stem().string());
-      std::cout << "[" << sampNo << "] Opening procedure file: " << procFile << std::endl;
+      std::filesystem::path mapFile = GetMappingPathForFunctionPath(procFile);
+      std::cout << "[" << sampNo << "] Opening func#" << i << "'s function: " << procFile << std::endl;
       std::ifstream procIFS(procFile);
-      std::cout << "[" << sampNo << "] Opening mapping file: " << mapFile << std::endl;
+      std::cout << "[" << sampNo << "] Opening func#" << i << "'s mapping: " << mapFile << std::endl;
       std::ifstream mapIFS(mapFile);
       if (!procIFS.is_open() || !mapIFS.is_open()) {
         std::cerr << "Error opening file: " << procFile.stem() << std::endl;
-        continue; // TODO: Continue??? The i-th procedure remains the one in the last sampling?
+        exit(1);
       }
       selProcedures[i] = Procedure(procIFS, mapIFS);
-      // std::cout << "Procedure name: " << procedures[i].getName() <<
-      // std::endl;
       procIFS.close();
       mapIFS.close();
     }
@@ -563,35 +544,38 @@ int main(int argc, char *argv[]) {
     std::vector<int> initialisation;
     std::vector<int> finalization;
     // Now replace the mappings in the procedures with the calls to the other procedures
-    for (int i = 0; i < PROCEDURE_DEPTH; ++i) {
-      if (i == PROCEDURE_DEPTH - 1) {
-        break;
-      }
+    for (int i = 0; i < FUNCTION_DEPTH - 1; ++i) {
       // Sample a procedure from i + 1 to PROCEDURE_DEPTH
-      auto thisRand = Random::Get().Uniform(i + 1, PROCEDURE_DEPTH - 1);
+      auto thisRand = Random::Get().Uniform(i + 1, FUNCTION_DEPTH - 1);
 
       // Calculate all replaceable coefficients
       int num_mappings_to_replace = selProcedures[i].calculateNumCoefficientsToReplace();
-      // std::cout << "Number of mappings to replace: " << num_mappings_to_replace << std::endl;
+
+      std::cout << "[" << sampNo << "] Replacing function"
+                << ": index=" << i << ", name=" << selProcFiles[i]->stem()
+                << ", num_replaceable=" << num_mappings_to_replace << std::endl;
 
       // For each coefficient that can be replaced, we find a procedure to replace it
       for (int k = 0; k < num_mappings_to_replace; ++k) {
-        int index = thisRand();
-        selProcedures[index].getMapping(initialisation, finalization);
-        if (!selProcedures[i].replaceCoefficient(selProcedures[index].getName(), initialisation, finalization)) {
+        int j = thisRand();
+        selProcedures[j].getMapping(initialisation, finalization);
+        if (!selProcedures[i].replaceCoefficient(selProcedures[j].getName(), initialisation, finalization)) {
           break; // TODO: break or continue? We can continue to the next, can't we?
         }
-        // std::cout<<"Replacing mapping for procedure: " <<
-        // procedures[index].getName() << " in procedure: " <<
-        // procedures[i].getName() << std::endl;
+        std::cout << "[" << sampNo << "]   var#" << k << " -> func#" << j << ": " << selProcFiles[j]->stem()
+                  << std::endl;
       }
+
+      std::cout << "[" << sampNo << "]   Done" << std::endl;
     }
 
-    // std::cout<< "Now generating code for interprocedural block" << std::endl;
+    std::cout << "[" << sampNo << "] Storing" << std::endl;
     std::string newProcedureName = new_procedure_uuid + "_" + std::to_string(sampNo);
-    generateCodeForInterproceduralBlock(NEW_PROCEDURES_DIR / (newProcedureName + ".c"), selProcedures, enableDebug);
     generateCodeForInterproceduralBlock(
-      NEW_PROCEDURES_DIR / (newProcedureName + "_static.c"), selProcedures, enableDebug, true
+        GetProgramsDir(inputDirectory) / (newProcedureName + ".c"), selProcedures, enableDebug
+    );
+    generateCodeForInterproceduralBlock(
+        GetProgramsDir(inputDirectory) / (newProcedureName + "_static.c"), selProcedures, enableDebug, true
     );
   }
 }

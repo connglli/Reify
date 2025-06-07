@@ -54,7 +54,7 @@ bool Graph::HasPath(int start, int target) const {
 }
 
 void Graph::Generate() {
-  auto rand = Random::Get().Uniform(0, numNodes-1);
+  auto rand = Random::Get().Uniform(0, numNodes - 1);
   for (int i = 0; i < numNodes - 1; i++) {
     if (rand() % 2 == 0 || i == numNodes - 2) {
       int target = rand();

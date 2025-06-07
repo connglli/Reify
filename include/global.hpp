@@ -70,7 +70,7 @@
 
 #define ENABLE_CONSISTENT_WALKS true
 #define NUM_INITS_PER_WALK                                                                                             \
-  3 // the number of different initialisation sets we want the solver to find for a given procedure
+  3 // the number of different initialisation sets we want the solver to find for a given function
 
 #define BITSHIFT_BY 6        // not used for now, but tried an experiment with bitwise operations
 #define BITWIDTH_DATATYPE 32 // not used for now, but tried an experiment with bitwise operations
@@ -79,43 +79,56 @@
 ////// Program Generation
 ////////////////////////////////////////////////////////////
 
-#define REPLACEMENT_PROBABILITY 0.5 // Probability of replacing a coefficient/constant with a call to another procedure
-#define PROCEDURE_DEPTH 3           // Number of procedures we want to knit together
+#define REPLACEMENT_PROBABILITY 0.5 // Probability of replacing a coefficient/constant with a call to another function
+#define FUNCTION_DEPTH 3            // Number of functions we want to knit together
 
 ////////////////////////////////////////////////////////////
 ////// Outputs
 ////////////////////////////////////////////////////////////
 
-static std::filesystem::path PROCEDURES_DIR = "procedures";
-static std::filesystem::path MAPPINGS_DIR = "mappings";
-static std::filesystem::path GEN_LOGS_DIR = "logs";
+static std::filesystem::path GetFunctionsDir(const std::filesystem::path &output) { return output / "functions"; }
 
-static std::filesystem::path NEW_PROCEDURES_DIR = "new_procedures";
+static std::filesystem::path GetMappingsDir(const std::filesystem::path &output) { return output / "mappings"; }
 
-static std::string GetProcedureName(const std::string &uuid, int sno) {
-  return "function_" + uuid + "_" + std::to_string(sno);
+static std::filesystem::path GetLoggingsDir(const std::filesystem::path &output) { return output / "loggings"; }
+
+static std::filesystem::path GetProgramsDir(const std::filesystem::path &output) { return output / "programs"; }
+
+static std::string GetFunctionName(const std::string &uuid, const std::string &sno) {
+  return "function_" + uuid + "_" + sno;
 }
 
-static std::filesystem::path GetProcedurePath(const std::string &uuid, int sno) {
-  return PROCEDURES_DIR / (GetProcedureName(uuid, sno) + ".c");
+static std::filesystem::path
+GetFunctionPath(const std::string &uuid, const std::string &sno, const std::filesystem::path &output) {
+  return GetFunctionsDir(output) / (GetFunctionName(uuid, sno) + ".c");
 }
 
-static std::string GetMappingNameForProcedureName(const std::string &procedureName) {
-  return procedureName + "_mapping";
+static std::string GetMappingNameForFunctionName(const std::string &functionName) { return functionName + ".map"; }
+
+static std::filesystem::path
+GetMappingPath(const std::string &uuid, const std::string &sno, const std::filesystem::path &output) {
+  return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path GetMappingPath(const std::string &uuid, int sno) {
-  return MAPPINGS_DIR / GetMappingNameForProcedureName(GetProcedureName(uuid, sno));
+static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
+  return GetMappingsDir(functionPath.parent_path().parent_path()) / GetMappingNameForFunctionName(functionPath.stem());
 }
 
-static std::string GetGenLogNameForProcedureName(const std::string &procedureName) { return procedureName + "_log"; }
+static std::string GetLoggingNameForFunctionName(const std::string &functionName) { return functionName + ".log"; }
 
-static std::filesystem::path GetGenLogPath(const std::string &uuid, int sno, bool devnull = true) {
+static std::filesystem::path GetGenLogPath(
+    const std::string &uuid, const std::string &sno, const std::filesystem::path &output, bool devnull = true
+) {
   if (devnull) {
     return {"/dev/null"};
   } else {
-    return GEN_LOGS_DIR / GetGenLogNameForProcedureName(GetProcedureName(uuid, sno));
+    return GetLoggingsDir(output) / GetLoggingNameForFunctionName(GetFunctionName(uuid, sno));
   }
 }
+
+static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
+  return GetLoggingsDir(functionPath.parent_path().parent_path()) / GetLoggingNameForFunctionName(functionPath.stem());
+}
+
 
 #endif // GRAPHFUZZ_GLOBAL_HPP

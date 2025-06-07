@@ -28,23 +28,16 @@
 #include <fstream>
 #include <iostream>
 
-Log::Log() :
-  fout_(new std::ofstream("/dev/null")) {
-  out = fout_;
-}
+Log::Log() : fout_(new std::ofstream("/dev/null")) { out = fout_; }
 
-Log::~Log() {
-  deleteFoutSafely();
-}
+Log::~Log() { deleteFoutSafely(); }
 
 Log &Log::Get() {
   static Log logger;
   return logger;
 }
 
-std::basic_ostream<char> &Log::Out() const {
-  return *out;
-}
+std::basic_ostream<char> &Log::Out() const { return *out; }
 
 void Log::SetCout() {
   deleteFoutSafely();

@@ -26,8 +26,8 @@
 #ifndef GRAPHFUZZ_LOGGER_H
 #define GRAPHFUZZ_LOGGER_H
 
-#include <string>
 #include <ostream>
+#include <string>
 
 class Log {
 
@@ -50,4 +50,4 @@ private:
   std::basic_ofstream<char> *fout_;
 };
 
-#endif //GRAPHFUZZ_LOGGER_H
+#endif // GRAPHFUZZ_LOGGER_H

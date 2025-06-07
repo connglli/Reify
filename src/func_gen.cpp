@@ -35,41 +35,27 @@
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 
-std::ofstream outputFile;
+std::ofstream funcionFile;
 std::ofstream mappingFile;
-std::filesystem::path mappingFileName;
-std::filesystem::path outputFileName;
-
+std::filesystem::path mapFilePath;
+std::filesystem::path funcFilePath;
 
 static bool isFormulaSatisfiable = false;
 
-std::string generateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation) {
-  std::ostringstream mapping;
-  for (auto x: initialisation) {
-    mapping << x << ",";
-  }
-  mapping << " : ";
-  for (auto x: finalisation) {
-    mapping << x << ",";
-  }
-  mapping << std::endl;
-  return mapping.str();
-}
-
 // Write a signal handler to handle SIGINT and SIGTERM signals
 void cleanupIfEmpty() {
-  if (outputFile.is_open()) {
-    outputFile.close();
+  if (funcionFile.is_open()) {
+    funcionFile.close();
   }
   if (mappingFile.is_open()) {
     mappingFile.close();
   }
   // if output file is empty, remove it from the filesystem
-  std::ifstream f(outputFileName);
-  std::ifstream f2(mappingFileName);
+  std::ifstream f(funcFilePath);
+  std::ifstream f2(mapFilePath);
   if (f.peek() == std::ifstream::traits_type::eof() || f2.peek() == std::ifstream::traits_type::eof()) {
-    std::remove(outputFileName.c_str());
-    std::remove(mappingFileName.c_str());
+    std::remove(funcFilePath.c_str());
+    std::remove(mapFilePath.c_str());
   }
   f.close();
   f2.close();
@@ -80,8 +66,8 @@ void signalHandler(int signum) {
   if (isFormulaSatisfiable) {
     return;
   } else {
-    if (outputFile.is_open()) {
-      outputFile.close();
+    if (funcionFile.is_open()) {
+      funcionFile.close();
     }
     if (mappingFile.is_open()) {
       mappingFile.close();
@@ -92,8 +78,8 @@ void signalHandler(int signum) {
 };
 
 struct FunGenOpts {
-  std::string uuid;
-  int sno;
+  std::string uuid, sno;
+  std::string output;
   bool verbose;
 
   static FunGenOpts Parse(int argc, char **argv) {
@@ -101,7 +87,8 @@ struct FunGenOpts {
     // clang-format off
     options.add_options()
       ("uuid", "An UUID identifier as the primary identifier", cxxopts::value<std::string>())
-      ("n,sno", "A sample number as the second identifier", cxxopts::value<int>())
+      ("n,sno", "A sample number as the second identifier", cxxopts::value<std::string>())
+      ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
@@ -134,16 +121,23 @@ struct FunGenOpts {
       std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
     }
 
-    int sno = -1;
+    std::string sno;
     if (!args.count("sno")) {
       std::cerr << "Error: The sample number (--sno) is not given." << std::endl;
       exit(1);
     } else {
-      sno = args["sno"].as<int>();
-      if (sno < 0) {
+      sno = args["sno"].as<std::string>();
+      if (std::stoi(sno) < 0) {
         std::cout << "Error: The sample number (--sno) must be non-negative." << std::endl;
         exit(1);
       }
+    }
+
+    std::string output;
+    if (!args.count("output")) {
+      std::cerr << "Error: The output directory (--output) is not given." << std::endl;
+    } else {
+      output = args["output"].as<std::string>();
     }
 
     if (args.count("seed")) {
@@ -160,22 +154,29 @@ struct FunGenOpts {
       verbose = false;
     }
 
-    return {.uuid = uuid, .sno = sno, .verbose = verbose};
+    return {.uuid = uuid, .sno = sno, .output = output, .verbose = verbose};
   }
 };
 
 int main(int argc, char **argv) {
   auto cliOpts = FunGenOpts::Parse(argc, argv);
 
-  int sno = cliOpts.sno;
   std::string uuid = cliOpts.uuid;
+  std::string sno = cliOpts.sno;
   bool verbose = cliOpts.verbose;
 
-  mappingFileName = GetMappingPath(uuid, sno);
-  mappingFile = std::ofstream(mappingFileName);
-  outputFileName = GetProcedurePath(uuid, sno);
-  outputFile = std::ofstream(outputFileName);
-  Log::Get().SetFout(GetGenLogPath(uuid, sno, /*devnull=*/!verbose));
+  std::filesystem::path outputDirectory = cliOpts.output;
+  std::filesystem::path functionsDirectory = GetFunctionsDir(outputDirectory);
+  std::filesystem::path mappingsDirectory = GetMappingsDir(outputDirectory);
+  std::filesystem::create_directories(outputDirectory);
+  std::filesystem::create_directories(functionsDirectory);
+  std::filesystem::create_directories(mappingsDirectory);
+
+  funcFilePath = GetFunctionPath(uuid, sno, outputDirectory);
+  mapFilePath = GetMappingPath(uuid, sno, outputDirectory);
+  funcionFile = std::ofstream(funcFilePath);
+  mappingFile = std::ofstream(mapFilePath);
+  Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/!verbose));
 
   std::signal(SIGINT, signalHandler);
   std::signal(SIGTERM, signalHandler);
@@ -231,10 +232,10 @@ int main(int argc, char **argv) {
   if (solver.check() == z3::unsat) {
     Log::Get().Out() << "UNSAT" << std::endl;
     // Remove the output file and mapping file from the filesystem because no model was found
-    outputFile.close();
+    funcionFile.close();
     mappingFile.close();
-    std::remove((outputFileName).c_str());
-    std::remove((mappingFileName).c_str());
+    std::remove((funcFilePath).c_str());
+    std::remove((mapFilePath).c_str());
     return 1;
   }
 
@@ -245,12 +246,12 @@ int main(int argc, char **argv) {
   Log::Get().Out() << "Execution Model: " << model << std::endl;
 
   f.ExtractParametersFromModel(model, c);
-  outputFile << f.GenerateCode(sno, uuid);
-  outputFile.close();
+  funcionFile << f.GenerateCode(sno, uuid);
+  funcionFile.close();
 
   std::vector<int> initialisation = f.ExtractInitialisationsFromModel(model, c);
   std::vector<int> finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
-  mappingFile << generateMapping(initialisation, finalisation);
+  mappingFile << Func::GenerateMapping(initialisation, finalisation);
 
   // Now, let's try to generate a couple more mappings (initialisation sets).
   // First, let's regenerate the SMT query by repopulating the solver with the
@@ -296,7 +297,7 @@ int main(int argc, char **argv) {
     f.ExtractParametersFromModel(model, c);
     initialisation = f.ExtractInitialisationsFromModel(model, c);
     finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
-    mappingFile << generateMapping(initialisation, finalisation);
+    mappingFile << Func::GenerateMapping(initialisation, finalisation);
   }
 
   mappingFile.close();

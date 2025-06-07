@@ -30,19 +30,19 @@ import uuid
 from argparse import ArgumentParser
 from subprocess import CalledProcessError
 
-from params import get_func_map_files
+from params import DEFAULT_OUTPUT_DIR, get_func_map_files
 from ubchk import check_ubs
 from utils import run_proc
 
 
-def gen_func(exec, sano, uuid_val, timeout=60, verbose=False, seed=None):
+def gen_func(exec, *, output, sano, uuid_val, timeout=60, verbose=False, seed=None):
     try:
         st_time = time.time()
         cmd = [exec]
         if verbose: cmd += ["-v"]
         if seed:
             cmd += ["-s", str(seed)]
-        cmd += ["-n", str(sano), uuid_val]
+        cmd += ["-o", str(output), "-n", str(sano), uuid_val]
         run_proc(
             cmd,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -58,7 +58,7 @@ def gen_func(exec, sano, uuid_val, timeout=60, verbose=False, seed=None):
         return False, None
 
 
-def main(limit, seed, check, timeout):
+def main(*, output, limit, seed, check, timeout):
     if seed >= 0:
         random.seed(seed)
         next_seed = lambda: random.randint(0, 2147483647)
@@ -66,17 +66,23 @@ def main(limit, seed, check, timeout):
         next_seed = lambda: None
     func_uuid, func_sano = str(uuid.uuid4()), 0
     print(
-        f"UUID={func_uuid}, limit={limit if limit != 0 else '<INF>'}, "
-        f"seed={seed if seed >= 0 else '<RND>'}, check={check}, timeout={timeout}s"
+        f"UUID={func_uuid}, output={output}, "
+        f"limit={limit if limit != 0 else '<INF>'}, "
+        f"seed={seed if seed >= 0 else '<RND>'}, "
+        f"check={check}, timeout={timeout}s"
     )
     while limit == 0 or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
-        succ, elapsed = gen_func("./build/bin/fgen", func_sano, func_uuid, timeout, verbose=check, seed=next_seed())
+        succ, elapsed = gen_func(
+            "./build/bin/fgen", output=output,
+            sano=func_sano, uuid_val=func_uuid,
+            timeout=timeout, verbose=check, seed=next_seed()
+        )
         if succ:
             print(f"SUCC (time={elapsed}s)")
         if check and succ:
             print(f"[{func_sano}]: CheckUBs ...", end=" ", flush=True)
-            check_ubs(*get_func_map_files(func_uuid, func_sano))
+            check_ubs(*get_func_map_files(func_uuid, func_sano, gen_dir=output))
             print("NO UBs")
         func_sano += 1
 
@@ -84,11 +90,13 @@ def main(limit, seed, check, timeout):
 if __name__ == '__main__':
     parser = ArgumentParser("fgen", description="Tool for generating a set of functions")
 
+    parser.add_argument("--output", type=str, default=str(DEFAULT_OUTPUT_DIR),
+                        help="the directory saving the generated functions and their mappings")
     parser.add_argument("--limit", type=int, default=0, help="the number of functions to generate (0 for unlimited)")
     parser.add_argument("--seed", type=int, default=-1, help="the seed for generation (negative for truly random)")
     parser.add_argument("--check", action="store_true", default=False, help="enable UB check per generated function")
-    parser.add_argument("--timeout", type=int, default=60, help="timeout (in seconds) for generating a program")
+    parser.add_argument("--timeout", type=int, default=15, help="timeout (in seconds) for generating a program")
 
     args = parser.parse_args()
 
-    main(args.limit, seed=args.seed, check=args.check, timeout=args.timeout)
+    main(output=args.output, limit=args.limit, seed=args.seed, check=args.check, timeout=args.timeout)

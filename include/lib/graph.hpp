@@ -32,9 +32,7 @@
 class Graph {
 
 public:
-  explicit Graph(int n) :
-    numNodes(n), adjTab(n) {
-  }
+  explicit Graph(int n) : numNodes(n), adjTab(n) {}
 
   [[nodiscard]] int NumNodes() const { return numNodes; }
 

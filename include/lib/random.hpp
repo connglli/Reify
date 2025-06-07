@@ -38,9 +38,7 @@ public:
   Random(const Random &) = delete;
   Random &operator=(const Random &) = delete;
 
-  [[nodiscard]] auto &GetRNG() {
-    return rng;
-  }
+  [[nodiscard]] auto &GetRNG() { return rng; }
 
   void Seed(int s);
 
@@ -63,9 +61,7 @@ public:
   }
 
 private:
-  Random() :
-    rng(std::random_device()()) {
-  }
+  Random() : rng(std::random_device()()) {}
 
   std::mt19937 rng;
 };
