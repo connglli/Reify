@@ -28,6 +28,7 @@ from pathlib import Path
 
 from params import get_map_file_for_func_file, get_funcs_dir
 
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("Usage: retouch <gen_dir>")
@@ -36,13 +37,22 @@ if __name__ == '__main__':
     for func_path in get_funcs_dir(Path(sys.argv[1])).iterdir():
         if func_path.is_dir() or func_path.suffix != '.c':
             continue
-        # Check if the .c file is empty
-        if func_path.stat().st_size != 0:
-            continue
+        print(f"INSPECT {func_path.stem}")
         map_path = get_map_file_for_func_file(func_path)
+        # Check if we'd delete the generated function
+        del_cond = (
+            # The .c is empty
+            func_path.stat().st_size == 0 or
+            # The .map does not exist
+            not map_path.exists() or
+            # The .map is empty
+            map_path.stat().st_size == 0
+        )
+        if not del_cond:
+            continue
         # Delete the corresponding mapping file if it exists
         if not map_path.exists():
             map_path.unlink()
-        if func_path.exists():
-            func_path.unlink()
-        print(f"DEL {func_path.stem}")
+        func_path.unlink()
+        print(f"DELETE {func_path.stem}")
+

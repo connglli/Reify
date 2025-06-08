@@ -127,7 +127,7 @@ PGEN_LIMIT     ?= 100000
 
 gen-prog-set: pgen
 	@mkdir -p $(PGEN_PROGS_DIR)
-	@python3 scripts/retouch.py  # cleanup
+	@python3 scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(shell uuidgen)
 
 gen-prog-set-check: pgen
