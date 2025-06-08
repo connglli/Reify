@@ -26,6 +26,7 @@
 #ifndef GRAPHFUZZ_STRUTILS_HPP
 #define GRAPHFUZZ_STRUTILS_HPP
 
+#include <algorithm>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -63,6 +64,12 @@ static std::string JoinStr(const std::vector<std::string> &tokens, const std::st
   oss << tokens[tokens.size() - 1];
 
   return oss.str();
+}
+
+static std::string& StripStr(std::string& s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](const auto c) { return !std::isspace(c); }));
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](const auto c) { return !std::isspace(c); }).base(), s.end());
+    return s;
 }
 
 #endif // GRAPHFUZZ_STRUTILS_HPP

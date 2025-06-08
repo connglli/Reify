@@ -105,36 +105,36 @@ GEN_SEED ?= -1
 
 ## Function Generation
 
-OUTPUT_DIR    ?= generated
-FUNCTIONS_DIR := $(OUTPUT_DIR)/functions
-MAPPINGS_DIR  := $(OUTPUT_DIR)/mappings
-LOGGINGS_DIR  := $(OUTPUT_DIR)/loggings
+FGEN_OUT_DIR  ?= generated
+FGEN_FUNS_DIR := $(FGEN_OUT_DIR)/functions
+FGEN_MAPS_DIR := $(FGEN_OUT_DIR)/mappings
+FGEN_LOGS_DIR := $(FGEN_OUT_DIR)/loggings
 FGEN_LIMIT    ?= 1000000
 
 gen-func-set: fgen
-	@mkdir -p $(FUNCTIONS_DIR) $(MAPPINGS_DIR)
-	@python3 scripts/fgen.py --output $(OUTPUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
+	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
+	@python3 scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
 
 gen-func-set-check-ubs: fgen
-	@mkdir -p $(FUNCTIONS_DIR) $(MAPPINGS_DIR) $(LOGGINGS_DIR)
-	@python3 scripts/fgen.py --output $(OUTPUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
+	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR) $(FGEN_LOGS_DIR)
+	@python3 scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
 
 ## Program Generation
 
-INPUT_DIR    ?= $(OUTPUT_DIR)
-PROGRAMS_DIR := $(INPUT_DIR)/programs
-PGEN_LIMIT   ?= 100000
+PGEN_IN_DIR    ?= $(FGEN_OUT_DIR)
+PGEN_PROGS_DIR := $(PGEN_IN_DIR)/programs
+PGEN_LIMIT     ?= 100000
 
 gen-prog-set: pgen
-	@mkdir -p $(PROGRAMS_DIR)
+	@mkdir -p $(PGEN_PROGS_DIR)
 	@python3 scripts/retouch.py  # cleanup
-	$(BIN_DIR)/pgen --input $(INPUT_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(shell uuidgen)
+	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(shell uuidgen)
 
 gen-prog-set-check: pgen
-	@mkdir -p $(PROGRAMS_DIR)
-	@python3 scripts/retouch.py $(INPUT_DIR)  # cleanup
-	$(BIN_DIR)/pgen --input $(INPUT_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) --debug $(shell uuidgen)
-	@python3 scripts/ubchk.py $(PROGRAMS_DIR)
+	@mkdir -p $(PGEN_PROGS_DIR)
+	@python3 scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
+	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) --debug $(shell uuidgen)
+	@python3 scripts/ubchk.py $(PGEN_PROGS_DIR)
 
 
 ########################################################################
@@ -142,4 +142,4 @@ gen-prog-set-check: pgen
 ########################################################################
 
 clean:
-	rm -rf $(BUILD_DIR) $(OUTPUT_DIR) $(INPUT_DIR)
+	rm -rf $(BUILD_DIR) $(FGEN_OUT_DIR) $(PGEN_IN_DIR)

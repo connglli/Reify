@@ -1,7 +1,7 @@
-1. Manage checksum, add logs, unify naming
+1. unify naming
 1. Support structured if/loop
 2. Add clang format to pre-commit
-3. Use an IR to unify our intermediate representations, either a DSL or just bit code. If we're using a DSL, we'd support multiple IR lowers (for example for C, LLVM IR, etc.). If we're using LLVM's bit code, directly use different backend.
+3. Use an IR to unify our intermediate representations, either a DSL or just bit code. The output of fgen and input of pgen should be IR or at least in JSON/YAML format, otherwise it is sensitive to spaces and human's alteration. If we're using a DSL, we'd support multiple IR lowers (for example for C, LLVM IR, etc.). If we're using LLVM's bit code, directly use different backend.
 4. Better optimization passes support
 5. More UBs. Create a UB manager which traces multiple UBs (specifically their constraints) along generation. For example for each statement L we generated: `ubManager.trace(L); -> `
 	```
