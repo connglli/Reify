@@ -2,7 +2,7 @@
 
 ## Prerequisite
 
-Z3
+Z3: Build and install Z3 C++ following [Build Z3 using Make and GCC/Clang](https://github.com/Z3Prover/z3?tab=readme-ov-file#building-z3-using-make-and-gccclang).
 
 ## Build
 
@@ -24,13 +24,13 @@ Z3
 make gen-func-set
 
 # Get FGEN_LIMIT (0 mean unlimited) functions and check if they are UB-free
-[OUTPUT_DIR=/path/to/output] [FGEN_LIMIT=10000] [GEN_SEED=0] make gen-func-set-check-ub
+[FGEN_OUT_DIR=/path/to/output] [FGEN_LIMIT=10000] [GEN_SEED=0] make gen-func-set-check-ub
 
 # Generate a set of programs
 make gen-prog-set
 
 # Get PGEN_LIMIT (0 means unlimited) programs and check if they are UB-free
-[INPUT_DIR=/path/to/functions] [PGEN_LIMIT=10000] [GEN_SEED=0] make gen-prog-set-check
+[PGEN_IN_DIR=/path/to/functions] [PGEN_LIMIT=10000] [GEN_SEED=0] make gen-prog-set-check
 
 # Check UB-freeness of the generated functions and their mappings
 python3 scripts/ubchk.py <func_dir> <map_dir>

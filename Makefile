@@ -1,14 +1,21 @@
 CXX := $(shell command -v g++ || command -v clang++)
 CC  := $(shell command -v gcc || command -v clang)
+PY3 := $(shell command -v python3)
 
 # Complain if we don't have any available compilers
 ifeq ($(CXX),)
-	$(error Neither g++ nor clang++ found! Please install one of them.)
+$(error Neither g++ nor clang++ found! Please install one of them.)
 else ifeq ($(CC),)
-	$(error Neither gc nor clang found! Please install one of them.)
+$(error Neither gcc nor clang found! Please install one of them.)
+else ifeq ($(PY3),)
+$(error python3 not found! Please install it.)
 endif
 
-# TODO: Complain if our dependencies are not installed for example z3
+# Check if our dependencies are not installed
+FOUND_Z3 := $(if $(shell ldconfig -p | grep z3),y,n)
+ifeq ($(FOUND_Z3),n)
+$(error libz3.so not found! Please install it)
+endif
 
 C_STD   := c17
 CPP_STD := c++20
@@ -115,11 +122,11 @@ FGEN_LIMIT    ?= 1000000
 
 gen-func-set: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
-	@python3 scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
 
 gen-func-set-check-ubs: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR) $(FGEN_LOGS_DIR)
-	@python3 scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
 
 ## Program Generation
 
@@ -129,12 +136,12 @@ PGEN_LIMIT     ?= 100000
 
 gen-prog-set: pgen
 	@mkdir -p $(PGEN_PROGS_DIR)
-	@python3 scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
+	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(shell uuidgen)
 
 gen-prog-set-check: pgen
 	@mkdir -p $(PGEN_PROGS_DIR)
-	@python3 scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
+	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) --debug $(shell uuidgen)
 	@python3 scripts/ubchk.py $(PGEN_PROGS_DIR)
 
