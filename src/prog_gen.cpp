@@ -60,6 +60,8 @@ public:
   }
 
 public:
+  virtual ~MyIR() = default;
+
   // Generate the C code for this node
   [[nodiscard]] virtual std::string GenerateCode() const = 0;
 
@@ -97,7 +99,7 @@ public:
     return mutated;
   }
 
-  void SetCoeff(const std::string new_coeff) {
+  void SetCoeff(const std::string& new_coeff) {
     c = new_coeff;
     mutated = true;
   }
@@ -119,18 +121,18 @@ public:
     // Replace the coefficient with a call to the function
     int coeff_val = std::stoi(GetCoeff());
     int chk_val = StatelessChecksum::Compute(finalization);
-    std::string replacement = "check_checksum(" + std::to_string(chk_val) + ", " + funName + "(";
+    std::ostringstream chk_oss;
+    chk_oss << "check_checksum(" << chk_val << ", " << funName << "(";
     for (int i = 0; i < static_cast<int>(initialisation.size()) - 1; ++i) {
-      replacement += std::to_string(initialisation[i]) + ", ";
+      chk_oss << initialisation[i] << ", ";
     }
-    replacement += std::to_string(initialisation[initialisation.size() - 1]);
-    replacement += "))";
+    chk_oss << initialisation[initialisation.size() - 1] << "))";
     // To avoid UBs, we'd use an upper type to save the result: long long here
     long long diff = static_cast<long long>(coeff_val) - static_cast<long long>(chk_val);
     if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
-      SetCoeff(replacement + " + " + std::to_string(diff));
+      SetCoeff(chk_oss.str() + " + " + std::to_string(diff));
     } else {
-      SetCoeff("(int) ((long long)" + replacement + " + " + std::to_string(diff) + "L)");
+      SetCoeff("(int) ((long long)" + chk_oss.str() + " + " + std::to_string(diff) + "L)");
     }
     return true;
   }
@@ -654,12 +656,12 @@ int main(int argc, char *argv[]) {
     }
 
     // Now we construct our new program
-    Program prog(progUuid, sampNo, selFunPaths);
-    prog.Generate();
+    auto prog = std::make_unique<Program>(progUuid, sampNo, selFunPaths);
+    prog->Generate();
 
     std::cout << "[" << sampNo << "] Storing" << std::endl;
 
-    prog.GenerateCode(GetProgramsDir(inputDir) / (prog.GetName() + ".c"), enableDebug);
-    prog.GenerateCode(GetProgramsDir(inputDir) / (prog.GetName() + "_static.c"), enableDebug, true);
+    prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + ".c"), enableDebug);
+    prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + "_static.c"), enableDebug, true);
   }
 }
