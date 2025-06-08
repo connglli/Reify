@@ -10,6 +10,8 @@ endif
 
 # TODO: Complain if our dependencies are not installed for example z3
 
+C_STD   := c17
+CPP_STD := c++20
 
 INC_DIR := include
 LIB_DIR := lib
@@ -55,8 +57,8 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 ########################################################################
 
 DBGFLAGS := $(if $(DEBUG),-g,)
-CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -std=c++20 -O0 -I$(INC_DIR)
-CFLAGS   := $(DBGFLAGS) -Wall -Wextra -std=c17 -O0
+CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -std=${CPP_STD} -O0 -I$(INC_DIR)
+CFLAGS   := $(DBGFLAGS) -Wall -Wextra -std=${C_STD} -O0
 LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread
 
 

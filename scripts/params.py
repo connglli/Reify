@@ -40,25 +40,25 @@ int main(int argc, int* argv[]) {{
 
 ROOT_DIR = Path(__file__).parent.parent.absolute()
 
-DEFAULT_OUTPUT_DIR = ROOT_DIR / 'generated'
+DEFAULT_OUTPUT_DIR = ROOT_DIR / "generated"
 
-CHKSUM_FILE = ROOT_DIR / 'res' / 'cchksum.txt'
+CHKSUM_FILE = ROOT_DIR / "res" / "cchksum.txt"
 CHKSUM_CODE = CHKSUM_FILE.read_text()
 
 
 def get_funcs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-    return Path(gen_dir) / 'functions'
+    return Path(gen_dir) / "functions"
 
 
 def get_maps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-    return Path(gen_dir) / 'mappings'
+    return Path(gen_dir) / "mappings"
 
 
 def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-    fuuid_ = fuuid.replace('-', '_')
+    fuuid_ = fuuid.replace("-", "_")
     return (
         get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c",
-        get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map"
+        get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map",
     )
 
 
@@ -74,15 +74,15 @@ def get_simple_program(func_name, func_code, func_args):
         chksum_code=CHKSUM_CODE,
         func_code=func_code,
         func_name=func_name,
-        func_args=", ".join(str(x) for x in func_args)
+        func_args=", ".join(str(x) for x in func_args),
     )
 
 
 def parse_mapping(map_path):
     return [
-        (pair[0].rstrip(',').split(','), pair[1].rstrip(',').split(','))
+        (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","))
         for pair in [
-            tuple(line.split(' : ', maxsplit=1))
+            tuple(line.split(" : ", maxsplit=1))
             for line in Path(map_path).read_text().splitlines()
         ]
     ]

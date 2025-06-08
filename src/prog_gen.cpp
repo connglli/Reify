@@ -45,7 +45,6 @@
 
 namespace fs = std::filesystem;
 
-
 ////////////////////////////////////////////////////////////
 ////// IR Definition
 ////////////////////////////////////////////////////////////
@@ -53,7 +52,7 @@ namespace fs = std::filesystem;
 class MyIR {
 public:
   template<typename MyIRType>
-  static std::unique_ptr<MyIRType> Create(const std::string& code) {
+  static std::unique_ptr<MyIRType> Create(const std::string &code) {
     auto node = std::make_unique<MyIRType>();
     node->Parse(code);
     return node;
@@ -66,45 +65,37 @@ public:
   [[nodiscard]] virtual std::string GenerateCode() const = 0;
 
   // Parse the given code to fill out this node
-  virtual void Parse(const std::string& code) = 0;
+  virtual void Parse(const std::string &code) = 0;
 };
-
 
 class Expression : public MyIR {
 public:
   // Get the number of coefficients within this expression
   virtual size_t GetNumCoeffs() const = 0;
   // Replace the first replaceable coefficent with the function call, return true for success
-  virtual bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) = 0;
+  virtual bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) = 0;
 };
-
 
 // An Term is an expression in the form of c * v,
 // where c is an coefficient and v a variable or 1.
 class Term : public Expression {
 public:
-  size_t GetNumCoeffs() const override {
-    return 1;
-  }
+  size_t GetNumCoeffs() const override { return 1; }
 
-  const std::string& GetCoeff() {
-    return c;
-  }
+  const std::string &GetCoeff() { return c; }
 
-  const std::string& GetVar() {
-    return v;
-  }
+  const std::string &GetVar() { return v; }
 
-  bool IsMutated() {
-    return mutated;
-  }
+  bool IsMutated() { return mutated; }
 
-  void SetCoeff(const std::string& new_coeff) {
+  void SetCoeff(const std::string &new_coeff) {
     c = new_coeff;
     mutated = true;
   }
 
-  void Parse(const std::string& code) override {
+  void Parse(const std::string &code) override {
     std::vector<std::string> tokens = SplitStr(code, "*");
     assert((tokens.size() == 1 || tokens.size() == 2) && "Invalid CMVExpr");
     c = StripStr(tokens[0]);
@@ -114,7 +105,9 @@ public:
 
   std::string GenerateCode() const override { return "(" + c + ") * " + v; };
 
-  bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) override {
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) override {
     if (IsMutated()) {
       return false;
     }
@@ -136,11 +129,11 @@ public:
     }
     return true;
   }
+
 private:
   std::string c, v;
   bool mutated = false;
 };
-
 
 // A TermSum is the sum of a series of terms: s = t1 + ... + tn.
 class TermSum : public Expression {
@@ -156,8 +149,10 @@ public:
     return JoinStr(tmp, " + ");
   }
 
-  bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) {
-    for (auto &term : terms) {
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) {
+    for (auto &term: terms) {
       if (term->RepFirstCoeff(funName, initialisation, finalization)) {
         return true;
       }
@@ -165,7 +160,7 @@ public:
     return false;
   }
 
-  void Parse(const std::string& code) override {
+  void Parse(const std::string &code) override {
     // We append it with a "+" to facilitate parsing
     std::istringstream iss(code + "+");
     std::string tm;
@@ -178,7 +173,6 @@ private:
   std::vector<std::unique_ptr<Term>> terms;
 };
 
-
 class Statement : public MyIR {
 public:
   enum Type { ASSIGN, IFGOTO, FLUFF };
@@ -189,17 +183,19 @@ public:
   // Return the number of coefficient within this statement
   virtual size_t GetNumCoeffs() const = 0;
   // Replace the first replaceable coefficent with the function call, return true for success
-  virtual bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) = 0;
+  virtual bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) = 0;
 };
-
 
 // An AssignStmt is an assign of an expression to a variable: v = expr;.
 class AssignStmt : public Statement {
 public:
-  void Parse(const std::string& code) override {
+  void Parse(const std::string &code) override {
     auto equal = code.find('=');
     auto semicolon = code.find(';');
-    lhsVar = code.substr(0, equal); StripStr(lhsVar);
+    lhsVar = code.substr(0, equal);
+    StripStr(lhsVar);
     // TODO: Currently, we only support TermSum
     rhsExpr = TermSum::Create<TermSum>(code.substr(equal + 1, semicolon - equal - 1));
   }
@@ -209,24 +205,23 @@ public:
 
   size_t GetNumCoeffs() const override { return rhsExpr->GetNumCoeffs(); }
 
-  bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) override {
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) override {
     return rhsExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
 
-  std::string GenerateCode() const override {
-    return "    " + lhsVar + " = " + rhsExpr->GenerateCode() + ";";
-  }
+  std::string GenerateCode() const override { return "    " + lhsVar + " = " + rhsExpr->GenerateCode() + ";"; }
 
 private:
   std::string lhsVar;
   std::unique_ptr<Expression> rhsExpr;
 };
 
-
 // An IfGotoStmt is an if-cond-goto statement: if (...) goto BB;
 class IfGotoStmt : public Statement {
 public:
-  void Parse(const std::string& code) {
+  void Parse(const std::string &code) {
     auto ifKeyword = code.find("if");
     auto openParen = code.find('(', ifKeyword);
     auto gtThEq = code.find(">=", openParen);
@@ -242,8 +237,10 @@ public:
 
   size_t GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
 
-  bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) override {
-      return condExpr->RepFirstCoeff(funName, initialisation, finalization);
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) override {
+    return condExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
 
   std::string GenerateCode() const override {
@@ -255,18 +252,19 @@ private:
   std::string gotoStmt;
 };
 
-
 // All other statements that are classified FluffStmt.
 class FluffStmt : public Statement {
 public:
-  void Parse(const std::string& code) override { stmt = code; }
+  void Parse(const std::string &code) override { stmt = code; }
 
 public:
   Type GetStmtType() const override { return Type::FLUFF; }
 
   size_t GetNumCoeffs() const override { return 0; }
 
-  bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) override {
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) override {
     return false;
   }
 
@@ -275,7 +273,6 @@ public:
 private:
   std::string stmt;
 };
-
 
 // This represents a Function that are generated by fgen
 class Function : public MyIR {
@@ -311,9 +308,7 @@ public:
     return fun;
   }
 
-  const std::string& GetName() {
-    return name;
-  }
+  const std::string &GetName() { return name; }
 
   int GetNumRepCoeffs() const { return numCoeffs * REPLACEMENT_PROBABILITY; }
 
@@ -324,7 +319,7 @@ public:
     foreign_finalization = finalizations[index];
   }
 
-  void ParseMapping(const std::string& mapping) {
+  void ParseMapping(const std::string &mapping) {
     std::istringstream iss(mapping);
     std::string line;
     while (std::getline(iss, line)) {
@@ -346,12 +341,14 @@ public:
     }
   }
 
-  void AddMapping(const std::vector<int>& initialisation, const std::vector<int>& finalization) {
+  void AddMapping(const std::vector<int> &initialisation, const std::vector<int> &finalization) {
     initialisations.push_back(initialisation);
     finalizations.push_back(finalization);
   }
 
-  bool RepFirstCoeff(const std::string& funName, const std::vector<int>& initialisation, const std::vector<int>& finalization) {
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+  ) {
     auto rand = Random::Get().Uniform(0, (int) statements.size() - 1);
     auto probability = Random::Get().UniformReal()();
     int trials = 1000;
@@ -381,7 +378,7 @@ public:
     return oss.str();
   }
 
-  void Parse(const std::string& code) override {
+  void Parse(const std::string &code) override {
     std::istringstream iss(code);
     std::string line;
     // Parse the function line by line
@@ -398,7 +395,7 @@ public:
         auto paramStart = line.find("(");
         auto paramEnd = line.find("(");
         name = line.substr(nameStart, paramStart - nameStart);
-        std::string params = line.substr(paramStart+1, paramEnd - paramStart);
+        std::string params = line.substr(paramStart + 1, paramEnd - paramStart);
         numParams = std::count(params.begin(), params.end(), ',') + 1;
         statements.push_back(FluffStmt::Create<FluffStmt>(line));
       } else if (line.find("return") != std::string::npos) {
@@ -428,20 +425,18 @@ private:
   std::vector<std::vector<int>> finalizations;
 };
 
-
 class Program {
 public:
-  Program(const std::string& uuid, int sno, const std::vector<std::string>& funPaths) : uuid(uuid), sno(std::to_string(sno)) {
+  Program(const std::string &uuid, int sno, const std::vector<std::string> &funPaths) :
+      uuid(uuid), sno(std::to_string(sno)) {
     // Parse all selected function files
-    for (const auto &funPath : funPaths) {
+    for (const auto &funPath: funPaths) {
       fs::path mapPath = GetMappingPathForFunctionPath(funPath);
       functions.push_back(Function::Of(funPath, mapPath));
     }
   }
 
-  std::string GetName() {
-    return uuid + "_" + sno;
-  }
+  std::string GetName() { return uuid + "_" + sno; }
 
   void Generate() {
     int numFuns = static_cast<int>(functions.size());
@@ -455,8 +450,7 @@ public:
       auto host = functions[i].get();
       int numRepCoeffs = host->GetNumRepCoeffs();
 
-      std::cout << "[" << sno << "] Replacing function"
-                << ": index=" << i << ", name=" << host->GetName()
+      std::cout << "[" << sno << "] Replacing function" << ": index=" << i << ", name=" << host->GetName()
                 << ", num_replaceable=" << numRepCoeffs << std::endl;
 
       // Sample a function from i + 1 to the end
@@ -470,24 +464,23 @@ public:
         if (!host->RepFirstCoeff(guest->GetName(), initialisation, finalization)) {
           break; // TODO: break or continue? We can continue to the next, can't we?
         }
-        std::cout << "[" << sno << "]   var#" << k << " -> func#" << j << ": " << guest->GetName()
-                  << std::endl;
+        std::cout << "[" << sno << "]   var#" << k << " -> func#" << j << ": " << guest->GetName() << std::endl;
       }
 
       std::cout << "[" << sno << "]   Done" << std::endl;
     }
   }
 
-  void GenerateCode(const fs::path& file, bool debug = false, bool staticModifier = false) {
+  void GenerateCode(const fs::path &file, bool debug = false, bool staticModifier = false) {
     std::ofstream oss(file);
     oss << StatelessChecksum::GetRawCode() << std::endl;
     oss << "#include <stdio.h>" << std::endl;
     if (debug) {
       oss << "#include <assert.h>" << std::endl << std::endl;
       oss << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
-                 "equal\"), (actual))"
-              << std::endl
-              << std::endl;
+             "equal\"), (actual))"
+          << std::endl
+          << std::endl;
     } else {
       oss << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
     }

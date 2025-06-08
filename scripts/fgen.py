@@ -39,19 +39,24 @@ def gen_func(exec, *, output, sano, uuid_val, timeout=60, verbose=False, seed=No
     try:
         st_time = time.time()
         cmd = [exec]
-        if verbose: cmd += ["-v"]
+        if verbose:
+            cmd += ["-v"]
         if seed:
             cmd += ["-s", str(seed)]
         cmd += ["-o", str(output), "-n", str(sano), uuid_val]
         run_proc(
             cmd,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            check=True, timeout=timeout
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=True,
+            timeout=timeout,
         )
         ed_time = time.time()
         return True, ed_time - st_time
     except CalledProcessError as e:
-        print(f"GEN ERROR ({e.returncode}): {e.stdout.decode('utf-8') or '<no output>'}")
+        print(
+            f"GEN ERROR ({e.returncode}): {e.stdout.decode('utf-8') or '<no output>'}"
+        )
         return False, None
     except subprocess.TimeoutExpired:
         print(f"GEN HANG (.): generation timeout (>{timeout}s)")
@@ -74,9 +79,13 @@ def main(*, output, limit, seed, check, timeout):
     while limit == 0 or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
         succ, elapsed = gen_func(
-            "./build/bin/fgen", output=output,
-            sano=func_sano, uuid_val=func_uuid,
-            timeout=timeout, verbose=check, seed=next_seed()
+            "./build/bin/fgen",
+            output=output,
+            sano=func_sano,
+            uuid_val=func_uuid,
+            timeout=timeout,
+            verbose=check,
+            seed=next_seed(),
         )
         if succ:
             print(f"SUCC (time={elapsed}s)")
@@ -87,16 +96,48 @@ def main(*, output, limit, seed, check, timeout):
         func_sano += 1
 
 
-if __name__ == '__main__':
-    parser = ArgumentParser("fgen", description="Tool for generating a set of functions")
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        "fgen", description="Tool for generating a set of functions"
+    )
 
-    parser.add_argument("--output", type=str, default=str(DEFAULT_OUTPUT_DIR),
-                        help="the directory saving the generated functions and their mappings")
-    parser.add_argument("--limit", type=int, default=0, help="the number of functions to generate (0 for unlimited)")
-    parser.add_argument("--seed", type=int, default=-1, help="the seed for generation (negative for truly random)")
-    parser.add_argument("--check", action="store_true", default=False, help="enable UB check per generated function")
-    parser.add_argument("--timeout", type=int, default=15, help="timeout (in seconds) for generating a program")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=str(DEFAULT_OUTPUT_DIR),
+        help="the directory saving the generated functions and their mappings",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="the number of functions to generate (0 for unlimited)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=-1,
+        help="the seed for generation (negative for truly random)",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        default=False,
+        help="enable UB check per generated function",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=15,
+        help="timeout (in seconds) for generating a program",
+    )
 
     args = parser.parse_args()
 
-    main(output=args.output, limit=args.limit, seed=args.seed, check=args.check, timeout=args.timeout)
+    main(
+        output=args.output,
+        limit=args.limit,
+        seed=args.seed,
+        check=args.check,
+        timeout=args.timeout,
+    )
