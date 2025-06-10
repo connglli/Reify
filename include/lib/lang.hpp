@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2025
+// Copyright (c) 2025-2025
 //
 // Kavya Chopra (chopra.kavya04@gmail.com)
 // Cong Li (cong.li@inf.ethz.ch)
@@ -12,8 +12,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -34,6 +34,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "lib/dbgutils.hpp"
@@ -50,9 +51,9 @@ class Goto;
 class Block;
 class Func;
 
-class MyIRVisitor {
+class SymIRVisitor {
 public:
-  virtual ~MyIRVisitor() = default;
+  virtual ~SymIRVisitor() = default;
   virtual void Visit(const Var &v) = 0;
   virtual void Visit(const Coef &c) = 0;
   virtual void Visit(const Term &t) = 0;
@@ -67,7 +68,7 @@ public:
 };
 
 /**
- * MyIR is an simplified IR for modeling a C-like function.
+ * SymIR is an simplified IR for modeling a C-like function.
  *
  * Context-Free Grammar:
  *
@@ -123,21 +124,37 @@ public:
  * )
  * -----------------------------------------------
  */
-class MyIR {
+class SymIR {
 public:
-#define MY_IR_TYPE_LIST(XX) XX(I32, "i32", "int")
+  using ID = int;
+
+  enum {
+    SIR_COEF,
+    SIR_VAR,
+    SIR_TERM,
+    SIR_EXPR,
+    SIR_COND,
+    SIR_STMT_ASS,
+    SIR_STMT_RET,
+    SIR_TGT_BRA,
+    SIR_TGT_GOTO,
+    SIR_BLK,
+    SIR_FUNC,
+  };
+
+#define SYM_IR_TYPE_LIST(XX) XX(I32, "i32", "int")
 
   enum Type {
 
 #define XX(val, sname, cname) val,
-    MY_IR_TYPE_LIST(XX)
+    SYM_IR_TYPE_LIST(XX)
 #undef XX
   };
 
   static std::string GetTypeName(Type type) {
     static const char *names[] = {
 #define XX(val, sname, cname) #val,
-        MY_IR_TYPE_LIST(XX)
+        SYM_IR_TYPE_LIST(XX)
 #undef XX
     };
     return names[type];
@@ -146,7 +163,7 @@ public:
   static std::string GetTypeShort(Type type) {
     static const char *names[] = {
 #define XX(val, sname, cname) sname,
-        MY_IR_TYPE_LIST(XX)
+        SYM_IR_TYPE_LIST(XX)
 #undef XX
     };
     return names[type];
@@ -155,53 +172,59 @@ public:
   static std::string GetTypeCName(Type type) {
     static const char *names[] = {
 #define XX(val, sname, cname) cname,
-        MY_IR_TYPE_LIST(XX)
+        SYM_IR_TYPE_LIST(XX)
 #undef XX
     };
     return names[type];
   }
 
-  MyIR() = default;
-  virtual ~MyIR() = default;
+  explicit SymIR(ID irId) : irId(irId) {}
 
-  virtual void Accept(MyIRVisitor &v) const = 0;
+  virtual ~SymIR() = default;
+
+  virtual void Accept(SymIRVisitor &v) const = 0;
+
+  [[nodiscard]] ID GetIRId() const { return irId; }
+
+private:
+  ID irId;
 };
 
-/// The type annotator for MyIR nodes
+/// The type annotator for SymIR nodes
 class WithType {
 public:
-  explicit WithType(const MyIR::Type type = MyIR::Type::I32) : type(type) {}
+  explicit WithType(const SymIR::Type type = SymIR::Type::I32) : type(type) {}
 
-  [[nodiscard]] MyIR::Type GetType() const { return type; }
-
-protected:
-  void setType(const MyIR::Type type) { this->type = type; }
+  [[nodiscard]] SymIR::Type GetType() const { return type; }
 
 protected:
-  MyIR::Type type;
+  void setType(const SymIR::Type type) { this->type = type; }
+
+protected:
+  SymIR::Type type;
 };
 
 /// A Var represents a variable
-class Var : public MyIR, public WithType {
+class Var : public SymIR, public WithType {
 public:
-  explicit Var(const std::string &name, const Type type) : WithType(type), name(name) {}
+  Var(std::string name, const Type type) : SymIR(SIR_VAR), WithType(type), name(std::move(name)) {}
 
   [[nodiscard]] const std::string &GetName() const { return name; }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::string name;
 };
 
 /// A Coef represents an coefficient for a variable
-class Coef : public MyIR, public WithType {
+class Coef : public SymIR, public WithType {
 public:
-  explicit Coef(const std::string &name, const Type type) :
-      WithType(type), name(name), value(std::nullopt) {}
+  Coef(std::string name, const Type type) :
+      SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(std::nullopt) {}
 
-  Coef(const std::string &name, const std::string &value, const Type type) :
-      WithType(type), name(name), value(value) {}
+  Coef(std::string name, const std::string &value, const Type type) :
+      SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(value) {}
 
   [[nodiscard]] const std::string &GetName() const { return name; }
 
@@ -216,7 +239,7 @@ public:
 
   void SetValue(const std::string &v) { value = v; }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::string name;
@@ -224,9 +247,9 @@ private:
 };
 
 /// A Term is an operation of a Coef and a Var
-class Term : public MyIR, public WithType {
+class Term : public SymIR, public WithType {
 public:
-#define MY_IR_TERM_OP_LIST(XX)                                                                     \
+#define SYM_IR_TERM_OP_LIST(XX)                                                                    \
   XX(ADD, "add", "+")                                                                              \
   XX(SUB, "sub", "-")                                                                              \
   XX(MUL, "mul", "*")                                                                              \
@@ -235,15 +258,15 @@ public:
 
   enum Op {
 
-#define XX(val, sname, sym) val,
-    MY_IR_TERM_OP_LIST(XX)
+#define XX(val, sname, sym) OP_##val,
+    SYM_IR_TERM_OP_LIST(XX)
 #undef XX
   };
 
   static std::string GetOpName(Op op) {
     static const char *names[] = {
 #define XX(val, sname, sym) #val,
-        MY_IR_TERM_OP_LIST(XX)
+        SYM_IR_TERM_OP_LIST(XX)
 #undef XX
     };
     return names[op];
@@ -252,7 +275,7 @@ public:
   static std::string GetOpShort(Op op) {
     static const char *names[] = {
 #define XX(val, sname, sym) sname,
-        MY_IR_TERM_OP_LIST(XX)
+        SYM_IR_TERM_OP_LIST(XX)
 #undef XX
     };
     return names[op];
@@ -261,14 +284,14 @@ public:
   static std::string GetOpSym(Op op) {
     static const char *symbols[] = {
 #define XX(val, sname, sym) sym,
-        MY_IR_TERM_OP_LIST(XX)
+        SYM_IR_TERM_OP_LIST(XX)
 #undef XX
     };
     return symbols[op];
   }
 
   Term(const Op op, std::unique_ptr<Coef> coef, const Var *var) :
-      op(op), coef(std::move(coef)), var(var) {
+      SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(var) {
     Assert(this->var != nullptr, "Nullptr is given for the variable");
     Assert(this->coef->GetType() == this->var->GetType(), "Different types are given");
     setType(this->var->GetType());
@@ -280,7 +303,7 @@ public:
 
   [[nodiscard]] const Var *GetVar() const { return var; }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   Op op;
@@ -289,23 +312,23 @@ private:
 };
 
 /// An Expr represents a cumulative computation of a series of terms
-class Expr : public MyIR, public WithType {
+class Expr : public SymIR, public WithType {
 public:
-#define MY_IR_EXPR_OP_LIST(XX)                                                                     \
+#define SYM_IR_EXPR_OP_LIST(XX)                                                                    \
   XX(ADD, "add", "+")                                                                              \
   XX(SUB, "sub", "-")
 
   enum Op {
 
-#define XX(val, sname, sym) val,
-    MY_IR_EXPR_OP_LIST(XX)
+#define XX(val, sname, sym) OP_##val,
+    SYM_IR_EXPR_OP_LIST(XX)
 #undef XX
   };
 
   static std::string GetOpName(Op op) {
     static const char *names[] = {
 #define XX(val, sname, sym) #val,
-        MY_IR_EXPR_OP_LIST(XX)
+        SYM_IR_EXPR_OP_LIST(XX)
 #undef XX
     };
     return names[op];
@@ -314,7 +337,7 @@ public:
   static std::string GetOpShort(Op op) {
     static const char *names[] = {
 #define XX(val, sname, sym) sname,
-        MY_IR_EXPR_OP_LIST(XX)
+        SYM_IR_EXPR_OP_LIST(XX)
 #undef XX
     };
     return names[op];
@@ -323,13 +346,14 @@ public:
   static std::string GetOpSym(Op op) {
     static const char *symbols[] = {
 #define XX(val, sname, sym) sym,
-        MY_IR_EXPR_OP_LIST(XX)
+        SYM_IR_EXPR_OP_LIST(XX)
 #undef XX
     };
     return symbols[op];
   }
 
-  Expr(Op op, std::vector<std::unique_ptr<Term>> terms) : op(op), terms(std::move(terms)) {
+  Expr(const Op op, std::vector<std::unique_ptr<Term>> terms) :
+      SymIR(SIR_EXPR), op(op), terms(std::move(terms)) {
     Assert(this->terms.size() > 0, "Emtpy terms are given");
     const auto type_ = this->terms[0]->GetType();
     for (const auto &t: this->terms) {
@@ -355,7 +379,7 @@ public:
     return terms[i].get();
   }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   Op op;
@@ -363,24 +387,24 @@ private:
 };
 
 /// A Cond represents a conditional over of an expression and 0
-class Cond : public MyIR, public WithType {
+class Cond : public SymIR, public WithType {
 public:
-#define MY_IR_COND_OP_LIST(XX)                                                                     \
+#define SYM_IR_COND_OP_LIST(XX)                                                                    \
   XX(GTZ, "gtz", ">")                                                                              \
   XX(LTZ, "ltz", "<")                                                                              \
   XX(EQZ, "eqz", "==")
 
   enum Op {
 
-#define XX(val, sname, sym) val,
-    MY_IR_COND_OP_LIST(XX)
+#define XX(val, sname, sym) OP_##val,
+    SYM_IR_COND_OP_LIST(XX)
 #undef XX
   };
 
   static std::string GetOpName(Op op) {
     static const char *names[] = {
 #define XX(val, sname, sym) #val,
-        MY_IR_COND_OP_LIST(XX)
+        SYM_IR_COND_OP_LIST(XX)
 #undef XX
     };
     return names[op];
@@ -389,7 +413,7 @@ public:
   static std::string GetOpShort(Op op) {
     static const char *names[] = {
 #define XX(val, sname, sym) sname,
-        MY_IR_COND_OP_LIST(XX)
+        SYM_IR_COND_OP_LIST(XX)
 #undef XX
     };
     return names[op];
@@ -398,32 +422,36 @@ public:
   static std::string GetOpSym(Op op) {
     static const char *symbols[] = {
 #define XX(val, sname, sym) sym,
-        MY_IR_COND_OP_LIST(XX)
+        SYM_IR_COND_OP_LIST(XX)
 #undef XX
     };
     return symbols[op];
   }
 
-  Cond(Op op, std::unique_ptr<Expr> expr) :
-      WithType(expr->GetType()), op(op), expr(std::move(expr)) {}
+  Cond(const Op op, std::unique_ptr<Expr> expr) :
+      SymIR(SIR_COND), WithType(expr->GetType()), op(op), expr(std::move(expr)) {}
 
   [[nodiscard]] Op GetOp() const { return op; }
 
   [[nodiscard]] const Expr *GetExpr() const { return expr.get(); }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   Op op;
   std::unique_ptr<Expr> expr;
 };
 
-class Stmt : public MyIR {};
+class Stmt : public SymIR {
+public:
+  explicit Stmt(SymIR::ID irId) : SymIR(irId) {}
+};
 
 /// An AssStmt represents the assignment of an expression to a variable
 class AssStmt : public Stmt {
 public:
-  AssStmt(const Var *var, std::unique_ptr<Expr> expr) : var(var), expr(std::move(expr)) {
+  AssStmt(const Var *var, std::unique_ptr<Expr> expr) :
+      Stmt(SIR_STMT_ASS), var(var), expr(std::move(expr)) {
     Assert(this->var->GetType() == this->expr->GetType(), "Different types are given");
   }
 
@@ -431,7 +459,7 @@ public:
 
   [[nodiscard]] const Expr *GetExpr() const { return expr.get(); }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   const Var *var;
@@ -441,7 +469,7 @@ private:
 /// A RetStmt represents a return of a series of variables.
 class RetStmt : public Stmt {
 public:
-  explicit RetStmt(const std::vector<const Var *> vars) : vars(vars) {}
+  explicit RetStmt(const std::vector<const Var *> vars) : Stmt(SIR_STMT_RET), vars(vars) {}
 
   [[nodiscard]] size_t GetNumVars() const { return vars.size(); }
 
@@ -452,7 +480,7 @@ public:
 
   [[nodiscard]] const std::vector<const Var *> &GetVars() const { return vars; }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::vector<const Var *> vars;
@@ -460,14 +488,17 @@ private:
 
 class Target : public Stmt {
 public:
-  virtual size_t GetNumSuccessors() = 0;
+  explicit Target(ID irId) : Stmt(irId) {}
+
+  [[nodiscard]] virtual size_t GetNumSuccessors() const = 0;
 };
 
 /// A Branch represents jumping to which targets are controlled by a condition.
 class Branch : public Target {
 public:
-  Branch(std::unique_ptr<Cond> cond, const std::string &truLab, const std::string &falLab) :
-      cond(std::move(cond)), truLab(truLab), falLab(falLab) {}
+  Branch(std::unique_ptr<Cond> cond, std::string truLab, std::string falLab) :
+      Target(SIR_TGT_BRA), cond(std::move(cond)), truLab(std::move(truLab)),
+      falLab(std::move(falLab)) {}
 
   [[nodiscard]] const Cond *GetCond() const { return cond.get(); }
 
@@ -475,9 +506,9 @@ public:
 
   [[nodiscard]] const std::string &GetFalseTarget() const { return falLab; }
 
-  size_t GetNumSuccessors() override { return 2; };
+  [[nodiscard]] size_t GetNumSuccessors() const override { return 2; };
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::unique_ptr<Cond> cond;
@@ -488,34 +519,34 @@ private:
 /// A Goto represents an unconditional jump.
 class Goto : public Target {
 public:
-  explicit Goto(const std::string &label) : label(label) {}
+  explicit Goto(std::string label) : Target(SIR_TGT_GOTO), label(std::move(label)) {}
 
-  const std::string &GetTarget() const { return label; }
+  [[nodiscard]] const std::string &GetTarget() const { return label; }
 
-  size_t GetNumSuccessors() override { return 1; };
+  [[nodiscard]] size_t GetNumSuccessors() const override { return 1; };
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::string label;
 };
 
 /// A Block represents a basic block of a series of statements and a target
-class Block : public MyIR {
+class Block : public SymIR {
 public:
   Block(
       // clang-format off
-      const std::string &label, 
+      std::string label,
       std::vector<std::unique_ptr<Stmt>> stmts,
       std::unique_ptr<Target> target
       // clang-format on
-  ) : label(label), stmts(std::move(stmts)), target(std::move(target)) {}
+  ) : SymIR(SIR_BLK), label(std::move(label)), stmts(std::move(stmts)), target(std::move(target)) {}
 
   [[nodiscard]] std::string GetLabel() const { return label; }
 
   [[nodiscard]] const Target *GetTarget() const { return target.get(); }
 
-  [[nodiscard]] const size_t GetNumSuccessors() {
+  [[nodiscard]] size_t GetNumSuccessors() const {
     if (!target.get()) {
       return 0;
     } else {
@@ -527,11 +558,7 @@ public:
 
   [[nodiscard]] Stmt *GetStmt(size_t i) const {
     Assert(i < GetNumStmts(), "Index out of bound");
-    if (i < stmts.size()) {
-      return stmts[i].get();
-    } else {
-      return target.get();
-    }
+    return i < stmts.size() ? stmts[i].get() : target.get();
   }
 
   [[nodiscard]] std::vector<const Stmt *> GetStmts() const {
@@ -545,7 +572,7 @@ public:
     return r;
   }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::string label;
@@ -554,16 +581,18 @@ private:
 };
 
 /// A Func is a series of basic blocks
-class Func : public MyIR, public WithType {
+class Func : public SymIR, public WithType {
 public:
   Func(
       // clang-format off
-      const std::string &name,
+      std::string name,
       Type retType,
       std::vector<std::unique_ptr<Var>> params,
       std::vector<std::unique_ptr<Block>> blocks
       // clang-format on
-  ) : WithType(retType), name(name), params(std::move(params)), blocks(std::move(blocks)) {
+  ) :
+      SymIR(SIR_FUNC), WithType(retType), name(std::move(name)), params(std::move(params)),
+      blocks(std::move(blocks)) {
     Assert(this->params.size() > 0, "No params are given");
     Assert(this->blocks.size() > 0, "No blocks are given");
     for (auto i = 0; i < this->blocks.size(); i++) {
@@ -580,7 +609,7 @@ public:
     }
   }
 
-  [[nodiscard]] MyIR::Type GetRetType() const { return GetType(); }
+  [[nodiscard]] Type GetRetType() const { return GetType(); }
 
   [[nodiscard]] const std::string &GetName() const { return name; }
 
@@ -625,7 +654,7 @@ public:
     return ret;
   }
 
-  void Accept(MyIRVisitor &v) const { return v.Visit(*this); }
+  void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
 private:
   std::string name;
@@ -646,35 +675,36 @@ public:
 public:
   using BlockBody = std::function<void(BlockBuilder *)>;
 
-  BlockBuilder(const FuncBuilder *ctx, const std::string &label) : ctx(ctx), label(label) {}
+  BlockBuilder(const FuncBuilder *ctx, std::string label) :
+      ctx(ctx), label(std::move(label)), target(nullptr) {}
 
-  TermID MyTerm(Term::Op op, const std::string &coef, const Var *var);
+  TermID SymTerm(Term::Op op, const std::string &coef, const Var *var);
 
-  ExprID MyExpr(Expr::Op op, const std::vector<TermID> &terms);
+  ExprID SymExpr(Expr::Op op, const std::vector<TermID> &terms);
 
-  CondID MyCond(Cond::Op, ExprID eid);
+  CondID SymCond(Cond::Op, ExprID eid);
 
-  void MyAssign(const Var *var, ExprID eid);
+  void SymAssign(const Var *var, ExprID eid);
 
-  void MyReturn();
+  void SymReturn();
 
-  void MyBranch(CondID cid, const std::string &truLab, const std::string &falLab);
+  void SymBranch(CondID cid, const std::string &truLab, const std::string &falLab);
 
-  void MyGoto(const std::string &label);
+  void SymGoto(const std::string &label);
 
-  void MyFallThro();
+  void SymFallThro();
 
   std::unique_ptr<Block> Build();
 
 private:
   const FuncBuilder *ctx;
   std::string label;
-  std::vector<std::unique_ptr<Stmt>> stmts{};
   std::unique_ptr<Target> target;
+  std::vector<std::unique_ptr<Stmt>> stmts{};
 
   bool finished = false;
 
-  // Management of temperatory objects
+  // Management of temporary objects
   TermID numCreatedTerms = 0;
   ExprID numCreatedExprs = 0;
   CondID numCreatedConds = 0;
@@ -687,10 +717,10 @@ private:
 class FuncBuilder final {
 
 public:
-  FuncBuilder(const std::string &name, MyIR::Type retType = MyIR::I32) :
-      name(name), retType(retType) {}
+  explicit FuncBuilder(std::string name, SymIR::Type retType = SymIR::I32) :
+      name(std::move(name)), retType(retType) {}
 
-  std::vector<const Var *> GetParams() const {
+  [[nodiscard]] std::vector<const Var *> GetParams() const {
     std::vector<const Var *> r;
     for (auto i = 0; i < params.size(); i++) {
       r.push_back(params[i].get());
@@ -698,19 +728,19 @@ public:
     return r;
   }
 
-  const Var *MyVar(const std::string &name, MyIR::Type type = MyIR::I32);
+  const Var *SymVar(const std::string &name, SymIR::Type type = SymIR::I32);
 
-  const Block *MyBlock(const std::string &label, const BlockBuilder::BlockBody &body);
+  const Block *SymBlock(const std::string &label, const BlockBuilder::BlockBody &body);
 
-  const Var *FindVar(const std::string &name) const;
+  [[nodiscard]] const Var *FindVar(const std::string &name) const;
 
-  const Block *FindBlock(const std::string &label) const;
+  [[nodiscard]] const Block *FindBlock(const std::string &label) const;
 
   std::unique_ptr<Func> Build();
 
 private:
   std::string name;
-  MyIR::Type retType;
+  SymIR::Type retType;
   std::vector<std::unique_ptr<Var>> params{};
   std::vector<std::unique_ptr<Block>> blocks{};
 
@@ -720,19 +750,10 @@ private:
   bool finished = false;
 };
 
-class MySexpLower : public MyIRVisitor {
-private:
-  std::ostream &oss;
-  int numIndent = 0;
-
-  void indent() {
-    for (int i = 0; i < numIndent; i++) {
-      oss << " ";
-    }
-  }
-
+/// The SymIR -> S Expression lower
+class SymSexpLower : public SymIRVisitor {
 public:
-  MySexpLower(std::ostream &oss) : oss(oss) {}
+  explicit SymSexpLower(std::ostream &oss) : oss(oss) {}
 
   void Visit(const Var &v) override { oss << v.GetName(); }
 
@@ -807,11 +828,11 @@ public:
   }
 
   void Visit(const Func &e) override {
-    oss << "(fun " << e.GetName() << " " << MyIR::GetTypeShort(e.GetRetType());
+    oss << "(fun " << e.GetName() << " " << SymIR::GetTypeShort(e.GetRetType());
     oss << " (";
     auto vars = e.GetParams();
     for (auto i = 0; i < vars.size(); ++i) {
-      oss << "(" << MyIR::GetTypeShort(vars[i]->GetType()) << " ";
+      oss << "(" << SymIR::GetTypeShort(vars[i]->GetType()) << " ";
       vars[i]->Accept(*this);
       oss << ")";
       if (i != vars.size() - 1) {
@@ -826,21 +847,24 @@ public:
     }
     oss << ")" << std::endl;
   }
-};
 
-class MyCLower : public MyIRVisitor {
 private:
-  std::ostream &oss;
-  int numIndent = 0;
-
   void indent() {
     for (int i = 0; i < numIndent; i++) {
       oss << " ";
     }
   }
 
+private:
+  std::ostream &oss;
+  int numIndent = 0;
+};
+
+/// The SymIR -> C lower
+class SymCLower : public SymIRVisitor {
+
 public:
-  MyCLower(std::ostream &oss) : oss(oss) {}
+  SymCLower(std::ostream &oss) : oss(oss) {}
 
   void Visit(const Var &v) override { oss << v.GetName(); }
 
@@ -880,7 +904,7 @@ public:
     oss << "return computeStatelessChecksum(";
     auto vars = e.GetVars();
     for (auto i = 0; i < vars.size(); ++i) {
-      oss << MyIR::GetTypeShort(vars[i]->GetType()) << " ";
+      oss << SymIR::GetTypeShort(vars[i]->GetType()) << " ";
       vars[i]->Accept(*this);
       if (i != vars.size() - 1) {
         oss << ", ";
@@ -911,10 +935,10 @@ public:
   }
 
   void Visit(const Func &e) override {
-    oss << MyIR::GetTypeCName(e.GetRetType()) << " " << e.GetName() << "(";
+    oss << SymIR::GetTypeCName(e.GetRetType()) << " " << e.GetName() << "(";
     auto vars = e.GetParams();
     for (auto i = 0; i < vars.size(); ++i) {
-      oss << MyIR::GetTypeCName(e.GetType()) << " ";
+      oss << SymIR::GetTypeCName(e.GetType()) << " ";
       vars[i]->Accept(*this);
       if (i != vars.size() - 1) {
         oss << ", ";
@@ -928,6 +952,17 @@ public:
     }
     oss << "}" << std::endl;
   }
+
+private:
+  void indent() {
+    for (int i = 0; i < numIndent; i++) {
+      oss << " ";
+    }
+  }
+
+private:
+  std::ostream &oss;
+  int numIndent = 0;
 };
 
 #endif // GRAPHFUZZ_LANG_HPP
