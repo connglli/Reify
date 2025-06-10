@@ -25,182 +25,184 @@
 
 #include "lib/lowers.hpp"
 
-void SymSexpLower::Visit(const Var &v) { out << v.GetName(); }
+namespace symir {
+  void SymSexpLower::Visit(const Var &v) { out << v.GetName(); }
 
-void SymSexpLower::Visit(const Coef &c) { out << c.GetValue(); }
+  void SymSexpLower::Visit(const Coef &c) { out << c.GetValue(); }
 
-void SymSexpLower::Visit(const Term &t) {
-  out << "(" << Term::GetOpShort(t.GetOp()) << " ";
-  t.GetCoef()->Accept(*this);
-  out << " ";
-  t.GetVar()->Accept(*this);
-  out << ")";
-}
-
-void SymSexpLower::Visit(const Expr &e) {
-  out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
-  auto terms = e.GetTerms();
-  for (auto i = 0; i < terms.size(); i++) {
-    terms[i]->Accept(*this);
-    if (i != terms.size() - 1) {
-      out << " ";
-    }
-  }
-  out << ")";
-}
-
-void SymSexpLower::Visit(const Cond &c) {
-  out << "(" << Cond::GetOpShort(c.GetOp()) << " ";
-  c.GetExpr()->Accept(*this);
-  out << ")";
-}
-
-void SymSexpLower::Visit(const AssStmt &a) {
-  indent();
-  out << "(asn ";
-  a.GetVar()->Accept(*this);
-  out << " ";
-  incIndent();
-  a.GetExpr()->Accept(*this);
-  decIndent();
-  out << ")" << std::endl;
-}
-
-void SymSexpLower::Visit(const RetStmt &r) {
-  indent();
-  out << "(ret)" << std::endl;
-}
-
-void SymSexpLower::Visit(const Branch &b) {
-  indent();
-  out << "(brh " << b.GetTrueTarget() << " " << b.GetFalseTarget() << " ";
-  incIndent();
-  b.GetCond()->Accept(*this);
-  decIndent();
-  out << ")" << std::endl;
-}
-
-void SymSexpLower::Visit(const Goto &g) {
-  indent();
-  out << "goto " << g.GetTarget() << std::endl;
-}
-
-void SymSexpLower::Visit(const Block &b) {
-  indent();
-  out << "(BB " << b.GetLabel() << " " << std::endl;
-  for (auto s: b.GetStmts()) {
-    incIndent();
-    s->Accept(*this);
-    decIndent();
-  }
-  indent();
-  out << ")" << std::endl;
-}
-
-void SymSexpLower::Visit(const Func &f) {
-  out << "(fun " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
-  out << " (";
-  auto vars = f.GetParams();
-  for (auto i = 0; i < vars.size(); ++i) {
-    out << "(" << SymIR::GetTypeSName(vars[i]->GetType()) << " ";
-    vars[i]->Accept(*this);
+  void SymSexpLower::Visit(const Term &t) {
+    out << "(" << Term::GetOpShort(t.GetOp()) << " ";
+    t.GetCoef()->Accept(*this);
+    out << " ";
+    t.GetVar()->Accept(*this);
     out << ")";
-    if (i != vars.size() - 1) {
-      out << " ";
-    }
   }
-  out << ")" << std::endl;
-  for (const auto &b: f.GetBlocks()) {
+
+  void SymSexpLower::Visit(const Expr &e) {
+    out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
+    auto terms = e.GetTerms();
+    for (auto i = 0; i < terms.size(); i++) {
+      terms[i]->Accept(*this);
+      if (i != terms.size() - 1) {
+        out << " ";
+      }
+    }
+    out << ")";
+  }
+
+  void SymSexpLower::Visit(const Cond &c) {
+    out << "(" << Cond::GetOpShort(c.GetOp()) << " ";
+    c.GetExpr()->Accept(*this);
+    out << ")";
+  }
+
+  void SymSexpLower::Visit(const AssStmt &a) {
+    indent();
+    out << "(asn ";
+    a.GetVar()->Accept(*this);
+    out << " ";
     incIndent();
-    b->Accept(*this);
+    a.GetExpr()->Accept(*this);
     decIndent();
+    out << ")" << std::endl;
   }
-  out << ")" << std::endl;
-}
 
-void SymCxLower::Visit(const Var &v) { out << v.GetName(); }
-
-void SymCxLower::Visit(const Coef &c) { out << c.GetValue(); }
-
-void SymCxLower::Visit(const Term &t) {
-  t.GetCoef()->Accept(*this);
-  out << " " << Term::GetOpSym(t.GetOp()) << " ";
-  t.GetVar()->Accept(*this);
-}
-
-void SymCxLower::Visit(const Expr &e) {
-  auto terms = e.GetTerms();
-  for (auto i = 0; i < terms.size(); ++i) {
-    e.GetTerm(i)->Accept(*this);
-    if (i != terms.size() - 1) {
-      out << " " << Expr::GetOpSym(e.GetOp());
-    }
+  void SymSexpLower::Visit(const RetStmt &r) {
+    indent();
+    out << "(ret)" << std::endl;
   }
-}
 
-void SymCxLower::Visit(const Cond &c) {
-  c.GetExpr()->Accept(*this);
-  out << " " << Cond::GetOpSym(c.GetOp()) << " 0";
-}
-
-void SymCxLower::Visit(const AssStmt &a) {
-  indent();
-  a.GetVar()->Accept(*this);
-  out << " = ";
-  a.GetExpr()->Accept(*this);
-  out << ";" << std::endl;
-}
-
-void SymCxLower::Visit(const RetStmt &r) {
-  indent();
-  out << "return computeStatelessChecksum(";
-  auto vars = r.GetVars();
-  for (auto i = 0; i < vars.size(); ++i) {
-    out << SymIR::GetTypeSName(vars[i]->GetType()) << " ";
-    vars[i]->Accept(*this);
-    if (i != vars.size() - 1) {
-      out << ", ";
-    }
-  }
-  out << ");" << std::endl;
-}
-
-void SymCxLower::Visit(const Branch &b) {
-  indent();
-  out << "if (";
-  b.GetCond()->Accept(*this);
-  out << ") goto " << b.GetTrueTarget() << ";" << std::endl;
-  indent();
-  out << "goto " << b.GetFalseTarget() << ";" << std::endl;
-}
-
-void SymCxLower::Visit(const Goto &g) {
-  indent();
-  out << "goto " << g.GetTarget() << std::endl;
-}
-
-void SymCxLower::Visit(const Block &b) {
-  out << b.GetLabel() << ":" << std::endl;
-  for (auto s: b.GetStmts()) {
-    s->Accept(*this);
-  }
-}
-
-void SymCxLower::Visit(const Func &f) {
-  out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
-  auto vars = f.GetParams();
-  for (auto i = 0; i < vars.size(); ++i) {
-    out << SymIR::GetTypeCName(f.GetType()) << " ";
-    vars[i]->Accept(*this);
-    if (i != vars.size() - 1) {
-      out << ", ";
-    }
-  }
-  out << ") {" << std::endl;
-  for (const auto &b: f.GetBlocks()) {
+  void SymSexpLower::Visit(const Branch &b) {
+    indent();
+    out << "(brh " << b.GetTrueTarget() << " " << b.GetFalseTarget() << " ";
     incIndent();
-    b->Accept(*this);
+    b.GetCond()->Accept(*this);
     decIndent();
+    out << ")" << std::endl;
   }
-  out << "}" << std::endl;
-}
+
+  void SymSexpLower::Visit(const Goto &g) {
+    indent();
+    out << "goto " << g.GetTarget() << std::endl;
+  }
+
+  void SymSexpLower::Visit(const Block &b) {
+    indent();
+    out << "(BB " << b.GetLabel() << " " << std::endl;
+    for (auto s: b.GetStmts()) {
+      incIndent();
+      s->Accept(*this);
+      decIndent();
+    }
+    indent();
+    out << ")" << std::endl;
+  }
+
+  void SymSexpLower::Visit(const Func &f) {
+    out << "(fun " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
+    out << " (";
+    auto vars = f.GetParams();
+    for (auto i = 0; i < vars.size(); ++i) {
+      out << "(" << SymIR::GetTypeSName(vars[i]->GetType()) << " ";
+      vars[i]->Accept(*this);
+      out << ")";
+      if (i != vars.size() - 1) {
+        out << " ";
+      }
+    }
+    out << ")" << std::endl;
+    for (const auto &b: f.GetBlocks()) {
+      incIndent();
+      b->Accept(*this);
+      decIndent();
+    }
+    out << ")" << std::endl;
+  }
+
+  void SymCxLower::Visit(const Var &v) { out << v.GetName(); }
+
+  void SymCxLower::Visit(const Coef &c) { out << c.GetValue(); }
+
+  void SymCxLower::Visit(const Term &t) {
+    t.GetCoef()->Accept(*this);
+    out << " " << Term::GetOpSym(t.GetOp()) << " ";
+    t.GetVar()->Accept(*this);
+  }
+
+  void SymCxLower::Visit(const Expr &e) {
+    auto terms = e.GetTerms();
+    for (auto i = 0; i < terms.size(); ++i) {
+      e.GetTerm(i)->Accept(*this);
+      if (i != terms.size() - 1) {
+        out << " " << Expr::GetOpSym(e.GetOp());
+      }
+    }
+  }
+
+  void SymCxLower::Visit(const Cond &c) {
+    c.GetExpr()->Accept(*this);
+    out << " " << Cond::GetOpSym(c.GetOp()) << " 0";
+  }
+
+  void SymCxLower::Visit(const AssStmt &a) {
+    indent();
+    a.GetVar()->Accept(*this);
+    out << " = ";
+    a.GetExpr()->Accept(*this);
+    out << ";" << std::endl;
+  }
+
+  void SymCxLower::Visit(const RetStmt &r) {
+    indent();
+    out << "return computeStatelessChecksum(";
+    auto vars = r.GetVars();
+    for (auto i = 0; i < vars.size(); ++i) {
+      out << SymIR::GetTypeSName(vars[i]->GetType()) << " ";
+      vars[i]->Accept(*this);
+      if (i != vars.size() - 1) {
+        out << ", ";
+      }
+    }
+    out << ");" << std::endl;
+  }
+
+  void SymCxLower::Visit(const Branch &b) {
+    indent();
+    out << "if (";
+    b.GetCond()->Accept(*this);
+    out << ") goto " << b.GetTrueTarget() << ";" << std::endl;
+    indent();
+    out << "goto " << b.GetFalseTarget() << ";" << std::endl;
+  }
+
+  void SymCxLower::Visit(const Goto &g) {
+    indent();
+    out << "goto " << g.GetTarget() << std::endl;
+  }
+
+  void SymCxLower::Visit(const Block &b) {
+    out << b.GetLabel() << ":" << std::endl;
+    for (auto s: b.GetStmts()) {
+      s->Accept(*this);
+    }
+  }
+
+  void SymCxLower::Visit(const Func &f) {
+    out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
+    auto vars = f.GetParams();
+    for (auto i = 0; i < vars.size(); ++i) {
+      out << SymIR::GetTypeCName(f.GetType()) << " ";
+      vars[i]->Accept(*this);
+      if (i != vars.size() - 1) {
+        out << ", ";
+      }
+    }
+    out << ") {" << std::endl;
+    for (const auto &b: f.GetBlocks()) {
+      incIndent();
+      b->Accept(*this);
+      decIndent();
+    }
+    out << "}" << std::endl;
+  }
+} // namespace symir

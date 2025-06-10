@@ -32,84 +32,88 @@
 
 #define INDENTATION_SIZE 2
 
-class SymIRLower : public SymIRVisitor {
+namespace symir {
+  using namespace symir;
 
-public:
-  explicit SymIRLower(std::ostream &out) : out(out) {}
+  class SymIRLower : public SymIRVisitor {
 
-protected:
-  void indent() const {
-    for (int i = 0; i < numIndent; i++) {
-      for (int j = 0; j < INDENTATION_SIZE; j++) {
-        out << " ";
+  public:
+    explicit SymIRLower(std::ostream &out) : out(out) {}
+
+  protected:
+    void indent() const {
+      for (int i = 0; i < numIndent; i++) {
+        for (int j = 0; j < INDENTATION_SIZE; j++) {
+          out << " ";
+        }
       }
     }
-  }
 
-  void incIndent(int inc = 1) { numIndent += inc; }
+    void incIndent(int inc = 1) { numIndent += inc; }
 
-  void decIndent(int dec = 1) { numIndent -= dec; }
+    void decIndent(int dec = 1) { numIndent -= dec; }
 
-protected:
-  std::ostream &out;
-  int numIndent = 0;
-};
+  protected:
+    std::ostream &out;
+    int numIndent = 0;
+  };
 
-/// An "SymIR -> S Expression" lower
-class SymSexpLower : public SymIRLower {
-public:
-  explicit SymSexpLower(std::ostream &out) : SymIRLower(out) {}
+  /// An "SymIR -> S Expression" lower
+  class SymSexpLower : public SymIRLower {
+  public:
+    explicit SymSexpLower(std::ostream &out) : SymIRLower(out) {}
 
-  void Visit(const Var &v) override;
+    void Visit(const Var &v) override;
 
-  void Visit(const Coef &c) override;
+    void Visit(const Coef &c) override;
 
-  void Visit(const Term &t) override;
+    void Visit(const Term &t) override;
 
-  void Visit(const Expr &e) override;
+    void Visit(const Expr &e) override;
 
-  void Visit(const Cond &c) override;
+    void Visit(const Cond &c) override;
 
-  void Visit(const AssStmt &e) override;
+    void Visit(const AssStmt &e) override;
 
-  void Visit(const RetStmt &r) override;
+    void Visit(const RetStmt &r) override;
 
-  void Visit(const Branch &b) override;
+    void Visit(const Branch &b) override;
 
-  void Visit(const Goto &g) override;
+    void Visit(const Goto &g) override;
 
-  void Visit(const Block &b) override;
+    void Visit(const Block &b) override;
 
-  void Visit(const Func &f) override;
-};
+    void Visit(const Func &f) override;
+  };
 
-/// An "SymIR -> C/C++" lower
-class SymCxLower : public SymIRLower {
-public:
-  explicit SymCxLower(std::ostream &out) : SymIRLower(out) {}
+  /// An "SymIR -> C/C++" lower
+  class SymCxLower : public SymIRLower {
+  public:
+    explicit SymCxLower(std::ostream &out) : SymIRLower(out) {}
 
-  void Visit(const Var &v) override;
+    void Visit(const Var &v) override;
 
-  void Visit(const Coef &c) override;
+    void Visit(const Coef &c) override;
 
-  void Visit(const Term &t) override;
+    void Visit(const Term &t) override;
 
-  void Visit(const Expr &e) override;
+    void Visit(const Expr &e) override;
 
-  void Visit(const Cond &c) override;
+    void Visit(const Cond &c) override;
 
-  void Visit(const AssStmt &e) override;
+    void Visit(const AssStmt &e) override;
 
-  void Visit(const RetStmt &r) override;
+    void Visit(const RetStmt &r) override;
 
-  void Visit(const Branch &b) override;
+    void Visit(const Branch &b) override;
 
-  void Visit(const Goto &g) override;
+    void Visit(const Goto &g) override;
 
-  void Visit(const Block &b) override;
+    void Visit(const Block &b) override;
 
-  void Visit(const Func &f) override;
-};
+    void Visit(const Func &f) override;
+  };
+} // namespace symir
 
 
 #endif // GRAPHFUZZ_LOWERS_H
