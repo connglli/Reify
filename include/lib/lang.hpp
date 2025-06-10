@@ -824,6 +824,7 @@ namespace symir {
   ///       })
   ///     )
   ///   );  // We cannot call anything any more after Branch
+  ///   auto blk = b.Build();
   /// ----------------------------------------------------------
   class BlockBuilder final : public SymIRBuilder<FuncBuilder, Block> {
   public:
