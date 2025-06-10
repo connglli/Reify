@@ -63,26 +63,18 @@ namespace symir {
   public:
     explicit SymSexpLower(std::ostream &out) : SymIRLower(out) {}
 
-    void Visit(const Var &v) override;
-
+    void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
-
     void Visit(const Term &t) override;
-
     void Visit(const Expr &e) override;
-
     void Visit(const Cond &c) override;
-
     void Visit(const AssStmt &e) override;
-
     void Visit(const RetStmt &r) override;
-
     void Visit(const Branch &b) override;
-
     void Visit(const Goto &g) override;
-
+    void Visit(const Param &p) override;
+    void Visit(const Local &l) override;
     void Visit(const Block &b) override;
-
     void Visit(const Func &f) override;
   };
 
@@ -91,26 +83,18 @@ namespace symir {
   public:
     explicit SymCxLower(std::ostream &out) : SymIRLower(out) {}
 
-    void Visit(const Var &v) override;
-
+    void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
-
     void Visit(const Term &t) override;
-
     void Visit(const Expr &e) override;
-
     void Visit(const Cond &c) override;
-
     void Visit(const AssStmt &e) override;
-
     void Visit(const RetStmt &r) override;
-
     void Visit(const Branch &b) override;
-
     void Visit(const Goto &g) override;
-
+    void Visit(const Param &p) override;
+    void Visit(const Local &l) override;
     void Visit(const Block &b) override;
-
     void Visit(const Func &f) override;
   };
 } // namespace symir

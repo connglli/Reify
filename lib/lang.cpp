@@ -26,11 +26,24 @@
 #include "lib/lang.hpp"
 
 namespace symir {
-  BlockBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const std::string &coef, const Var *var) {
+  BlockBuilder::TermID
+  BlockBuilder::SymTerm(Term::Op op, const std::string &coef, const VarDef *var) {
     Assert(isActive(), "BlockBuilder has already finished its work");
     TermID tid = numCreatedTerms++;
-    createdTerms[tid] =
-        std::make_unique<Term>(op, std::make_unique<Coef>("c", coef, var->GetType()), var);
+    createdTerms[tid] = std::make_unique<Term>(
+        op, std::make_unique<Coef>(coef, var->GetType()), std::make_unique<VarUse>(var)
+    );
+    return tid;
+  }
+
+  BlockBuilder::TermID BlockBuilder::SymTerm(
+      Term::Op op, const std::string &coefName, const std::string &coefVal, const VarDef *var
+  ) {
+    Assert(isActive(), "BlockBuilder has already finished its work");
+    TermID tid = numCreatedTerms++;
+    createdTerms[tid] = std::make_unique<Term>(
+        op, std::make_unique<Coef>(coefName, coefVal, var->GetType()), std::make_unique<VarUse>(var)
+    );
     return tid;
   }
 
@@ -58,18 +71,22 @@ namespace symir {
     return cid;
   }
 
-  void BlockBuilder::SymAssign(const Var *var, ExprID eid) {
+  void BlockBuilder::SymAssign(const VarDef *var, ExprID eid) {
     Assert(isActive(), "BlockBuilder has already finished its work");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID=%lu does not exist", eid);
-    stmts.push_back(std::make_unique<AssStmt>(var, std::move(it->second)));
+    stmts.push_back(std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+    );
     createdExprs.erase(it);
   }
 
   void BlockBuilder::SymReturn() {
     Assert(isActive(), "BlockBuilder has already finished its work");
-    std::vector<const Var *> vars = GetParent()->GetParams();
-    stmts.push_back(std::make_unique<RetStmt>(vars));
+    std::vector<std::unique_ptr<VarUse>> uses;
+    for (const auto *p: GetParent()->GetParams()) {
+      uses.push_back(std::make_unique<VarUse>(p));
+    }
+    stmts.push_back(std::make_unique<RetStmt>(std::move(uses)));
   }
 
   void BlockBuilder::SymBranch(const std::string &truLab, const std::string &falLab, CondID cid) {
@@ -97,12 +114,54 @@ namespace symir {
     return std::make_unique<Block>(label, std::move(stmts), std::move(target));
   }
 
-  const Var *FuncBuilder::SymVar(const std::string &name, SymIR::Type type) {
+  const Param *FuncBuilder::SymParam(const std::string &name, SymIR::Type type) {
     Assert(isActive(), "FuncBuilder has already finished its work");
-    Assert(!paramMap.contains(name), "Name conflicts with parameter: %s", name.c_str());
-    params.push_back(std::make_unique<Var>(name, type));
+    Assert(
+        !paramMap.contains(name), "A parameter with the same name is already defined: %s",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "A local with the same name is already defined: %s", name.c_str()
+    );
+    params.push_back(std::make_unique<Param>(name, type));
     auto v = params.back().get();
     paramMap[name] = v;
+    return v;
+  }
+
+  const Local *
+  FuncBuilder::SymLocal(const std::string &name, const std::string &coef, SymIR::Type type) {
+    Assert(isActive(), "FuncBuilder has already finished its work");
+    Assert(
+        !paramMap.contains(name), "A parameter with the same name is already defined: %s",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "A local with the same name is already defined: %s", name.c_str()
+    );
+    locals.push_back(std::make_unique<Local>(name, std::make_unique<Coef>(coef, type), type));
+    auto v = locals.back().get();
+    localMap[name] = v;
+    return v;
+  }
+
+  const Local *FuncBuilder::SymLocal(
+      const std::string &name, const std::string &coefName, const std::string &coefVal,
+      SymIR::Type type
+  ) {
+    Assert(isActive(), "FuncBuilder has already finished its work");
+    Assert(
+        !paramMap.contains(name), "A parameter with the same name is already defined: %s",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "A local with the same name is already defined: %s", name.c_str()
+    );
+    locals.push_back(
+        std::make_unique<Local>(name, std::make_unique<Coef>(coefName, coefVal, type), type)
+    );
+    auto v = locals.back().get();
+    localMap[name] = v;
     return v;
   }
 
@@ -118,25 +177,11 @@ namespace symir {
     return bb;
   }
 
-  const Var *FuncBuilder::FindVar(const std::string &name) const {
-    if (paramMap.contains(name)) {
-      return paramMap.find(name)->second;
-    } else {
-      return nullptr;
-    }
-  }
-
-  const Block *FuncBuilder::FindBlock(const std::string &label) const {
-    if (blockMap.contains(label)) {
-      return blockMap.find(label)->second;
-    } else {
-      return nullptr;
-    }
-  }
-
   std::unique_ptr<Func> FuncBuilder::Build() {
     Assert(isActive(), "FuncBuilder has already finished its work");
     deactivate();
-    return std::make_unique<Func>(name, retType, std::move(params), std::move(blocks));
+    return std::make_unique<Func>(
+        name, retType, std::move(params), std::move(locals), std::move(blocks)
+    );
   }
 } // namespace symir

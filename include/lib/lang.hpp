@@ -45,7 +45,7 @@ namespace symir {
   // The SymIR Tiny Language
   ///////////////////////////////////////////////////////////////////////
 
-  class Var;
+  class VarUse;
   class Coef;
   class Term;
   class Expr;
@@ -54,13 +54,15 @@ namespace symir {
   class RetStmt;
   class Branch;
   class Goto;
+  class Param;
+  class Local;
   class Block;
   class Func;
 
   class SymIRVisitor {
   public:
     virtual ~SymIRVisitor() = default;
-    virtual void Visit(const Var &v) = 0;
+    virtual void Visit(const VarUse &v) = 0;
     virtual void Visit(const Coef &c) = 0;
     virtual void Visit(const Term &t) = 0;
     virtual void Visit(const Expr &e) = 0;
@@ -69,6 +71,8 @@ namespace symir {
     virtual void Visit(const RetStmt &r) = 0;
     virtual void Visit(const Branch &b) = 0;
     virtual void Visit(const Goto &g) = 0;
+    virtual void Visit(const Param &p) = 0;
+    virtual void Visit(const Local &l) = 0;
     virtual void Visit(const Block &b) = 0;
     virtual void Visit(const Func &f) = 0;
   };
@@ -135,7 +139,7 @@ namespace symir {
 
     enum {
       SIR_COEF,
-      SIR_VAR,
+      SIR_VAR_USE,
       SIR_TERM,
       SIR_EXPR,
       SIR_COND,
@@ -143,7 +147,9 @@ namespace symir {
       SIR_STMT_RET,
       SIR_TGT_BRA,
       SIR_TGT_GOTO,
-      SIR_BLK,
+      SIR_PARAM,
+      SIR_LOCAL,
+      SIR_BLOCK,
       SIR_FUNC,
     };
 
@@ -195,7 +201,7 @@ namespace symir {
     ID irId;
   };
 
-  /// The type annotator for SymIR nodes
+  /// WithType is an annotator for SymIR nodes to mark nodes with type
   class WithType {
   public:
     explicit WithType(const SymIR::Type type = SymIR::Type::I32) : type(type) {}
@@ -209,28 +215,44 @@ namespace symir {
     SymIR::Type type;
   };
 
-  /// A Var represents a variable
-  class Var : public SymIR, public WithType {
+  /// VarDef WithType is an annotator for SymIR nodes which defines a variable
+  class VarDef : public WithType {
   public:
-    Var(std::string name, const Type type) :
-        SymIR(SIR_VAR), WithType(type), name(std::move(name)) {}
+    VarDef(std::string name, const SymIR::Type type) : WithType(type), name(std::move(name)) {}
 
     [[nodiscard]] const std::string &GetName() const { return name; }
-
-    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
     std::string name;
   };
 
-  /// A Coef represents an coefficient for a variable
+  /// The VarUse represent a usage of a defined variable
+  class VarUse : public SymIR, public WithType {
+  public:
+    explicit VarUse(const VarDef *var) : SymIR(SIR_VAR_USE), var(var) {
+      Assert(var != nullptr, "Null var are given");
+      setType(var->GetType());
+    }
+
+    [[nodiscard]] const VarDef *GetDef() const { return var; }
+
+    [[nodiscard]] const std::string &GetName() const { return var->GetName(); }
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+
+  protected:
+    const VarDef *var;
+  };
+
+  /// A Coef represents an coefficient for updating a variable. Since we are a symbolic IR,
+  /// the value of the coefficient can be not yet set which should be solved.
   class Coef : public SymIR, public WithType {
   public:
     Coef(std::string name, const Type type) :
         SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(std::nullopt) {}
 
-    Coef(std::string name, const std::string &value, const Type type) :
-        SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(value) {}
+    Coef(std::string name, std::string value, const Type type) :
+        SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(std::move(value)) {}
 
     [[nodiscard]] const std::string &GetName() const { return name; }
 
@@ -296,9 +318,9 @@ namespace symir {
       return symbols[op];
     }
 
-    Term(const Op op, std::unique_ptr<Coef> coef, const Var *var) :
-        SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(var) {
-      Assert(this->var != nullptr, "Nullptr is given for the variable");
+    Term(const Op op, std::unique_ptr<Coef> coef, std::unique_ptr<VarUse> var) :
+        SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(std::move(var)) {
+      Assert(this->var.get() != nullptr, "Nullptr is given for the variable");
       Assert(this->coef->GetType() == this->var->GetType(), "Different types are given");
       setType(this->var->GetType());
     }
@@ -307,14 +329,14 @@ namespace symir {
 
     [[nodiscard]] const Coef *GetCoef() const { return coef.get(); }
 
-    [[nodiscard]] const Var *GetVar() const { return var; }
+    [[nodiscard]] const VarUse *GetVar() const { return var.get(); }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
     Op op;
     std::unique_ptr<Coef> coef;
-    const Var *var;
+    std::unique_ptr<VarUse> var;
   };
 
   /// An Expr represents a cumulative computation of a series of terms
@@ -434,8 +456,10 @@ namespace symir {
       return symbols[op];
     }
 
-    Cond(const Op op, std::unique_ptr<Expr> expr) :
-        SymIR(SIR_COND), WithType(expr->GetType()), op(op), expr(std::move(expr)) {}
+    Cond(const Op op, std::unique_ptr<Expr> expr) : SymIR(SIR_COND), op(op), expr(std::move(expr)) {
+      Assert(this->expr.get() != nullptr, "Null expr are given");
+      setType(this->expr->GetType());
+    }
 
     [[nodiscard]] Op GetOp() const { return op; }
 
@@ -456,42 +480,50 @@ namespace symir {
   /// An AssStmt represents the assignment of an expression to a variable
   class AssStmt : public Stmt {
   public:
-    AssStmt(const Var *var, std::unique_ptr<Expr> expr) :
-        Stmt(SIR_STMT_ASS), var(var), expr(std::move(expr)) {
+    AssStmt(std::unique_ptr<VarUse> var, std::unique_ptr<Expr> expr) :
+        Stmt(SIR_STMT_ASS), var(std::move(var)), expr(std::move(expr)) {
       Assert(this->var->GetType() == this->expr->GetType(), "Different types are given");
     }
 
-    [[nodiscard]] const Var *GetVar() const { return var; }
+    [[nodiscard]] const VarUse *GetVar() const { return var.get(); }
 
     [[nodiscard]] const Expr *GetExpr() const { return expr.get(); }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
-    const Var *var;
+    std::unique_ptr<VarUse> var;
     std::unique_ptr<Expr> expr;
   };
 
   /// A RetStmt represents a return of a series of variables.
   class RetStmt : public Stmt {
   public:
-    explicit RetStmt(const std::vector<const Var *> vars) : Stmt(SIR_STMT_RET), vars(vars) {}
+    explicit RetStmt(std::vector<std::unique_ptr<VarUse>> vars) :
+        Stmt(SIR_STMT_RET), vars(std::move(vars)) {}
 
     [[nodiscard]] size_t GetNumVars() const { return vars.size(); }
 
-    [[nodiscard]] const Var *GetVar(size_t i) const {
+    [[nodiscard]] const VarUse *GetVar(size_t i) const {
       Assert(i < vars.size(), "Index out of bounds");
-      return vars[i];
+      return vars[i].get();
     }
 
-    [[nodiscard]] const std::vector<const Var *> &GetVars() const { return vars; }
+    [[nodiscard]] std::vector<const VarUse *> GetVars() const {
+      std::vector<const VarUse *> r;
+      for (auto i = 0; i < vars.size(); i++) {
+        r.push_back(vars[i].get());
+      }
+      return r;
+    }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
-    std::vector<const Var *> vars;
+    std::vector<std::unique_ptr<VarUse>> vars;
   };
 
+  /// A Target indicates the target basic blocks of a basic block.
   class Target : public Stmt {
   public:
     explicit Target(ID irId) : Stmt(irId) {}
@@ -537,6 +569,32 @@ namespace symir {
     std::string label;
   };
 
+  /// A Param is a declaration of a function's parameter.
+  class Param : public SymIR, public VarDef {
+  public:
+    explicit Param(std::string name, Type type = Type::I32) :
+        SymIR(SIR_PARAM), VarDef(std::move(name), type) {}
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+  };
+
+  /// A Local is a declaration of a local variable with an initial value within the function.
+  class Local : public Stmt, public VarDef {
+  public:
+    explicit Local(std::string name, std::unique_ptr<Coef> init, Type type = Type::I32) :
+        Stmt(SIR_LOCAL), VarDef(std::move(name), type), coef(std::move(init)) {
+      Assert(this->coef.get(), "Null coef are given");
+      Assert(this->coef->GetType() == type, "The coef and var are of different type");
+    }
+
+    [[nodiscard]] const Coef *GetCoef() const { return coef.get(); }
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+
+  private:
+    std::unique_ptr<Coef> coef;
+  };
+
   /// A Block represents a basic block of a series of statements and a target
   class Block : public SymIR {
   public:
@@ -547,7 +605,7 @@ namespace symir {
       std::unique_ptr<Target> target
         // clang-format on
     ) :
-        SymIR(SIR_BLK), label(std::move(label)), stmts(std::move(stmts)),
+        SymIR(SIR_BLOCK), label(std::move(label)), stmts(std::move(stmts)),
         target(std::move(target)) {}
 
     [[nodiscard]] std::string GetLabel() const { return label; }
@@ -593,14 +651,15 @@ namespace symir {
   public:
     Func(
         // clang-format off
-      std::string name,
-      Type retType,
-      std::vector<std::unique_ptr<Var>> params,
-      std::vector<std::unique_ptr<Block>> blocks
+        std::string name,
+        Type retType,
+        std::vector<std::unique_ptr<Param>> params,
+        std::vector<std::unique_ptr<Local>> locals,
+        std::vector<std::unique_ptr<Block>> blocks
         // clang-format on
     ) :
         SymIR(SIR_FUNC), WithType(retType), name(std::move(name)), params(std::move(params)),
-        blocks(std::move(blocks)) {
+        locals(std::move(locals)), blocks(std::move(blocks)) {
       Assert(this->params.size() > 0, "No params are given");
       Assert(this->blocks.size() > 0, "No blocks are given");
       for (auto i = 0; i < this->blocks.size(); i++) {
@@ -612,8 +671,24 @@ namespace symir {
       for (auto i = 0; i < this->params.size(); i++) {
         const auto &prm = this->params[i];
         const auto &prmName = prm->GetName();
-        Assert(!paramMap.contains(prmName), "Name conflicts with variables: %s", prmName.c_str());
+        Assert(
+            !paramMap.contains(prmName), "A parameter with the same name is already defined: %s",
+            prmName.c_str()
+        );
         paramMap[prmName] = prm.get();
+      }
+      for (auto i = 0; i < this->locals.size(); i++) {
+        const auto &loc = this->locals[i];
+        const auto &locName = loc->GetName();
+        Assert(
+            !paramMap.contains(locName), "A parameter with the same name is already defined: %s",
+            locName.c_str()
+        );
+        Assert(
+            !localMap.contains(locName), "A local with the same name is already defined: %s",
+            locName.c_str()
+        );
+        localMap[locName] = loc.get();
       }
     }
 
@@ -621,17 +696,33 @@ namespace symir {
 
     [[nodiscard]] const std::string &GetName() const { return name; }
 
-    [[nodiscard]] std::vector<const Var *> GetParams() const {
-      std::vector<const Var *> r;
+    [[nodiscard]] std::vector<const Param *> GetParams() const {
+      std::vector<const Param *> r;
       for (const auto &v: params) {
         r.push_back(v.get());
       }
       return r;
     }
 
-    [[nodiscard]] const Var *GetParam(const std::string &name) const {
+    [[nodiscard]] const Param *GetParam(const std::string &name) const {
       if (paramMap.contains(name)) {
         return paramMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    [[nodiscard]] std::vector<const Local *> GetLocals() const {
+      std::vector<const Local *> r;
+      for (const auto &v: locals) {
+        r.push_back(v.get());
+      }
+      return r;
+    }
+
+    [[nodiscard]] const VarDef *GetLocal(const std::string &name) const {
+      if (localMap.contains(name)) {
+        return localMap.find(name)->second;
       } else {
         return nullptr;
       }
@@ -655,6 +746,9 @@ namespace symir {
 
     [[nodiscard]] std::vector<const Stmt *> GetStmts() const {
       std::vector<const Stmt *> ret;
+      for (auto i = 0; i < locals.size(); ++i) {
+        ret.push_back(locals[i].get());
+      }
       for (auto i = 0; i < blocks.size(); ++i) {
         auto sr = blocks[i]->GetStmts();
         ret.insert(ret.end(), sr.begin(), sr.end());
@@ -666,16 +760,19 @@ namespace symir {
 
   private:
     std::string name;
-    std::vector<std::unique_ptr<Var>> params;
+    std::vector<std::unique_ptr<Param>> params;
+    std::map<std::string, const Param *> paramMap;
+    std::vector<std::unique_ptr<Local>> locals;
+    std::map<std::string, const Local *> localMap;
     std::vector<std::unique_ptr<Block>> blocks;
     std::map<std::string, const Block *> blockMap;
-    std::map<std::string, const Var *> paramMap;
   };
 
   ///////////////////////////////////////////////////////////////////////
   // SymIR Program Builders
   ///////////////////////////////////////////////////////////////////////
 
+  /// The base SIR builder. Each have a parent builder.
   template<typename ParentBuilder, typename SIR>
   class SymIRBuilder {
   public:
@@ -740,11 +837,25 @@ namespace symir {
     BlockBuilder(const FuncBuilder *ctx, std::string label) :
         SymIRBuilder<FuncBuilder, Block>(ctx), label(std::move(label)), target(nullptr) {}
 
-    /// Create a Term and return the ID to use it. The term can be used only once.
-    TermID SymTerm(Term::Op op, const std::string &coef, const Var *var);
+    /// Create a Term with symbolic coef and return the ID to use it. The term can be used only
+    /// once.
+    TermID SymTerm(Term::Op op, const std::string &coef, const VarDef *var);
 #define XX(val, capt, ...)                                                                         \
-  TermID Sym##capt##Term(const std::string &coef, const Var *var) {                                \
+  TermID Sym##capt##Term(const std::string &coef, const VarDef *var) {                             \
     return SymTerm(Term::OP_##val, coef, var);                                                     \
+  }
+    SYMIR_TERMOP_LIST(XX)
+#undef XX
+
+    /// Create a Term with concret coef and return the ID to use it. The term can be used only once.
+    TermID SymTerm(
+        Term::Op op, const std::string &coefName, const std::string &coefVal, const VarDef *var
+    );
+#define XX(val, capt, ...)                                                                         \
+  TermID Sym##capt##Term(                                                                          \
+      const std::string &coefName, const std::string &coefVal, const VarDef *var                   \
+  ) {                                                                                              \
+    return SymTerm(Term::OP_##val, coefName, coefVal, var);                                        \
   }
     SYMIR_TERMOP_LIST(XX)
 #undef XX
@@ -766,7 +877,7 @@ namespace symir {
 #undef XX
 
     /// Create and commit an AssStmt to the builder..
-    void SymAssign(const Var *var, ExprID eid);
+    void SymAssign(const VarDef *var, ExprID eid);
 
     /// Create and commit a RetStmt to the builder.
     void SymReturn();
@@ -831,25 +942,83 @@ namespace symir {
         SymIRBuilder<RootBuilder, Func>(nullptr), name(std::move(name)), retType(retType) {}
 
     /// Get all defined parameters
-    [[nodiscard]] std::vector<const Var *> GetParams() const {
-      std::vector<const Var *> r;
+    [[nodiscard]] std::vector<const Param *> GetParams() const {
+      std::vector<const Param *> r;
       for (auto i = 0; i < params.size(); i++) {
         r.push_back(params[i].get());
       }
       return r;
     }
 
-    /// Define and commit a new Var
-    const Var *SymVar(const std::string &name, SymIR::Type type = SymIR::I32);
+    /// Get all defined locals
+    [[nodiscard]] std::vector<const Local *> GetLocals() const {
+      std::vector<const Local *> r;
+      for (auto i = 0; i < locals.size(); i++) {
+        r.push_back(locals[i].get());
+      }
+      return r;
+    }
+
+    /// Get all defined blocks
+    [[nodiscard]] std::vector<const Block *> GetBlocks() const {
+      std::vector<const Block *> r;
+      for (auto i = 0; i < blocks.size(); i++) {
+        r.push_back(blocks[i].get());
+      }
+      return r;
+    }
+
+    /// Find a defined variable
+    [[nodiscard]] const VarDef *FindVar(const std::string &name) const {
+      const VarDef *s = FindParam(name);
+      if (s != nullptr) {
+        return s;
+      }
+      return FindLocal(name);
+    }
+
+    /// Find a defined parameter
+    [[nodiscard]] const Param *FindParam(const std::string &name) const {
+      if (paramMap.contains(name)) {
+        return paramMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    /// Find a defined local
+    [[nodiscard]] const Local *FindLocal(const std::string &name) const {
+      if (localMap.contains(name)) {
+        return localMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    /// Find a defined basic block
+    [[nodiscard]] const Block *FindBlock(const std::string &label) const {
+      if (blockMap.contains(label)) {
+        return blockMap.find(label)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    /// Define and commit a new Param
+    const Param *SymParam(const std::string &name, SymIR::Type type = SymIR::I32);
+
+    /// Define and commit a new Local
+    const Local *
+    SymLocal(const std::string &name, const std::string &coef, SymIR::Type type = SymIR::I32);
+
+    /// Define and commit a new Local
+    const Local *SymLocal(
+        const std::string &name, const std::string &coefName, const std::string &coefValue,
+        SymIR::Type type = SymIR::I32
+    );
 
     /// Define and commit a new basic block
     const Block *SymBlock(const std::string &label, const BlockBuilder::BlockBody &body);
-
-    /// Find a defined Var
-    [[nodiscard]] const Var *FindVar(const std::string &name) const;
-
-    /// Find a defined basic block
-    [[nodiscard]] const Block *FindBlock(const std::string &label) const;
 
     /// Build the function.
     /// After calling this function, the builder is no longer usable.
@@ -859,12 +1028,14 @@ namespace symir {
     // Ingredients for building a function
     std::string name;
     SymIR::Type retType;
-    std::vector<std::unique_ptr<Var>> params{};
+    std::vector<std::unique_ptr<Param>> params{};
+    std::vector<std::unique_ptr<Local>> locals{};
     std::vector<std::unique_ptr<Block>> blocks{};
 
     // For ease of managing and manipulating
+    std::map<std::string, const Param *> paramMap{};
+    std::map<std::string, const Local *> localMap{};
     std::map<std::string, const Block *> blockMap{};
-    std::map<std::string, const Var *> paramMap{};
   };
 } // namespace symir
 

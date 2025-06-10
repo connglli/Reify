@@ -26,9 +26,15 @@
 #include "lib/lowers.hpp"
 
 namespace symir {
-  void SymSexpLower::Visit(const Var &v) { out << v.GetName(); }
+  void SymSexpLower::Visit(const VarUse &v) { out << v.GetName(); }
 
-  void SymSexpLower::Visit(const Coef &c) { out << c.GetValue(); }
+  void SymSexpLower::Visit(const Coef &c) {
+    if (c.IsValueSet()) {
+      out << c.GetValue();
+    } else {
+      out << c.GetName();
+    }
+  }
 
   void SymSexpLower::Visit(const Term &t) {
     out << "(" << Term::GetOpShort(t.GetOp()) << " ";
@@ -86,9 +92,20 @@ namespace symir {
     out << "goto " << g.GetTarget() << std::endl;
   }
 
+  void SymSexpLower::Visit(const Param &p) {
+    out << "(" << p.GetName() << " " << SymIR::GetTypeSName(p.GetType()) << ")";
+  }
+
+  void SymSexpLower::Visit(const Local &l) {
+    indent();
+    out << "(loc " << l.GetName() << " ";
+    l.GetCoef()->Accept(*this);
+    out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
+  }
+
   void SymSexpLower::Visit(const Block &b) {
     indent();
-    out << "(BB " << b.GetLabel() << " " << std::endl;
+    out << "(bbl " << b.GetLabel() << " " << std::endl;
     for (auto s: b.GetStmts()) {
       incIndent();
       s->Accept(*this);
@@ -101,16 +118,19 @@ namespace symir {
   void SymSexpLower::Visit(const Func &f) {
     out << "(fun " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
     out << " (";
-    auto vars = f.GetParams();
-    for (auto i = 0; i < vars.size(); ++i) {
-      out << "(" << SymIR::GetTypeSName(vars[i]->GetType()) << " ";
-      vars[i]->Accept(*this);
-      out << ")";
-      if (i != vars.size() - 1) {
+    auto params = f.GetParams();
+    for (auto i = 0; i < params.size(); ++i) {
+      params[i]->Accept(*this);
+      if (i != params.size() - 1) {
         out << " ";
       }
     }
     out << ")" << std::endl;
+    for (const auto &l: f.GetLocals()) {
+      incIndent();
+      l->Accept(*this);
+      decIndent();
+    }
     for (const auto &b: f.GetBlocks()) {
       incIndent();
       b->Accept(*this);
@@ -119,9 +139,15 @@ namespace symir {
     out << ")" << std::endl;
   }
 
-  void SymCxLower::Visit(const Var &v) { out << v.GetName(); }
+  void SymCxLower::Visit(const VarUse &v) { out << v.GetName(); }
 
-  void SymCxLower::Visit(const Coef &c) { out << c.GetValue(); }
+  void SymCxLower::Visit(const Coef &c) {
+    if (c.IsValueSet()) {
+      out << c.GetValue();
+    } else {
+      out << c.GetName();
+    }
+  }
 
   void SymCxLower::Visit(const Term &t) {
     t.GetCoef()->Accept(*this);
@@ -134,7 +160,7 @@ namespace symir {
     for (auto i = 0; i < terms.size(); ++i) {
       e.GetTerm(i)->Accept(*this);
       if (i != terms.size() - 1) {
-        out << " " << Expr::GetOpSym(e.GetOp());
+        out << " " << Expr::GetOpSym(e.GetOp()) + " ";
       }
     }
   }
@@ -180,6 +206,17 @@ namespace symir {
     out << "goto " << g.GetTarget() << std::endl;
   }
 
+  void SymCxLower::Visit(const Param &p) {
+    out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+  }
+
+  void SymCxLower::Visit(const Local &l) {
+    indent();
+    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+    l.GetCoef()->Accept(*this);
+    out << ";" << std::endl;
+  }
+
   void SymCxLower::Visit(const Block &b) {
     out << b.GetLabel() << ":" << std::endl;
     for (auto s: b.GetStmts()) {
@@ -189,15 +226,19 @@ namespace symir {
 
   void SymCxLower::Visit(const Func &f) {
     out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
-    auto vars = f.GetParams();
-    for (auto i = 0; i < vars.size(); ++i) {
-      out << SymIR::GetTypeCName(f.GetType()) << " ";
-      vars[i]->Accept(*this);
-      if (i != vars.size() - 1) {
+    auto params = f.GetParams();
+    for (auto i = 0; i < params.size(); ++i) {
+      params[i]->Accept(*this);
+      if (i != params.size() - 1) {
         out << ", ";
       }
     }
     out << ") {" << std::endl;
+    for (const auto &b: f.GetLocals()) {
+      incIndent();
+      b->Accept(*this);
+      decIndent();
+    }
     for (const auto &b: f.GetBlocks()) {
       incIndent();
       b->Accept(*this);
