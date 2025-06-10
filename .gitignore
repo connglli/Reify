@@ -1,5 +1,5 @@
 build/
-generated/
+generated*/
 */__pycache__
 .idea
 .vscode

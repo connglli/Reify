@@ -53,7 +53,7 @@ if __name__ == "__main__":
         if not del_cond:
             continue
         # Delete the corresponding mapping file if it exists
-        if not map_path.exists():
+        if map_path.exists():
             map_path.unlink()
         func_path.unlink()
         print(f"DELETE {func_path.stem}")
