@@ -811,16 +811,16 @@ namespace symir {
   ///   auto b = std::make_unique<BlockBuilder>("BB1")
   ///   b->SymAssign(
   ///     v0, b->SymAddExpr({
-  ///       b->SymTerm(Term::OP_MUL, "12", v1),
-  ///       b->SymTerm(Term::OP_MUL, "23", v1)
+  ///       b->SymMulTerm("12", v1),
+  ///       b->SymSubTerm("23", v1)
   ///     })
   ///   );
   ///   b->SymBranch(
   ///     "BB1", "BB2",
   ///     b->SymGtzCond(
   ///       b->SymSubExpr({
-  ///         b->SymTerm(Term::OP_MUL, "123", v2),
-  ///         b->SymTerm(Term::OP_MUL, "33", v1)
+  ///         b->SymAddTerm("123", v2),
+  ///         b->SymAddTerm("33", v1)
   ///       })
   ///     )
   ///   );  // We cannot call anything any more after Branch
@@ -921,14 +921,15 @@ namespace symir {
   ///
   /// -----------------------------------------------------------
   ///   auto b = std::make_unique<FuncBuilder>("f0", SymIR::Type::I32)
-  ///   auto v0 = b->SymVar("v0);
+  ///   auto v0 = b->SymParam("v0");
+  ///   auto v1 = b->SymLocal("v1");
   ///   auto bb1 = b.SymBlock("BB1", [=](BlockBuilder *blk) {
   ///     blk->SymBranch(
   ///       "BB1", "BB2",
   ///       blk->SymGtzCond(
   ///         blk->SymSubExpr({
-  ///           blk->SymTerm(Term::OP_MUL, "123", v2),
-  ///           blk->SymTerm(Term::OP_MUL, "33", v1)
+  ///           blk->SymMulTerm("123", v0),
+  ///           blk->SymAddTerm("33", v1)
   ///         })
   ///       )
   ///     );
