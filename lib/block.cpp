@@ -35,7 +35,7 @@
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 
-void BB::Generate() {
+void BlkGen::Generate() {
   auto rand = Random::Get().Uniform(0, f.NumVars() - 1);
 
   // We define a variable for each statement using other variables
@@ -53,7 +53,8 @@ void BB::Generate() {
       }
     }
 
-    // We assign a coefficient to it for each variable that contributes to the current variable being defined
+    // We assign a coefficient to it for each variable that contributes to the current variable
+    // being defined
     for (int i = 0; i < defUsedVars[varIndex].size(); i++) {
       // Statement index is the index of the assignment statement in a
       // basic block, and i is the index of the variable in the RHS of
@@ -73,7 +74,8 @@ void BB::Generate() {
   condUsedVars = assignmentOrder;
   for (int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL - assignmentOrder.size(); i++) {
     int randomVariable = rand();
-    while (std::find(condUsedVars.begin(), condUsedVars.end(), randomVariable) != condUsedVars.end()) {
+    while (std::find(condUsedVars.begin(), condUsedVars.end(), randomVariable) != condUsedVars.end()
+    ) {
       randomVariable = rand();
     }
     condUsedVars.push_back(randomVariable);
@@ -105,7 +107,7 @@ void BB::Generate() {
 /////// Constraint Generation
 ///////////////////////////////////////////////////////////////////
 
-// void BB::pushAfterSearch(std::vector<z3::expr> &coeffs, std::string name, z3::context &ctx) {
+// void BlkGen::pushAfterSearch(std::vector<z3::expr> &coeffs, std::string name, z3::context &ctx) {
 //   // If we've already extracted the value from the model, we use that value,
 //   //  otherwise it's an uninterpreted constant which the solver needs to figure
 //   //  out the value for
@@ -120,7 +122,7 @@ void BB::Generate() {
 //     }
 // }
 
-z3::expr BB::createParameterExpr(std::string name, z3::context &ctx) {
+z3::expr BlkGen::createParameterExpr(std::string name, z3::context &ctx) {
   // If we've already extracted the value from the model, we use that value,
   //  otherwise it's an uninterpreted constant which the solver needs to figure
   //  out the value for
@@ -132,7 +134,7 @@ z3::expr BB::createParameterExpr(std::string name, z3::context &ctx) {
   }
 }
 
-z3::expr BB::makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3::context &c) {
+z3::expr BlkGen::makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3::context &c) {
   // z3::expr allZero = c.bool_const(("true"));
   // for(auto coeff: coeffs)
   // {
@@ -145,15 +147,16 @@ z3::expr BB::makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3
   return AtMostKZeroes(c, coeffs, coeffs.size() / 2);
 }
 
-z3::expr BB::boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs) {
+z3::expr BlkGen::boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs) {
   z3::expr allAssignedConstraint = c.bool_val(true);
   for (const auto &coeff: coeffs) {
-    allAssignedConstraint = allAssignedConstraint && (coeff >= LOWER_COEFF_BOUND && coeff <= UPPER_COEFF_BOUND);
+    allAssignedConstraint =
+        allAssignedConstraint && (coeff >= LOWER_COEFF_BOUND && coeff <= UPPER_COEFF_BOUND);
   }
   return allAssignedConstraint;
 }
 
-void BB::GenerateConstraints(
+void BlkGen::GenerateConstraints(
     int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
 ) {
   // TODO: Remove redundant code
@@ -196,7 +199,8 @@ void BB::GenerateConstraints(
       solver.add(term_constraint);
     }
     for (int i = 1; i < terms.size(); i++) {
-      // Addition is left associative, so in an addition of k terms, the subexpressions with the first 1, 2,
+      // Addition is left associative, so in an addition of k terms, the subexpressions with the
+      // first 1, 2,
       // ...k terms added should all be between LOWER_BOUND and UPPER_BOUND as well
       z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
       if (ENABLE_SAFETY_CHECKS) {
@@ -293,7 +297,8 @@ void BB::GenerateConstraints(
 ///////////////////////////////////////////////////////////////////
 
 
-std::string BB::generateConditionalConstraint(int blkNo, int target, std::vector<int> condUsedVars) const {
+std::string
+BlkGen::generateConditionalConstraint(int blkNo, int target, std::vector<int> condUsedVars) const {
   std::ostringstream constraint;
   auto rand = Random::Get().Uniform(LOWER_BOUND, UPPER_BOUND);
   constraint << "    if (";
@@ -326,13 +331,13 @@ std::string BB::generateConditionalConstraint(int blkNo, int target, std::vector
   return constraint.str();
 }
 
-std::string BB::generateUnconditionalGoto(int target) const {
+std::string BlkGen::generateUnconditionalGoto(int target) const {
   std::ostringstream code;
   code << "    goto " << NameLabel(target) << ";" << std::endl;
   return code.str();
 }
 
-std::string BB::GenerateCode() const {
+std::string BlkGen::GenerateCode() const {
   std::ostringstream code;
 
   // Generate the label for the basic block

@@ -32,16 +32,17 @@
 #include <string>
 #include <vector>
 #include <z3++.h>
+
 #include "lib/block.hpp"
 #include "lib/graph.hpp"
 
-class BB;
+class BlkGen;
 
-class Func {
+class FunGen {
 public:
-  explicit Func(int numBBs, int numVars) : numBBs(numBBs), g(numBBs), numVars(numVars) {}
+  explicit FunGen(int numBBs, int numVars) : numBBs(numBBs), cfg(numBBs), numVars(numVars) {}
 
-  const auto &GetUdlyGraph() const { return g; }
+  const auto &GetCFGBkbone() const { return cfg; }
 
   const int GetNumBBs() const { return numBBs; }
 
@@ -49,7 +50,7 @@ public:
 
   const auto &GetBBs() const { return bbs; }
 
-  void GenCFG();
+  void Generate();
 
   std::vector<int> SampleExec(int execStep, bool consistent);
 
@@ -58,17 +59,17 @@ public:
   ///////////////////////////////////////////////////////////////////
 
   const bool ParamDefined(const std::string &name) {
-    return parameters.find(name) != parameters.end() && parameters[name].has_value();
+    return state.find(name) != state.end() && state[name].has_value();
   }
 
   const int GetParamVal(const std::string &name) {
     assert(ParamDefined(name) && "Parameter not defined");
-    return parameters[name].value();
+    return state[name].value();
   }
 
-  void InitParam(const std::string &name) { parameters[name] = std::nullopt; }
+  void InitParam(const std::string &name) { state[name] = std::nullopt; }
 
-  void DefineParam(const std::string &name, int val) { parameters[name] = val; }
+  void DefineParam(const std::string &name, int val) { state[name] = val; }
 
   z3::expr MakeInitialisationsInteresting(z3::context &c) const;
 
@@ -96,17 +97,18 @@ public:
 
   std::string GenerateCode(const std::string &sno, const std::string &uuid);
 
-  static std::string GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation);
+  static std::string
+  GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation);
 
 private:
-  int numBBs;          // The number of basic blocks the function has
-  Graph g;             // Nodes in g maps to that in bbs one-by-one
-  std::vector<BB> bbs; // The basic blocks (in the same order as g)
+  int numBBs;              // The number of basic blocks the function has
+  int numVars;             // The number of variables that the function can define
+  std::vector<BlkGen> bbs; // The basic blocks (in the same order as g)
 
-  // TODO: Move parameters to each basic block
-  int numVars; // The number of variables that the function can define
-  std::unordered_map<std::string, std::optional<int>>
-      parameters; // Value of variables, coefficients or constants computed so far
+  CfgBkboneGen cfg; // Nodes in cfg maps to that in bbs one-by-one
+
+  std::unordered_map<std::string, std::optional<int>> state{
+  }; // Value of variables, coefficients or constants computed so far
 };
 
 

@@ -29,44 +29,49 @@
 #include <set>
 #include <vector>
 
-class Graph {
+// CfgBkboneGen is a random generator for the backbone (without generating SIRs) of a CFG
+class CfgBkboneGen {
 
 public:
-  explicit Graph(int n) : numNodes(n), adjTab(n) {}
+  explicit CfgBkboneGen(int n) : numNodes(n), adjTab(n) {}
 
   [[nodiscard]] int NumNodes() const { return numNodes; }
 
   [[nodiscard]] const std::set<int> &GetAdj(int i) const { return adjTab[i]; }
 
-  // Generate the random graph
+  // Check if there exists a path from node u to node v.
+  [[nodiscard]] bool HasPath(int u, int v) const;
+
+  // Walk the graph randomly from start and stop if we encounter end or reach max steps.
+  // Return the path we've been through (including start and the end).
+  [[nodiscard]] std::vector<int> SampleWalk(int start, int end, int maxSteps = 100) const;
+
+  [[nodiscard]] std::vector<int> SampleConsistentWalk(int start, int end, int maxSteps = 100) const;
+
+  // Generate the backbone graph randomly.
   void Generate();
-
-  // Check if a node has a path to a given target
-  [[nodiscard]] bool HasPath(int start, int target) const;
-
-  [[nodiscard]] std::vector<int> SampleWalk(int start, int end, int max_steps = 100) const;
-
-  [[nodiscard]] std::vector<int> SampleConsistentWalk(int start, int end, int max_steps = 100) const;
-
-  [[nodiscard]] std::vector<std::vector<int>> SampleKDisjointWalksAndBackpatchGraph(int start, int end, int k);
 
   [[nodiscard]] std::vector<std::vector<int>> GetKDistinctWalks(int start, int end, int k) const;
 
-  [[nodiscard]] std::vector<std::vector<int>> GetKDistinctConsistentWalks(int start, int end, int k) const;
+  [[nodiscard]] std::vector<std::vector<int>>
+  GetKDistinctConsistentWalks(int start, int end, int k) const;
+
+  [[nodiscard]] std::vector<std::vector<int>>
+  SampleKDisjointWalksAndBackpatch(int start, int end, int k);
 
 private:
   // Add an edge between node u and node v
   void addEdge(int u, int v);
 
-  // Ensure every node has a path to the last node while keeping outdegree <= 2
-  void enforceReachabilityToLast();
+  // Ensure every node is reachable from the entry node while keeping outdegree <= 2 as we are a CFG
+  void enforceReachabilityFromEntry();
 
-  // Ensure every node is reachable from 0 while keeping outdegree <= 2
-  void enforceReachabilityFromStart();
+  // Ensure every node has a path to the exit node while keeping outdegree <= 2 as we are a CFG
+  void enforceReachabilityToExit();
 
 private:
   const int numNodes;
-  std::vector<std::set<int>> adjTab; // Use set to avoid duplicate edges
+  std::vector<std::set<int>> adjTab;
 };
 
 #endif // GRAPHFUZZ_GRAPH_HPP

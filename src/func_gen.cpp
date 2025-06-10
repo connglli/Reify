@@ -53,7 +53,8 @@ void cleanupIfEmpty() {
   // if output file is empty, remove it from the filesystem
   std::ifstream f(funcFilePath);
   std::ifstream f2(mapFilePath);
-  if (f.peek() == std::ifstream::traits_type::eof() || f2.peek() == std::ifstream::traits_type::eof()) {
+  if (f.peek() == std::ifstream::traits_type::eof() ||
+      f2.peek() == std::ifstream::traits_type::eof()) {
     std::remove(funcFilePath.c_str());
     std::remove(mapFilePath.c_str());
   }
@@ -118,7 +119,9 @@ struct FunGenOpts {
       // Replace uuid's non-alphanumeric characters with underscore
       // used a UUID so that i could throw everything from different runs
       // into the same directory without worrying about name clashes
-      std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
+      std::replace_if(
+          uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_'
+      );
     }
 
     std::string sno;
@@ -186,10 +189,10 @@ int main(int argc, char **argv) {
 
   Log::Get().Out() << "==== Generation =============================" << std::endl;
 
-  Func f(NUM_NODES_PER_FUNC, NUM_VARS_PER_FUNC);
-  f.GenCFG();
+  FunGen f(NUM_NODES_PER_FUNC, NUM_VARS_PER_FUNC);
+  f.Generate();
 
-  auto g = f.GetUdlyGraph();
+  auto cfg = f.GetCFGBkbone();
   auto basicBlocks = f.GetBBs();
 
   auto execution = f.SampleExec(100, ENABLE_CONSISTENT_WALKS);
@@ -251,7 +254,7 @@ int main(int argc, char **argv) {
 
   std::vector<int> initialisation = f.ExtractInitialisationsFromModel(model, c);
   std::vector<int> finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
-  mappingFile << Func::GenerateMapping(initialisation, finalisation);
+  mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
 
   // Now, let's try to generate a couple more mappings (initialisation sets).
   // First, let's regenerate the SMT query by repopulating the solver with the
@@ -274,7 +277,8 @@ int main(int argc, char **argv) {
   basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
   for (int i = 0; i < NUM_INITS_PER_WALK - 1; i++) {
-    Log::Get().Out() << "==== Initialization " << i + 1 << " =============================" << std::endl;
+    Log::Get().Out() << "==== Initialization " << i + 1
+                     << " =============================" << std::endl;
 
     // Ensure that the initialisation is sufficiently different from the previous one
     solver.add(f.DifferentInitialisationConstraint(initialisation, c));
@@ -297,7 +301,7 @@ int main(int argc, char **argv) {
     f.ExtractParametersFromModel(model, c);
     initialisation = f.ExtractInitialisationsFromModel(model, c);
     finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
-    mappingFile << Func::GenerateMapping(initialisation, finalisation);
+    mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
   }
 
   mappingFile.close();

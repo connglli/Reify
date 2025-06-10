@@ -34,21 +34,22 @@
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 
-void Func::GenCFG() {
-  g.Generate();
+void FunGen::Generate() {
+  // Generate the shape of us
+  cfg.Generate();
   for (int i = 0; i < numBBs; i++) {
-    bbs.push_back(BB(*this, i, g.GetAdj(i)));
+    bbs.emplace_back(*this, i, cfg.GetAdj(i));
     bbs.back().Generate();
   }
 }
 
-std::vector<int> Func::SampleExec(int execStep, bool consistent) {
+std::vector<int> FunGen::SampleExec(int execStep, bool consistent) {
   std::vector<int> sampleWalk = {};
   int startNode = 0, endNode = numBBs - 1;
   if (consistent) {
-    sampleWalk = g.SampleConsistentWalk(startNode, endNode, execStep);
+    sampleWalk = cfg.SampleConsistentWalk(startNode, endNode, execStep);
   } else {
-    sampleWalk = g.SampleWalk(startNode, endNode, execStep);
+    sampleWalk = cfg.SampleWalk(startNode, endNode, execStep);
   }
   int stopNode = sampleWalk.back();
   if (stopNode == endNode) {
@@ -59,9 +60,10 @@ std::vector<int> Func::SampleExec(int execStep, bool consistent) {
   // if we're artificially creating an edge to the end node).
   // Modify the basic block at the end of the sample walk to have pass counter
   // equal to the number of times that basic block has been visited.
-  int passCounter = std::count_if(sampleWalk.begin(), sampleWalk.end(), [=](auto n) { return n == stopNode; });
+  int passCounter =
+      static_cast<int>(std::ranges::count_if(sampleWalk, [=](auto n) { return n == stopNode; }));
   bbs[stopNode].SetPassCounter(passCounter);
-  parameters[NamePassCounter()] = passCounter;
+  state[NamePassCounter()] = passCounter;
   sampleWalk.push_back(endNode);
   Log::Get().Out() << "Sample walk has been modified to end at the last node." << std::endl;
   return sampleWalk;
@@ -71,7 +73,7 @@ std::vector<int> Func::SampleExec(int execStep, bool consistent) {
 /////// Constraint Initialization and Finalization
 ///////////////////////////////////////////////////////////////////
 
-z3::expr Func::MakeInitialisationsInteresting(z3::context &c) const {
+z3::expr FunGen::MakeInitialisationsInteresting(z3::context &c) const {
   std::vector<z3::expr> allVars;
   for (int i = 0; i < numVars; i++) {
     allVars.push_back(c.int_const((NameVar(i) + "_0").c_str()));
@@ -80,7 +82,7 @@ z3::expr Func::MakeInitialisationsInteresting(z3::context &c) const {
   return AtMostKZeroes(c, allVars, numVars / 2);
 }
 
-z3::expr Func::AddRandomInitialisations(z3::context &c) {
+z3::expr FunGen::AddRandomInitialisations(z3::context &c) {
   auto rand = Random::Get().Uniform(LOWER_INIT_BOUND, UPPER_INIT_BOUND);
   std::vector<z3::expr> allVars;
   z3::expr allAssignedConstraint = c.bool_val(true);
@@ -101,13 +103,16 @@ z3::expr Func::AddRandomInitialisations(z3::context &c) {
   return allAssignedConstraint;
 }
 
-z3::expr Func::DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) const {
+z3::expr
+FunGen::DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) const {
   // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
   std::vector<z3::expr> differentInitialisationConstraints;
   for (int i = 0; i < numVars; i++) {
     int boundedValue1 = initialisation[i];
     z3::expr boundedValue2 = c.int_const((NameVar(i) + "_0").c_str());
-    differentInitialisationConstraints.push_back(z3::ite(boundedValue1 != boundedValue2, c.int_val(1), c.int_val(0)));
+    differentInitialisationConstraints.push_back(
+        z3::ite(boundedValue1 != boundedValue2, c.int_val(1), c.int_val(0))
+    );
   }
   z3::expr differentInitialisationConstraint =
       AtMostKZeroes(c, differentInitialisationConstraints, std::min(3, numVars / 2));
@@ -116,8 +121,8 @@ z3::expr Func::DifferentInitialisationConstraint(std::vector<int> initialisation
 
 // Function to extract parameters from the model, so that we can store the
 // coefficients and constants that the solver found an interpretation for
-void Func::ExtractParametersFromModel(z3::model &model, z3::context &ctx) {
-  for (const auto &param: parameters) {
+void FunGen::ExtractParametersFromModel(z3::model &model, z3::context &ctx) {
+  for (const auto &param: state) {
     const std::string &name = param.first;
     const auto key = ctx.int_const(name.c_str()).decl();
 
@@ -128,18 +133,20 @@ void Func::ExtractParametersFromModel(z3::model &model, z3::context &ctx) {
       if (value.is_numeral()) {
         int int_value;
         if (Z3_get_numeral_int(ctx, value, &int_value)) {
-          parameters[name] = int_value;
-          Log::Get().Out() << "Parameter " << name << " is in the model with value: " << int_value << std::endl;
+          state[name] = int_value;
+          Log::Get().Out() << "Parameter " << name << " is in the model with value: " << int_value
+                           << std::endl;
         }
       }
     } else {
-      Log::Get().Out() << "Parameter " << name << " is not explicitly defined in the model" << std::endl;
+      Log::Get().Out() << "Parameter " << name << " is not explicitly defined in the model"
+                       << std::endl;
     }
   }
 }
 
 // Extract the initial values of each variable that's an input to the function from the model
-std::vector<int> Func::ExtractInitialisationsFromModel(z3::model &model, z3::context &ctx) const {
+std::vector<int> FunGen::ExtractInitialisationsFromModel(z3::model &model, z3::context &ctx) const {
   std::vector<int> initialisations;
   for (int i = 0; i < numVars; i++) {
     std::string varName = NameVar(i) + "_0";
@@ -167,7 +174,7 @@ std::vector<int> Func::ExtractInitialisationsFromModel(z3::model &model, z3::con
 // i wanted a bit of flexibility for the checksum function in the future so i
 // decided to just store the final values of all the variables (at the end basic
 // block) instead of just the checksum
-std::vector<int> Func::ExtractFinalizationsFromModel(
+std::vector<int> FunGen::ExtractFinalizationsFromModel(
     z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
 ) const {
   std::vector<int> finalisations;
@@ -198,7 +205,7 @@ std::vector<int> Func::ExtractFinalizationsFromModel(
 /////// Code Generation
 ///////////////////////////////////////////////////////////////////
 
-std::string Func::GenerateCode(const std::string &sno, const std::string &uuid) {
+std::string FunGen::GenerateCode(const std::string &sno, const std::string &uuid) {
   std::ostringstream code;
   code << "int function_" << uuid << "_" << sno << "(";
   for (int i = 0; i < numVars; ++i) {
@@ -217,7 +224,9 @@ std::string Func::GenerateCode(const std::string &sno, const std::string &uuid) 
   return code.str();
 }
 
-std::string Func::GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation) {
+std::string FunGen::GenerateMapping(
+    const std::vector<int> &initialisation, const std::vector<int> &finalisation
+) {
   std::ostringstream mapping;
   for (auto x: initialisation) {
     mapping << x << ",";

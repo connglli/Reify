@@ -34,12 +34,12 @@
 #include "lib/function.hpp"
 #include "z3++.h"
 
-class Func;
+class FunGen;
 
-class BB {
+class BlkGen {
 
 public:
-  BB(Func &f, int blkNo, const std::set<int> &successors) :
+  BlkGen(FunGen &f, int blkNo, const std::set<int> &successors) :
       f(f), blkNo(blkNo), successors(successors.begin(), successors.end()) {}
 
   void Generate();
@@ -54,8 +54,9 @@ public:
   ///////////////////////////////////////////////////////////////////
 
 public:
-  void
-  GenerateConstraints(int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions);
+  void GenerateConstraints(
+      int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
+  );
 
 private:
   z3::expr createParameterExpr(std::string name, z3::context &ctx);
@@ -72,18 +73,22 @@ public:
   std::string GenerateCode() const;
 
 private:
-  std::string generateConditionalConstraint(int blockno, int target, std::vector<int> conditionalVariables) const;
+  std::string generateConditionalConstraint(
+      int blockno, int target, std::vector<int> conditionalVariables
+  ) const;
 
   std::string generateUnconditionalGoto(int target) const;
 
 private:
-  Func &f;                     // The residing function of this basic block
+  FunGen &f;                   // The residing function of this basic block
   int blkNo;                   // The identifier of this basic block
   std::vector<int> successors; // Successors of the basic block
 
-  std::vector<int> assignmentOrder;            // The order of the definition of each variable
-  std::map<int, std::vector<int>> defUsedVars; // The list of used variables for each defined variables
-  std::vector<int> condUsedVars;               // The list of used variables for the conditional
+
+  std::vector<int> assignmentOrder; // The order of the definition of each variable
+  std::map<int, std::vector<int>>
+      defUsedVars;               // The list of used variables for each defined variables
+  std::vector<int> condUsedVars; // The list of used variables for the conditional
 
   // MOTIVATION: We need to generate a pass counter name for the block in case we
   // end up in a consistent walk with a loop which never reaches the end node
