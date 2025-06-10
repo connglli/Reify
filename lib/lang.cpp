@@ -26,7 +26,7 @@
 #include "lib/lang.hpp"
 
 BlockBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const std::string &coef, const Var *var) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+  Assert(isActive(), "BlockBuilder has already finished its work");
   TermID tid = numCreatedTerms++;
   createdTerms[tid] =
       std::make_unique<::Term>(op, std::make_unique<Coef>("c", coef, var->GetType()), var);
@@ -34,7 +34,7 @@ BlockBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const std::string &coef,
 }
 
 BlockBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID> &termIds) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+  Assert(isActive(), "BlockBuilder has already finished its work");
   ExprID eid = numCreatedExprs++;
   std::vector<std::unique_ptr<::Term>> terms;
   for (const auto tid: termIds) {
@@ -48,7 +48,7 @@ BlockBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID
 }
 
 BlockBuilder::ExprID BlockBuilder::SymCond(Cond::Op op, ExprID eid) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+  Assert(isActive(), "BlockBuilder has already finished its work");
   CondID cid = numCreatedConds++;
   auto it = createdExprs.find(eid);
   Assert(it != createdExprs.end(), "Expr with ID=%lu does not exist", eid);
@@ -58,7 +58,7 @@ BlockBuilder::ExprID BlockBuilder::SymCond(Cond::Op op, ExprID eid) {
 }
 
 void BlockBuilder::SymAssign(const Var *var, ExprID eid) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+  Assert(isActive(), "BlockBuilder has already finished its work");
   auto it = createdExprs.find(eid);
   Assert(it != createdExprs.end(), "Expr with ID=%lu does not exist", eid);
   stmts.push_back(std::make_unique<AssStmt>(var, std::move(it->second)));
@@ -66,38 +66,38 @@ void BlockBuilder::SymAssign(const Var *var, ExprID eid) {
 }
 
 void BlockBuilder::SymReturn() {
-  Assert(!finished, "BlockBuilder has already finished its work");
-  std::vector<const Var *> vars = ctx->GetParams();
+  Assert(isActive(), "BlockBuilder has already finished its work");
+  std::vector<const Var *> vars = GetParent()->GetParams();
   stmts.push_back(std::make_unique<RetStmt>(vars));
 }
 
-void BlockBuilder::SymBranch(CondID cid, const std::string &truLab, const std::string &falLab) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+void BlockBuilder::SymBranch(const std::string &truLab, const std::string &falLab, CondID cid) {
+  Assert(isActive(), "BlockBuilder has already finished its work");
   auto it = createdConds.find(cid);
   Assert(it != createdConds.end(), "Cond with ID=%lu does not exist", cid);
   target = std::make_unique<::Branch>(std::move(it->second), truLab, falLab);
   createdConds.erase(it);
-  finished = true;
+  deactivate();
 }
 
 void BlockBuilder::SymGoto(const std::string &label) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+  Assert(isActive(), "BlockBuilder has already finished its work");
   target = std::make_unique<::Goto>(label);
-  finished = true;
+  deactivate();
 }
 
 void BlockBuilder::SymFallThro() {
-  Assert(!finished, "BlockBuilder has already finished its work");
-  finished = true;
+  Assert(isActive(), "BlockBuilder has already finished its work");
+  deactivate();
 }
 
 std::unique_ptr<Block> BlockBuilder::Build() {
-  Assert(finished, "BlockBuilder has not yet finished its work");
+  Assert(!isActive(), "BlockBuilder has not yet finished its work");
   return std::make_unique<Block>(label, std::move(stmts), std::move(target));
 }
 
 const Var *FuncBuilder::SymVar(const std::string &name, SymIR::Type type) {
-  Assert(!finished, "BlockBuilder has already finished its work");
+  Assert(isActive(), "FuncBuilder has already finished its work");
   Assert(!paramMap.contains(name), "Name conflicts with parameter: %s", name.c_str());
   params.push_back(std::make_unique<Var>(name, type));
   auto v = params.back().get();
@@ -106,6 +106,7 @@ const Var *FuncBuilder::SymVar(const std::string &name, SymIR::Type type) {
 }
 
 const Block *FuncBuilder::SymBlock(const std::string &label, const BlockBuilder::BlockBody &body) {
+  Assert(isActive(), "FuncBuilder has already finished its work");
   Assert(!blockMap.contains(label), "Label conflicts with blocks: %s", label.c_str());
   BlockBuilder b(this, label);
   body(&b);
@@ -132,5 +133,7 @@ const Block *FuncBuilder::FindBlock(const std::string &label) const {
 }
 
 std::unique_ptr<Func> FuncBuilder::Build() {
+  Assert(isActive(), "FuncBuilder has already finished its work");
+  deactivate();
   return std::make_unique<Func>(name, retType, std::move(params), std::move(blocks));
 }
