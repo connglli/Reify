@@ -64,7 +64,7 @@ namespace symir {
 
   void SymSexpLower::Visit(const AssStmt &a) {
     indent();
-    out << "(asn ";
+    out << "(" << KW_ASS << " ";
     a.GetVar()->Accept(*this);
     out << " ";
     incIndent();
@@ -75,12 +75,12 @@ namespace symir {
 
   void SymSexpLower::Visit(const RetStmt &r) {
     indent();
-    out << "(ret)" << std::endl;
+    out << "(" << KW_RET << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const Branch &b) {
     indent();
-    out << "(brh " << b.GetTrueTarget() << " " << b.GetFalseTarget() << " ";
+    out << "(" << KW_BRH << " " << b.GetTrueTarget() << " " << b.GetFalseTarget() << " ";
     incIndent();
     b.GetCond()->Accept(*this);
     decIndent();
@@ -89,7 +89,7 @@ namespace symir {
 
   void SymSexpLower::Visit(const Goto &g) {
     indent();
-    out << "goto " << g.GetTarget() << std::endl;
+    out << "(" << KW_GOTO << " " << g.GetTarget() << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const Param &p) {
@@ -98,14 +98,14 @@ namespace symir {
 
   void SymSexpLower::Visit(const Local &l) {
     indent();
-    out << "(loc " << l.GetName() << " ";
+    out << "(" << KW_LOC << " " << l.GetName() << " ";
     l.GetCoef()->Accept(*this);
     out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const Block &b) {
     indent();
-    out << "(bbl " << b.GetLabel() << " " << std::endl;
+    out << "(" << KW_BBL << " " << b.GetLabel() << " " << std::endl;
     for (auto s: b.GetStmts()) {
       incIndent();
       s->Accept(*this);
@@ -116,7 +116,7 @@ namespace symir {
   }
 
   void SymSexpLower::Visit(const Func &f) {
-    out << "(fun " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
+    out << "(" << KW_FUN << " " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
     out << " (";
     auto params = f.GetParams();
     for (auto i = 0; i < params.size(); ++i) {

@@ -37,6 +37,7 @@ LIB_OBJ_DIR := $(OBJ_DIR)/lib
 
 LIB_SRC_CXX := $(wildcard $(LIB_DIR)/*.cpp)
 LIB_SRC_C   := $(wildcard $(LIB_DIR)/*.c)
+LIB_SRC     := $(LIB_SRC_CXX) $(LIB_SRC_C)
 
 LIB_OBJ_CXX := $(patsubst $(LIB_DIR)/%.cpp,$(LIB_OBJ_DIR)/%.o,$(LIB_SRC_CXX))
 LIB_OBJ_C   += $(patsubst $(LIB_DIR)/%.c,$(LIB_OBJ_DIR)/%.o,$(LIB_SRC_C))
@@ -69,14 +70,13 @@ CFLAGS   := $(DBGFLAGS) -Wall -Wextra -std=${C_STD} -O0
 LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread
 
 
-.PHONY: all clean lib gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check
-
-
 ########################################################################
 ## Building Targets
 ########################################################################
 
-all: lib fgen pgen
+.PHONY: clean all lib fgen pgen bins gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check
+
+all: lib bins
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(OBJ_DIR)
@@ -97,14 +97,19 @@ $(LIB_OBJ_DIR)/chksum.o: $(LIB_DIR)/chksum.cpp
 
 lib: $(LIB_OBJ)
 
-fgen: $(LIB_OBJ) $(OBJ_DIR)/func_gen.o
+$(BIN_DIR)/fgen: $(LIB_OBJ) $(OBJ_DIR)/func_gen.o
 	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $(BIN_DIR)/fgen $^ $(LDFLAGS) 
+	$(CXX) -o $(BIN_DIR)/fgen $^ $(LDFLAGS)
 
-pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
+$(BIN_DIR)/pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
 	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $(BIN_DIR)/pgen $^ $(LDFLAGS) 
+	$(CXX) -o $(BIN_DIR)/pgen $^ $(LDFLAGS)
 
+fgen: $(BIN_DIR)/fgen
+
+pgen: $(BIN_DIR)/pgen
+
+bins: fgen pgen
 
 ########################################################################
 ## Generation Targets

@@ -30,7 +30,16 @@
 
 #include "lang.hpp"
 
-#define INDENTATION_SIZE 2
+#define SYMIR_LOWER_INDENTATION_SIZE 2
+
+#define SYMIR_KEYWORD_LIST(XX)                                                                     \
+  XX(FUN, fun)                                                                                     \
+  XX(LOC, loc)                                                                                     \
+  XX(BBL, bbl)                                                                                     \
+  XX(ASS, asn)                                                                                     \
+  XX(RET, ret)                                                                                     \
+  XX(BRH, brh)                                                                                     \
+  XX(GOTO, goto)
 
 namespace symir {
   using namespace symir;
@@ -43,7 +52,7 @@ namespace symir {
   protected:
     void indent() const {
       for (int i = 0; i < numIndent; i++) {
-        for (int j = 0; j < INDENTATION_SIZE; j++) {
+        for (int j = 0; j < SYMIR_LOWER_INDENTATION_SIZE; j++) {
           out << " ";
         }
       }
@@ -60,6 +69,11 @@ namespace symir {
 
   /// An "SymIR -> S Expression" lower
   class SymSexpLower : public SymIRLower {
+  public:
+#define XX(name, sname) static constexpr char const *KW_##name = #sname;
+    SYMIR_KEYWORD_LIST(XX)
+#undef XX
+
   public:
     explicit SymSexpLower(std::ostream &out) : SymIRLower(out) {}
 

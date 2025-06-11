@@ -78,7 +78,10 @@ namespace symir {
   };
 
   /**
-   * SymIR is an simplified IR for modeling a C-like function.
+   * SymIR is a simplified, symbolic IR for modeling a C-like function.
+   * The main goal of SymIR is to generate code that are easier to model
+   * UBs (undefined behavior) and easier for symbolic execution. The
+   * symbols in SymIR including for example, coefficient.
    *
    * Context-Free Grammar:
    *
@@ -215,7 +218,7 @@ namespace symir {
     SymIR::Type type;
   };
 
-  /// VarDef WithType is an annotator for SymIR nodes which defines a variable
+  /// VarDef is an annotator for SymIR nodes which defines a variable
   class VarDef : public WithType {
   public:
     VarDef(std::string name, const SymIR::Type type) : WithType(type), name(std::move(name)) {}
@@ -224,6 +227,35 @@ namespace symir {
 
   private:
     std::string name;
+  };
+
+  /// SymDef is a definition of a symbolic value, either been solved or not yet.
+  class SymDef : public WithType {
+  public:
+    explicit SymDef(std::string name, const SymIR::Type type = SymIR::I32) :
+        WithType(type), name(std::move(name)), value(std::nullopt) {}
+
+    SymDef(std::string name, std::string value, const SymIR::Type type = SymIR::I32) :
+        WithType(type), name(std::move(name)), value(std::move(value)) {}
+
+    [[nodiscard]] const std::string &GetName() const { return name; }
+
+    [[nodiscard]] const std::optional<std::string> &GetValueOrNull() const { return value; }
+
+    [[nodiscard]] const std::string &GetValue() const {
+      Assert(IsValueSet(), "Value is not set yet");
+      return value.value();
+    }
+
+    [[nodiscard]] bool IsValueSet() const { return value.has_value(); }
+
+    [[nodiscard]] bool IsSolved() const { return !IsValueSet(); }
+
+    void SetValue(const std::string &v) { value = v; }
+
+  protected:
+    std::string name;
+    std::optional<std::string> value;
   };
 
   /// The VarUse represent a usage of a defined variable
@@ -246,32 +278,14 @@ namespace symir {
 
   /// A Coef represents an coefficient for updating a variable. Since we are a symbolic IR,
   /// the value of the coefficient can be not yet set which should be solved.
-  class Coef : public SymIR, public WithType {
+  class Coef : public SymIR, public SymDef {
   public:
-    Coef(std::string name, const Type type) :
-        SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(std::nullopt) {}
+    Coef(std::string name, const Type type) : SymIR(SIR_COEF), SymDef(std::move(name), type) {}
 
     Coef(std::string name, std::string value, const Type type) :
-        SymIR(SIR_COEF), WithType(type), name(std::move(name)), value(std::move(value)) {}
-
-    [[nodiscard]] const std::string &GetName() const { return name; }
-
-    [[nodiscard]] const std::optional<std::string> &GetValueOrNull() const { return value; }
-
-    [[nodiscard]] const std::string &GetValue() const {
-      Assert(IsValueSet(), "Value is not set yet");
-      return value.value();
-    }
-
-    [[nodiscard]] bool IsValueSet() const { return value.has_value(); }
-
-    void SetValue(const std::string &v) { value = v; }
+        SymIR(SIR_COEF), SymDef(std::move(name), std::move(value), type) {}
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
-
-  private:
-    std::string name;
-    std::optional<std::string> value;
   };
 
   /// A Term is an operation of a Coef and a Var
