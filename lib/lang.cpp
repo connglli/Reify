@@ -26,7 +26,7 @@
 #include "lib/lang.hpp"
 
 namespace symir {
-  BlockBuilder::TermID
+  SymIRBuilder::TermID
   BlockBuilder::SymTerm(Term::Op op, const std::string &coef, const VarDef *var) {
     Assert(isActive(), "BlockBuilder has already finished its work");
     TermID tid = numCreatedTerms++;
@@ -36,7 +36,7 @@ namespace symir {
     return tid;
   }
 
-  BlockBuilder::TermID BlockBuilder::SymTerm(
+  SymIRBuilder::TermID BlockBuilder::SymTerm(
       Term::Op op, const std::string &coefName, const std::string &coefVal, const VarDef *var
   ) {
     Assert(isActive(), "BlockBuilder has already finished its work");
@@ -47,7 +47,7 @@ namespace symir {
     return tid;
   }
 
-  BlockBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID> &termIds) {
+  SymIRBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID> &termIds) {
     Assert(isActive(), "BlockBuilder has already finished its work");
     ExprID eid = numCreatedExprs++;
     std::vector<std::unique_ptr<Term>> terms;
@@ -61,7 +61,7 @@ namespace symir {
     return eid;
   }
 
-  BlockBuilder::ExprID BlockBuilder::SymCond(Cond::Op op, ExprID eid) {
+  SymIRBuilder::ExprID BlockBuilder::SymCond(Cond::Op op, ExprID eid) {
     Assert(isActive(), "BlockBuilder has already finished its work");
     CondID cid = numCreatedConds++;
     auto it = createdExprs.find(eid);
@@ -75,7 +75,8 @@ namespace symir {
     Assert(isActive(), "BlockBuilder has already finished its work");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID=%lu does not exist", eid);
-    stmts.push_back(std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+    stmts.push_back(
+        std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
     );
     createdExprs.erase(it);
   }
@@ -95,22 +96,16 @@ namespace symir {
     Assert(it != createdConds.end(), "Cond with ID=%lu does not exist", cid);
     target = std::make_unique<Branch>(std::move(it->second), truLab, falLab);
     createdConds.erase(it);
-    deactivate();
   }
 
   void BlockBuilder::SymGoto(const std::string &label) {
     Assert(isActive(), "BlockBuilder has already finished its work");
     target = std::make_unique<Goto>(label);
-    deactivate();
-  }
-
-  void BlockBuilder::SymFallThro() {
-    Assert(isActive(), "BlockBuilder has already finished its work");
-    deactivate();
   }
 
   std::unique_ptr<Block> BlockBuilder::Build() {
-    Assert(!isActive(), "BlockBuilder has not yet finished its work");
+    Assert(SymIRBuilderGeneric::isActive(), "BlockBuilder has already finished its work");
+    deactivate();
     return std::make_unique<Block>(label, std::move(stmts), std::move(target));
   }
 
@@ -167,14 +162,31 @@ namespace symir {
 
   const Block *
   FuncBuilder::SymBlock(const std::string &label, const BlockBuilder::BlockBody &body) {
+    BlockBuilder *b = OpenBlock(label);
+    body(b);
+    return CloseBlock(b);
+  }
+
+  /// Open a basic block to define new statements
+  BlockBuilder *FuncBuilder::OpenBlock(const std::string &label) {
     Assert(isActive(), "FuncBuilder has already finished its work");
     Assert(!blockMap.contains(label), "Label conflicts with blocks: %s", label.c_str());
-    BlockBuilder b(this, label);
-    body(&b);
-    blocks.push_back(b.Build());
-    auto bb = blocks.back().get();
-    blockMap[label] = bb;
-    return bb;
+    for (auto &b: createdBlocks) {
+      Assert(b.first != label, "Label conflicts with blocks: %s", label.c_str());
+    }
+    createdBlocks[label] = std::make_unique<BlockBuilder>(this, label);
+    return createdBlocks[label].get();
+  }
+
+  /// Close an existing basic block
+  const Block *FuncBuilder::CloseBlock(BlockBuilder *builder) {
+    const std::string &label = builder->GetLabel();
+    const auto it = createdBlocks.find(label);
+    Assert(it != createdBlocks.end(), "Block with label=%s does not exist", label.c_str());
+    blocks.push_back(builder->Build());
+    blockMap[label] = blocks.back().get();
+    createdBlocks.erase(it);
+    return blocks.back().get();
   }
 
   std::unique_ptr<Func> FuncBuilder::Build() {

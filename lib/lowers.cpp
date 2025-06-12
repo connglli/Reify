@@ -93,7 +93,7 @@ namespace symir {
   }
 
   void SymSexpLower::Visit(const Param &p) {
-    out << "(" << p.GetName() << " " << SymIR::GetTypeSName(p.GetType()) << ")";
+    out << "(" << KW_PAR << " " << p.GetName() << " " << SymIR::GetTypeSName(p.GetType()) << ")";
   }
 
   void SymSexpLower::Visit(const Local &l) {

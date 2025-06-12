@@ -192,6 +192,15 @@ namespace symir {
       return names[type];
     }
 
+    static Type GetTypeFromSName(const std::string &name) {
+      static std::map<std::string, Type> map = {
+#define XX(val, cname, sname) {sname, val},
+          SYMIR_TYPE_LIST(XX)
+#undef XX
+      };
+      return map[name];
+    }
+
     explicit SymIR(ID irId) : irId(irId) {}
 
     virtual ~SymIR() = default;
@@ -334,7 +343,7 @@ namespace symir {
 
     Term(const Op op, std::unique_ptr<Coef> coef, std::unique_ptr<VarUse> var) :
         SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(std::move(var)) {
-      Assert(this->var.get() != nullptr, "Nullptr is given for the variable");
+      Assert(this->var != nullptr, "Nullptr is given for the variable");
       Assert(this->coef->GetType() == this->var->GetType(), "Different types are given");
       setType(this->var->GetType());
     }
@@ -471,7 +480,7 @@ namespace symir {
     }
 
     Cond(const Op op, std::unique_ptr<Expr> expr) : SymIR(SIR_COND), op(op), expr(std::move(expr)) {
-      Assert(this->expr.get() != nullptr, "Null expr are given");
+      Assert(this->expr != nullptr, "Null expr are given");
       setType(this->expr->GetType());
     }
 
@@ -597,7 +606,7 @@ namespace symir {
   public:
     explicit Local(std::string name, std::unique_ptr<Coef> init, Type type = Type::I32) :
         Stmt(SIR_LOCAL), VarDef(std::move(name), type), coef(std::move(init)) {
-      Assert(this->coef.get(), "Null coef are given");
+      Assert(this->coef != nullptr, "Null coef are given");
       Assert(this->coef->GetType() == type, "The coef and var are of different type");
     }
 
@@ -627,7 +636,7 @@ namespace symir {
     [[nodiscard]] const Target *GetTarget() const { return target.get(); }
 
     [[nodiscard]] size_t GetNumSuccessors() const {
-      if (!target.get()) {
+      if (target == nullptr) {
         return 0;
       } else {
         return target->GetNumSuccessors();
@@ -646,7 +655,7 @@ namespace symir {
       for (const auto &s: stmts) {
         r.push_back(s.get());
       }
-      if (target.get()) {
+      if (target != nullptr) {
         r.push_back(target.get());
       }
       return r;
@@ -786,33 +795,42 @@ namespace symir {
   // SymIR Program Builders
   ///////////////////////////////////////////////////////////////////////
 
-  /// The base SIR builder. Each have a parent builder.
-  template<typename ParentBuilder, typename SIR>
   class SymIRBuilder {
   public:
-    explicit SymIRBuilder(const ParentBuilder *ctx) : ctx(ctx) {}
+    using TermID = size_t;
+    using ExprID = size_t;
+    using CondID = size_t;
 
     virtual ~SymIRBuilder() = default;
 
-    virtual std::unique_ptr<SIR> Build() = 0;
+  protected:
+    [[nodiscard]] virtual bool isActive() const { return active; }
+
+    virtual void deactivate() { active = false; }
 
   protected:
-    const ParentBuilder *GetParent() const { return ctx; }
-
-    [[nodiscard]] bool isActive() const { return active; }
-
-    void deactivate() { active = false; }
-
-  private:
-    // Our residing builder
-    const ParentBuilder *ctx;
     // Whether the builder is active or not
     bool active = true;
   };
 
+  /// The base SIR builder. Each have a parent builder.
+  template<typename ParentBuilder, typename SIR>
+  class SymIRBuilderGeneric : public SymIRBuilder {
+  public:
+    explicit SymIRBuilderGeneric(const ParentBuilder *ctx) : ctx(ctx) {}
+
+    const ParentBuilder *GetParent() const { return ctx; }
+
+    virtual std::unique_ptr<SIR> Build() = 0;
+
+  private:
+    // Our residing builder
+    const ParentBuilder *ctx;
+  };
+
   /// The top-level builder for all other builders
-  class RootBuilder : SymIRBuilder<void, void> {
-    explicit RootBuilder() : SymIRBuilder(nullptr) {}
+  class RootBuilder : SymIRBuilderGeneric<void, void> {
+    explicit RootBuilder() : SymIRBuilderGeneric(nullptr) {}
   };
 
   class FuncBuilder;
@@ -840,17 +858,15 @@ namespace symir {
   ///   );  // We cannot call anything any more after Branch
   ///   auto blk = b.Build();
   /// ----------------------------------------------------------
-  class BlockBuilder final : public SymIRBuilder<FuncBuilder, Block> {
-  public:
-    using TermID = size_t;
-    using ExprID = size_t;
-    using CondID = size_t;
-
+  class BlockBuilder final : public SymIRBuilderGeneric<FuncBuilder, Block> {
   public:
     using BlockBody = std::function<void(BlockBuilder *)>;
 
     BlockBuilder(const FuncBuilder *ctx, std::string label) :
-        SymIRBuilder<FuncBuilder, Block>(ctx), label(std::move(label)), target(nullptr) {}
+        SymIRBuilderGeneric<FuncBuilder, Block>(ctx), label(std::move(label)) {}
+
+    /// Return the label of the basic block being built
+    [[nodiscard]] const std::string &GetLabel() const { return label; }
 
     /// Create a Term with symbolic coef and return the ID to use it. The term can be used only
     /// once.
@@ -907,18 +923,18 @@ namespace symir {
     /// and the builder cannot be used any more to create more SIRs.
     void SymGoto(const std::string &label);
 
-    /// Indicate that the basic block being built has no target blocks.
-    /// After calling this function, the ::Build() should be called to commit the block
-    /// and the builder cannot be used any more to create more SIRs.
-    void SymFallThro();
-
     /// Build and commit the basic block.
     std::unique_ptr<Block> Build() override;
+
+  protected:
+    [[nodiscard]] bool isActive() const {
+      return target == nullptr && SymIRBuilderGeneric::isActive();
+    }
 
   private:
     // Ingredients for the basic block being built
     std::string label;
-    std::unique_ptr<Target> target;
+    std::unique_ptr<Target> target = nullptr;
     std::vector<std::unique_ptr<Stmt>> stmts{};
 
     // Management of temporary objects created by users
@@ -951,11 +967,11 @@ namespace symir {
   ///   });  // We cannot call anything any more after Branch
   ///   auto f0 = b.Build();
   /// ----------------------------------------------------------
-  class FuncBuilder final : SymIRBuilder<RootBuilder, Func> {
+  class FuncBuilder final : SymIRBuilderGeneric<RootBuilder, Func> {
 
   public:
     explicit FuncBuilder(std::string name, SymIR::Type retType = SymIR::I32) :
-        SymIRBuilder<RootBuilder, Func>(nullptr), name(std::move(name)), retType(retType) {}
+        SymIRBuilderGeneric<RootBuilder, Func>(nullptr), name(std::move(name)), retType(retType) {}
 
     /// Get all defined parameters
     [[nodiscard]] std::vector<const Param *> GetParams() const {
@@ -1033,8 +1049,14 @@ namespace symir {
         SymIR::Type type = SymIR::I32
     );
 
-    /// Define and commit a new basic block
+    /// Define and commit a new basic block with defined body
     const Block *SymBlock(const std::string &label, const BlockBuilder::BlockBody &body);
+
+    /// Open a basic block to define new statements
+    BlockBuilder *OpenBlock(const std::string &label);
+
+    /// Close an existing basic block
+    const Block *CloseBlock(BlockBuilder *bbl);
 
     /// Build the function.
     /// After calling this function, the builder is no longer usable.
@@ -1052,6 +1074,9 @@ namespace symir {
     std::map<std::string, const Param *> paramMap{};
     std::map<std::string, const Local *> localMap{};
     std::map<std::string, const Block *> blockMap{};
+
+    // For managing created basic blocks
+    std::map<std::string, std::unique_ptr<BlockBuilder>> createdBlocks{};
   };
 } // namespace symir
 

@@ -34,6 +34,7 @@
 
 #define SYMIR_KEYWORD_LIST(XX)                                                                     \
   XX(FUN, fun)                                                                                     \
+  XX(PAR, par)                                                                                     \
   XX(LOC, loc)                                                                                     \
   XX(BBL, bbl)                                                                                     \
   XX(ASS, asn)                                                                                     \
