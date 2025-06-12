@@ -234,7 +234,7 @@ namespace symir {
 
     [[nodiscard]] const std::string &GetName() const { return name; }
 
-  private:
+  protected:
     std::string name;
   };
 
@@ -252,13 +252,13 @@ namespace symir {
     [[nodiscard]] const std::optional<std::string> &GetValueOrNull() const { return value; }
 
     [[nodiscard]] const std::string &GetValue() const {
-      Assert(IsValueSet(), "Value is not set yet");
+      Assert(IsSolved(), "This coefficient is not yet solved");
       return value.value();
     }
 
     [[nodiscard]] bool IsValueSet() const { return value.has_value(); }
 
-    [[nodiscard]] bool IsSolved() const { return !IsValueSet(); }
+    [[nodiscard]] bool IsSolved() const { return IsValueSet(); }
 
     void SetValue(const std::string &v) { value = v; }
 
@@ -271,7 +271,7 @@ namespace symir {
   class VarUse : public SymIR, public WithType {
   public:
     explicit VarUse(const VarDef *var) : SymIR(SIR_VAR_USE), var(var) {
-      Assert(var != nullptr, "Null var are given");
+      Assert(var != nullptr, "No var to use: a nullptr is given");
       setType(var->GetType());
     }
 
@@ -343,8 +343,12 @@ namespace symir {
 
     Term(const Op op, std::unique_ptr<Coef> coef, std::unique_ptr<VarUse> var) :
         SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(std::move(var)) {
-      Assert(this->var != nullptr, "Nullptr is given for the variable");
-      Assert(this->coef->GetType() == this->var->GetType(), "Different types are given");
+      Assert(this->var != nullptr, "No var to use: a nullptr is given for the variable");
+      Assert(
+          this->coef->GetType() == this->var->GetType(),
+          "The coef (%s) and the var (%s) are of different types",
+          GetTypeSName(this->coef->GetType()).c_str(), GetTypeSName(this->var->GetType()).c_str()
+      );
       setType(this->var->GetType());
     }
 
@@ -405,10 +409,14 @@ namespace symir {
 
     Expr(const Op op, std::vector<std::unique_ptr<Term>> terms) :
         SymIR(SIR_EXPR), op(op), terms(std::move(terms)) {
-      Assert(this->terms.size() > 0, "Emtpy terms are given");
+      Assert(!this->terms.empty(), "The terms array should not be empty");
       const auto type_ = this->terms[0]->GetType();
       for (const auto &t: this->terms) {
-        Assert(t->GetType() == type_, "Different types are given");
+        Assert(
+            t->GetType() == type_,
+            "At least one term is in different type: %s (the term) vs %s (others)",
+            GetTypeSName(t->GetType()).c_str(), GetTypeSName(type_).c_str()
+        );
       }
       setType(type_);
     }
@@ -426,7 +434,7 @@ namespace symir {
     }
 
     [[nodiscard]] const Term *GetTerm(size_t i) const {
-      Assert(i < terms.size(), "Index out of bounds");
+      Assert(i < terms.size(), "The accessing index (%lu) is out of bound (%lu)", i, terms.size());
       return terms[i].get();
     }
 
@@ -480,7 +488,7 @@ namespace symir {
     }
 
     Cond(const Op op, std::unique_ptr<Expr> expr) : SymIR(SIR_COND), op(op), expr(std::move(expr)) {
-      Assert(this->expr != nullptr, "Null expr are given");
+      Assert(this->expr != nullptr, "The given expression is a nullptr");
       setType(this->expr->GetType());
     }
 
@@ -505,7 +513,11 @@ namespace symir {
   public:
     AssStmt(std::unique_ptr<VarUse> var, std::unique_ptr<Expr> expr) :
         Stmt(SIR_STMT_ASS), var(std::move(var)), expr(std::move(expr)) {
-      Assert(this->var->GetType() == this->expr->GetType(), "Different types are given");
+      Assert(
+          this->expr->GetType() == this->var->GetType(),
+          "The var (%s) and the expr (%s) are of different types",
+          GetTypeSName(this->var->GetType()).c_str(), GetTypeSName(this->expr->GetType()).c_str()
+      );
     }
 
     [[nodiscard]] const VarUse *GetVar() const { return var.get(); }
@@ -528,7 +540,7 @@ namespace symir {
     [[nodiscard]] size_t GetNumVars() const { return vars.size(); }
 
     [[nodiscard]] const VarUse *GetVar(size_t i) const {
-      Assert(i < vars.size(), "Index out of bounds");
+      Assert(i < vars.size(), "The accessing index (%lu) is out of bounds (%lu)", i, vars.size());
       return vars[i].get();
     }
 
@@ -606,8 +618,11 @@ namespace symir {
   public:
     explicit Local(std::string name, std::unique_ptr<Coef> init, Type type = Type::I32) :
         Stmt(SIR_LOCAL), VarDef(std::move(name), type), coef(std::move(init)) {
-      Assert(this->coef != nullptr, "Null coef are given");
-      Assert(this->coef->GetType() == type, "The coef and var are of different type");
+      Assert(this->coef != nullptr, "The coef is given a nullptr");
+      Assert(
+          type == this->coef->GetType(), "The coef (%s) and the var (%s) are of different types",
+          GetTypeSName(this->coef->GetType()).c_str(), GetTypeSName(type).c_str()
+      );
     }
 
     [[nodiscard]] const Coef *GetCoef() const { return coef.get(); }
@@ -646,7 +661,9 @@ namespace symir {
     [[nodiscard]] size_t GetNumStmts() const { return stmts.size() + (target.get() ? 0 : 1); }
 
     [[nodiscard]] Stmt *GetStmt(size_t i) const {
-      Assert(i < GetNumStmts(), "Index out of bound");
+      Assert(
+          i < GetNumStmts(), "The accessing index (%lu) is out of bound (%lu)", i, GetNumStmts()
+      );
       return i < stmts.size() ? stmts[i].get() : target.get();
     }
 
@@ -683,19 +700,22 @@ namespace symir {
     ) :
         SymIR(SIR_FUNC), WithType(retType), name(std::move(name)), params(std::move(params)),
         locals(std::move(locals)), blocks(std::move(blocks)) {
-      Assert(this->params.size() > 0, "No params are given");
-      Assert(this->blocks.size() > 0, "No blocks are given");
+      Assert(!this->params.empty(), "No parameters are given");
+      Assert(!this->blocks.empty(), "No basic blocks are given");
       for (auto i = 0; i < this->blocks.size(); i++) {
         const auto &blk = this->blocks[i];
         const auto &blkLabel = blk->GetLabel();
-        Assert(!blockMap.contains(blkLabel), "Label conflicts with blocks: %s", blkLabel.c_str());
+        Assert(
+            !blockMap.contains(blkLabel), "Blocks with the same label \"%s\" already exists",
+            blkLabel.c_str()
+        );
         blockMap[blkLabel] = blk.get();
       }
       for (auto i = 0; i < this->params.size(); i++) {
         const auto &prm = this->params[i];
         const auto &prmName = prm->GetName();
         Assert(
-            !paramMap.contains(prmName), "A parameter with the same name is already defined: %s",
+            !paramMap.contains(prmName), "Parameters with the same name \"%s\" is already defined",
             prmName.c_str()
         );
         paramMap[prmName] = prm.get();
@@ -704,11 +724,11 @@ namespace symir {
         const auto &loc = this->locals[i];
         const auto &locName = loc->GetName();
         Assert(
-            !paramMap.contains(locName), "A parameter with the same name is already defined: %s",
+            !paramMap.contains(locName), "Parameters with the same name \"%s\" is already defined",
             locName.c_str()
         );
         Assert(
-            !localMap.contains(locName), "A local with the same name is already defined: %s",
+            !localMap.contains(locName), "Locals with the same name \"%s\" is already defined",
             locName.c_str()
         );
         localMap[locName] = loc.get();
