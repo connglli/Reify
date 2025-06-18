@@ -89,16 +89,14 @@ std::string generateCodeForChecksumFunction(int checksumType = globalChecksumTyp
         default:
             assert(false && "Invalid checksum type");
     }
-    code << "int computeStatelessChecksum(int num_args, ...)\n";
+    code << "int computeStatelessChecksum(int num_args, int* args)\n";
     code << "{\n";
-    code << "    va_list args;\n";
-    code << "    va_start(args, num_args);\n";
     switch(checksumType)
     {
         case 0:
             code << "    uint32_t checksum = 0xFFFFFFFFUL;\n";
             code << "    for (int i = 0; i < num_args; ++i) {\n";
-            code << "        int arg = va_arg(args, int);\n";
+            code << "        int arg = args[i];\n";
             code << "        checksum = context_free_crc32_4bytes(checksum, arg);\n";
             code << "    }\n";
             code << "    checksum = uint32_to_int32(checksum ^ 0xFFFFFFFFUL);\n";
@@ -107,7 +105,7 @@ std::string generateCodeForChecksumFunction(int checksumType = globalChecksumTyp
             code << "    int mod = 1000000007;\n";
             code << "    long checksum = 0;\n";
             code << "    for (int i = 0; i < num_args; ++i) {\n";
-            code << "        int arg = va_arg(args, int);\n";
+            code << "        int arg = args[i];\n";
             code << "        checksum = (checksum + (long)arg) % (long)mod;\n";
             code << "        checksum = (checksum + (long)mod) % (long)mod;\n";
             code << "    }\n";
@@ -116,7 +114,6 @@ std::string generateCodeForChecksumFunction(int checksumType = globalChecksumTyp
         default:
             assert(false && "Invalid checksum type");
     }
-    code << "    va_end(args);\n";
     code << "    return checksum;\n";
     code << "}\n";
     return code.str();
@@ -420,12 +417,12 @@ class Procedure{
             else if(line.find("return") != std::string::npos) {
                 // End of the procedure
                 //modify the return computeStatelessChecksum function to take in num_input_vars as an argument
-                std::string newLine = "return computeStatelessChecksum(" + std::to_string(num_input_vars);
+                std::string newLine = "return computeStatelessChecksum(" + std::to_string(num_input_vars) + ", (int[" + std::to_string(num_input_vars) + "]){";
                 for(int i = 0; i < num_input_vars; ++i)
                 {
-                    newLine += ", var_" + std::to_string(i);
+                    newLine += "var_" + std::to_string(i) + ",";
                 }
-                newLine += ");";
+                newLine += "});";
                 statements.push_back(std::make_unique<FluffStatement>(newLine));
                 // statements.push_back(std::make_unique<FluffStatement>(line));
             }
@@ -561,7 +558,6 @@ void generateCodeForInterproceduralBlock(std::string filename, const std::vector
     std::ofstream outFile(filename);
     outFile << "#include <stdint.h>\n";
     outFile << "#include <stdio.h>\n";
-    outFile << "#include <stdarg.h>\n";
     outFile << generateCodeForChecksumFunction(checksumType);
     outFile << "\n";
     std::random_device rd;
