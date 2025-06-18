@@ -205,7 +205,7 @@ std::vector<int> FunGen::ExtractFinalizationsFromModel(
 /////// Code Generation
 ///////////////////////////////////////////////////////////////////
 
-std::string FunGen::GenerateCode(const std::string &sno, const std::string &uuid) {
+std::string FunGen::GenerateFunCode(const std::string &sno, const std::string &uuid) {
   std::ostringstream code;
   code << "int function_" << uuid << "_" << sno << "(";
   for (int i = 0; i < numVars; ++i) {
@@ -222,6 +222,30 @@ std::string FunGen::GenerateCode(const std::string &sno, const std::string &uuid
   }
   code << "}" << std::endl;
   return code.str();
+}
+
+std::string FunGen::GenerateMainCode(
+    const std::string &sno, const std::string &uuid,
+    const std::vector<std::vector<int>> &initialisations,
+    const std::vector<std::vector<int>> &finalizations
+) {
+  std::ostringstream main;
+  main << "int main(int argc, int* argv[])" << std::endl;
+  main << "{" << std::endl;
+  for (auto init: initialisations) {
+    auto numVars = init.size();
+    main << "  function_" << uuid << "_" << sno << "(";
+    for (auto i = 0; i < numVars; i++) {
+      main << init[i];
+      if (i < numVars - 1) {
+        main << ", ";
+      }
+    }
+    main << ");" << std::endl;
+  }
+  main << "  return 0;" << std::endl;
+  main << "}" << std::endl;
+  return main.str();
 }
 
 std::string FunGen::GenerateMapping(

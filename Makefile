@@ -123,15 +123,16 @@ FGEN_OUT_DIR  ?= generated
 FGEN_FUNS_DIR := $(FGEN_OUT_DIR)/functions
 FGEN_MAPS_DIR := $(FGEN_OUT_DIR)/mappings
 FGEN_LOGS_DIR := $(FGEN_OUT_DIR)/loggings
+FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
 FGEN_LIMIT    ?= 1000000
 
 gen-func-set: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT)
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT)
 
 gen-func-set-check-ubs: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR) $(FGEN_LOGS_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) --check
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) --check
 
 ## Program Generation
 

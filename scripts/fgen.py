@@ -30,15 +30,27 @@ import uuid
 from argparse import ArgumentParser
 from subprocess import CalledProcessError
 
-from params import DEFAULT_OUTPUT_DIR, get_func_map_files
-from ubchk import check_ubs
+from params import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file
+from ubchk import check_ubs, check_ubs_once
 from utils import run_proc
 
 
-def gen_func(exec, *, output, sano, uuid_val, timeout=60, verbose=False, seed=None):
+def gen_func(
+        exec,
+        *,
+        output,
+        sano,
+        uuid_val,
+        with_main=False,
+        timeout=60,
+        verbose=False,
+        seed=None,
+):
     try:
         st_time = time.time()
         cmd = [exec]
+        if with_main:
+            cmd += ["-m"]
         if verbose:
             cmd += ["-v"]
         if seed:
@@ -63,7 +75,7 @@ def gen_func(exec, *, output, sano, uuid_val, timeout=60, verbose=False, seed=No
         return False, None
 
 
-def main(*, output, limit, seed, check, timeout):
+def main(*, output, limit, seed, mainf, check, timeout):
     if seed >= 0:
         random.seed(seed)
         next_seed = lambda: random.randint(0, 2147483647)
@@ -85,6 +97,7 @@ def main(*, output, limit, seed, check, timeout):
             uuid_val=func_uuid,
             timeout=timeout,
             verbose=check,
+            with_main=mainf,
             seed=next_seed(),
         )
         if succ:
@@ -92,6 +105,8 @@ def main(*, output, limit, seed, check, timeout):
         if check and succ:
             print(f"[{func_sano}]: CheckUBs ...", end=" ", flush=True)
             check_ubs(*get_func_map_files(func_uuid, func_sano, gen_dir=output))
+            if mainf:
+                check_ubs_once(get_prog_file(func_uuid, func_sano, gen_dir=output))
             print("NO UBs")
         func_sano += 1
 
@@ -120,6 +135,12 @@ if __name__ == "__main__":
         help="the seed for generation (negative for truly random)",
     )
     parser.add_argument(
+        "--main",
+        action="store_true",
+        default=False,
+        help="enable the generation of a main function",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         default=False,
@@ -138,6 +159,7 @@ if __name__ == "__main__":
         output=args.output,
         limit=args.limit,
         seed=args.seed,
+        mainf=args.main,
         check=args.check,
         timeout=args.timeout,
     )

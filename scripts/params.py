@@ -54,11 +54,29 @@ def get_maps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
     return Path(gen_dir) / "mappings"
 
 
-def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+def get_progs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
+    return Path(gen_dir) / "programs"
+
+
+def get_func_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
     fuuid_ = fuuid.replace("-", "_")
+    return get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c"
+
+
+def get_map_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+    fuuid_ = fuuid.replace("-", "_")
+    return get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map"
+
+
+def get_prog_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+    fuuid_ = fuuid.replace("-", "_")
+    return get_progs_dir(gen_dir) / f"{fuuid_}_{fsano}.c"
+
+
+def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
     return (
-        get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c",
-        get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map",
+        get_func_file(fuuid, fsano, gen_dir=gen_dir),
+        get_map_file(fuuid, fsano, gen_dir=gen_dir),
     )
 
 

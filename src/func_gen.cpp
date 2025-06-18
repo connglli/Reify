@@ -30,12 +30,13 @@
 #include "cxxopts.hpp"
 #include "global.hpp"
 #include "lib/block.hpp"
+#include "lib/chksum.hpp"
 #include "lib/function.hpp"
 #include "lib/graph.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 
-std::ofstream funcionFile;
+std::ofstream functionFile;
 std::ofstream mappingFile;
 std::filesystem::path mapFilePath;
 std::filesystem::path funcFilePath;
@@ -44,8 +45,8 @@ static bool isFormulaSatisfiable = false;
 
 // Write a signal handler to handle SIGINT and SIGTERM signals
 void cleanupIfEmpty() {
-  if (funcionFile.is_open()) {
-    funcionFile.close();
+  if (functionFile.is_open()) {
+    functionFile.close();
   }
   if (mappingFile.is_open()) {
     mappingFile.close();
@@ -67,8 +68,8 @@ void signalHandler(int signum) {
   if (isFormulaSatisfiable) {
     return;
   } else {
-    if (funcionFile.is_open()) {
-      funcionFile.close();
+    if (functionFile.is_open()) {
+      functionFile.close();
     }
     if (mappingFile.is_open()) {
       mappingFile.close();
@@ -81,6 +82,7 @@ void signalHandler(int signum) {
 struct FunGenOpts {
   std::string uuid, sno;
   std::string output;
+  bool main;
   bool verbose;
 
   static FunGenOpts Parse(int argc, char **argv) {
@@ -91,6 +93,7 @@ struct FunGenOpts {
       ("n,sno", "A sample number as the second identifier", cxxopts::value<std::string>())
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -139,6 +142,7 @@ struct FunGenOpts {
     std::string output;
     if (!args.count("output")) {
       std::cerr << "Error: The output directory (--output) is not given." << std::endl;
+      exit(1);
     } else {
       output = args["output"].as<std::string>();
     }
@@ -150,6 +154,13 @@ struct FunGenOpts {
       }
     }
 
+    bool main;
+    if (args.count("main")) {
+      main = true;
+    } else {
+      main = false;
+    }
+
     bool verbose;
     if (args.count("verbose")) {
       verbose = true;
@@ -157,7 +168,7 @@ struct FunGenOpts {
       verbose = false;
     }
 
-    return {.uuid = uuid, .sno = sno, .output = output, .verbose = verbose};
+    return {.uuid = uuid, .sno = sno, .output = output, .main = main, .verbose = verbose};
   }
 };
 
@@ -166,18 +177,17 @@ int main(int argc, char **argv) {
 
   std::string uuid = cliOpts.uuid;
   std::string sno = cliOpts.sno;
+  bool genMain = cliOpts.main;
   bool verbose = cliOpts.verbose;
 
   std::filesystem::path outputDirectory = cliOpts.output;
-  std::filesystem::path functionsDirectory = GetFunctionsDir(outputDirectory);
-  std::filesystem::path mappingsDirectory = GetMappingsDir(outputDirectory);
   std::filesystem::create_directories(outputDirectory);
-  std::filesystem::create_directories(functionsDirectory);
-  std::filesystem::create_directories(mappingsDirectory);
+  std::filesystem::create_directories(GetFunctionsDir(outputDirectory));
+  std::filesystem::create_directories(GetMappingsDir(outputDirectory));
 
   funcFilePath = GetFunctionPath(uuid, sno, outputDirectory);
   mapFilePath = GetMappingPath(uuid, sno, outputDirectory);
-  funcionFile = std::ofstream(funcFilePath);
+  functionFile = std::ofstream(funcFilePath);
   mappingFile = std::ofstream(mapFilePath);
   Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/!verbose));
 
@@ -235,7 +245,7 @@ int main(int argc, char **argv) {
   if (solver.check() == z3::unsat) {
     Log::Get().Out() << "UNSAT" << std::endl;
     // Remove the output file and mapping file from the filesystem because no model was found
-    funcionFile.close();
+    functionFile.close();
     mappingFile.close();
     std::remove((funcFilePath).c_str());
     std::remove((mapFilePath).c_str());
@@ -248,13 +258,22 @@ int main(int argc, char **argv) {
   z3::model model = solver.get_model();
   Log::Get().Out() << "Execution Model: " << model << std::endl;
 
+  // Extract all parameters from the model down to the function
   f.ExtractParametersFromModel(model, c);
-  funcionFile << f.GenerateCode(sno, uuid);
-  funcionFile.close();
+
+  const std::string funCode = f.GenerateFunCode(sno, uuid);
+  functionFile << funCode << std::endl;
+  functionFile.close();
+
+  std::vector<std::vector<int>> initialisations;
+  std::vector<std::vector<int>> finalisations;
 
   std::vector<int> initialisation = f.ExtractInitialisationsFromModel(model, c);
   std::vector<int> finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
   mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
+
+  initialisations.emplace_back(initialisation);
+  finalisations.emplace_back(finalisation);
 
   // Now, let's try to generate a couple more mappings (initialisation sets).
   // First, let's regenerate the SMT query by repopulating the solver with the
@@ -288,8 +307,7 @@ int main(int argc, char **argv) {
     if (solver.check() == z3::unsat) {
       Log::Get().Out() << "UNSAT" << std::endl;
       std::cout << "WARNING: UNSAT at " << i + 1 << "-th initialization" << std::endl;
-      mappingFile.close();
-      return 0; // There's no need to report an error to our caller
+      break; // There's no need to report an error to our caller
     }
 
     isFormulaSatisfiable = true;
@@ -302,9 +320,20 @@ int main(int argc, char **argv) {
     initialisation = f.ExtractInitialisationsFromModel(model, c);
     finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
     mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
+    initialisations.emplace_back(initialisation);
+    finalisations.emplace_back(finalisation);
   }
 
   mappingFile.close();
+
+  if (genMain) {
+    std::filesystem::create_directories(GetProgramsDir(outputDirectory));
+    std::ofstream programFile = std::ofstream(GetProgramPath(uuid, sno, outputDirectory));
+    programFile << StatelessChecksum::GetRawCode() << std::endl;
+    programFile << funCode << std::endl;
+    programFile << f.GenerateMainCode(sno, uuid, initialisations, finalisations) << std::endl;
+    programFile.close();
+  }
 
   return 0;
 }

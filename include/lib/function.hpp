@@ -95,7 +95,13 @@ public:
   /////// Code Generation
   ///////////////////////////////////////////////////////////////////
 
-  std::string GenerateCode(const std::string &sno, const std::string &uuid);
+  std::string GenerateFunCode(const std::string &sno, const std::string &uuid);
+
+  std::string GenerateMainCode(
+      const std::string &sno, const std::string &uuid,
+      const std::vector<std::vector<int>> &initialisations,
+      const std::vector<std::vector<int>> &finalizations
+  );
 
   static std::string
   GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation);
