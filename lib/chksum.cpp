@@ -28,25 +28,17 @@
 #include <cassert>
 #include <string>
 
-extern "C" int computeStatelessChecksum(int num_args, ...);
+extern "C" int computeStatelessChecksum(int num_args, int args[]);
 
 int StatelessChecksum::Compute(const std::vector<int> &values) {
   // This is a trick to call into a variadic function.
-  // Suppose we can only handle to the maximum of 32 values.
-  assert(values.size() <= 32 && "Too many (>32) values provided to compute checksum");
-  static int args[32];
+  // Suppose we can only handle to the maximum of 128 values.
+  assert(values.size() <= 128 && "Too many (>128) values provided to compute checksum");
+  static int args[128];
   for (int i = 0; i < values.size(); i++) {
     args[i] = values[i];
   }
-  // clang-format off
-  return computeStatelessChecksum(
-      values.size(),
-      args[0],  args[1],  args[2],  args[3],  args[4],  args[5],  args[6],  args[7],
-      args[8],  args[9],  args[10], args[11], args[12], args[13], args[14], args[15],
-      args[16], args[17], args[18], args[19], args[20], args[21], args[22], args[23],
-      args[24], args[25], args[26], args[27], args[28], args[29], args[30], args[31]
-  );
-  // clang-format on
+  return computeStatelessChecksum(values.size(), args);
 }
 
 std::string StatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }

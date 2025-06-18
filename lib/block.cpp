@@ -342,13 +342,11 @@ std::string BlkGen::GenerateCode() const {
 
   // Generate the label for the basic block
   code << NameLabel(blkNo) << ":" << std::endl;
-  // code << "printf(\" at basic block"  << NameLabel(blkNo) <<
-  // "\\n\");\n";
   if (needPassCounter) {
     code << NamePassCounter() << "++;" << std::endl;
   }
-  // code<< "    printf(\"starting off at
-  // "<<NameLabel(blkNo)<<"\\n\");\n";
+
+  // Generate the statements one by one
   auto rand = Random::Get().Uniform(LOWER_BOUND, UPPER_BOUND);
   int stmtIndex = 0;
   for (const auto &[varIndex, dependencies]: defUsedVars) {
@@ -397,16 +395,15 @@ std::string BlkGen::GenerateCode() const {
   } else if (successors.size() == 1) {
     code << generateUnconditionalGoto(successors[0]);
   } else {
-    // print the values of all the variables, separated by commas
-    //  code << "    return 0;";
-    code << "    return " << StatelessChecksum::GetComputeName() << "(" << f.NumVars() << ",";
+    code << "    return " << StatelessChecksum::GetComputeName() << "(" << f.NumVars() << ", (int["
+         << f.NumVars() << "]){ ";
     for (int i = 0; i < f.NumVars(); ++i) {
       code << NameVar(i);
       if (i < f.NumVars() - 1) {
-        code << ",";
+        code << ", ";
       }
     }
-    code << ");" << std::endl;
+    code << " });" << std::endl;
   }
   return code.str();
 }

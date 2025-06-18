@@ -74,7 +74,8 @@ public:
   virtual size_t GetNumCoeffs() const = 0;
   // Replace the first replaceable coefficent with the function call, return true for success
   virtual bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) = 0;
 };
 
@@ -106,7 +107,8 @@ public:
   std::string GenerateCode() const override { return "(" + c + ") * " + v; };
 
   bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) override {
     if (IsMutated()) {
       return false;
@@ -145,12 +147,15 @@ public:
 
   std::string GenerateCode() const override {
     std::vector<std::string> tmp(terms.size());
-    std::transform(terms.begin(), terms.end(), tmp.begin(), [](const auto &t) { return t->GenerateCode(); });
+    std::transform(terms.begin(), terms.end(), tmp.begin(), [](const auto &t) {
+      return t->GenerateCode();
+    });
     return JoinStr(tmp, " + ");
   }
 
   bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) {
     for (auto &term: terms) {
       if (term->RepFirstCoeff(funName, initialisation, finalization)) {
@@ -184,7 +189,8 @@ public:
   virtual size_t GetNumCoeffs() const = 0;
   // Replace the first replaceable coefficent with the function call, return true for success
   virtual bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) = 0;
 };
 
@@ -206,12 +212,15 @@ public:
   size_t GetNumCoeffs() const override { return rhsExpr->GetNumCoeffs(); }
 
   bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) override {
     return rhsExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
 
-  std::string GenerateCode() const override { return "    " + lhsVar + " = " + rhsExpr->GenerateCode() + ";"; }
+  std::string GenerateCode() const override {
+    return "    " + lhsVar + " = " + rhsExpr->GenerateCode() + ";";
+  }
 
 private:
   std::string lhsVar;
@@ -238,7 +247,8 @@ public:
   size_t GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
 
   bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) override {
     return condExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
@@ -263,7 +273,8 @@ public:
   size_t GetNumCoeffs() const override { return 0; }
 
   bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) override {
     return false;
   }
@@ -312,7 +323,9 @@ public:
 
   int GetNumRepCoeffs() const { return numCoeffs * REPLACEMENT_PROBABILITY; }
 
-  void ExtractMapping(std::vector<int> &foreign_initialisation, std::vector<int> &foreign_finalization) const {
+  void ExtractMapping(
+      std::vector<int> &foreign_initialisation, std::vector<int> &foreign_finalization
+  ) const {
     // sample a random index from initialisations list
     int index = Random::Get().Uniform(0, (int) initialisations.size() - 1)();
     foreign_initialisation = initialisations[index];
@@ -328,16 +341,20 @@ public:
 
       std::vector<std::string> ini = SplitStr(iniFin[0], ",", true);
       std::vector<std::string> fin = SplitStr(iniFin[1], ",", true);
-      assert(ini.size() == fin.size() && "the size of initialisation and finalization is different");
+      assert(
+          ini.size() == fin.size() && "the size of initialisation and finalization is different"
+      );
 
       initialisations.push_back(std::vector<int>(ini.size()));
-      std::transform(ini.begin(), ini.end(), initialisations.back().begin(), [](const auto &s) -> int {
-        return std::stoi(s);
-      });
+      std::transform(
+          ini.begin(), ini.end(), initialisations.back().begin(),
+          [](const auto &s) -> int { return std::stoi(s); }
+      );
       finalizations.push_back(std::vector<int>(fin.size()));
-      std::transform(fin.begin(), fin.end(), finalizations.back().begin(), [](const auto &s) -> int {
-        return std::stoi(s);
-      });
+      std::transform(
+          fin.begin(), fin.end(), finalizations.back().begin(),
+          [](const auto &s) -> int { return std::stoi(s); }
+      );
     }
   }
 
@@ -347,7 +364,8 @@ public:
   }
 
   bool RepFirstCoeff(
-      const std::string &funName, const std::vector<int> &initialisation, const std::vector<int> &finalization
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
   ) {
     auto rand = Random::Get().Uniform(0, (int) statements.size() - 1);
     auto probability = Random::Get().UniformReal()();
@@ -355,7 +373,7 @@ public:
     // Sample a statement from the list of statements for replacement
     while (trials > 0) {
       int index = rand();
-      // Idea: 80% of the replacements should be in the IF statements, and 20%  in the assignment statements
+      // Idea: 80% of the replacements should be in the IF statements, and 20% in assignments
       if (statements[index]->GetStmtType() == Statement::Type::IFGOTO && probability < 0.8) {
         if (statements[index]->RepFirstCoeff(funName, initialisation, finalization)) {
           return true;
@@ -389,11 +407,11 @@ public:
       } else if (line.find("if") != std::string::npos) {
         statements.push_back(IfGotoStmt::Create<IfGotoStmt>(line));
         numCoeffs += statements.back()->GetNumCoeffs();
-      } else if (line.find("int") != std::string::npos) {
+      } else if (line.find("int function") != std::string::npos) {
         // Start of the function
         auto nameStart = line.find("function");
         auto paramStart = line.find("(");
-        auto paramEnd = line.find("(");
+        auto paramEnd = line.find(")");
         name = line.substr(nameStart, paramStart - nameStart);
         std::string params = line.substr(paramStart + 1, paramEnd - paramStart);
         numParams = std::count(params.begin(), params.end(), ',') + 1;
@@ -450,8 +468,9 @@ public:
       auto host = functions[i].get();
       int numRepCoeffs = host->GetNumRepCoeffs();
 
-      std::cout << "[" << sno << "] Replacing function" << ": index=" << i << ", name=" << host->GetName()
-                << ", num_replaceable=" << numRepCoeffs << std::endl;
+      std::cout << "[" << sno << "] Replacing function" << ": index=" << i
+                << ", name=" << host->GetName() << ", num_replaceable=" << numRepCoeffs
+                << std::endl;
 
       // Sample a function from i + 1 to the end
       auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
@@ -464,7 +483,8 @@ public:
         if (!host->RepFirstCoeff(guest->GetName(), initialisation, finalization)) {
           break; // TODO: break or continue? We can continue to the next, can't we?
         }
-        std::cout << "[" << sno << "]   var#" << k << " -> func#" << j << ": " << guest->GetName() << std::endl;
+        std::cout << "[" << sno << "]   var#" << k << " -> func#" << j << ": " << guest->GetName()
+                  << std::endl;
       }
 
       std::cout << "[" << sno << "]   Done" << std::endl;
@@ -477,8 +497,8 @@ public:
     oss << "#include <stdio.h>" << std::endl;
     if (debug) {
       oss << "#include <assert.h>" << std::endl << std::endl;
-      oss << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum not "
-             "equal\"), (actual))"
+      oss << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum "
+             "not equal\"), (actual))"
           << std::endl
           << std::endl;
     } else {
@@ -505,7 +525,8 @@ public:
     std::vector<int> finalization;
     functions[0]->ExtractMapping(initialisation, finalization);
     int checksum = StatelessChecksum::Compute(finalization);
-    oss << "    printf(\"%d,\", check_checksum(" << checksum << ", " << functions[0]->GetName() << "(";
+    oss << "    printf(\"%d,\", check_checksum(" << checksum << ", " << functions[0]->GetName()
+        << "(";
     for (int i = 0; i < initialisation.size(); ++i) {
       oss << initialisation[i];
       if (i != initialisation.size() - 1) {
@@ -565,7 +586,9 @@ struct ProgGenOpts {
       // Replace uuid's non-alphanumeric characters with underscore
       // used a UUID so that i could throw everything from different runs
       // into the same directory without worrying about name clashes
-      std::replace_if(uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_');
+      std::replace_if(
+          uuid.begin(), uuid.end(), [](auto c) -> bool { return !std::isalnum(c); }, '_'
+      );
     }
 
     std::string input;
@@ -643,7 +666,8 @@ int main(int argc, char *argv[]) {
       if (selFunInds.contains(index)) {
         continue;
       }
-      std::cout << "[" << sampNo << "] Selecting func#" << index << ": " << allFunPaths[index] << std::endl;
+      std::cout << "[" << sampNo << "] Selecting func#" << index << ": " << allFunPaths[index]
+                << std::endl;
       selFunInds.insert(index);
       selFunPaths.push_back(allFunPaths[index]);
     }
@@ -655,6 +679,8 @@ int main(int argc, char *argv[]) {
     std::cout << "[" << sampNo << "] Storing" << std::endl;
 
     prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + ".c"), enableDebug);
-    prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + "_static.c"), enableDebug, true);
+    prog->GenerateCode(
+        GetProgramsDir(inputDir) / (prog->GetName() + "_static.c"), enableDebug, true
+    );
   }
 }

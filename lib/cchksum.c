@@ -23,7 +23,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <stdarg.h>
 #include <stdint.h>
 
 // The CRC32 table is initialized via the following code:
@@ -92,15 +91,11 @@ static uint32_t context_free_crc32_4bytes(uint32_t context, uint32_t val) {
   return context;
 }
 
-int computeStatelessChecksum(int num_args, ...) {
-  va_list args;
-  va_start(args, num_args);
+int computeStatelessChecksum(int num_args, int args[]) {
   uint32_t checksum = 0xFFFFFFFFUL;
   for (int i = 0; i < num_args; ++i) {
-    int arg = va_arg(args, int);
-    checksum = context_free_crc32_4bytes(checksum, arg);
+    checksum = context_free_crc32_4bytes(checksum, args[i]);
   }
   checksum = uint32_to_int32(checksum ^ 0xFFFFFFFFUL);
-  va_end(args);
   return checksum;
 }
