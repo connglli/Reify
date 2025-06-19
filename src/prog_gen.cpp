@@ -565,6 +565,7 @@ struct ProgGenOpts {
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
     options.positional_help("UUID");
+    GlobalOptions::AddProgOpts(options);
     // clang-format on
 
     cxxopts::ParseResult args;
@@ -606,26 +607,19 @@ struct ProgGenOpts {
       }
     }
 
-    int limit = 0;
-    if (args.count("limit")) {
-      limit = args["limit"].as<int>();
-      if (limit < 0) {
-        std::cerr << "Error: The limit (--limit) must be greater than or equal to 0." << std::endl;
-        exit(1);
-      }
+    const int limit = args["limit"].as<int>();
+    if (limit < 0) {
+      std::cerr << "Error: The limit (--limit) must be greater than or equal to 0." << std::endl;
+      exit(1);
     }
 
-    if (args.count("seed")) {
-      int seed = args["seed"].as<int>();
-      if (seed >= 0) {
-        Random::Get().Seed(seed);
-      }
+    if (const int seed = args["seed"].as<int>(); seed >= 0) {
+      Random::Get().Seed(seed);
     }
 
-    bool debug = false;
-    if (args.count("debug")) {
-      debug = true;
-    }
+    const bool debug = args["debug"].as<bool>();
+
+    GlobalOptions::Get().HandleProgArgs(args);
 
     return {.uuid = uuid, .input = input, .limits = limit, .debug = debug};
   }

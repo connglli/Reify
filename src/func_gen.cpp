@@ -98,6 +98,7 @@ struct FunGenOpts {
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
     options.positional_help("UUID");
+    GlobalOptions::AddFuncOpts(options);
     // clang-format on
 
     cxxopts::ParseResult args;
@@ -147,26 +148,14 @@ struct FunGenOpts {
       output = args["output"].as<std::string>();
     }
 
-    if (args.count("seed")) {
-      int seed = args["seed"].as<int>();
-      if (seed >= 0) {
-        Random::Get().Seed(seed);
-      }
+    if (const int seed = args["seed"].as<int>(); seed >= 0) {
+      Random::Get().Seed(seed);
     }
 
-    bool main;
-    if (args.count("main")) {
-      main = true;
-    } else {
-      main = false;
-    }
+    const bool main = args["main"].as<bool>();
+    const bool verbose = args["verbose"].as<bool>();
 
-    bool verbose;
-    if (args.count("verbose")) {
-      verbose = true;
-    } else {
-      verbose = false;
-    }
+    GlobalOptions::Get().HandleFuncArgs(args);
 
     return {.uuid = uuid, .sno = sno, .output = output, .main = main, .verbose = verbose};
   }

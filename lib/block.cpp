@@ -39,7 +39,7 @@ void BlkGen::Generate() {
   auto rand = Random::Get().Uniform(0, f.NumVars() - 1);
 
   // We define a variable for each statement using other variables
-  assignmentOrder = SampleKDistinct(f.NumVars(), GlobalOptions::Get().NumAssignPerBBL);
+  assignmentOrder = SampleKDistinct(f.NumVars(), GlobalOptions::Get().NumAssignsPerBBL);
   for (int stmtIndex = 0; stmtIndex < assignmentOrder.size(); stmtIndex++) {
     int varIndex = assignmentOrder[stmtIndex];
 
