@@ -21,18 +21,21 @@ following [Build Z3 using Make and GCC/Clang](https://github.com/Z3Prover/z3?tab
 ## Generate
 
 ```sh
-# Generate a set of functions
-make gen-func-set
-
-# Get FGEN_LIMIT (0 mean unlimited) functions and check if they are UB-free controlled by GEN_SEED
+# Get FGEN_LIMIT (0 mean unlimited) functions into FGEN_OUT_DIR, controlled by GEN_SEED.
 # When FGEN_GEN_MAIN is set to any value (even false), a program will also be generated following each function
-[FGEN_OUT_DIR=/path/to/output] [FGEN_LIMIT=10000] [GEN_SEED=0] [FGEN_GEN_MAIN=true] make gen-func-set-check-ub
+# When tailing with -check-ub, each function (and program) will be checked against undefined behavior
+[FGEN_OUT_DIR=/path/to/output]              \
+[FGEN_LIMIT=10000]                          \
+[GEN_SEED=0]                                \
+[FGEN_GEN_MAIN=true]                        \
+make gen-func-set[-check-ub]
 
-# Generate a set of programs
-make gen-prog-set
-
-# Get PGEN_LIMIT (0 means unlimited) programs and check if they are UB-free controlled by GEN_SEED
-[PGEN_IN_DIR=/path/to/functions] [PGEN_LIMIT=10000] [GEN_SEED=0] make gen-prog-set-check
+# Get PGEN_LIMIT (0 means unlimited) programs into PGEN_IN_DIR, controlled by GEN_SEED.
+# When tailing with -check, each program will be checked against undefined behavior
+[PGEN_IN_DIR=/path/to/functions]            \
+[PGEN_LIMIT=10000]                          \
+[GEN_SEED=0]                                \
+make gen-prog-set-check
 
 # Check UB-freeness of the generated functions and their mappings
 python3 scripts/ubchk.py <func_dir> <map_dir>
