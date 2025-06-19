@@ -401,7 +401,7 @@ class Procedure{
                 statements.push_back(std::make_unique<IfStatement>(line));
                 total_num_coefficients += statements.back()->getNumCoefficients();
             }
-            else if (line.find("int") != std::string::npos) {
+            else if (line.find("int function") != std::string::npos) {
                 if(line.find("pass_counter") != std::string::npos)
                 {
                     statements.push_back(std::make_unique<FluffStatement>(line));
