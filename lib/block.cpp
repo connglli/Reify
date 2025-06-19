@@ -39,12 +39,12 @@ void BlkGen::Generate() {
   auto rand = Random::Get().Uniform(0, f.NumVars() - 1);
 
   // We define a variable for each statement using other variables
-  assignmentOrder = SampleKDistinct(f.NumVars(), NUM_ASSIGNMENTS_PER_BB);
+  assignmentOrder = SampleKDistinct(f.NumVars(), GlobalOptions::Get().NumAssignPerBBL);
   for (int stmtIndex = 0; stmtIndex < assignmentOrder.size(); stmtIndex++) {
     int varIndex = assignmentOrder[stmtIndex];
 
     // Sample the variables which will be used in the RHS of the assignment statement
-    defUsedVars[varIndex] = SampleKDistinct(f.NumVars(), NUM_VARIABLES_PER_ASSIGNMENT);
+    defUsedVars[varIndex] = SampleKDistinct(f.NumVars(), GlobalOptions::Get().NumVarsPerAssign);
 
     // Check every element present in vector is less than f.NumVars()
     for (auto var: defUsedVars[varIndex]) {
@@ -72,7 +72,7 @@ void BlkGen::Generate() {
   // In case we need more variables beyond the number of variables we already defined,
   // let's refer to some variables defined in other basic blocks.
   condUsedVars = assignmentOrder;
-  for (int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL - assignmentOrder.size(); i++) {
+  for (int i = 0; i < GlobalOptions::Get().NumVarsInCond - assignmentOrder.size(); i++) {
     int randomVariable = rand();
     while (std::find(condUsedVars.begin(), condUsedVars.end(), randomVariable) != condUsedVars.end()
     ) {
@@ -86,7 +86,7 @@ void BlkGen::Generate() {
   if (successors.size() > 1) {
     std::shuffle(successors.begin(), successors.end(), Random::Get().GetRNG());
     // Assign a coefficient to each variable contributing to the conditional
-    for (int i = 0; i < NUM_VARIABLES_IN_CONDITIONAL; i++) {
+    for (int i = 0; i < GlobalOptions::Get().NumVarsInCond; i++) {
       // 0 is the statement index here (even I'm not sure why i chose
       // this as a parameter but i don't want to break the code so
       // let's just not touch this), and i is the index of the
@@ -141,7 +141,7 @@ z3::expr BlkGen::makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs
   //     allZero = allZero && (coeff == 0);
   // }
   // return !allZero;
-  if (!ENABLE_INTERESTING_COEFFS) {
+  if (!GlobalOptions::Get().EnableInterestCoefs) {
     return c.bool_val(true);
   }
   return AtMostKZeroes(c, coeffs, coeffs.size() / 2);
@@ -151,7 +151,8 @@ z3::expr BlkGen::boundCoefficients(z3::context &c, const std::vector<z3::expr> &
   z3::expr allAssignedConstraint = c.bool_val(true);
   for (const auto &coeff: coeffs) {
     allAssignedConstraint =
-        allAssignedConstraint && (coeff >= LOWER_COEFF_BOUND && coeff <= UPPER_COEFF_BOUND);
+        allAssignedConstraint && (coeff >= GlobalOptions::Get().LowerCoefBound &&
+                                  coeff <= GlobalOptions::Get().UpperCoefBound);
   }
   return allAssignedConstraint;
 }
@@ -180,7 +181,10 @@ void BlkGen::GenerateConstraints(
       std::string depVarName = NameVar(dependencies[i]);
       std::string depVarVer = std::to_string(versions[depVarName]);
       vars.push_back(c.int_const((depVarName + "_" + depVarVer).c_str()));
-      solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
+      solver.add(
+          vars.back() >= GlobalOptions::Get().LowerBound &&
+          vars.back() <= GlobalOptions::Get().UpperBound
+      );
       coeffs.push_back(createParameterExpr(NameCoeff(blkNo, stmtIndex, i), c));
       terms.push_back(coeffs.back() * vars.back()); // a_i * var_i
     }
@@ -190,30 +194,37 @@ void BlkGen::GenerateConstraints(
     // Taking care of the constant
     coeffs.push_back(createParameterExpr(NameConst(blkNo, stmtIndex), c));
     terms.push_back(coeffs.back());
-    solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
+    solver.add(
+        coeffs.back() >= GlobalOptions::Get().LowerBound &&
+        coeffs.back() <= GlobalOptions::Get().UpperBound
+    );
 
     // Taking care of the terms and their addition
     z3::expr sum = terms[0];
-    z3::expr term_constraint = (terms[0] <= UPPER_BOUND) && (terms[0] >= LOWER_BOUND);
-    if (ENABLE_SAFETY_CHECKS) {
+    z3::expr term_constraint = (terms[0] <= GlobalOptions::Get().UpperBound) &&
+                               (terms[0] >= GlobalOptions::Get().LowerBound);
+    if (GlobalOptions::Get().EnableSafetyChecks) {
       solver.add(term_constraint);
     }
     for (int i = 1; i < terms.size(); i++) {
       // Addition is left associative, so in an addition of k terms, the subexpressions with the
       // first 1, 2,
       // ...k terms added should all be between LOWER_BOUND and UPPER_BOUND as well
-      z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-      if (ENABLE_SAFETY_CHECKS) {
+      z3::expr constraint =
+          (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
+      if (GlobalOptions::Get().EnableSafetyChecks) {
         solver.add(constraint);
       }
       sum = sum + terms[i];
-      term_constraint = (terms[i] <= UPPER_BOUND) && (terms[i] >= LOWER_BOUND);
-      if (ENABLE_SAFETY_CHECKS) {
+      term_constraint = (terms[i] <= GlobalOptions::Get().UpperBound) &&
+                        (terms[i] >= GlobalOptions::Get().LowerBound);
+      if (GlobalOptions::Get().EnableSafetyChecks) {
         solver.add(term_constraint);
       }
     }
-    z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-    if (ENABLE_SAFETY_CHECKS) {
+    z3::expr constraint =
+        (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
+    if (GlobalOptions::Get().EnableSafetyChecks) {
       solver.add(constraint);
     }
 
@@ -250,7 +261,10 @@ void BlkGen::GenerateConstraints(
     std::string depVarName = NameVar(condUsedVars[i]);
     std::string depVarVer = std::to_string(versions[depVarName]);
     vars.push_back(c.int_const((depVarName + "_" + depVarVer).c_str()));
-    solver.add(vars.back() >= LOWER_BOUND && vars.back() <= UPPER_BOUND);
+    solver.add(
+        vars.back() >= GlobalOptions::Get().LowerBound &&
+        vars.back() <= GlobalOptions::Get().UpperBound
+    );
     coeffs.push_back(createParameterExpr(NameCondCoeff(blkNo, 0, i), c));
     terms.push_back(coeffs.back() * vars.back());
   }
@@ -260,27 +274,34 @@ void BlkGen::GenerateConstraints(
   // The constant
   coeffs.push_back(createParameterExpr(NameCondConst(blkNo, successors[0]), c));
   terms.push_back(coeffs.back());
-  solver.add(coeffs.back() >= LOWER_BOUND && coeffs.back() <= UPPER_BOUND);
+  solver.add(
+      coeffs.back() >= GlobalOptions::Get().LowerBound &&
+      coeffs.back() <= GlobalOptions::Get().UpperBound
+  );
 
   // Terms and their addition
   z3::expr sum = terms[0];
-  z3::expr term_constraint = (terms[0] <= UPPER_BOUND) && (terms[0] >= LOWER_BOUND);
-  if (ENABLE_SAFETY_CHECKS) {
+  z3::expr term_constraint = (terms[0] <= GlobalOptions::Get().UpperBound) &&
+                             (terms[0] >= GlobalOptions::Get().LowerBound);
+  if (GlobalOptions::Get().EnableSafetyChecks) {
     solver.add(term_constraint);
   }
   for (int i = 1; i < terms.size(); i++) {
-    z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-    if (ENABLE_SAFETY_CHECKS) {
+    z3::expr constraint =
+        (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
+    if (GlobalOptions::Get().EnableSafetyChecks) {
       solver.add(constraint);
     }
     sum = sum + terms[i];
-    term_constraint = (terms[i] <= UPPER_BOUND) && (terms[i] >= LOWER_BOUND);
-    if (ENABLE_SAFETY_CHECKS) {
+    term_constraint = (terms[i] <= GlobalOptions::Get().UpperBound) &&
+                      (terms[i] >= GlobalOptions::Get().LowerBound);
+    if (GlobalOptions::Get().EnableSafetyChecks) {
       solver.add(term_constraint);
     }
   }
-  z3::expr constraint = (sum <= UPPER_BOUND) && (sum >= LOWER_BOUND);
-  if (ENABLE_SAFETY_CHECKS) {
+  z3::expr constraint =
+      (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
+  if (GlobalOptions::Get().EnableSafetyChecks) {
     solver.add(constraint);
   }
 
@@ -300,7 +321,8 @@ void BlkGen::GenerateConstraints(
 std::string
 BlkGen::generateConditionalConstraint(int blkNo, int target, std::vector<int> condUsedVars) const {
   std::ostringstream constraint;
-  auto rand = Random::Get().Uniform(LOWER_BOUND, UPPER_BOUND);
+  auto rand =
+      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
   constraint << "    if (";
   int ctr = 0;
   for (auto i: condUsedVars) {
@@ -347,7 +369,8 @@ std::string BlkGen::GenerateCode() const {
   }
 
   // Generate the statements one by one
-  auto rand = Random::Get().Uniform(LOWER_BOUND, UPPER_BOUND);
+  auto rand =
+      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
   int stmtIndex = 0;
   for (const auto &[varIndex, dependencies]: defUsedVars) {
     code << "    " << NameVar(varIndex) << " = ";

@@ -321,7 +321,7 @@ public:
 
   const std::string &GetName() { return name; }
 
-  int GetNumRepCoeffs() const { return numCoeffs * REPLACEMENT_PROBABILITY; }
+  int GetNumRepCoeffs() const { return numCoeffs * GlobalOptions::Get().ReplaceProba; }
 
   void ExtractMapping(
       std::vector<int> &foreign_initialisation, std::vector<int> &foreign_finalization
@@ -458,7 +458,10 @@ public:
 
   void Generate() {
     int numFuns = static_cast<int>(functions.size());
-    assert(numFuns == FUNCTION_DEPTH && "The number of selected functions is not FUNCTION_DEPTH");
+    assert(
+        numFuns == GlobalOptions::Get().FunctionDepth &&
+        "The number of selected functions is not FUNCTION_DEPTH"
+    );
 
     std::vector<int> initialisation;
     std::vector<int> finalization;
@@ -658,7 +661,7 @@ int main(int argc, char *argv[]) {
     std::set<int> selFunInds;
     std::vector<std::string> selFunPaths;
 
-    int numAll = static_cast<int>(allFunPaths.size()), numSel = FUNCTION_DEPTH;
+    int numAll = static_cast<int>(allFunPaths.size()), numSel = GlobalOptions::Get().FunctionDepth;
     auto rand = Random::Get().Uniform(0, static_cast<int>(numAll - 1));
 
     while (selFunInds.size() < static_cast<size_t>(numSel)) {

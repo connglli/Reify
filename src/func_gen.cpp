@@ -199,13 +199,13 @@ int main(int argc, char **argv) {
 
   Log::Get().Out() << "==== Generation =============================" << std::endl;
 
-  FunGen f(NUM_NODES_PER_FUNC, NUM_VARS_PER_FUNC);
+  FunGen f(GlobalOptions::Get().NumNodesPerFun, GlobalOptions::Get().NumVarsPerFun);
   f.Generate();
 
   auto cfg = f.GetCFGBkbone();
   auto basicBlocks = f.GetBBs();
 
-  auto execution = f.SampleExec(100, ENABLE_CONSISTENT_WALKS);
+  auto execution = f.SampleExec(100, GlobalOptions::Get().EnableConsistentWalks);
   Log::Get().Out() << "Exec: ";
   for (int i: execution) {
     Log::Get().Out() << i << ",";
@@ -218,10 +218,10 @@ int main(int argc, char **argv) {
   Log::Get().Out() << "==== Initialization 0 =============================" << std::endl;
 
   // Let each parameter (coefficient or constant) interesting initially
-  if (ENABLE_INTERESTING_INITS) {
+  if (GlobalOptions::Get().EnableInterestInits) {
     solver.add(f.MakeInitialisationsInteresting(c));
   }
-  if (ENABLE_RANDOM_INITS) {
+  if (GlobalOptions::Get().EnableRandomInits) {
     solver.add(f.AddRandomInitialisations(c));
   }
 
@@ -280,10 +280,10 @@ int main(int argc, char **argv) {
   // same constraints, except this time - the solver would use the coefficients
   // and constants we already generated from the model.
   solver.reset();
-  if (ENABLE_INTERESTING_INITS) {
+  if (GlobalOptions::Get().EnableInterestInits) {
     solver.add(f.MakeInitialisationsInteresting(c));
   }
-  if (ENABLE_RANDOM_INITS) {
+  if (GlobalOptions::Get().EnableRandomInits) {
     solver.add(f.AddRandomInitialisations(c));
   }
 
@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
   }
   basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
-  for (int i = 0; i < NUM_INITS_PER_WALK - 1; i++) {
+  for (int i = 0; i < GlobalOptions::Get().NumInitsPerWalk - 1; i++) {
     Log::Get().Out() << "==== Initialization " << i + 1
                      << " =============================" << std::endl;
 

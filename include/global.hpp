@@ -29,67 +29,85 @@
 #include <climits>
 #include <filesystem>
 
+#include "cxxopts.hpp"
 
-////////////////////////////////////////////////////////////
-////// Block Generation
-////////////////////////////////////////////////////////////
+struct GlobalOptions {
+  ////////////////////////////////////////////////////////////
+  ////// Block Generation Parameters
+  ////////////////////////////////////////////////////////////
 
-#define UPPER_BOUND                                                                                \
-  INT_MAX // upper bound for the results of expression and subexpression evaluation
-#define LOWER_BOUND                                                                                \
-  INT_MIN // lower bound for the results of expression and subexpression evaluation
-#define LOWER_INIT_BOUND INT_MIN // lower bound for the initialisation of variables
-#define UPPER_INIT_BOUND INT_MAX // upper bound for the initialisation of variables
-#define LOWER_COEFF_BOUND                                                                          \
-  -1000 // lower bound for coefficients. added to make quadratic integer arithmetic more tractable
-        // for the solver
-#define UPPER_COEFF_BOUND                                                                          \
-  1000 // upper bound for coefficients. added to make quadratic integer arithmetic more tractable
-       // for the solver
+  // Upper bound for the results of expression and subexpression evaluation
+  int UpperBound = INT_MAX;
+  // Lower bound for the results of expression and subexpression evaluation
+  int LowerBound = INT_MIN;
+  // Lower bound for the initialisation of variables
+  int LowerInitBound = INT_MIN;
+  // Upper bound for the initialisation of variables
+  int UpperInitBound = INT_MAX;
+  // Lower bound for coefficients to make quadratic integer arithmetic more tractable for the solver
+  int LowerCoefBound = -1000;
+  // Upper bound for coefficients to make quadratic integer arithmetic more tractable for the solver
+  int UpperCoefBound = 1000;
 
-#define NUM_ASSIGNMENTS_PER_BB 1       // the number of assignment statements in a basic block
-#define NUM_VARIABLES_PER_ASSIGNMENT 2 // the number of variables in each assignment statement
-#define NUM_VARIABLES_IN_CONDITIONAL 4 // the number of variables in each conditional statement
-#define ENABLE_SAFETY_CHECKS                                                                       \
-  true // these are our anti-UB (mostly just checking for overflow and underflow) checks
-#define ENABLE_INTERESTING_COEFFS                                                                  \
-  true // i don't want all coefficients to be 0, so this constraint takes care of that
+  // The number of assignment statements in a basic block
+  int NumAssignPerBBL = 1;
+  // The number of variables in each assignment statement
+  int NumVarsPerAssign = 2;
+  // The number of variables in each conditional statement
+  int NumVarsInCond = 4;
+  // These are our anti-UB (mostly just checking for overflow and underflow) checks
+  bool EnableSafetyChecks = true;
+  // I don't want all coefficients to be 0, so this constraint takes care of that
+  bool EnableInterestCoefs = true;
 
-////////////////////////////////////////////////////////////
-////// Function Generation
-////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////
+  ////// Function Generation Parameters
+  ////////////////////////////////////////////////////////////
 
-#define NUM_NODES_PER_FUNC 10 // the umber of nodes for each function's graph
-// Consistent means that after a tipping point, from the same node, exactly one outward edge is
-// traversed.ample, if node 0 has edges to 1 and 3, then from 0, either:
-//   initially all edges taken will be 1, followed by all edges taken to 3
-// or:
-//   initially all edges taken will be 3, followed by all edges taken to 1
-// There will be no out-edge interleaving.
-#define NUM_VARS_PER_FUNC 8 // the number of allowed variables in a function
+  // The number of nodes for each control flow graph
+  int NumNodesPerFun = 10;
+  // The number of allowed variables for each function
+  int NumVarsPerFun = 8;
 
-// Empirically, if random initialisations are enabled, then the smt solver isn't able to generate
-// more initialisations for the same set of coefficients. I would recommend to either have a
-// reasonably high number of NUMBER_OF_INITIALISATIONS_OF_EACH_WALK and set this to false, or set
-// this to true and set NUMBER_OF_INITIALISATIONS_OF_EACH_WALK 1
-#define ENABLE_RANDOM_INITS false // randomly initialise the variables
-#define ENABLE_INTERESTING_INITS                                                                   \
-  true // i don't want all initialisations to be 0, so this constraint takes care of that
+  // Empirically, if random initialisations are enabled, then the smt solver isn't able to generate
+  // more initialisations for the same set of coefficients. I would recommend to either have a
+  // reasonably high number of NUMBER_OF_INITIALISATIONS_OF_EACH_WALK and set this to false, or set
+  // this to true and set NUMBER_OF_INITIALISATIONS_OF_EACH_WALK 1
+  bool EnableRandomInits = false;
+  // I don't want all initialisations to be 0, so this constraint takes care of that
+  bool EnableInterestInits = true;
+  // Consistent means that after a tipping point, from the same node, exactly one outward edge is
+  // traversed.ample, if node 0 has edges to 1 and 3, then from 0, either:
+  //   initially all edges taken will be 1, followed by all edges taken to 3
+  // or:
+  //   initially all edges taken will be 3, followed by all edges taken to 1
+  // There will be no out-edge interleaving.
+  bool EnableConsistentWalks = true;
+  // The number of different initialisation sets we want the solver to find for a given function
+  int NumInitsPerWalk = 3;
 
-#define ENABLE_CONSISTENT_WALKS true
-#define NUM_INITS_PER_WALK                                                                         \
-  3 // the number of different initialisation sets we want the solver to find for a given function
+  ////////////////////////////////////////////////////////////
+  ////// Program Generation Parameters
+  ////////////////////////////////////////////////////////////
 
-#define BITSHIFT_BY 6        // not used for now, but tried an experiment with bitwise operations
-#define BITWIDTH_DATATYPE 32 // not used for now, but tried an experiment with bitwise operations
+  // Probability of replacing a coefficient/constant with a call to another function
+  double ReplaceProba = 0.5;
+  // Number of functions we want to knit together
+  int FunctionDepth = 3;
 
-////////////////////////////////////////////////////////////
-////// Program Generation
-////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////
+  ////// Helper Functions
+  ////////////////////////////////////////////////////////////
 
-#define REPLACEMENT_PROBABILITY                                                                    \
-  0.5 // Probability of replacing a coefficient/constant with a call to another function
-#define FUNCTION_DEPTH 3 // Number of functions we want to knit together
+  static GlobalOptions &Get() {
+    static GlobalOptions instance;
+    return instance;
+  }
+
+private:
+  // Private constructor to enforce singleton pattern
+  GlobalOptions() = default;
+};
 
 ////////////////////////////////////////////////////////////
 ////// Outputs

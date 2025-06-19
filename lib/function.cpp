@@ -83,7 +83,9 @@ z3::expr FunGen::MakeInitialisationsInteresting(z3::context &c) const {
 }
 
 z3::expr FunGen::AddRandomInitialisations(z3::context &c) {
-  auto rand = Random::Get().Uniform(LOWER_INIT_BOUND, UPPER_INIT_BOUND);
+  auto rand = Random::Get().Uniform(
+      GlobalOptions::Get().LowerInitBound, GlobalOptions::Get().UpperInitBound
+  );
   std::vector<z3::expr> allVars;
   z3::expr allAssignedConstraint = c.bool_val(true);
   for (int i = 0; i < numVars; i++) {
