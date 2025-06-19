@@ -42,9 +42,10 @@ def gen_func(
         sano,
         uuid_val,
         with_main=False,
-        timeout=60,
         verbose=False,
         seed=None,
+        extra_opts=None,
+        timeout=60,
 ):
     try:
         st_time = time.time()
@@ -55,6 +56,8 @@ def gen_func(
             cmd += ["-v"]
         if seed:
             cmd += ["-s", str(seed)]
+        if extra_opts:
+            cmd += extra_opts.split()
         cmd += ["-o", str(output), "-n", str(sano), uuid_val]
         run_proc(
             cmd,
@@ -75,7 +78,7 @@ def gen_func(
         return False, None
 
 
-def main(*, output, limit, seed, mainf, check, timeout):
+def main(*, output, limit, seed, mainf, check, timeout, extra_opts):
     if seed >= 0:
         random.seed(seed)
         next_seed = lambda: random.randint(0, 2147483647)
@@ -87,6 +90,7 @@ def main(*, output, limit, seed, mainf, check, timeout):
         f"limit={limit if limit != 0 else '<INF>'}, "
         f"seed={seed if seed >= 0 else '<RND>'}, "
         f"check={check}, timeout={timeout}s"
+        f"extra='{extra_opts}'"
     )
     while limit == 0 or func_sano < limit:
         print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
@@ -99,6 +103,7 @@ def main(*, output, limit, seed, mainf, check, timeout):
             verbose=check,
             with_main=mainf,
             seed=next_seed(),
+            extra_opts=extra_opts
         )
         if succ:
             print(f"SUCC (time={elapsed}s)")
@@ -152,6 +157,12 @@ if __name__ == "__main__":
         default=15,
         help="timeout (in seconds) for generating a program",
     )
+    parser.add_argument(
+        "--extra",
+        type=str,
+        default="",
+        help="extra options passed to fgen"
+    )
 
     args = parser.parse_args()
 
@@ -162,4 +173,5 @@ if __name__ == "__main__":
         mainf=args.main,
         check=args.check,
         timeout=args.timeout,
+        extra_opts=args.extra
     )
