@@ -70,6 +70,14 @@ struct GlobalOptions {
   int NumNodesPerFun = 10;
   // The number of allowed variables for each function
   int NumVarsPerFun = 8;
+  // The number of execution steps per function. Empirically, this should be a number
+  // that is considerably larger than the number of nodes in the function so that we
+  // can eventually sample an reasonable execution.
+  int MaxNumExecStepsPerFun = 100;
+  // The allowed number of loops per function
+  int MaxNumLoopsPerFun = 2;
+  // The maximum number of basic blocks in a loop
+  int MaxNumBblsPerLoop = 5;
 
   // Empirically, if random initialisations are enabled, then the smt solver isn't able to generate
   // more initialisations for the same set of coefficients. I would recommend to either have a
@@ -292,8 +300,8 @@ static std::filesystem::path GetMappingPath(
   return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path
-GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
+static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
+) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
 }
@@ -329,8 +337,8 @@ static std::filesystem::path GetGenLogPath(
   }
 }
 
-static std::filesystem::path
-GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
+static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
+) {
   return GetLoggingsDir(functionPath.parent_path().parent_path()) /
          GetLoggingNameForFunctionName(functionPath.stem());
 }

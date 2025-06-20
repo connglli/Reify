@@ -190,11 +190,15 @@ int main(int argc, char **argv) {
 
   FunGen f(GlobalOptions::Get().NumNodesPerFun, GlobalOptions::Get().NumVarsPerFun);
   f.Generate();
+  // f.GenerateRedLoop(GlobalOptions.Get().MaxNumLoopsPerFun,
+  // GlobalOptions::Get().MaxNumBblsPerLoop);
 
   auto cfg = f.GetCFGBkbone();
   auto basicBlocks = f.GetBBs();
 
-  auto execution = f.SampleExec(100, GlobalOptions::Get().EnableConsistentWalks);
+  auto execution = f.SampleExec(
+      GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentWalks
+  );
   Log::Get().Out() << "Exec: ";
   for (int i: execution) {
     Log::Get().Out() << i << ",";
