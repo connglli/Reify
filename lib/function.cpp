@@ -254,7 +254,7 @@ std::string FunGen::GenerateMainCode(
     const auto &fina = finalizations[i];
     auto numVars = init.size();
     std::ostringstream chk_oss;
-    main << "check_checksum(" << StatelessChecksum::Compute(fina) << ", " << "function_" << uuid
+    main << "    check_checksum(" << StatelessChecksum::Compute(fina) << ", " << "function_" << uuid
          << "_" << sno << "(";
     for (auto i = 0; i < numVars; i++) {
       main << init[i];
