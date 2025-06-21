@@ -386,18 +386,18 @@ std::vector<int> Loop::SampleOneIter(int stepLimit, bool consistent, bool inclEx
 void CfgSketch::Generate() {
   graph.Reset();
   graph.Generate();
-  // Sync all imposters and their start index in successors
+  // Sync all bimpos and their start index in successors
   // Also clear and update the flattened successors table
-  imposters.clear();
+  bimpos.clear();
   indexInSuccessorsOf.clear();
   successors.clear();
-  for (auto impo = 0; impo < numImposters(); impo++) {
-    // Currently, each imposter is a indeed basic block
-    imposters.push_back(std::make_unique<Block>());
-    // So each imposter occupy only 1 basic block
-    indexInSuccessorsOf.push_back(impo);
-    const auto &adj = graph.GetAdj(impo);
-    std::cout << "Updating: " << impo << " -> [";
+  for (auto bi = 0; bi < numBimpos(); bi++) {
+    // Currently, each bimpo is a indeed basic block
+    bimpos.push_back(std::make_unique<Block>());
+    // So each bimpo occupy only 1 basic block
+    indexInSuccessorsOf.push_back(bi);
+    const auto &adj = graph.GetAdj(bi);
+    std::cout << "Updating: " << bi << " -> [";
     int j = 0;
     for (auto v: adj) {
       std::cout << v;
@@ -408,61 +408,61 @@ void CfgSketch::Generate() {
     }
     std::cout << "]" << std::endl;
     // Sync the successors table
-    successors.emplace_back(graph.GetAdj(impo).begin(), graph.GetAdj(impo).end());
+    successors.emplace_back(graph.GetAdj(bi).begin(), graph.GetAdj(bi).end());
   }
 }
 
 void CfgSketch::GenerateReduLoop(const int numBbls) {
   // Randomly select a block and transform it into a loop, except for the entry and exit
-  const auto rand = Random::Get().Uniform(1, numImposters() - 2);
-  int impoIndex;
+  const auto rand = Random::Get().Uniform(1, numBimpos() - 2);
+  int biInd;
   do {
-    impoIndex = rand();
-    if (imposters[impoIndex]->GetType() == BblImpo::Type::BLOCK) {
+    biInd = rand();
+    if (bimpos[biInd]->GetType() == Bimpo::Type::BLOCK) {
       break;
     }
   } while (true);
   // TODO: Currently, we did not support nested loops as otherwise
   // we'll often Get into cycles when sampling executions.
-  imposters[impoIndex] = std::make_unique<Loop>(numBbls, /*allowNestedLoops=*/false);
+  bimpos[biInd] = std::make_unique<Loop>(numBbls, /*allowNestedLoops=*/false);
 
   // Update the flattened successors table.
   // Previously, the successors table is:
-  //   [flatImpoIndex-1          : a               ],
-  //   [flatImpoIndex            : imposter's block],
-  //   [flatImpoIndex+1          : b               ]
+  //   [flatBiInd-1          : a               ],
+  //   [flatBiInd            : bimpo's block   ],
+  //   [flatBiInd+1          : b               ]
   // Currently, it should change to:
-  //   [flatImpoIndex-1          : a               ],
-  //   [flatImpoIndex            : loopGraph.entry ],
+  //   [flatBiInd-1          : a               ],
+  //   [flatBiInd            : loopGraph.entry ],
   //   ...
-  //   [flatImpoIndex+loopSize-2 : loopGraph.latch ],
-  //   [flatImpoIndex+loopSize-1 : loopGraph.exit  ],
-  //   [flatImpoIndex+loopSize   : b               ]
+  //   [flatBiInd+loopSize-2 : loopGraph.latch ],
+  //   [flatBiInd+loopSize-1 : loopGraph.exit  ],
+  //   [flatBiInd+loopSize   : b               ]
 
   // Specifically, we should flatten all basic blocks into successors starting
-  // at the index of the old imposter in the successors table
-  const auto flatImpoIndex = indexInSuccessorsOf[impoIndex];
-  // The insertion point in the successors table is flatImpoIndex
-  const auto flatImpoIter = successors.begin() + flatImpoIndex;
+  // at the index of the old bimpo in the successors table
+  const auto flatBiInd = indexInSuccessorsOf[biInd];
+  // The insertion point in the successors table is flatBiInd
+  const auto flatBiIt = successors.begin() + flatBiInd;
 
   // Now we are going to construct the successors table of the newly inserted
   // loop. The newly inserted loop's basic blocks will be inserted starting from
-  // flatImpoIndex. So it is obvious that the successors-table index of all
-  // imposters after impoIndex will march by the number of blocks in the loop
-  const auto *loop = dynamic_cast<const Loop *>(imposters[impoIndex].get());
+  // flatBiInd. So it is obvious that the successors-table index of all
+  // bimpos after biInd will march by the number of blocks in the loop
+  const auto *loop = dynamic_cast<const Loop *>(bimpos[biInd].get());
   const int loopSize = loop->NumBbls();
-  for (int i = impoIndex + 1; i < numImposters(); i++) {
+  for (int i = biInd + 1; i < numBimpos(); i++) {
     indexInSuccessorsOf[i] = indexInSuccessorsOf[i] + loopSize - 1;
   }
-  std::cout << "...... Replacing " << impoIndex << " with loop of size " << loopSize << " ......"
+  std::cout << "...... Replacing " << biInd << " with loop of size " << loopSize << " ......"
             << std::endl;
 
   // Since blkSuccessorsInLoop will be inserted into the successors table,
-  // all blocks' successors that are > flatImpoIndex should march loopSize-1:
+  // all blocks' successors that are > flatBiInd should march loopSize-1:
   for (std::set<int> &blkSuccessors: successors) {
     std::set<int> toUpdate;
     for (auto &succ: blkSuccessors) {
-      if (succ > flatImpoIndex) {
+      if (succ > flatBiInd) {
         toUpdate.insert(succ);
       }
     }
@@ -473,11 +473,11 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
   }
 
   // Since blkSuccessorsInLoop will be inserted into the successors table,
-  // all blocks in the loop's original adjacent table should march by flatImpoIndex
+  // all blocks in the loop's original adjacent table should march by flatBiInd
   auto blkSuccessorsInLoop = std::vector<std::set<int>>(loopSize);
   for (int bbl = 0; bbl < loopSize; bbl++) {
     for (const auto &succ: loop->GetSuccessor(bbl)) {
-      blkSuccessorsInLoop[bbl].insert(succ + flatImpoIndex);
+      blkSuccessorsInLoop[bbl].insert(succ + flatBiInd);
     }
   }
   // The loop latch should branch to the header of the loop
@@ -485,7 +485,7 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
       blkSuccessorsInLoop[loop->GetLatch()].size() == 1,
       "The latch of the loop should have only 1 successor, i.e., its exit"
   );
-  blkSuccessorsInLoop[loop->GetLatch()].insert(flatImpoIndex);
+  blkSuccessorsInLoop[loop->GetLatch()].insert(flatBiInd);
   Assert(
       !loop->GetSuccessor(loop->GetLatch()).contains(loop->GetEntry()),
       "The original loop graph's latch should remain untouched"
@@ -495,15 +495,15 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
       blkSuccessorsInLoop[loop->GetExit()].size() == 0,
       "The exit of the loop should not have any successor"
   );
-  blkSuccessorsInLoop[loop->GetExit()].insert(flatImpoIter->begin(), flatImpoIter->end());
+  blkSuccessorsInLoop[loop->GetExit()].insert(flatBiIt->begin(), flatBiIt->end());
   Assert(
       loop->GetSuccessor(loop->GetExit()).empty(),
       "The original loop graph's exit should remain untouched"
   );
 
   // Insert blkSuccessorsInLoop into the successors table
-  successors.erase(flatImpoIter);
-  successors.insert(flatImpoIter, blkSuccessorsInLoop.begin(), blkSuccessorsInLoop.end());
+  successors.erase(flatBiIt);
+  successors.insert(flatBiIt, blkSuccessorsInLoop.begin(), blkSuccessorsInLoop.end());
 }
 
 std::vector<int>
@@ -518,15 +518,15 @@ CfgSketch::SampleExec(const int stepLimit, const bool consistent, const int maxL
     if (restSteps <= 0) {
       break;
     }
-    const auto impoIndex = coarseExec[i];
-    const auto &impo = imposters[impoIndex];
-    if (impo->GetType() == BblImpo::Type::BLOCK) {
+    const auto biInd = coarseExec[i];
+    const auto &bi = bimpos[biInd];
+    if (bi->GetType() == Bimpo::Type::BLOCK) {
       // This is a real basic block, we directly append it
-      fineExec.push_back(indexInSuccessorsOf[impoIndex]);
-    } else if (impo->GetType() == BblImpo::Type::LOOP) {
+      fineExec.push_back(indexInSuccessorsOf[biInd]);
+    } else if (bi->GetType() == Bimpo::Type::LOOP) {
       // This is a loop, we'd sample an execution in the loop, then we'd
       // decide whether we re-execute the loop by one more iteration.
-      const Loop *loop = dynamic_cast<const Loop *>(impo.get());
+      const Loop *loop = dynamic_cast<const Loop *>(bi.get());
       double prob = continueLoop(), threshold = 1.0;
       bool executedAtLeastOnce = false;
       for (int it = 0; it < maxLoopIter && restSteps > 0 && prob < threshold; it++) {
@@ -535,7 +535,7 @@ CfgSketch::SampleExec(const int stepLimit, const bool consistent, const int maxL
         // Append the loop execution to the fine-grained execution
         // Update the id of each block in the loop to match that in successors
         for (const auto &blk: loopExec) {
-          fineExec.push_back(blk + indexInSuccessorsOf[impoIndex]);
+          fineExec.push_back(blk + indexInSuccessorsOf[biInd]);
         }
         threshold = decayGamma * threshold;
         prob = continueLoop();
@@ -544,10 +544,10 @@ CfgSketch::SampleExec(const int stepLimit, const bool consistent, const int maxL
       }
       if (executedAtLeastOnce) {
         // Append the exit of the loop to the fine execution
-        fineExec.push_back(loop->GetExit() + indexInSuccessorsOf[impoIndex]);
+        fineExec.push_back(loop->GetExit() + indexInSuccessorsOf[biInd]);
       }
     } else {
-      Assert(false, "Unknown imposter type %d", impo->GetType());
+      Assert(false, "Unknown bimpo type %d", bi->GetType());
     }
   }
   return fineExec;
@@ -556,9 +556,9 @@ CfgSketch::SampleExec(const int stepLimit, const bool consistent, const int maxL
 void CfgSketch::Print() {
   std::cout << "======== Unflattened CFG Sketch ========" << std::endl;
   std::cout << ": " << std::endl;
-  for (int i = 0; i < numImposters(); i++) {
-    std::cout << "Imposter: type=" << imposters[i]->GetType() << ", id=" << i
-              << ", size=" << imposters[i]->NumBbls() << ", start=" << indexInSuccessorsOf[i]
+  for (int i = 0; i < numBimpos(); i++) {
+    std::cout << "Bimpo: type=" << bimpos[i]->GetType() << ", id=" << i
+              << ", size=" << bimpos[i]->NumBbls() << ", start=" << indexInSuccessorsOf[i]
               << std::endl;
   }
   std::cout << "======== Flattened CFG Sketch ========" << std::endl;

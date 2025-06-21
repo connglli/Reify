@@ -135,23 +135,23 @@ private:
   const int maxOutdeg;
 };
 
-/// A BblImpo is an imposter of a basic block.
-/// This means the imposter might not be a real basic block.
-class BblImpo {
+/// A Bimpo is an imposter of a basic block.
+/// This means the bimpo might not be a real basic block.
+class Bimpo {
 public:
   enum Type {
-    BLOCK, // The imposter represents a real basic block
-    LOOP,  // The imposter represents a loop's control flow graph
+    BLOCK, // The bimpo represents a real basic block
+    LOOP,  // The bimpo represents a loop's control flow graph
   };
 
 public:
-  virtual ~BblImpo() = default;
+  virtual ~Bimpo() = default;
   [[nodiscard]] virtual int NumBbls() const = 0;
   [[nodiscard]] virtual Type GetType() const = 0;
 };
 
 /// A Block is a real basic block
-class Block final : public BblImpo {
+class Block final : public Bimpo {
 public:
   [[nodiscard]] int NumBbls() const override { return 1; }
 
@@ -159,7 +159,7 @@ public:
 };
 
 /// A Loop is a reducible loop with entry, latch, and exit
-class Loop final : public BblImpo {
+class Loop final : public Bimpo {
 public:
   explicit Loop(int numBbls, bool allowNestedLoops = true) : graph(numBbls - 1, 2) {
     bool reachable = false;
@@ -232,13 +232,13 @@ public:
   void Print();
 
 private:
-  int numImposters() const { return graph.NumNodes(); }
+  int numBimpos() const { return graph.NumNodes(); }
 
 private:
   // The unflattened view of the CFG
-  GraphPlus graph; // Each node in the graph corresponds to an imposter
-  std::vector<std::unique_ptr<BblImpo>> imposters{};
-  std::vector<int> indexInSuccessorsOf{}; // The index of each imposter in the successors table
+  GraphPlus graph; // Each node in the graph corresponds to an bimpo
+  std::vector<std::unique_ptr<Bimpo>> bimpos{};
+  std::vector<int> indexInSuccessorsOf{}; // The index of each bimpo in the successors table
 
   // The flattened view of the CFG, each correspond to a real basic block
   std::vector<std::set<int>> successors{};
