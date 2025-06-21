@@ -34,21 +34,26 @@
 #include <z3++.h>
 
 #include "lib/block.hpp"
-#include "lib/graph.hpp"
+#include "lib/graphplus.hpp"
 
 class BlkGen;
 
 class FunGen {
 public:
-  explicit FunGen(int numBBs, int numVars) : numBBs(numBBs), cfg(numBBs), numVars(numVars) {}
+  explicit FunGen(int numBBs, int numVars, int maxNumLoops, int maxNumBblsPerLoop) :
+      cfg(numBBs), numVars(numVars), maxNumLoops(maxNumLoops),
+      maxNumBblsPerLoop(maxNumBblsPerLoop) {}
 
-  const auto &GetCFGBkbone() const { return cfg; }
+  FunGen(const FunGen &) = delete;
+  FunGen &operator=(const FunGen &) = delete;
 
-  const int GetNumBBs() const { return numBBs; }
+  const auto &GetCfg() const { return cfg; }
+
+  const int NumBbls() const { return cfg.NumBbls(); }
 
   const int NumVars() const { return numVars; }
 
-  const auto &GetBBs() const { return bbs; }
+  const auto &GetBbls() const { return bblGens; }
 
   void Generate();
 
@@ -100,18 +105,20 @@ public:
   std::string GenerateMainCode(
       const std::string &sno, const std::string &uuid,
       const std::vector<std::vector<int>> &initialisations,
-      const std::vector<std::vector<int>> &finalizations
+      const std::vector<std::vector<int>> &finalizations, bool debug = false
   );
 
   static std::string
   GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation);
 
 private:
-  int numBBs;              // The number of basic blocks the function has
-  int numVars;             // The number of variables that the function can define
-  std::vector<BlkGen> bbs; // The basic blocks (in the same order as g)
+  CfgSketch cfg; // The sketch of our CFG, where each bbl maps to a blockgen in bbs
 
-  CfgBkboneGen cfg; // Nodes in cfg maps to that in bbs one-by-one
+  int numVars;           // The number of variables that the function can define
+  int maxNumLoops;       // The maximum number of loops that the function can have
+  int maxNumBblsPerLoop; // The maximum number of basic blocks in a loop
+
+  std::vector<BlkGen> bblGens{}; // The basic block generators (in the same order as basic blocks)
 
   std::unordered_map<std::string, std::optional<int>> state{
   }; // Value of variables, coefficients or constants computed so far

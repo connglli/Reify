@@ -396,22 +396,12 @@ void CfgSketch::Generate() {
     bimpos.push_back(std::make_unique<Block>());
     // So each bimpo occupy only 1 basic block
     indexInBbls.push_back(bi);
-    {
-      const auto &adj = graph.GetAdj(bi);
-      std::cout << "Updating: " << bi << " -> [";
-      int j = 0;
-      for (auto v: adj) {
-        std::cout << v;
-        if (j != adj.size() - 1) {
-          std::cout << ", ";
-        }
-        j++;
-      }
-    }
-    std::cout << "]" << std::endl;
     // Sync the basicblocks array
     basicblocks.emplace_back(BblSketch::Type::BLOCK_ORDINARY);
-    basicblocks.back().successors.insert(graph.GetAdj(bi).begin(), graph.GetAdj(bi).end());
+    basicblocks.back().successors.insert(
+        // We fix the successors order of the each basic block from now on
+        basicblocks.back().successors.begin(), graph.GetAdj(bi).begin(), graph.GetAdj(bi).end()
+    );
   }
 }
 
@@ -457,56 +447,20 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
   for (int i = biInd + 1; i < numBimpos(); i++) {
     indexInBbls[i] = indexInBbls[i] + loopSize - 1;
   }
-  std::cout << "...... Replacing " << biInd << " with loop of size " << loopSize << " ......"
-            << std::endl;
 
   // Since blkSuccessorsInLoop will be inserted into the basicblocks array,
   // all blocks' successors that are > flatBiInd should march loopSize-1:
   for (auto &bbl: basicblocks) {
-    std::set<int> toUpdate;
     for (auto &succ: bbl.successors) {
       if (succ > flatBiInd) {
-        toUpdate.insert(succ);
+        succ = succ + loopSize - 1;
       }
     }
-    for (auto &succ: toUpdate) {
-      bbl.successors.erase(succ);
-      bbl.successors.insert(succ + loopSize - 1);
-    }
   }
 
+  // Map each block in the loop into a BblSketch.
   // Since blkSuccessorsInLoop will be inserted into the basicblocks array,
   // all blocks in the loop's original adjacent table should march by flatBiInd
-  auto blkSuccessorsInLoop = std::vector<std::set<int>>(loopSize);
-  for (int bbl = 0; bbl < loopSize; bbl++) {
-    for (const auto &succ: loop->GetSuccessor(bbl)) {
-      blkSuccessorsInLoop[bbl].insert(succ + flatBiInd);
-    }
-  }
-  // The loop latch should branch to the header of the loop
-  Assert(
-      blkSuccessorsInLoop[loop->GetLatch()].size() == 1,
-      "The latch of the loop should have only 1 successor, i.e., its exit"
-  );
-  blkSuccessorsInLoop[loop->GetLatch()].insert(flatBiInd);
-  Assert(
-      !loop->GetSuccessor(loop->GetLatch()).contains(loop->GetEntry()),
-      "The original loop graph's latch should remain untouched"
-  );
-  // The loop exiting node should branch to all the old successors
-  Assert(
-      blkSuccessorsInLoop[loop->GetExit()].size() == 0,
-      "The exit of the loop should not have any successor"
-  );
-  blkSuccessorsInLoop[loop->GetExit()].insert(
-      flatBiIt->successors.begin(), flatBiIt->successors.end()
-  );
-  Assert(
-      loop->GetSuccessor(loop->GetExit()).empty(),
-      "The original loop graph's exit should remain untouched"
-  );
-
-  // Map each block in the loop into a BblSketch
   std::vector<BblSketch> loopBbls;
   for (auto i = 0; i < loopSize; i++) {
     if (i == loop->GetEntry()) {
@@ -518,10 +472,39 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
     } else {
       loopBbls.emplace_back(BblSketch::Type::BLOCK_ORDINARY);
     }
-    loopBbls.back().successors.insert(blkSuccessorsInLoop[i].begin(), blkSuccessorsInLoop[i].end());
+    // We fix the successors order of the each basic block from now on
+    for (const auto &succ: loop->GetSuccessor(i)) {
+      loopBbls.back().successors.push_back(succ + flatBiInd);
+    }
   }
+  // The loop latch should branch to the header of the loop
+  Assert(
+      loopBbls[loop->GetLatch()].successors.size() == 1,
+      "The latch of the loop should have only 1 successor, i.e., its exit"
+  );
+  loopBbls[loop->GetLatch()].successors.insert(
+      // We always ensure that the first successor of the latch is the entry
+      loopBbls[loop->GetLatch()].successors.begin(), flatBiInd
+  );
+  Assert(
+      !loop->GetSuccessor(loop->GetLatch()).contains(loop->GetEntry()),
+      "The original loop graph's latch should remain untouched"
+  );
+  // The loop exiting node should branch to all the old successors
+  Assert(
+      loopBbls[loop->GetExit()].successors.size() == 0,
+      "The exit of the loop should not have any successor"
+  );
+  loopBbls[loop->GetExit()].successors.insert(
+      loopBbls[loop->GetExit()].successors.begin(), flatBiIt->successors.begin(),
+      flatBiIt->successors.end()
+  );
+  Assert(
+      loop->GetSuccessor(loop->GetExit()).empty(),
+      "The original loop graph's exit should remain untouched"
+  );
 
-  // Insert blkSuccessorsInLoop into the basicblocks array
+  // Insert loopBbls into the basicblocks array
   basicblocks.erase(flatBiIt);
   basicblocks.insert(flatBiIt, loopBbls.begin(), loopBbls.end());
 }

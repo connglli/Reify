@@ -59,12 +59,12 @@ void BlkGen::Generate() {
       // Statement index is the index of the assignment statement in a
       // basic block, and i is the index of the variable in the RHS of
       // the assignment statement
-      std::string coefficientKey = NameCoeff(blkNo, stmtIndex, i);
+      std::string coefficientKey = NameCoeff(bblNo, stmtIndex, i);
       f.InitParam(coefficientKey);
     }
 
     // We also assign a constant to the current variable being defined
-    std::string constantKey = NameConst(blkNo, stmtIndex);
+    std::string constantKey = NameConst(bblNo, stmtIndex);
     f.InitParam(constantKey);
   }
 
@@ -83,8 +83,7 @@ void BlkGen::Generate() {
   Log::Get().Out() << "Size of conditional variables: " << condUsedVars.size() << std::endl;
 
   // Define a specific target that our conditional controls
-  if (successors.size() > 1) {
-    std::shuffle(successors.begin(), successors.end(), Random::Get().GetRNG());
+  if (bblSkt.GetSuccessors().size() > 1) {
     // Assign a coefficient to each variable contributing to the conditional
     for (int i = 0; i < GlobalOptions::Get().NumVarsInCond; i++) {
       // 0 is the statement index here (even I'm not sure why i chose
@@ -92,13 +91,13 @@ void BlkGen::Generate() {
       // let's just not touch this), and i is the index of the
       // variable in the actual conditional.
       // (... perhaps because it is the first conditional statement)
-      std::string coefficientKey = NameCondCoeff(blkNo, 0, i);
+      std::string coefficientKey = NameCondCoeff(bblNo, 0, i);
       f.InitParam(coefficientKey);
     }
     // target block is a parameter here if we ever
     // wanted to support more that 2 potential targets
     // for the same basic block
-    std::string constantKey = NameCondConst(blkNo, successors[0]);
+    std::string constantKey = NameCondConst(bblNo, bblSkt.GetSuccessors()[0]);
     f.InitParam(constantKey);
   }
 }
@@ -185,14 +184,14 @@ void BlkGen::GenerateConstraints(
           vars.back() >= GlobalOptions::Get().LowerBound &&
           vars.back() <= GlobalOptions::Get().UpperBound
       );
-      coeffs.push_back(createParameterExpr(NameCoeff(blkNo, stmtIndex, i), c));
+      coeffs.push_back(createParameterExpr(NameCoeff(bblNo, stmtIndex, i), c));
       terms.push_back(coeffs.back() * vars.back()); // a_i * var_i
     }
     solver.add(boundCoefficients(c, coeffs));
     solver.add(makeCoefficientsInteresting(coeffs, c));
 
     // Taking care of the constant
-    coeffs.push_back(createParameterExpr(NameConst(blkNo, stmtIndex), c));
+    coeffs.push_back(createParameterExpr(NameConst(bblNo, stmtIndex), c));
     terms.push_back(coeffs.back());
     solver.add(
         coeffs.back() >= GlobalOptions::Get().LowerBound &&
@@ -243,10 +242,10 @@ void BlkGen::GenerateConstraints(
     stmtIndex++;
   }
 
-  Log::Get().Out() << successors.size() << std::endl;
+  Log::Get().Out() << bblSkt.GetSuccessors().size() << std::endl;
   Log::Get().Out() << "Target: " << target << std::endl;
 
-  if (successors.size() <= 1) {
+  if (bblSkt.GetSuccessors().size() <= 1) {
     return;
   }
 
@@ -265,14 +264,14 @@ void BlkGen::GenerateConstraints(
         vars.back() >= GlobalOptions::Get().LowerBound &&
         vars.back() <= GlobalOptions::Get().UpperBound
     );
-    coeffs.push_back(createParameterExpr(NameCondCoeff(blkNo, 0, i), c));
+    coeffs.push_back(createParameterExpr(NameCondCoeff(bblNo, 0, i), c));
     terms.push_back(coeffs.back() * vars.back());
   }
   solver.add(boundCoefficients(c, coeffs));
   solver.add(makeCoefficientsInteresting(coeffs, c));
 
   // The constant
-  coeffs.push_back(createParameterExpr(NameCondConst(blkNo, successors[0]), c));
+  coeffs.push_back(createParameterExpr(NameCondConst(bblNo, bblSkt.GetSuccessors()[0]), c));
   terms.push_back(coeffs.back());
   solver.add(
       coeffs.back() >= GlobalOptions::Get().LowerBound &&
@@ -306,7 +305,7 @@ void BlkGen::GenerateConstraints(
   }
 
   // The jump: We always jump to the first successor for sum >= 0
-  if (target == successors[0]) {
+  if (target == bblSkt.GetSuccessors()[0]) {
     solver.add(sum >= 0);
   } else {
     solver.add(sum < 0);
@@ -319,14 +318,18 @@ void BlkGen::GenerateConstraints(
 
 
 std::string
-BlkGen::generateConditionalConstraint(int blkNo, int target, std::vector<int> condUsedVars) const {
+BlkGen::generateConditionalConstraint(int bblNo, int target, std::vector<int> condUsedVars) const {
   std::ostringstream constraint;
   auto rand =
       Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
-  constraint << "    if (";
+  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_LATCH) {
+    constraint << "    } while (";
+  } else {
+    constraint << "    if (";
+  }
   int ctr = 0;
   for (auto i: condUsedVars) {
-    std::string coefficientKey = NameCondCoeff(blkNo, 0, ctr);
+    std::string coefficientKey = NameCondCoeff(bblNo, 0, ctr);
     int coefficient;
     if (f.ParamDefined(coefficientKey)) {
       coefficient = f.GetParamVal(coefficientKey);
@@ -338,7 +341,7 @@ BlkGen::generateConditionalConstraint(int blkNo, int target, std::vector<int> co
     constraint << " + ";
     ++ctr;
   }
-  std::string constantKey = NameCondConst(blkNo, target);
+  std::string constantKey = NameCondConst(bblNo, target);
   int constant;
   if (f.ParamDefined(constantKey)) {
     constant = f.GetParamVal(constantKey);
@@ -347,7 +350,11 @@ BlkGen::generateConditionalConstraint(int blkNo, int target, std::vector<int> co
     f.DefineParam(constantKey, constant);
   }
   constraint << constant;
-  constraint << " >= 0) goto " << NameLabel(target) << ";" << std::endl;
+  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_LATCH) {
+    constraint << " >= 0);" << std::endl; // We latch to the loop header
+  } else {
+    constraint << " >= 0) goto " << NameLabel(target) << ";" << std::endl;
+  }
 
   // Output the constraint
   return constraint.str();
@@ -363,7 +370,10 @@ std::string BlkGen::GenerateCode() const {
   std::ostringstream code;
 
   // Generate the label for the basic block
-  code << NameLabel(blkNo) << ":" << std::endl;
+  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_HEAD) {
+    code << "    do {" << std::endl;
+  }
+  code << NameLabel(bblNo) << ":" << std::endl;
   if (needPassCounter) {
     code << NamePassCounter() << "++;" << std::endl;
   }
@@ -376,7 +386,7 @@ std::string BlkGen::GenerateCode() const {
     code << "    " << NameVar(varIndex) << " = ";
     for (size_t i = 0; i < dependencies.size(); ++i) {
       // Look up the coefficient in the parameters map
-      std::string coefficientKey = NameCoeff(blkNo, stmtIndex, i);
+      std::string coefficientKey = NameCoeff(bblNo, stmtIndex, i);
       int coefficient;
       if (f.ParamDefined(coefficientKey)) {
         coefficient = f.GetParamVal(coefficientKey);
@@ -395,7 +405,7 @@ std::string BlkGen::GenerateCode() const {
       }
     }
     // Add a constant term
-    std::string constantKey = NameConst(blkNo, stmtIndex);
+    std::string constantKey = NameConst(bblNo, stmtIndex);
     int constant;
     if (f.ParamDefined(constantKey)) {
       constant = f.GetParamVal(constantKey);
@@ -409,14 +419,14 @@ std::string BlkGen::GenerateCode() const {
   if (needPassCounter) {
     code << "    if(" << NamePassCounter() << " >= " << passCounterValue << ")" << std::endl;
     code << "    {" << std::endl;
-    code << "        goto " << NameLabel(f.GetNumBBs() - 1) << ";" << std::endl;
+    code << "        goto " << NameLabel(f.NumBbls() - 1) << ";" << std::endl;
     code << "    }" << std::endl;
   }
-  if (successors.size() > 1) {
-    code << generateConditionalConstraint(blkNo, successors[0], condUsedVars);
-    code << generateUnconditionalGoto(successors[1]);
-  } else if (successors.size() == 1) {
-    code << generateUnconditionalGoto(successors[0]);
+  if (bblSkt.GetSuccessors().size() > 1) {
+    code << generateConditionalConstraint(bblNo, bblSkt.GetSuccessors()[0], condUsedVars);
+    code << generateUnconditionalGoto(bblSkt.GetSuccessors()[1]);
+  } else if (bblSkt.GetSuccessors().size() == 1) {
+    code << generateUnconditionalGoto(bblSkt.GetSuccessors()[0]);
   } else {
     code << "    return " << StatelessChecksum::GetComputeName() << "(" << f.NumVars() << ", (int["
          << f.NumVars() << "]){ ";

@@ -32,7 +32,6 @@
 #include "lib/block.hpp"
 #include "lib/chksum.hpp"
 #include "lib/function.hpp"
-#include "lib/graph.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 
@@ -188,15 +187,16 @@ int main(int argc, char **argv) {
 
   Log::Get().Out() << "==== Generation =============================" << std::endl;
 
-  FunGen f(GlobalOptions::Get().NumNodesPerFun, GlobalOptions::Get().NumVarsPerFun);
-  f.Generate();
-  // f.GenerateRedLoop(GlobalOptions.Get().MaxNumLoopsPerFun,
-  // GlobalOptions::Get().MaxNumBblsPerLoop);
+  FunGen fun(
+      GlobalOptions::Get().NumNodesPerFun, GlobalOptions::Get().NumVarsPerFun,
+      GlobalOptions::Get().MaxNumLoopsPerFun, GlobalOptions::Get().MaxNumBblsPerLoop
+  );
+  fun.Generate();
 
-  auto cfg = f.GetCFGBkbone();
-  auto basicBlocks = f.GetBBs();
+  const auto &cfg = fun.GetCfg();
+  auto bbls = fun.GetBbls();
 
-  auto execution = f.SampleExec(
+  auto execution = fun.SampleExec(
       GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentWalks
   );
   Log::Get().Out() << "Exec: ";
@@ -212,10 +212,10 @@ int main(int argc, char **argv) {
 
   // Let each parameter (coefficient or constant) interesting initially
   if (GlobalOptions::Get().EnableInterestInits) {
-    solver.add(f.MakeInitialisationsInteresting(c));
+    solver.add(fun.MakeInitialisationsInteresting(c));
   }
   if (GlobalOptions::Get().EnableRandomInits) {
-    solver.add(f.AddRandomInitialisations(c));
+    solver.add(fun.AddRandomInitialisations(c));
   }
 
   Log::Get().Out() << "Initialization SMT: " << solver.to_smt2() << std::endl;
@@ -228,9 +228,9 @@ int main(int argc, char **argv) {
     int next_bb = execution[i + 1];
     // Generate constraints for the current basic block so that
     // no UB occurs and it can reach the next basic block
-    basicBlocks[current_bb].GenerateConstraints(next_bb, solver, c, versions);
+    bbls[current_bb].GenerateConstraints(next_bb, solver, c, versions);
   }
-  basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
+  bbls[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
   // Dump the SMT queries for debugging
   Log::Get().Out() << "Execution SMT: " << solver.to_smt2() << std::endl;
@@ -252,17 +252,17 @@ int main(int argc, char **argv) {
   Log::Get().Out() << "Execution Model: " << model << std::endl;
 
   // Extract all parameters from the model down to the function
-  f.ExtractParametersFromModel(model, c);
+  fun.ExtractParametersFromModel(model, c);
 
-  const std::string funCode = f.GenerateFunCode(sno, uuid);
+  const std::string funCode = fun.GenerateFunCode(sno, uuid);
   functionFile << funCode << std::endl;
   functionFile.close();
 
   std::vector<std::vector<int>> initialisations;
   std::vector<std::vector<int>> finalisations;
 
-  std::vector<int> initialisation = f.ExtractInitialisationsFromModel(model, c);
-  std::vector<int> finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
+  std::vector<int> initialisation = fun.ExtractInitialisationsFromModel(model, c);
+  std::vector<int> finalisation = fun.ExtractFinalizationsFromModel(model, c, versions);
   mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
 
   initialisations.emplace_back(initialisation);
@@ -274,26 +274,26 @@ int main(int argc, char **argv) {
   // and constants we already generated from the model.
   solver.reset();
   if (GlobalOptions::Get().EnableInterestInits) {
-    solver.add(f.MakeInitialisationsInteresting(c));
+    solver.add(fun.MakeInitialisationsInteresting(c));
   }
   if (GlobalOptions::Get().EnableRandomInits) {
-    solver.add(f.AddRandomInitialisations(c));
+    solver.add(fun.AddRandomInitialisations(c));
   }
 
   versions.clear();
   for (int i = 0; i < execution.size() - 1; i++) {
     int current_bb = execution[i];
     int next_bb = execution[i + 1];
-    basicBlocks[current_bb].GenerateConstraints(next_bb, solver, c, versions);
+    bbls[current_bb].GenerateConstraints(next_bb, solver, c, versions);
   }
-  basicBlocks[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
+  bbls[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
 
   for (int i = 0; i < GlobalOptions::Get().NumInitsPerWalk - 1; i++) {
     Log::Get().Out() << "==== Initialization " << i + 1
                      << " =============================" << std::endl;
 
     // Ensure that the initialisation is sufficiently different from the previous one
-    solver.add(f.DifferentInitialisationConstraint(initialisation, c));
+    solver.add(fun.DifferentInitialisationConstraint(initialisation, c));
 
     Log::Get().Out() << "Execution SMT: " << solver.to_smt2() << std::endl;
 
@@ -309,9 +309,9 @@ int main(int argc, char **argv) {
     model = solver.get_model();
     Log::Get().Out() << "Execution Model: " << model << std::endl;
 
-    f.ExtractParametersFromModel(model, c);
-    initialisation = f.ExtractInitialisationsFromModel(model, c);
-    finalisation = f.ExtractFinalizationsFromModel(model, c, versions);
+    fun.ExtractParametersFromModel(model, c);
+    initialisation = fun.ExtractInitialisationsFromModel(model, c);
+    finalisation = fun.ExtractFinalizationsFromModel(model, c, versions);
     mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
     initialisations.emplace_back(initialisation);
     finalisations.emplace_back(finalisation);
@@ -324,7 +324,10 @@ int main(int argc, char **argv) {
     std::ofstream programFile = std::ofstream(GetProgramPath(uuid, sno, outputDirectory));
     programFile << StatelessChecksum::GetRawCode() << std::endl;
     programFile << funCode << std::endl;
-    programFile << f.GenerateMainCode(sno, uuid, initialisations, finalisations) << std::endl;
+    programFile << fun.GenerateMainCode(
+                       sno, uuid, initialisations, finalisations, /*debug=*/verbose
+                   )
+                << std::endl;
     programFile.close();
   }
 

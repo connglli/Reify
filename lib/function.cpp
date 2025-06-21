@@ -29,28 +29,29 @@
 #include <sstream>
 
 #include "global.hpp"
+#include "lib/chksum.hpp"
 #include "lib/logger.hpp"
 #include "lib/naming.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 
 void FunGen::Generate() {
-  // Generate the shape of us
+  // Generate the sketch of our control flow graph
   cfg.Generate();
-  for (int i = 0; i < numBBs; i++) {
-    bbs.emplace_back(*this, i, cfg.GetAdj(i));
-    bbs.back().Generate();
+  auto rand = Random::Get().Uniform(0, maxNumLoops);
+  for (int i = 0; i < rand(); i++) {
+    cfg.GenerateReduLoop(maxNumBblsPerLoop);
+  }
+  // Map each basic block in the CFG to a basic block generator
+  for (int i = 0; i < NumBbls(); i++) {
+    bblGens.emplace_back(*this, i, cfg.GetBbl(i));
+    bblGens.back().Generate();
   }
 }
 
 std::vector<int> FunGen::SampleExec(int execStep, bool consistent) {
-  std::vector<int> sampleWalk = {};
-  int startNode = 0, endNode = numBBs - 1;
-  if (consistent) {
-    sampleWalk = cfg.SampleConsistentWalk(startNode, endNode, execStep);
-  } else {
-    sampleWalk = cfg.SampleWalk(startNode, endNode, execStep);
-  }
+  std::vector<int> sampleWalk = cfg.SampleExec(execStep, consistent);
+  int endNode = NumBbls() - 1;
   int stopNode = sampleWalk.back();
   if (stopNode == endNode) {
     return sampleWalk;
@@ -62,7 +63,7 @@ std::vector<int> FunGen::SampleExec(int execStep, bool consistent) {
   // equal to the number of times that basic block has been visited.
   int passCounter =
       static_cast<int>(std::ranges::count_if(sampleWalk, [=](auto n) { return n == stopNode; }));
-  bbs[stopNode].SetPassCounter(passCounter);
+  bblGens[stopNode].SetPassCounter(passCounter);
   state[NamePassCounter()] = passCounter;
   sampleWalk.push_back(endNode);
   Log::Get().Out() << "Sample walk has been modified to end at the last node." << std::endl;
@@ -219,8 +220,8 @@ std::string FunGen::GenerateFunCode(const std::string &sno, const std::string &u
   code << ")" << std::endl;
   code << "{" << std::endl;
   code << "    int " << NamePassCounter() << " = 0;" << std::endl;
-  for (const auto &bb: bbs) {
-    code << bb.GenerateCode() << std::endl;
+  for (const auto &gen: bblGens) {
+    code << gen.GenerateCode() << std::endl;
   }
   code << "}" << std::endl;
   return code.str();
@@ -229,21 +230,39 @@ std::string FunGen::GenerateFunCode(const std::string &sno, const std::string &u
 std::string FunGen::GenerateMainCode(
     const std::string &sno, const std::string &uuid,
     const std::vector<std::vector<int>> &initialisations,
-    const std::vector<std::vector<int>> &finalizations
+    const std::vector<std::vector<int>> &finalizations, bool debug
 ) {
+  assert(
+      initialisations.size() == finalizations.size() &&
+      "Initialisations and finalizations must have the same size"
+  );
+  // TODO: Remove duplicate
   std::ostringstream main;
+  if (debug) {
+    main << "#include <assert.h>" << std::endl << std::endl;
+    main << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum "
+            "not equal\"), (actual))"
+         << std::endl
+         << std::endl;
+  } else {
+    main << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
+  }
   main << "int main(int argc, int* argv[])" << std::endl;
   main << "{" << std::endl;
-  for (auto init: initialisations) {
+  for (auto i = 0; i < initialisations.size(); i++) {
+    const auto &init = initialisations[i];
+    const auto &fina = finalizations[i];
     auto numVars = init.size();
-    main << "  function_" << uuid << "_" << sno << "(";
+    std::ostringstream chk_oss;
+    main << "check_checksum(" << StatelessChecksum::Compute(fina) << ", " << "function_" << uuid
+         << "_" << sno << "(";
     for (auto i = 0; i < numVars; i++) {
       main << init[i];
       if (i < numVars - 1) {
         main << ", ";
       }
     }
-    main << ");" << std::endl;
+    main << "));" << std::endl;
   }
   main << "  return 0;" << std::endl;
   main << "}" << std::endl;

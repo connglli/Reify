@@ -180,7 +180,7 @@ private:
 
 class Statement : public MyIR {
 public:
-  enum Type { ASSIGN, IFGOTO, FLUFF };
+  enum Type { ASSIGN, IFGOTO, WHILE, FLUFF };
 
 public:
   // Return the type of the statement
@@ -260,6 +260,39 @@ public:
 private:
   std::unique_ptr<Expression> condExpr;
   std::string gotoStmt;
+};
+
+// An WhileStmt is the while-clause of an do-while statement: "} while (...);"
+class WhileStmt : public Statement {
+public:
+  void Parse(const std::string &code) {
+    auto whileKeyword = code.find("while");
+    auto openParen = code.find('(', whileKeyword);
+    auto gtThEq = code.find(">=", openParen);
+    auto closeParen = code.find(')', gtThEq);
+    auto semicolon = code.find(';', closeParen);
+    // TODO: Currently, we only support TermSum
+    condExpr = TermSum::Create<TermSum>(code.substr(openParen + 1, gtThEq - 1 - openParen - 1));
+  }
+
+public:
+  Type GetStmtType() const override { return Type::WHILE; }
+
+  size_t GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
+
+  bool RepFirstCoeff(
+      const std::string &funName, const std::vector<int> &initialisation,
+      const std::vector<int> &finalization
+  ) override {
+    return condExpr->RepFirstCoeff(funName, initialisation, finalization);
+  }
+
+  std::string GenerateCode() const override {
+    return "    } while (" + condExpr->GenerateCode() + " >= 0);";
+  }
+
+private:
+  std::unique_ptr<Expression> condExpr;
 };
 
 // All other statements that are classified FluffStmt.
@@ -401,9 +434,14 @@ public:
     std::string line;
     // Parse the function line by line
     while (std::getline(iss, line)) {
-      if (line.find("pass_counter") != std::string::npos) {
+      if (line.find("do {") != std::string::npos) {
+        statements.push_back(FluffStmt::Create<FluffStmt>(line));
+      } else if (line.find("pass_counter") != std::string::npos) {
         // Our replacement respect pass_counter
         statements.push_back(FluffStmt::Create<FluffStmt>(line));
+      } else if (line.find("while") != std::string::npos) {
+        statements.push_back(WhileStmt::Create<WhileStmt>(line));
+        numCoeffs += statements.back()->GetNumCoeffs();
       } else if (line.find("if") != std::string::npos) {
         statements.push_back(IfGotoStmt::Create<IfGotoStmt>(line));
         numCoeffs += statements.back()->GetNumCoeffs();

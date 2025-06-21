@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 #include "lib/function.hpp"
+#include "lib/graphplus.hpp"
 #include "z3++.h"
 
 class FunGen;
@@ -39,8 +40,7 @@ class FunGen;
 class BlkGen {
 
 public:
-  BlkGen(FunGen &f, int blkNo, const std::set<int> &successors) :
-      f(f), blkNo(blkNo), successors(successors.begin(), successors.end()) {}
+  BlkGen(FunGen &f, int bblNo, BblSketch bblSkt) : f(f), bblNo(bblNo), bblSkt(std::move(bblSkt)) {}
 
   void Generate();
 
@@ -80,10 +80,9 @@ private:
   std::string generateUnconditionalGoto(int target) const;
 
 private:
-  FunGen &f;                   // The residing function of this basic block
-  int blkNo;                   // The identifier of this basic block
-  std::vector<int> successors; // Successors of the basic block
-
+  FunGen &f;        // The residing function of this basic block
+  int bblNo;        // The identifier of this basic block
+  BblSketch bblSkt; // The sketch of this basic block
 
   std::vector<int> assignmentOrder; // The order of the definition of each variable
   std::map<int, std::vector<int>>

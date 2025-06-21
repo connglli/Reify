@@ -220,17 +220,20 @@ public:
 
   [[nodiscard]] Type GetType() const { return type; }
 
-  [[nodiscard]] const std::set<int> &GetSuccessors() const { return successors; }
+  [[nodiscard]] const std::vector<int> &GetSuccessors() const { return successors; }
 
 private:
-  Type type;                  // The type of the basic block (e.g., BLOCK, LOOP)
-  std::set<int> successors{}; // The successors of the basic block
+  Type type;                     // The type of the basic block (e.g., BLOCK, LOOP)
+  std::vector<int> successors{}; // The successors of the basic block
 };
 
 /// CfgSketch is a random generator for the backbone (without generating SIRs) of a CFG
 class CfgSketch {
 public:
   explicit CfgSketch(int initNumBbls) : graph(initNumBbls, 2) {}
+
+  CfgSketch(const CfgSketch &) = delete;
+  CfgSketch &operator=(const CfgSketch &) = delete;
 
   // Get the number of basic blocks
   [[nodiscard]] int NumBbls() const { return static_cast<int>(basicblocks.size()); }
