@@ -203,19 +203,44 @@ private:
   GraphPlus graph;
 };
 
+/// A BblSketch is a sketch of a basic block (without generating SIRs) in the CFG.
+class BblSketch {
+  friend class CfgSketch;
+
+public:
+  enum Type {
+    BLOCK_ORDINARY = 0, // Oridinary block
+    BLOCK_LOOP_HEAD,    // Loop head block
+    BLOCK_LOOP_LATCH,   // Loop latch block
+    BLOCK_LOOP_EXIT,    // Loop exit block
+  };
+
+public:
+  explicit BblSketch(Type type) : type(type) {}
+
+  [[nodiscard]] Type GetType() const { return type; }
+
+  [[nodiscard]] const std::set<int> &GetSuccessors() const { return successors; }
+
+private:
+  Type type;                  // The type of the basic block (e.g., BLOCK, LOOP)
+  std::set<int> successors{}; // The successors of the basic block
+};
+
 /// CfgSketch is a random generator for the backbone (without generating SIRs) of a CFG
 class CfgSketch {
 public:
   explicit CfgSketch(int initNumBbls) : graph(initNumBbls, 2) {}
 
   // Get the number of basic blocks
-  [[nodiscard]] int NumBbls() const { return static_cast<int>(successors.size()); }
+  [[nodiscard]] int NumBbls() const { return static_cast<int>(basicblocks.size()); }
 
-  // Get the successors table
-  [[nodiscard]] const std::vector<std::set<int>> &GetSuccTab() const { return successors; }
-
-  // Get the successors of a basic block
-  [[nodiscard]] const std::set<int> &GetSuccessors(int block) const { return successors[block]; }
+  [[nodiscard]] const BblSketch &GetBbl(int id) const {
+    Assert(
+        id >= 0 && id < NumBbls(), "Invalid basic block id %d, must be in [0, %d)", id, NumBbls()
+    );
+    return basicblocks[id];
+  }
 
   // Sample an execution and stop once we executed the exit block
   // or we have reached the limit of our execution steps
@@ -238,10 +263,10 @@ private:
   // The unflattened view of the CFG
   GraphPlus graph; // Each node in the graph corresponds to an bimpo
   std::vector<std::unique_ptr<Bimpo>> bimpos{};
-  std::vector<int> indexInSuccessorsOf{}; // The index of each bimpo in the successors table
+  std::vector<int> indexInBbls{}; // The index of each bimpo in the basicblocks list
 
   // The flattened view of the CFG, each correspond to a real basic block
-  std::vector<std::set<int>> successors{};
+  std::vector<BblSketch> basicblocks{};
 };
 
 #endif // GRAPHFUZZ_GRAPHPLUS_HPP
