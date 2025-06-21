@@ -126,7 +126,7 @@ FGEN_MAPS_DIR := $(FGEN_OUT_DIR)/mappings
 FGEN_LOGS_DIR := $(FGEN_OUT_DIR)/loggings
 FGEN_LIMIT    ?= 1000000
 FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
-FGEN_EX_OPTS  ?= $(if $(FGEN_EX_OPTS),--extra $(FGEN_EX_OPTS),)
+FGEN_EX_OPTS  := $(if $(FGEN_EX_OPTS),--extra $(FGEN_EX_OPTS),)
 
 gen-func-set: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
