@@ -131,8 +131,8 @@ private:
   void unsafeEnforceReachFromEntry();
 
 private:
-  std::vector<std::set<int>> adjTab;
   const int maxOutdeg;
+  std::vector<std::set<int>> adjTab{};
 };
 
 /// A Bimpo is an imposter of a basic block.

@@ -26,13 +26,12 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "cxxopts.hpp"
@@ -71,9 +70,9 @@ public:
 class Expression : public MyIR {
 public:
   // Get the number of coefficients within this expression
-  virtual size_t GetNumCoeffs() const = 0;
+  [[nodiscard]] virtual int GetNumCoeffs() const = 0;
   // Replace the first replaceable coefficent with the function call, return true for success
-  virtual bool RepFirstCoeff(
+  [[nodiscard]] virtual bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) = 0;
@@ -83,13 +82,13 @@ public:
 // where c is an coefficient and v a variable or 1.
 class Term : public Expression {
 public:
-  size_t GetNumCoeffs() const override { return 1; }
+  [[nodiscard]] int GetNumCoeffs() const override { return 1; }
 
-  const std::string &GetCoeff() { return c; }
+  [[nodiscard]] const std::string &GetCoeff() const { return c; }
 
-  const std::string &GetVar() { return v; }
+  [[nodiscard]] const std::string &GetVar() const { return v; }
 
-  bool IsMutated() { return mutated; }
+  [[nodiscard]] bool IsMutated() const { return mutated; }
 
   void SetCoeff(const std::string &new_coeff) {
     c = new_coeff;
@@ -104,9 +103,9 @@ public:
     mutated = false;
   }
 
-  std::string GenerateCode() const override { return "(" + c + ") * " + v; };
+  [[nodiscard]] std::string GenerateCode() const override { return "(" + c + ") * " + v; };
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) override {
@@ -140,12 +139,12 @@ private:
 // A TermSum is the sum of a series of terms: s = t1 + ... + tn.
 class TermSum : public Expression {
 public:
-  size_t GetNumCoeffs() const override {
+  [[nodiscard]] int GetNumCoeffs() const override {
     // Each term has exactly 1 coeff
-    return terms.size();
+    return static_cast<int>(terms.size());
   }
 
-  std::string GenerateCode() const override {
+  [[nodiscard]] std::string GenerateCode() const override {
     std::vector<std::string> tmp(terms.size());
     std::transform(terms.begin(), terms.end(), tmp.begin(), [](const auto &t) {
       return t->GenerateCode();
@@ -153,10 +152,10 @@ public:
     return JoinStr(tmp, " + ");
   }
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
-  ) {
+  ) override {
     for (auto &term: terms) {
       if (term->RepFirstCoeff(funName, initialisation, finalization)) {
         return true;
@@ -184,11 +183,11 @@ public:
 
 public:
   // Return the type of the statement
-  virtual Type GetStmtType() const = 0;
+  [[nodiscard]] virtual Type GetStmtType() const = 0;
   // Return the number of coefficient within this statement
-  virtual size_t GetNumCoeffs() const = 0;
+  [[nodiscard]] virtual int GetNumCoeffs() const = 0;
   // Replace the first replaceable coefficent with the function call, return true for success
-  virtual bool RepFirstCoeff(
+  [[nodiscard]] virtual bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) = 0;
@@ -207,18 +206,18 @@ public:
   }
 
 public:
-  Type GetStmtType() const override { return Type::ASSIGN; }
+  [[nodiscard]] Type GetStmtType() const override { return Type::ASSIGN; }
 
-  size_t GetNumCoeffs() const override { return rhsExpr->GetNumCoeffs(); }
+  [[nodiscard]] int GetNumCoeffs() const override { return rhsExpr->GetNumCoeffs(); }
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) override {
     return rhsExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
 
-  std::string GenerateCode() const override {
+  [[nodiscard]] std::string GenerateCode() const override {
     return "    " + lhsVar + " = " + rhsExpr->GenerateCode() + ";";
   }
 
@@ -230,7 +229,7 @@ private:
 // An IfGotoStmt is an if-cond-goto statement: if (...) goto BB;
 class IfGotoStmt : public Statement {
 public:
-  void Parse(const std::string &code) {
+  void Parse(const std::string &code) override {
     auto ifKeyword = code.find("if");
     auto openParen = code.find('(', ifKeyword);
     auto gtThEq = code.find(">=", openParen);
@@ -242,18 +241,18 @@ public:
   }
 
 public:
-  Type GetStmtType() const override { return Type::IFGOTO; }
+  [[nodiscard]] Type GetStmtType() const override { return Type::IFGOTO; }
 
-  size_t GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
+  [[nodiscard]] int GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) override {
     return condExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
 
-  std::string GenerateCode() const override {
+  [[nodiscard]] std::string GenerateCode() const override {
     return "    if (" + condExpr->GenerateCode() + " >= 0) " + gotoStmt + ";";
   }
 
@@ -265,29 +264,27 @@ private:
 // An WhileStmt is the while-clause of an do-while statement: "} while (...);"
 class WhileStmt : public Statement {
 public:
-  void Parse(const std::string &code) {
+  void Parse(const std::string &code) override {
     auto whileKeyword = code.find("while");
     auto openParen = code.find('(', whileKeyword);
     auto gtThEq = code.find(">=", openParen);
-    auto closeParen = code.find(')', gtThEq);
-    auto semicolon = code.find(';', closeParen);
     // TODO: Currently, we only support TermSum
-    condExpr = TermSum::Create<TermSum>(code.substr(openParen + 1, gtThEq - 1 - openParen - 1));
+    condExpr = Create<TermSum>(code.substr(openParen + 1, gtThEq - 1 - openParen - 1));
   }
 
 public:
-  Type GetStmtType() const override { return Type::WHILE; }
+  [[nodiscard]] Type GetStmtType() const override { return Type::WHILE; }
 
-  size_t GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
+  [[nodiscard]] int GetNumCoeffs() const override { return condExpr->GetNumCoeffs(); }
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) override {
     return condExpr->RepFirstCoeff(funName, initialisation, finalization);
   }
 
-  std::string GenerateCode() const override {
+  [[nodiscard]] std::string GenerateCode() const override {
     return "    } while (" + condExpr->GenerateCode() + " >= 0);";
   }
 
@@ -301,18 +298,18 @@ public:
   void Parse(const std::string &code) override { stmt = code; }
 
 public:
-  Type GetStmtType() const override { return Type::FLUFF; }
+  [[nodiscard]] Type GetStmtType() const override { return Type::FLUFF; }
 
-  size_t GetNumCoeffs() const override { return 0; }
+  [[nodiscard]] int GetNumCoeffs() const override { return 0; }
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
   ) override {
     return false;
   }
 
-  std::string GenerateCode() const override { return stmt; }
+  [[nodiscard]] std::string GenerateCode() const override { return stmt; }
 
 private:
   std::string stmt;
@@ -346,15 +343,17 @@ public:
     }
     mifs.close();
 
-    auto fun = Function::Create<Function>(foss.str());
+    auto fun = Create<Function>(foss.str());
     fun->ParseMapping(moss.str());
 
     return fun;
   }
 
-  const std::string &GetName() { return name; }
+  [[nodiscard]] const std::string &GetName() { return name; }
 
-  int GetNumRepCoeffs() const { return numCoeffs * GlobalOptions::Get().ReplaceProba; }
+  [[nodiscard]] int GetNumRepCoeffs() const {
+    return static_cast<int>(numCoeffs * GlobalOptions::Get().ReplaceProba);
+  }
 
   void ExtractMapping(
       std::vector<int> &foreign_initialisation, std::vector<int> &foreign_finalization
@@ -378,12 +377,12 @@ public:
           ini.size() == fin.size() && "the size of initialisation and finalization is different"
       );
 
-      initialisations.push_back(std::vector<int>(ini.size()));
+      initialisations.emplace_back(ini.size());
       std::transform(
           ini.begin(), ini.end(), initialisations.back().begin(),
           [](const auto &s) -> int { return std::stoi(s); }
       );
-      finalizations.push_back(std::vector<int>(fin.size()));
+      finalizations.emplace_back(fin.size());
       std::transform(
           fin.begin(), fin.end(), finalizations.back().begin(),
           [](const auto &s) -> int { return std::stoi(s); }
@@ -396,32 +395,38 @@ public:
     finalizations.push_back(finalization);
   }
 
-  bool RepFirstCoeff(
+  [[nodiscard]] bool RepFirstCoeff(
       const std::string &funName, const std::vector<int> &initialisation,
       const std::vector<int> &finalization
-  ) {
+  ) const {
     auto rand = Random::Get().Uniform(0, (int) statements.size() - 1);
     auto probability = Random::Get().UniformReal()();
-    int trials = 1000;
     // Sample a statement from the list of statements for replacement
-    while (trials > 0) {
-      int index = rand();
+    for (int tries = 0; tries < 1000; tries++) {
+      const int index = rand();
+      const auto &stmt = statements[index];
       // Idea: 80% of the replacements should be in the IF statements, and 20% in assignments
-      if (statements[index]->GetStmtType() == Statement::Type::IFGOTO && probability < 0.8) {
-        if (statements[index]->RepFirstCoeff(funName, initialisation, finalization)) {
-          return true;
-        }
-      } else if (statements[index]->GetStmtType() == Statement::Type::ASSIGN && probability > 0.8) {
-        if (statements[index]->RepFirstCoeff(funName, initialisation, finalization)) {
-          return true;
-        }
+      double threshold;
+      switch (stmt->GetStmtType()) {
+        case Statement::Type::IFGOTO:
+        case Statement::Type::WHILE:
+          threshold = 0.4;
+          break;
+        case Statement::Type::ASSIGN:
+          threshold = 0.2;
+          break;
+        default:
+          threshold = 0;
+          break;
       }
-      trials--;
+      if (probability < threshold && stmt->RepFirstCoeff(funName, initialisation, finalization)) {
+        return true;
+      }
     }
     return false;
   }
 
-  std::string GenerateCode() const override {
+  [[nodiscard]] std::string GenerateCode() const override {
     std::ostringstream oss;
     for (const auto &statement: statements) {
       oss << statement->GenerateCode() << std::endl;
@@ -434,57 +439,57 @@ public:
     std::string line;
     // Parse the function line by line
     while (std::getline(iss, line)) {
-      if (line.find("do {") != std::string::npos) {
-        statements.push_back(FluffStmt::Create<FluffStmt>(line));
-      } else if (line.find("pass_counter") != std::string::npos) {
+      if (line.find("pass_counter") != std::string::npos) {
         // Our replacement respect pass_counter
-        statements.push_back(FluffStmt::Create<FluffStmt>(line));
-      } else if (line.find("while") != std::string::npos) {
-        statements.push_back(WhileStmt::Create<WhileStmt>(line));
+        statements.push_back(Create<FluffStmt>(line));
+      } else if (line.find("do {") != std::string::npos) {
+        statements.push_back(Create<FluffStmt>(line));
+      } else if (line.find("} while") != std::string::npos) {
+        statements.push_back(Create<WhileStmt>(line));
         numCoeffs += statements.back()->GetNumCoeffs();
       } else if (line.find("if") != std::string::npos) {
-        statements.push_back(IfGotoStmt::Create<IfGotoStmt>(line));
+        statements.push_back(Create<IfGotoStmt>(line));
         numCoeffs += statements.back()->GetNumCoeffs();
       } else if (line.find("int function") != std::string::npos) {
         // Start of the function
         auto nameStart = line.find("function");
-        auto paramStart = line.find("(");
-        auto paramEnd = line.find(")");
+        auto paramStart = line.find('(');
+        auto paramEnd = line.find(')');
         name = line.substr(nameStart, paramStart - nameStart);
         std::string params = line.substr(paramStart + 1, paramEnd - paramStart);
-        numParams = std::count(params.begin(), params.end(), ',') + 1;
-        statements.push_back(FluffStmt::Create<FluffStmt>(line));
+        numParams = static_cast<int>(std::ranges::count(params, ',')) + 1;
+        statements.push_back(Create<FluffStmt>(line));
       } else if (line.find("return") != std::string::npos) {
-        statements.push_back(FluffStmt::Create<FluffStmt>(line));
+        statements.push_back(Create<FluffStmt>(line));
       } else if (line.find("BB") != std::string::npos) {
         // Start a new basic block
-        statements.push_back(FluffStmt::Create<FluffStmt>(line));
-      } else if (line.find("=") != std::string::npos) {
+        statements.push_back(Create<FluffStmt>(line));
+      } else if (line.find('=') != std::string::npos) {
         // Add statement to the current basic block
-        statements.push_back(AssignStmt::Create<AssignStmt>(line));
+        statements.push_back(Create<AssignStmt>(line));
         numCoeffs += statements.back()->GetNumCoeffs();
       } else {
         // Add it as a fluff statement
-        statements.push_back(FluffStmt::Create<FluffStmt>(line));
+        statements.push_back(Create<FluffStmt>(line));
       }
     }
   }
 
 private:
   std::string name;
-  std::vector<std::unique_ptr<Statement>> statements;
+  std::vector<std::unique_ptr<Statement>> statements{};
 
-  int numParams; // The number of function parameters/arguments
-  int numCoeffs; // The number of coefficients in this function
+  int numParams = 0; // The number of function parameters/arguments
+  int numCoeffs = 0; // The number of coefficients in this function
 
-  std::vector<std::vector<int>> initialisations;
-  std::vector<std::vector<int>> finalizations;
+  std::vector<std::vector<int>> initialisations{};
+  std::vector<std::vector<int>> finalizations{};
 };
 
-class Program {
+class ProgGen {
 public:
-  Program(const std::string &uuid, int sno, const std::vector<std::string> &funPaths) :
-      uuid(uuid), sno(std::to_string(sno)) {
+  ProgGen(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
+      uuid(std::move(uuid)), sno(std::to_string(sno)) {
     // Parse all selected function files
     for (const auto &funPath: funPaths) {
       fs::path mapPath = GetMappingPathForFunctionPath(funPath);
@@ -494,7 +499,7 @@ public:
 
   std::string GetName() { return uuid + "_" + sno; }
 
-  void Generate() {
+  void Generate() const {
     int numFuns = static_cast<int>(functions.size());
     assert(
         numFuns == GlobalOptions::Get().FunctionDepth &&
@@ -532,7 +537,7 @@ public:
     }
   }
 
-  void GenerateCode(const fs::path &file, bool debug = false, bool staticModifier = false) {
+  void GenerateCode(const fs::path &file, bool debug = false, bool staticModifier = false) const {
     std::ofstream oss(file);
     oss << StatelessChecksum::GetRawCode() << std::endl;
     oss << "#include <stdio.h>" << std::endl;
@@ -708,7 +713,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Now we construct our new program
-    auto prog = std::make_unique<Program>(progUuid, sampNo, selFunPaths);
+    auto prog = std::make_unique<ProgGen>(progUuid, sampNo, selFunPaths);
     prog->Generate();
 
     std::cout << "[" << sampNo << "] Storing" << std::endl;
