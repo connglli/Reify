@@ -31,8 +31,8 @@
 
 #include "lib/random.hpp"
 
-bool CfgBkboneGen::HasPath(int u, int v) const {
-  std::vector<bool> visited(numNodes, false);
+bool GraphPlus::IsReachable(const int u, const int v) const {
+  std::vector visited(NumNodes(), false);
   std::queue<int> worklist;
 
   worklist.push(u);
@@ -54,12 +54,12 @@ bool CfgBkboneGen::HasPath(int u, int v) const {
   return false;
 }
 
-std::vector<int> CfgBkboneGen::SampleWalk(int start, int end, int maxSteps) const {
+auto GraphPlus::SampleWalk(const int start, const int end, int maxSteps) const -> std::vector<int> {
   auto rand = Random::Get().Uniform();
 
   std::vector<int> walk;
   // Ensure maxSteps is at least 10 times the number of nodes
-  maxSteps = std::max(maxSteps, 50 * numNodes);
+  maxSteps = std::max(maxSteps, 50 * NumNodes());
   int curNode = start;
   walk.push_back(curNode);
 
@@ -84,11 +84,12 @@ std::vector<int> CfgBkboneGen::SampleWalk(int start, int end, int maxSteps) cons
   return walk;
 }
 
-std::vector<int> CfgBkboneGen::SampleConsistentWalk(int start, int end, int maxSteps) const {
+auto GraphPlus::SampleConsistentWalk(const int start, const int end, int maxSteps) const
+    -> std::vector<int> {
   auto rand = Random::Get().Uniform();
 
   std::vector<int> walk;
-  maxSteps = std::max(maxSteps, 50 * numNodes); // Ensure enough steps
+  maxSteps = std::max(maxSteps, 50 * NumNodes()); // Ensure enough steps
   int curNode = start;
   walk.push_back(curNode);
 
@@ -116,8 +117,8 @@ std::vector<int> CfgBkboneGen::SampleConsistentWalk(int start, int end, int maxS
       // Record the visit
       visitedNeighbors[curNode].insert(nextNode);
 
-      // If the node had outdegree 2 and now has visited both, lock to the last one
-      if (neighbors.size() == 2 && visitedNeighbors[curNode].size() == 2) {
+      // If the node had max outdegree and now has visited all, lock to the last one
+      if (neighbors.size() == maxOutdeg && visitedNeighbors[curNode].size() == maxOutdeg) {
         lockedNeighbors[curNode] = nextNode; // Lock to the first visited neighbor
       }
 
@@ -132,168 +133,238 @@ std::vector<int> CfgBkboneGen::SampleConsistentWalk(int start, int end, int maxS
   return walk;
 }
 
-std::vector<std::vector<int>> CfgBkboneGen::GetKDistinctWalks(int start, int end, int k) const {
-  std::set<std::vector<int>> walks;
-  int tries = 0;
-  while (walks.size() < k && tries < 1000) {
-    std::vector<int> walk = SampleWalk(start, end);
-    if (walk.size() > 1) {
-      walks.insert(walk);
-    }
-    tries++;
-  }
-  return std::vector<std::vector<int>>(walks.begin(), walks.end());
+std::vector<int> GraphPlus::SampleGraph(const bool consistent, const int maxSteps) const {
+  return consistent ? SampleConsistentWalk(0, NumNodes() - 1, maxSteps)
+                    : SampleWalk(0, NumNodes() - 1, maxSteps);
 }
 
-std::vector<std::vector<int>>
-CfgBkboneGen::GetKDistinctConsistentWalks(int start, int end, int k) const {
-  std::set<std::vector<int>> walks;
-  int tries = 0;
-  while (walks.size() < k && tries < 1000) {
-    std::vector<int> walk = SampleConsistentWalk(start, end);
-    if (walk.size() > 1) {
-      walks.insert(walk);
+void GraphPlus::Generate(const bool acyclic) {
+  auto randTarget = Random::Get().Uniform(0, NumNodes() - 1);
+  auto randTarNum = Random::Get().Uniform(2, maxOutdeg);
+
+  for (int node = 0; node < NumNodes() - 1; node++) {
+    if (randTarget() % 2 == 0 || node == NumNodes() - 2) {
+      int target = randTarget();
+      while (target == 0 || target == node) {
+        target = randTarget();
+      }
+      addEdge(node, target);
+    } else {
+      std::set<int> targets;
+      const int numTargets = randTarNum();
+
+      for (int i = 0; i < numTargets; i++) {
+        int target = randTarget();
+        while (target == 0 || target == node || targets.contains(target)) {
+          target = randTarget();
+        }
+        addEdge(node, target);
+        targets.insert(target);
+      }
     }
-    tries++;
   }
-  return std::vector<std::vector<int>>(walks.begin(), walks.end());
+
+  if (acyclic) {
+    ensureNoCycles();
+    Assert(!HasCycles(), "The generated graph still has cycles even though we removed some");
+  }
+
+  tryMakeReachFromEntry();
+  tryMakeReachToExit();
+
+  if (!IsReachable(0, NumNodes() - 1)) {
+    std::cerr << "Warning: The generated graph is not reachable from the entry to the exit"
+              << std::endl;
+  }
 }
 
-std::vector<std::vector<int>>
-CfgBkboneGen::SampleKDisjointWalksAndBackpatch(int start, int end, int k) {
-  auto rand = Random::Get().Uniform();
+bool GraphPlus::HasCycles() const {
+  // This is a simple cycle detection algorithm using DFS
+  std::vector<bool> visited(NumNodes(), false);
+  std::vector<bool> recStack(NumNodes(), false);
 
-  // k paths must only have the start and end node in common
-  // for others, we make random connections between the nodes in order to make them disjoint
-  std::vector<std::vector<int>> walks;
-  int tries = 0;
-  std::set<int> nonVisitedNodes;
-  for (int i = 0; i < numNodes; i++) {
-    nonVisitedNodes.insert(i);
-  }
-  while (walks.size() < k && tries < 1000) {
-    std::vector<int> walk;
-    // let's sample a walk from the unvisited nodes
-    int curNode = start;
-    int numNodesInWalk = 0;
-    walk.push_back(curNode);
-    // look for a neighbour in the unvisited nodes, if not, then we create a new edge after
-    // arbitrarily choosing a node from the unvisited nodes
-    while (curNode != end || numNodesInWalk >= 50 * numNodes) {
-      const std::set<int> &neighbors = adjTab[curNode];
-      // check if any of the current node's neighbours are in the unvisited nodes
-      std::set<int> unvisitedNeighbors;
-      for (auto neighbor: neighbors) {
-        if (nonVisitedNodes.find(neighbor) != nonVisitedNodes.end()) {
-          unvisitedNeighbors.insert(neighbor);
+  const std::function<bool(int)> hasCycles = [&](int n) {
+    if (!visited[n]) {
+      visited[n] = true;
+      recStack[n] = true;
+      for (int nb: adjTab[n]) {
+        if (!visited[nb] && hasCycles(nb)) {
+          return true; // Cycle detected
+        } else if (recStack[nb]) {
+          return true; // Cycle detected
         }
       }
-      if (!unvisitedNeighbors.empty()) {
-        auto it = unvisitedNeighbors.begin();
-        std::advance(it, rand() % unvisitedNeighbors.size()); // Random step
-        curNode = *it;
-      } else {
-        // choose a random node from the unvisited nodes
-        auto it = nonVisitedNodes.begin();
-        std::advance(it, rand() % nonVisitedNodes.size()); // Random step
-        adjTab[curNode].insert(*it);
-        curNode = *it;
-      }
-      walk.push_back(curNode);
-      numNodesInWalk++;
     }
-    // remove all the nodes in the walk from the nonVisitedNodes set
-    for (auto node: nonVisitedNodes) {
-      if (node != start && node != end) {
-        nonVisitedNodes.erase(node);
-      }
-    }
-    // add the walk to the set of walks
-    if (walk.size() > 1) {
-      walks.push_back(walk);
-    }
-    tries++;
-  }
-  return walks;
-}
+    recStack[n] = false; // Backtrack
+    return false;
+  };
 
-void CfgBkboneGen::Generate() {
-  auto rand = Random::Get().Uniform(0, numNodes - 1);
-
-  for (int i = 0; i < numNodes - 1; i++) {
-    if (rand() % 2 == 0 || i == numNodes - 2) {
-      int target = rand();
-      while (target == 0 || target == i)
-        target = rand();
-      addEdge(i, target);
-    } else {
-      int target1 = rand();
-      int target2 = rand();
-
-      while (target1 == 0 || target1 == i)
-        target1 = rand();
-      while (target2 == 0 || target2 == i || target2 == target1)
-        target2 = rand();
-
-      addEdge(i, target1);
-      addEdge(i, target2);
+  for (int node = 0; node < NumNodes(); node++) {
+    if (!visited[node] && hasCycles(node)) {
+      return true;
     }
   }
 
-  enforceReachabilityFromEntry();
-  enforceReachabilityToExit();
+  return false;
 }
 
-void CfgBkboneGen::addEdge(int u, int v) {
-  // Ensure outdegree <= 2 as we are a CFG
-  if (u != v && adjTab[u].size() < 2) {
+void GraphPlus::Reset() {
+  for (auto &adj: adjTab) {
+    adj.clear();
+  }
+}
+
+bool GraphPlus::addEdge(const int u, const int v) {
+  // Ensure outdegree <= maxOutdeg
+  if (u != v && adjTab[u].size() < maxOutdeg) {
     adjTab[u].insert(v);
+    return true;
+  }
+  return false;
+}
+
+void GraphPlus::ensureNoCycles() {
+  // This is a simple cycle detection algorithm using DFS
+  std::vector<bool> visited(NumNodes(), false);
+  std::vector<bool> recStack(NumNodes(), false);
+
+  const std::function<void(int)> removeCycles = [&](int n) {
+    if (!visited[n]) {
+      visited[n] = true;
+      recStack[n] = true;
+      std::vector<int> cycleEdges;
+      for (int neighbor: adjTab[n]) {
+        if (!visited[neighbor]) {
+          removeCycles(neighbor);
+        } else if (recStack[neighbor]) {
+          cycleEdges.push_back(neighbor); // Cycle detected
+        }
+      }
+      if (!cycleEdges.empty()) {
+        for (auto e: cycleEdges) {
+          adjTab[n].erase(e); // Remove the back edge to break the cycle
+        }
+      }
+    }
+    recStack[n] = false; // Backtrack
+  };
+
+  for (int node = 0; node < NumNodes(); node++) {
+    if (!visited[node]) {
+      removeCycles(node);
+    }
   }
 }
 
-void CfgBkboneGen::enforceReachabilityToExit() {
-  for (int i = numNodes - 2; i >= 0; i--) {
-    if (!HasPath(i, numNodes - 1)) {
+void GraphPlus::tryMakeReachFromEntry() {
+  const int entryNode = 0;
+  for (int node = entryNode + 1; node < NumNodes(); node++) {
+    if (!IsReachable(entryNode, node)) {
       std::vector<int> candidates;
-      for (int j = i + 1; j < numNodes; j++) {
-        if (HasPath(j, numNodes - 1)) {
-          candidates.push_back(j);
+      for (int i = entryNode; i < node; i++) {
+        if (IsReachable(entryNode, i)) {
+          candidates.push_back(i);
+        }
+      }
+      for (auto candidate: candidates) {
+        if (candidate == entryNode) {
+          continue;
+        }
+        if (adjTab[candidate].size() < maxOutdeg) {
+          addEdge(candidate, node); // TODO Don't we stop if we succeed?
+        }
+      }
+    }
+  }
+}
+
+void GraphPlus::tryMakeReachToExit() {
+  const int exitNode = NumNodes() - 1;
+  for (int node = exitNode - 1; node >= 0; node--) {
+    if (!IsReachable(node, exitNode)) {
+      std::vector<int> candidates;
+      for (int i = node + 1; i < NumNodes(); i++) {
+        if (IsReachable(i, exitNode)) {
+          candidates.push_back(i);
         }
       }
       bool found = false;
       for (auto candidate: candidates) {
-        if (candidate == numNodes - 1) {
+        if (candidate == exitNode) {
           continue;
         }
-        if (adjTab[candidate].size() < 2) {
-          addEdge(i, candidate);
-          found = true;
+        if (adjTab[candidate].size() < maxOutdeg) {
+          addEdge(node, candidate);
+          found = true; // TODO Don't we stop if we succeed?
         }
       }
       if (!found) {
-        addEdge(i, numNodes - 1);
+        addEdge(node, exitNode);
       }
     }
   }
 }
 
-void CfgBkboneGen::enforceReachabilityFromEntry() {
-  for (int i = 1; i < numNodes; i++) {
-    if (!HasPath(0, i)) {
+void GraphPlus::unsafeEnforceReachFromEntry() {
+  const int entryNode = 0;
+  for (int node = 1; node < NumNodes(); node++) {
+    if (!IsReachable(entryNode, node)) {
       std::vector<int> candidates;
-      for (int j = 0; j < i; j++) {
-        if (HasPath(0, j)) {
-          candidates.push_back(j);
+      for (int i = 1; i < node; i++) {
+        if (IsReachable(entryNode, i)) {
+          candidates.push_back(i);
         }
       }
+      bool found = false;
       for (auto candidate: candidates) {
-        if (candidate == 0) {
-          continue;
-        }
-        if (adjTab[candidate].size() < 2) {
-          addEdge(candidate, i);
+        if (addEdge(candidate, node)) {
+          found = true;
+          break;
         }
       }
+      if (!found) {
+        // We force the connection between the entry and the node
+        // This may break the max outdegree constraints on the entry
+        adjTab[entryNode].insert(node);
+      }
+    }
+  }
+}
+
+void GraphPlus::unsafeEnforceReachToExit() {
+  const int exitNode = NumNodes() - 1;
+  for (int node = NumNodes() - 2; node >= 0; node--) {
+    if (IsReachable(node, exitNode)) {
+      continue;
+    }
+    std::vector<int> candidates;
+    for (int i = node + 1; i < exitNode; i++) {
+      if (IsReachable(i, exitNode)) {
+        candidates.push_back(i);
+      }
+    }
+    bool found = false;
+    for (auto candidate: candidates) {
+      if (addEdge(node, candidate)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found && !addEdge(node, exitNode)) {
+      // It must be the case the i's outdegree reaches the limit.
+      // We remove anyone successor and directly branch to the exit.
+      Assert(
+          adjTab[node].size() == maxOutdeg,
+          "The outdegree of node %d is not reaching the limit "
+          "but we're unable to add any edges",
+          node
+      );
+      adjTab[node].erase(adjTab[node].begin());
+      Assert(
+          addEdge(node, exitNode),
+          "We removed an edge from node %d's successor but we're unable to branch it to the exit",
+          node
+      );
     }
   }
 }

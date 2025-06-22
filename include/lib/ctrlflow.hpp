@@ -30,110 +30,11 @@
 #include <memory>
 #include <set>
 #include <vector>
+
 #include "lib/dbgutils.hpp"
+#include "lib/graph.hpp"
 
 class CfgSketch;
-
-/// A GraphPlus is random graph generator
-class GraphPlus {
-  friend class CfgSketch;
-
-public:
-  explicit GraphPlus(int numNodes, int maxOutdeg = 2) : adjTab(numNodes), maxOutdeg(maxOutdeg) {
-    Assert(numNodes >= 3, "The minimum nodes must be greater than 3, but got %d", numNodes);
-    Assert(maxOutdeg >= 2, "The maximum outdegree must be greater than 2, but got %d", maxOutdeg);
-  }
-
-  [[nodiscard]] int NumNodes() const { return static_cast<int>(adjTab.size()); }
-
-  [[nodiscard]] const std::set<int> &GetAdj(int i) const { return adjTab[i]; }
-
-  [[nodiscard]] const std::vector<std::set<int>> &GetAdjTab() const { return adjTab; }
-
-  // Check if u->v is reachable, i.e., there exists a path from node u to node v.
-  [[nodiscard]] bool IsReachable(int u, int v) const;
-
-  // Check if the entry node can reach the exit node
-  [[nodiscard]] bool IsEntryExitReachable() const { return IsReachable(0, NumNodes() - 1); }
-
-  // Check if the graph has cycles.
-  [[nodiscard]] bool HasCycles() const;
-
-  // Walk the graph randomly from start and stop if we encounter end or reach max steps.
-  // Return the path we've been through (including start and the end).
-  [[nodiscard]] std::vector<int> SampleWalk(int start, int end, int maxSteps = 100) const;
-
-  // Walk the graph randomly from start and stop if we encounter end or reach max steps.
-  // Return the path we've been through (including start and the end).
-  // Different from inconsistent walk, this walk consistently visit a single successor after
-  // successors of a node have all been visited.
-  [[nodiscard]] std::vector<int> SampleConsistentWalk(int start, int end, int maxSteps = 100) const;
-
-  // Sample the whole graph from the entry to the exit, or reach the max number of steps.
-  [[nodiscard]] std::vector<int> SampleGraph(bool consistent, int maxSteps = 100) const;
-
-  // Add a new entry node to the graph, which points to the old entry node
-  void AddNewEntry() {
-    // Update all the successors of all the old nodes
-    for (int node = 0; node < NumNodes(); ++node) {
-      // Update the successors of node by adding each successor's value by 1
-      auto &oldSuccessors = adjTab[node];
-      std::vector<int> newSuccessors(oldSuccessors.size());
-      std::transform(oldSuccessors.begin(), oldSuccessors.end(), newSuccessors.begin(), [](int v) {
-        return v + 1;
-      });
-      oldSuccessors.clear();
-      oldSuccessors.insert(newSuccessors.begin(), newSuccessors.end());
-    }
-    // Add an entry node to the graph
-    adjTab.insert(adjTab.begin(), std::set<int>());
-    // Point the entry node to the old entry node
-    adjTab.front().insert(1);
-  }
-
-  // Add a new exit node to the graph, which is pointed by the old exit node
-  void AddNewExit() {
-    // Point the old exit node to the new exit node
-    adjTab.back().insert(NumNodes());
-    // Add an exit node to the graph
-    adjTab.emplace_back();
-  }
-
-  // Generate the backbone graph randomly.
-  void Generate(bool acyclic = false);
-
-  // Reset the graph
-  void Reset();
-
-private:
-  // Add an edge between node u and node v, return true if added
-  bool addEdge(int u, int v);
-
-  // Ensure the graph has no cycles
-  void ensureNoCycles();
-
-  // Try to make every node is reachable from the entry node
-  // However, this is not ensured
-  void tryMakeReachFromEntry();
-
-  // Try to make every node has a path to the exit node
-  // However, this is not ensured
-  void tryMakeReachToExit();
-
-  // Enforce the reachability from every node to the exit.
-  // This is an unsafe operation as they may break our set
-  // constraints over the maximum in/out degrees.
-  void unsafeEnforceReachToExit();
-
-  // Enforce the reachability from the entry to every node.
-  // This is an unsafe operation as they may break our set
-  // constraints over the maximum in/out degrees.
-  void unsafeEnforceReachFromEntry();
-
-private:
-  const int maxOutdeg;
-  std::vector<std::set<int>> adjTab{};
-};
 
 /// A Bimpo is an imposter of a basic block.
 /// This means the bimpo might not be a real basic block.
@@ -146,22 +47,26 @@ public:
 
 public:
   virtual ~Bimpo() = default;
+
+  // Get the number of actual basic blocks this bimpo is pretending
   [[nodiscard]] virtual int NumBbls() const = 0;
+
+  // Get the type of the real basic block or basic blocks
   [[nodiscard]] virtual Type GetType() const = 0;
 };
 
-/// A Block is a real basic block
-class Block final : public Bimpo {
+/// A BiBlock is a real basic block
+class BiBlock final : public Bimpo {
 public:
   [[nodiscard]] int NumBbls() const override { return 1; }
 
   [[nodiscard]] Type GetType() const override { return BLOCK; }
 };
 
-/// A Loop is a reducible loop with entry, latch, and exit
-class Loop final : public Bimpo {
+/// A BiLoop is a reducible loop with entry, latch, and exit
+class BiLoop final : public Bimpo {
 public:
-  explicit Loop(int numBbls, bool allowNestedLoops = true) : graph(numBbls - 1, 2) {
+  explicit BiLoop(int numBbls, bool allowNestedLoops = true) : graph(numBbls - 1, 2) {
     bool reachable = false;
     // We instantiate the loop's CFG directly. We'll try until we successfully
     // generate a loop that is reachable from the entry to the exit.
@@ -182,13 +87,13 @@ public:
     graph.AddNewExit();
   }
 
-  int GetEntry() const { return 0; }
+  [[nodiscard]] int GetEntry() const { return 0; }
 
-  int GetLatch() const { return graph.NumNodes() - 2; }
+  [[nodiscard]] int GetLatch() const { return graph.NumNodes() - 2; }
 
-  int GetExit() const { return graph.NumNodes() - 1; }
+  [[nodiscard]] int GetExit() const { return graph.NumNodes() - 1; }
 
-  const std::set<int> &GetSuccessor(int block) const { return graph.GetAdj(block); }
+  [[nodiscard]] const std::set<int> &GetSuccessor(int block) const { return graph.GetAdj(block); }
 
   [[nodiscard]] int NumBbls() const override { return graph.NumNodes(); }
 
@@ -230,7 +135,7 @@ private:
 /// CfgSketch is a random generator for the backbone (without generating SIRs) of a CFG
 class CfgSketch {
 public:
-  explicit CfgSketch(int initNumBbls) : graph(initNumBbls, 2) {}
+  explicit CfgSketch(const int initNumBbls) : graph(initNumBbls, 2) {}
 
   CfgSketch(const CfgSketch &) = delete;
   CfgSketch &operator=(const CfgSketch &) = delete;
@@ -257,10 +162,10 @@ public:
   // This method will turn a random block into a
   void GenerateReduLoop(int numBbls = 5);
 
-  void Print();
+  void Print() const;
 
 private:
-  int numBimpos() const { return graph.NumNodes(); }
+  [[nodiscard]] int numBimpos() const { return graph.NumNodes(); }
 
 private:
   // The unflattened view of the CFG

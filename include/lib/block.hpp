@@ -28,15 +28,15 @@
 #define GRAPHFUZZ_BLOCK_HPP
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
+#include "lib/ctrlflow.hpp"
 #include "lib/function.hpp"
-#include "lib/graphplus.hpp"
 #include "z3++.h"
 
 class FunGen;
 
+/// BlkGen is a basic block generator which populates each basic block with real statements
 class BlkGen {
 
 public:
@@ -59,35 +59,35 @@ public:
   );
 
 private:
-  z3::expr createParameterExpr(std::string name, z3::context &ctx);
+  z3::expr createParameterExpr(std::string name, z3::context &ctx) const;
 
-  z3::expr makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3::context &c);
+  static z3::expr makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3::context &c);
 
-  z3::expr boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs);
+  static z3::expr boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs);
 
   ///////////////////////////////////////////////////////////////////
   /////// Code Generation
   ///////////////////////////////////////////////////////////////////
 
 public:
-  std::string GenerateCode() const;
+  [[nodiscard]] std::string GenerateCode() const;
 
 private:
-  std::string generateConditionalConstraint(
+  [[nodiscard]] std::string generateConditionalConstraint(
       int blockno, int target, std::vector<int> conditionalVariables
   ) const;
 
-  std::string generateUnconditionalGoto(int target) const;
+  [[nodiscard]] std::string generateUnconditionalGoto(int target) const;
 
 private:
   FunGen &f;        // The residing function of this basic block
   int bblNo;        // The identifier of this basic block
   BblSketch bblSkt; // The sketch of this basic block
 
-  std::vector<int> assignmentOrder; // The order of the definition of each variable
-  std::map<int, std::vector<int>>
-      defUsedVars;               // The list of used variables for each defined variables
-  std::vector<int> condUsedVars; // The list of used variables for the conditional
+  std::vector<int> assignmentOrder{}; // The order of the definition of each variable
+  std::map<int, std::vector<int>> defUsedVars{
+  }; // The list of used variables for each defined variables
+  std::vector<int> condUsedVars{}; // The list of used variables for the conditional
 
   // MOTIVATION: We need to generate a pass counter name for the block in case we
   // end up in a consistent walk with a loop which never reaches the end node

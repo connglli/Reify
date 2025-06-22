@@ -23,21 +23,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
 #ifndef GRAPHFUZZ_FUNCTION_HPP
 #define GRAPHFUZZ_FUNCTION_HPP
 
-#include <cassert>
 #include <optional>
 #include <string>
 #include <vector>
 #include <z3++.h>
 
 #include "lib/block.hpp"
-#include "lib/graphplus.hpp"
+#include "lib/ctrlflow.hpp"
+#include "lib/dbgutils.hpp"
 
 class BlkGen;
 
+/// FunGen is a function generator which populates each the whole function with real statements
 class FunGen {
 public:
   explicit FunGen(int numBBs, int numVars, int maxNumLoops, int maxNumBblsPerLoop) :
@@ -47,28 +47,28 @@ public:
   FunGen(const FunGen &) = delete;
   FunGen &operator=(const FunGen &) = delete;
 
-  const auto &GetCfg() const { return cfg; }
+  [[nodiscard]] const auto &GetCfg() const { return cfg; }
 
-  const int NumBbls() const { return cfg.NumBbls(); }
+  [[nodiscard]] int NumBbls() const { return cfg.NumBbls(); }
 
-  const int NumVars() const { return numVars; }
+  [[nodiscard]] int NumVars() const { return numVars; }
 
-  const auto &GetBbls() const { return bblGens; }
+  [[nodiscard]] const auto &GetBbls() const { return bblGens; }
 
   void Generate();
 
-  std::vector<int> SampleExec(int execStep, bool consistent);
+  [[nodiscard]] std::vector<int> SampleExec(int execStep, bool consistent);
 
   ///////////////////////////////////////////////////////////////////
   /////// Constraint Initialization and Finalization
   ///////////////////////////////////////////////////////////////////
 
-  const bool ParamDefined(const std::string &name) {
+  [[nodiscard]] bool ParamDefined(const std::string &name) {
     return state.find(name) != state.end() && state[name].has_value();
   }
 
-  const int GetParamVal(const std::string &name) {
-    assert(ParamDefined(name) && "Parameter not defined");
+  [[nodiscard]] int GetParamVal(const std::string &name) {
+    Assert(ParamDefined(name), "Parameter %s not defined", name.c_str());
     return state[name].value();
   }
 
@@ -100,13 +100,13 @@ public:
   /////// Code Generation
   ///////////////////////////////////////////////////////////////////
 
-  std::string GenerateFunCode(const std::string &sno, const std::string &uuid);
+  std::string GenerateFunCode(const std::string &sno, const std::string &uuid) const;
 
   std::string GenerateMainCode(
       const std::string &sno, const std::string &uuid,
       const std::vector<std::vector<int>> &initialisations,
       const std::vector<std::vector<int>> &finalizations, bool debug = false
-  );
+  ) const;
 
   static std::string
   GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation);

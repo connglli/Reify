@@ -30,7 +30,7 @@
 #include <vector>
 #include <z3++.h>
 
-#include "random.hpp"
+#include "lib/random.hpp"
 
 static z3::expr AtMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k) {
   z3::expr_vector zero_constraints(ctx);
@@ -43,12 +43,12 @@ static z3::expr AtMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec
 
 static std::vector<int> SampleKDistinct(int n, int k) {
   n -= 1;
-  assert(k <= n + 1 && "k must be at most n + 1 to sample k distinct numbers");
+  Assert(k <= n + 1, "k (=%d) must be at most n + 1 (=%d) to sample k distinct numbers", k, n + 1);
   std::vector<int> numbers(n + 1);
   for (int i = 0; i <= n; ++i) {
     numbers[i] = i;
   }
-  std::shuffle(numbers.begin(), numbers.end(), Random::Get().GetRNG());
+  std::ranges::shuffle(numbers, Random::Get().GetRNG());
   return std::vector<int>(numbers.begin(), numbers.begin() + k);
 }
 

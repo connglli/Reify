@@ -23,7 +23,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
 #include "lib/function.hpp"
 
 #include <sstream>
@@ -154,7 +153,7 @@ std::vector<int> FunGen::ExtractInitialisationsFromModel(z3::model &model, z3::c
   for (int i = 0; i < numVars; i++) {
     std::string varName = NameVar(i) + "_0";
     z3::expr varExpr = ctx.int_const(varName.c_str());
-    assert(model.has_interp(varExpr.decl()) && "Variable not found in model");
+    Assert(model.has_interp(varExpr.decl()), "Variable %s not found in model", varName.c_str());
     if (model.has_interp(varExpr.decl())) {
       z3::expr value = model.get_const_interp(varExpr.decl());
       if (value.is_numeral()) {
@@ -184,7 +183,7 @@ std::vector<int> FunGen::ExtractFinalizationsFromModel(
   for (int i = 0; i < numVars; i++) {
     std::string varName = NameVar(i) + "_" + std::to_string(versions[NameVar(i)]);
     z3::expr varExpr = ctx.int_const(varName.c_str());
-    assert(model.has_interp(varExpr.decl()) && "Variable not found in model");
+    Assert(model.has_interp(varExpr.decl()), "Variable %s not found in model", varName.c_str());
     if (model.has_interp(varExpr.decl())) {
       z3::expr value = model.get_const_interp(varExpr.decl());
       if (value.is_numeral()) {
@@ -208,7 +207,7 @@ std::vector<int> FunGen::ExtractFinalizationsFromModel(
 /////// Code Generation
 ///////////////////////////////////////////////////////////////////
 
-std::string FunGen::GenerateFunCode(const std::string &sno, const std::string &uuid) {
+std::string FunGen::GenerateFunCode(const std::string &sno, const std::string &uuid) const {
   std::ostringstream code;
   code << "int function_" << uuid << "_" << sno << "(";
   for (int i = 0; i < numVars; ++i) {
@@ -231,9 +230,9 @@ std::string FunGen::GenerateMainCode(
     const std::string &sno, const std::string &uuid,
     const std::vector<std::vector<int>> &initialisations,
     const std::vector<std::vector<int>> &finalizations, bool debug
-) {
-  assert(
-      initialisations.size() == finalizations.size() &&
+) const {
+  Assert(
+      initialisations.size() == finalizations.size(),
       "Initialisations and finalizations must have the same size"
   );
   // TODO: Remove duplicate

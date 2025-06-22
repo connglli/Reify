@@ -39,12 +39,14 @@ void BlkGen::Generate() {
   auto rand = Random::Get().Uniform(0, f.NumVars() - 1);
 
   // We define a variable for each statement using other variables
-  assignmentOrder = SampleKDistinct(f.NumVars(), GlobalOptions::Get().NumAssignsPerBBL);
-  for (int stmtIndex = 0; stmtIndex < assignmentOrder.size(); stmtIndex++) {
+  const auto numAssPerBbl = GlobalOptions::Get().NumAssignsPerBBL;
+  assignmentOrder = SampleKDistinct(f.NumVars(), numAssPerBbl);
+  for (int stmtIndex = 0; stmtIndex < numAssPerBbl; stmtIndex++) {
     int varIndex = assignmentOrder[stmtIndex];
 
     // Sample the variables which will be used in the RHS of the assignment statement
-    defUsedVars[varIndex] = SampleKDistinct(f.NumVars(), GlobalOptions::Get().NumVarsPerAssign);
+    const auto numVarsPerAss = GlobalOptions::Get().NumVarsPerAssign;
+    defUsedVars[varIndex] = SampleKDistinct(f.NumVars(), numVarsPerAss);
 
     // Check every element present in vector is less than f.NumVars()
     for (auto var: defUsedVars[varIndex]) {
@@ -53,9 +55,8 @@ void BlkGen::Generate() {
       }
     }
 
-    // We assign a coefficient to it for each variable that contributes to the current variable
-    // being defined
-    for (int i = 0; i < defUsedVars[varIndex].size(); i++) {
+    // We assign a coefficient for each variable that contributes to the current one
+    for (int i = 0; i < numVarsPerAss; i++) {
       // Statement index is the index of the assignment statement in a
       // basic block, and i is the index of the variable in the RHS of
       // the assignment statement
@@ -72,7 +73,7 @@ void BlkGen::Generate() {
   // In case we need more variables beyond the number of variables we already defined,
   // let's refer to some variables defined in other basic blocks.
   condUsedVars = assignmentOrder;
-  for (int i = 0; i < GlobalOptions::Get().NumVarsInCond - assignmentOrder.size(); i++) {
+  for (int i = 0; i < GlobalOptions::Get().NumVarsInCond - numAssPerBbl; i++) {
     int randomVariable = rand();
     while (std::find(condUsedVars.begin(), condUsedVars.end(), randomVariable) != condUsedVars.end()
     ) {
@@ -121,7 +122,7 @@ void BlkGen::Generate() {
 //     }
 // }
 
-z3::expr BlkGen::createParameterExpr(std::string name, z3::context &ctx) {
+z3::expr BlkGen::createParameterExpr(std::string name, z3::context &ctx) const {
   // If we've already extracted the value from the model, we use that value,
   //  otherwise it's an uninterpreted constant which the solver needs to figure
   //  out the value for
