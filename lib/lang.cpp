@@ -25,25 +25,13 @@
 
 #include "lib/lang.hpp"
 
-namespace symir {
-  SymIRBuilder::TermID
-  BlockBuilder::SymTerm(Term::Op op, const std::string &coef, const VarDef *var) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
-    TermID tid = numCreatedTerms++;
-    createdTerms[tid] = std::make_unique<Term>(
-        op, std::make_unique<Coef>(coef, var->GetType()), std::make_unique<VarUse>(var)
-    );
-    return tid;
-  }
+#include <z3++.h>
 
-  SymIRBuilder::TermID BlockBuilder::SymTerm(
-      Term::Op op, const std::string &coefName, const std::string &coefVal, const VarDef *var
-  ) {
+namespace symir {
+  SymIRBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const Coef *coef, const VarDef *var) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     TermID tid = numCreatedTerms++;
-    createdTerms[tid] = std::make_unique<Term>(
-        op, std::make_unique<Coef>(coefName, coefVal, var->GetType()), std::make_unique<VarUse>(var)
-    );
+    createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var));
     return tid;
   }
 
@@ -109,6 +97,33 @@ namespace symir {
     return std::make_unique<Block>(label, std::move(stmts), std::move(target));
   }
 
+  /// Define and commit a new unsolved coefficient
+  const Coef *FuncBuilder::SymCoef(const std::string &name, SymIR::Type type) {
+    Assert(isActive(), "The FuncBuilder is no longer active");
+    Assert(
+        !symMap.contains(name), "Coefficients with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    symbols.push_back(std::make_unique<Coef>(name, type));
+    SymDef *s = symbols.back().get();
+    symMap[name] = s;
+    return dynamic_cast<Coef *>(s);
+  }
+
+  /// Define and commit a new solved coefficient
+  const Coef *
+  FuncBuilder::SymCoef(const std::string &name, const std::string &value, SymIR::Type type) {
+    Assert(isActive(), "The FuncBuilder is no longer active");
+    Assert(
+        !symMap.contains(name), "Coefficients with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    symbols.push_back(std::make_unique<Coef>(name, value, type));
+    SymDef *s = symbols.back().get();
+    symMap[name] = s;
+    return dynamic_cast<Coef *>(s);
+  }
+
   const Param *FuncBuilder::SymParam(const std::string &name, SymIR::Type type) {
     Assert(isActive(), "The FuncBuilder is no longer active");
     Assert(
@@ -125,8 +140,7 @@ namespace symir {
     return v;
   }
 
-  const Local *
-  FuncBuilder::SymLocal(const std::string &name, const std::string &coef, SymIR::Type type) {
+  const Local *FuncBuilder::SymLocal(const std::string &name, const Coef *coef, SymIR::Type type) {
     Assert(isActive(), "The FuncBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
@@ -136,28 +150,7 @@ namespace symir {
         !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
         name.c_str()
     );
-    locals.push_back(std::make_unique<Local>(name, std::make_unique<Coef>(coef, type), type));
-    auto v = locals.back().get();
-    localMap[name] = v;
-    return v;
-  }
-
-  const Local *FuncBuilder::SymLocal(
-      const std::string &name, const std::string &coefName, const std::string &coefVal,
-      SymIR::Type type
-  ) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
-    Assert(
-        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
-        name.c_str()
-    );
-    Assert(
-        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
-        name.c_str()
-    );
-    locals.push_back(
-        std::make_unique<Local>(name, std::make_unique<Coef>(coefName, coefVal, type), type)
-    );
+    locals.push_back(std::make_unique<Local>(name, coef, type));
     auto v = locals.back().get();
     localMap[name] = v;
     return v;
@@ -201,7 +194,7 @@ namespace symir {
     Assert(isActive(), "The FuncBuilder is no longer active");
     deactivate();
     return std::make_unique<Func>(
-        name, retType, std::move(params), std::move(locals), std::move(blocks)
+        name, retType, std::move(params), std::move(locals), std::move(symbols), std::move(blocks)
     );
   }
 } // namespace symir

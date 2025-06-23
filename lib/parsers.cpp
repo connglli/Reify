@@ -407,8 +407,10 @@ namespace symir {
     );
     auto *numTerms = popArg<int>();
     (*numTerms)++;
+    const auto varDef = funBd->FindVar(varToken->ToStr());
+    const auto termType = varDef->GetType();
     pushArg<SymIRBuilder::TermID>(
-        bblBd->SymTerm(op, coefToken->ToStr(), funBd->FindVar(varToken->ToStr()))
+        bblBd->SymTerm(op, funBd->SymCoef(coefToken->ToStr(), termType), varDef)
     );
     pushArg<int>(*numTerms);
     delete varToken;
@@ -492,9 +494,8 @@ namespace symir {
         "type of the term",
         varToken->FullInfo().c_str()
     );
-    funBd->SymLocal(
-        varToken->ToStr(), coefToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr())
-    );
+    const auto localType = SymIR::GetTypeFromSName(typeToken->ToStr());
+    funBd->SymLocal(varToken->ToStr(), funBd->SymCoef(coefToken->ToStr(), localType), localType);
     delete typeToken;
     delete coefToken;
     delete varToken;
