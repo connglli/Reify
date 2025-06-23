@@ -202,7 +202,8 @@ int main(int argc, char **argv) {
     exec = std::make_unique<UBFreeExec>(fun, execPath);
     int numSolved = exec->Solve(
         GlobalOptions::Get().NumInitsPerExec, GlobalOptions::Get().EnableInterestInits,
-        GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs
+        GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs,
+        /*debug=*/verbose
     );
     if (numSolved != 0) {
       break;

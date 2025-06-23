@@ -32,7 +32,7 @@
 #include "lib/samputils.hpp"
 
 int UBFreeExec::Solve(
-    int numMap, bool withInterestInit, bool withRandomInit, bool withInterestCoefs
+    int numMap, bool withInterestInit, bool withRandomInit, bool withInterestCoefs, bool debug
 ) {
   Assert(numMap > 0, "Number of mappings must be greater than 0");
 
@@ -50,7 +50,7 @@ int UBFreeExec::Solve(
   // Try to generate a couple of init-final mapping
   for (int i = 0; i < numMap; i++) {
     Log::Get().OpenSection("UBFreeExec: Iteration " + std::to_string(i));
-    if (!solve(withInterestInit, withRandomInit, withInterestCoefs)) {
+    if (!solve(withInterestInit, withRandomInit, withInterestCoefs, debug)) {
       std::cout << "WARNING: UNSAT at " << i << "-th initialization" << std::endl;
       return i; // There's no need to report an error to our caller
     }
@@ -62,7 +62,9 @@ int UBFreeExec::Solve(
   return numMap;
 }
 
-bool UBFreeExec::solve(bool withInterestInit, bool withRandomInit, bool withInterestCoefs = true) {
+bool UBFreeExec::solve(
+    bool withInterestInit, bool withRandomInit, bool withInterestCoefs, bool debug
+) {
   // clang-format off
   // Our constraint generation follow some rules:
   // 1. When the initializations vector is empty, we need to generate the constraints from scratch.
@@ -84,9 +86,11 @@ bool UBFreeExec::solve(bool withInterestInit, bool withRandomInit, bool withInte
       solver.add(makeInitWithRandomValue());
     }
 
-    Log::Get().Out() << "Initial constraints: " << std::endl
-                     << "```" << std::endl
-                     << solver.to_smt2() << "```" << std::endl;
+    if (debug) {
+      Log::Get().Out() << "Initial constraints: " << std::endl
+                       << "```" << std::endl
+                       << solver.to_smt2() << "```" << std::endl;
+    }
 
     // Generate UB constraint for each statement in the executed basic block
     for (int i = 0; i < execution.size() - 1; i++) {
@@ -97,15 +101,50 @@ bool UBFreeExec::solve(bool withInterestInit, bool withRandomInit, bool withInte
     generateConstraintsForBasicBlock(execution[execution.size() - 1], -1, withInterestCoefs);
   }
 
-  // Ensure that the initialisation is sufficiently different from the previous one
+  // We are solving the input parameters; let's sample for a different solution
   if (!initializations.empty()) {
+    // Ensure that the initialisation is sufficiently different from the previous one
     solver.add(differentiateInitFrom(initializations.back()));
   }
 
-  // Dump the SMT queries for debugging
-  Log::Get().Out() << "Final constraints: " << std::endl
-                   << "```" << std::endl
-                   << solver.to_smt2() << "```" << std::endl;
+  if (debug) {
+    Log::Get().Out() << "Final constraints: " << std::endl
+                     << "```" << std::endl
+                     << solver.to_smt2() << "```" << std::endl;
+  }
+
+  // We are solving the symbols for the first time; let's try simplifying the constraints
+  if (initializations.empty()) {
+    // Accumulate all our assertions obtained so far
+    z3::goal goal(ctx);
+    for (auto assertion: solver.assertions()) {
+      goal.add(assertion);
+    }
+
+    // Create a chain of optimization passes (or tactics in Z3) for constraint optimization
+    // Note, we only consider tactics that can preserve constant (i.e., symbols) here as
+    // we'll extract them later. So we should exclude for example solve-eqs.
+    z3::tactic opt =
+        z3::repeat(z3::tactic(ctx, "simplify") & z3::tactic(ctx, "propagate-values"), /*max=*/3);
+
+    // Apply all the assertions on our optimization chain to obtain a new set of constraints
+    auto optimized = opt(goal);
+    // All tactics we used generate one subgoal
+    Assert(optimized.size() == 1u, "More than one (=%u) subgoals are generated!", optimized.size());
+
+    // Re-add all assertions after optimization into our solver
+    solver.reset();
+    for (int i = 0; i < static_cast<int>(optimized[0].size()); i++) {
+      solver.add(optimized[0][i]);
+    }
+
+    if (debug) {
+      // Dump the optimized SMT queries for debugging
+      Log::Get().Out() << "Optimized constraints: " << std::endl
+                       << "```" << std::endl
+                       << solver.to_smt2() << "```" << std::endl;
+    }
+  }
 
   // Solve the generated constraints and see if we succeeded
   if (solver.check() == z3::unsat) {

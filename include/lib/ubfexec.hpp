@@ -89,7 +89,8 @@ public:
       int numMap,
       bool withInterestInit = true,
       bool withRandomInit = false,
-      bool withInterestCoefs = true
+      bool withInterestCoefs = true,
+      bool debug = false
       // clang-format on
   );
 
@@ -102,7 +103,14 @@ private:
   // from scratch. However, this is a stateful call. That means, all subsequent calls
   // although always generate the same as query, the solver would use the symbols
   // we already resolved in the previous calls to this method.
-  bool solve(bool withInterestInit, bool withRandomInit, bool withInterestCoefs);
+  bool solve(
+      // clang-format off
+      bool withInterestInit,
+      bool withRandomInit,
+      bool withInterestCoefs,
+      bool debug
+      // clang-format on
+  );
 
   // Generate constraints for the basic block at u and target the basic block at v
   void generateConstraintsForBasicBlock(int u, int v, bool withInterestCoefs);

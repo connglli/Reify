@@ -154,7 +154,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--timeout",
         type=int,
-        default=15,
+        # Our experiences are that in the default settings of fgen, if a program cannot
+        # be generated within 3 seconds, then it won't be generated even given 15 seconds.
+        # Thus, using 3s significantly improves the throughput of us.
+        default=3,
         help="timeout (in seconds) for generating a program",
     )
     parser.add_argument(
