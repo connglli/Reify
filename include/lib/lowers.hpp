@@ -74,6 +74,7 @@ namespace symir {
 #define XX(name, sname) static constexpr char const *KW_##name = #sname;
     SYMIR_KEYWORD_LIST(XX)
 #undef XX
+    static constexpr char KW_COEF_VAL_SYM = '#';
 
   public:
     explicit SymSexpLower(std::ostream &out) : SymIRLower(out) {}

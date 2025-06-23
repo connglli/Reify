@@ -30,7 +30,7 @@ namespace symir {
 
   void SymSexpLower::Visit(const Coef &c) {
     if (c.IsValueSet()) {
-      out << c.GetValue();
+      out << KW_COEF_VAL_SYM << c.GetValue();
     } else {
       out << c.GetName();
     }

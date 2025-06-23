@@ -211,6 +211,7 @@ namespace symir {
     void buildGoto();
     void buildBlock();
     void buildFunc();
+    const Coef *buildCoef(const SymSexpLexer::Token *token, SymIR::Type type);
 
   private:
     SymSexpLexer lexer;                   // The lexer we're using

@@ -868,7 +868,7 @@ namespace symir {
   template<typename ParentBuilder, typename SIR>
   class SymIRBuilderGeneric : public SymIRBuilder {
   public:
-    explicit SymIRBuilderGeneric(const ParentBuilder *ctx) : ctx(ctx) {}
+    explicit SymIRBuilderGeneric(ParentBuilder *ctx) : ctx(ctx) {}
 
     ParentBuilder *GetParent() const { return ctx; }
 
@@ -876,7 +876,7 @@ namespace symir {
 
   private:
     // Our residing builder
-    const ParentBuilder *ctx;
+    ParentBuilder *ctx;
   };
 
   /// The top-level builder for all other builders
@@ -894,16 +894,16 @@ namespace symir {
   ///   auto b = std::make_unique<BlockBuilder>("BB1")
   ///   b->SymAssign(
   ///     v0, b->SymAddExpr({
-  ///       b->SymMulTerm(b->GetParent()->SymCoef("12"), v1),
-  ///       b->SymSubTerm(b->GetParent()->SymCoef("23"), v1)
+  ///       b->SymMulTerm(b->GetParent()->SymCoef("c1", "12"), v1),
+  ///       b->SymSubTerm(b->GetParent()->SymCoef("c2"), v1)
   ///     })
   ///   );
   ///   b->SymBranch(
   ///     "BB1", "BB2",
   ///     b->SymGtzCond(
   ///       b->SymSubExpr({
-  ///         b->SymAddTerm(b->GetParent()->SymCoef("123"), v2),
-  ///         b->SymAddTerm(b->GetParent()->SymCoef("33"), v1)
+  ///         b->SymAddTerm(b->GetParent()->SymCoef("c3", "123"), v2),
+  ///         b->SymAddTerm(b->GetParent()->SymCoef("c4"), v1)
   ///       })
   ///     )
   ///   );  // We cannot call anything any more after Branch
@@ -913,7 +913,7 @@ namespace symir {
   public:
     using BlockBody = std::function<void(BlockBuilder *)>;
 
-    BlockBuilder(const FuncBuilder *ctx, std::string label) :
+    BlockBuilder(FuncBuilder *ctx, std::string label) :
         SymIRBuilderGeneric<FuncBuilder, Block>(ctx), label(std::move(label)) {}
 
     /// Return the label of the basic block being built
@@ -996,8 +996,8 @@ namespace symir {
   ///       "BB1", "BB2",
   ///       blk->SymGtzCond(
   ///         blk->SymSubExpr({
-  ///           blk->SymMulTerm(b.SymCoef("123"), v0),
-  ///           blk->SymAddTerm(b.SymCoef("33"), v1)
+  ///           blk->SymMulTerm(b.SymCoef("c1", "123"), v0),
+  ///           blk->SymAddTerm(b.SymCoef("c2"), v1)
   ///         })
   ///       )
   ///     );

@@ -112,7 +112,7 @@ namespace symir {
       // Since we do not support non-text operators, string, and comment, all others are identifiers
       [](const std::string_view &str) {
         return std::ranges::all_of(str, [](const char c) {
-          return c == '-' || c == '+' || std::isalnum(c);
+          return c == '-' || c == '+' || c == SymSexpLower::KW_COEF_VAL_SYM || std::isalnum(c);
         });
       },
 
@@ -409,9 +409,7 @@ namespace symir {
     (*numTerms)++;
     const auto varDef = funBd->FindVar(varToken->ToStr());
     const auto termType = varDef->GetType();
-    pushArg<SymIRBuilder::TermID>(
-        bblBd->SymTerm(op, funBd->SymCoef(coefToken->ToStr(), termType), varDef)
-    );
+    pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(op, buildCoef(coefToken, termType), varDef));
     pushArg<int>(*numTerms);
     delete varToken;
     delete coefToken;
@@ -495,7 +493,7 @@ namespace symir {
         varToken->FullInfo().c_str()
     );
     const auto localType = SymIR::GetTypeFromSName(typeToken->ToStr());
-    funBd->SymLocal(varToken->ToStr(), funBd->SymCoef(coefToken->ToStr(), localType), localType);
+    funBd->SymLocal(varToken->ToStr(), buildCoef(coefToken, localType), localType);
     delete typeToken;
     delete coefToken;
     delete varToken;
@@ -554,5 +552,14 @@ namespace symir {
   void SymSexpParser::buildFunc() {
     func = funBd->Build();
     funBd = nullptr;
+  }
+
+  const Coef *SymSexpParser::buildCoef(const SymSexpLexer::Token *token, SymIR::Type type) {
+    if (token->str.starts_with(SymSexpLower::KW_COEF_VAL_SYM)) {
+      std::string tempName = std::string("__c") + std::to_string(funBd->GetSymbols().size());
+      return funBd->SymCoef(tempName, token->ToStr().substr(1), type);
+    } else {
+      return funBd->SymCoef(token->ToStr(), type);
+    }
   }
 } // namespace symir
