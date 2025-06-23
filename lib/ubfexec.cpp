@@ -144,11 +144,9 @@ void UBFreeExec::generateConstraintsForBasicBlock(int u, int v, bool withInteres
       z3::expr sum = generateConstraintsForTermSum(
           u, stmtIndex, false, bblU.GetDeps(varIndex), withInterestCoefs
       );
-      // Unrolled the entire graph and tracking the versions of each variable
-      // because they change adter assignment statements LHS of the assignment
-      // statement's version number is changed
-      z3::expr assignment = ctx.int_const(NameVar(varIndex, ++versions[varIndex]).c_str());
-      solver.add(assignment == sum);
+      // An assignment makes a new SSA variable with the same name but updated version
+      z3::expr newVar = createVarExpr(varIndex, ++versions[varIndex]);
+      solver.add(newVar == sum);
       stmtIndex++;
     }
   }
@@ -194,14 +192,11 @@ z3::expr UBFreeExec::generateConstraintsForTermSum(
 
   // Taking care of coefficients and the multiplication
   for (int i = 0; i < dependencies.size(); i++) {
-    vars.push_back(ctx.int_const(NameVar(dependencies[i], versions[dependencies[i]]).c_str()));
-    solver.add(
-        vars.back() >= GlobalOptions::Get().LowerBound &&
-        vars.back() <= GlobalOptions::Get().UpperBound
-    );
+    vars.push_back(createVarExpr(dependencies[i]));
     coefs.push_back(createCoefExpr(nameCoef(blkIndex, stmtIndex, i)));
     terms.push_back(coefs.back() * vars.back()); // a_i * var_i
   }
+  solver.add(boundVariables(vars));
   solver.add(boundCoefficients(coefs));
 
   // Taking care of the constant coefficient
@@ -211,6 +206,7 @@ z3::expr UBFreeExec::generateConstraintsForTermSum(
       coefs.back() >= GlobalOptions::Get().LowerBound &&
       coefs.back() <= GlobalOptions::Get().UpperBound
   );
+  solver.add(boundTerms(terms));
 
   // Ensure that the coefficients are interesting
   if (withInterestCoefs) {
@@ -219,31 +215,13 @@ z3::expr UBFreeExec::generateConstraintsForTermSum(
 
   // Taking care of the terms and their addition
   z3::expr sum = terms[0];
-  z3::expr term_constraint = (terms[0] <= GlobalOptions::Get().UpperBound) &&
-                             (terms[0] >= GlobalOptions::Get().LowerBound);
-  if (GlobalOptions::Get().EnableSafetyChecks) {
-    solver.add(term_constraint);
-  }
   for (int i = 1; i < terms.size(); i++) {
     // Addition is left associative, so in an addition of k terms, the subexpressions with the
-    // first 1, 2,
-    // ...k terms added should all be between LOWER_BOUND and UPPER_BOUND as well
-    z3::expr constraint =
-        (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
-    if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(constraint);
-    }
+    // first 1, 2, ..., k terms added should all be between LOWER_BOUND and UPPER_BOUND as well
     sum = sum + terms[i];
-    term_constraint = (terms[i] <= GlobalOptions::Get().UpperBound) &&
-                      (terms[i] >= GlobalOptions::Get().LowerBound);
     if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(term_constraint);
+      solver.add(sum <= GlobalOptions::Get().UpperBound && sum >= GlobalOptions::Get().LowerBound);
     }
-  }
-  z3::expr constraint =
-      (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
-  if (GlobalOptions::Get().EnableSafetyChecks) {
-    solver.add(constraint);
   }
 
   // Return the sum of the terms
@@ -272,7 +250,7 @@ void UBFreeExec::fixUnterminatedExecution() {
 z3::expr UBFreeExec::makeInitInteresting() {
   std::vector<z3::expr> params;
   for (int i = 0; i < fun.NumParams(); i++) {
-    params.push_back(ctx.int_const((NameVar(i, 0)).c_str()));
+    params.push_back(createVarExpr(i, 0));
   }
   return AtMostKZeroes(ctx, params, fun.NumParams() / 2);
 }
@@ -284,8 +262,8 @@ z3::expr UBFreeExec::makeInitWithRandomValue() {
   std::vector<z3::expr> params;
   z3::expr constraints = ctx.bool_val(true);
   for (int i = 0; i < fun.NumParams(); i++) {
-    std::string paramName = NameVar(i, 0);
-    params.push_back(ctx.int_const(paramName.c_str()));
+    params.push_back(createVarExpr(i, 0));
+    const std::string &paramName = params.back().decl().name().str();
     z3::expr randomInit = ctx.bool_val(true);
     if (SymDefined(paramName)) {
       randomInit = (params[i] == GetSymVal(paramName));
@@ -303,9 +281,9 @@ z3::expr UBFreeExec::differentiateInitFrom(std::vector<int> initialisation) {
   // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
   std::vector<z3::expr> constraints;
   for (int i = 0; i < fun.NumParams(); i++) {
-    int newValue = initialisation[i];
-    z3::expr oldValue = ctx.int_const((NameVar(i, 0)).c_str());
-    constraints.push_back(z3::ite(newValue != oldValue, ctx.int_val(1), ctx.int_val(0)));
+    int oldValue = initialisation[i];
+    z3::expr newValue = createVarExpr(i, 0);
+    constraints.push_back(z3::ite(oldValue != newValue, ctx.int_val(1), ctx.int_val(0)));
   }
   return AtMostKZeroes(ctx, constraints, std::min(3, fun.NumParams() / 2));
 }
@@ -336,17 +314,15 @@ void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
 void UBFreeExec::extractInitFromModel(z3::model &model) {
   std::vector<int> init;
   for (int i = 0; i < fun.NumParams(); i++) {
-    std::string paramName = NameVar(i, 0);
-    z3::expr paramKey = ctx.int_const(paramName.c_str());
-    Assert(
-        model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName.c_str()
-    );
+    z3::expr paramKey = createVarExpr(i, 0);
+    const auto paramName = paramKey.decl().name().str().c_str();
+    Assert(model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName);
     z3::expr paramConst = model.get_const_interp(paramKey.decl());
-    Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName.c_str());
+    Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
     int paramVal;
     Assert(
         Z3_get_numeral_int(ctx, paramConst, &paramVal),
-        "Failed to obtain the value of parameter %s from the model", paramName.c_str()
+        "Failed to obtain the value of parameter %s from the model", paramName
     );
     init.push_back(paramVal);
     Log::Get().Out() << "Extract initialization: param=" << paramName << ", value=" << paramVal
@@ -358,23 +334,37 @@ void UBFreeExec::extractInitFromModel(z3::model &model) {
 void UBFreeExec::extractFinalFromModel(z3::model &model) {
   std::vector<int> fina;
   for (int paramIndex = 0; paramIndex < fun.NumParams(); paramIndex++) {
-    std::string paramName = NameVar(paramIndex, versions[paramIndex]);
-    z3::expr paramKey = ctx.int_const(paramName.c_str());
-    Assert(
-        model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName.c_str()
-    );
+    z3::expr paramKey = createVarExpr(paramIndex);
+    const auto paramName = paramKey.decl().name().str().c_str();
+    Assert(model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName);
     z3::expr paramConst = model.get_const_interp(paramKey.decl());
-    Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName.c_str());
+    Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
     int paramVal;
     Assert(
         Z3_get_numeral_int(ctx, paramConst, &paramVal),
-        "Failed to obtain the value of parameter %s from the model", paramName.c_str()
+        "Failed to obtain the value of parameter %s from the model", paramName
     );
     fina.push_back(paramVal);
     Log::Get().Out() << "Extract finalization: param=" << paramName << ", value=" << paramVal
                      << std::endl;
   }
   finalizations.push_back(fina);
+}
+
+z3::expr UBFreeExec::createVarExpr(const int varIndex, int version) {
+  if (version == -1) {
+    version = versions[varIndex];
+  }
+  return ctx.int_const(NameVar(varIndex, version).c_str());
+}
+
+z3::expr UBFreeExec::boundVariables(const std::vector<z3::expr> &vars) {
+  z3::expr constraints = ctx.bool_val(true);
+  for (const auto &var: vars) {
+    constraints = constraints && (var >= GlobalOptions::Get().LowerBound &&
+                                  var <= GlobalOptions::Get().UpperBound);
+  }
+  return constraints;
 }
 
 z3::expr UBFreeExec::createCoefExpr(const std::string &name) {
@@ -390,20 +380,25 @@ z3::expr UBFreeExec::createCoefExpr(const std::string &name) {
 }
 
 z3::expr UBFreeExec::makeCoefsInteresting(const std::vector<z3::expr> &coefs) {
-  // z3::expr allZero = c.bool_const(("true"));
-  // for(auto coeff: coeffs)
-  // {
-  //     allZero = allZero && (coeff == 0);
-  // }
-  // return !allZero;
-  return AtMostKZeroes(ctx, coefs, coefs.size() / 2);
+  return AtMostKZeroes(ctx, coefs, static_cast<int>(coefs.size()) / 2);
 }
 
 z3::expr UBFreeExec::boundCoefficients(const std::vector<z3::expr> &coefs) {
   z3::expr constraints = ctx.bool_val(true);
-  for (const auto &coeff: coefs) {
-    constraints = constraints && (coeff >= GlobalOptions::Get().LowerCoefBound &&
-                                  coeff <= GlobalOptions::Get().UpperCoefBound);
+  for (const auto &coef: coefs) {
+    if (coef.is_const()) {
+      constraints = constraints && (coef >= GlobalOptions::Get().LowerCoefBound &&
+                                    coef <= GlobalOptions::Get().UpperCoefBound);
+    }
+  }
+  return constraints;
+}
+
+z3::expr UBFreeExec::boundTerms(const std::vector<z3::expr> &terms) {
+  z3::expr constraints = ctx.bool_val(true);
+  for (const auto &term: terms) {
+    constraints = constraints && (term <= GlobalOptions::Get().UpperBound &&
+                                  term >= GlobalOptions::Get().LowerBound);
   }
   return constraints;
 }

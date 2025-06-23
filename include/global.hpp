@@ -86,7 +86,7 @@ struct GlobalOptions {
   // reasonably high number of NumInitsPerExec and set this to false, or set this to true and set
   // NumInitsPerExec to 1
   bool EnableRandomInits = false;
-  // I don't want all initialisations to be 0, so this constraint takes care of that
+  // We don't want all initialisations to be 0, so this constraint takes care of that
   bool EnableInterestInits = true;
   // Consistent means that after a tipping point, from the same node, exactly one outward edge is
   // traversed.ample, if node 0 has edges to 1 and 3, then from 0, either:

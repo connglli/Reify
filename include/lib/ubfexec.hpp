@@ -135,14 +135,24 @@ private:
   // Generate constraints to differentiate the initialization from the given one
   z3::expr differentiateInitFrom(std::vector<int> initialisation);
 
+  // Create a versioned variable expression for the given variable
+  // When version==-1, the current version in the version table is used
+  z3::expr createVarExpr(int varIndex, int version = -1);
+
+  // Generate a bound constraint for each variable
+  z3::expr boundVariables(const std::vector<z3::expr> &vars);
+
   // Create a coefficient expression for the given name
   z3::expr createCoefExpr(const std::string &name);
 
   // Generate constraints to make the coefficients interesting
   z3::expr makeCoefsInteresting(const std::vector<z3::expr> &coefs);
 
-  // Generate a bound constraint for the coefficients
+  // Generate a bound constraint for each coefficient
   z3::expr boundCoefficients(const std::vector<z3::expr> &coefs);
+
+  // Generate a bound constraint for each term
+  z3::expr boundTerms(const std::vector<z3::expr> &terms);
 
   // Insert undefined behaviors into unexecuted basic blocks
   void insertUBsIntoUnexecutedBbls();
