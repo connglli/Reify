@@ -25,7 +25,7 @@
 
 #include <algorithm>
 
-#include "lib/parser.hpp"
+#include "lib/parsers.hpp"
 
 // clang-format off
 namespace symir {
