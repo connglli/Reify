@@ -30,21 +30,29 @@
 
 static std::string NamePassCounter() { return "pass_counter"; }
 
-static std::string NameLabel(int block) { return "BB" + std::to_string(block); }
+static std::string NameLabel(const int block) { return "BB" + std::to_string(block); }
 
-static std::string NameVar(int index) { return "var_" + std::to_string(index); }
+static std::string NameVar(const int index, const int version = -1) {
+  if (version == -1) {
+    return "var_" + std::to_string(index);
+  } else {
+    return "var_" + std::to_string(index) + "_" + std::to_string(version);
+  }
+}
 
-static std::string NameCoeff(int block, int stmt, int which) {
+static std::string NameCoef(const int block, const int stmt, const int which) {
   return "a_" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which);
 }
 
-static std::string NameConst(int block, int stmt) { return "a_" + std::to_string(block) + "_" + std::to_string(stmt); }
+static std::string NameConst(const int block, const int stmt) {
+  return "a_" + std::to_string(block) + "_" + std::to_string(stmt);
+}
 
-static std::string NameCondCoeff(int block, int stmt, int which) {
+static std::string NameCondCoef(const int block, const int stmt, const int which) {
   return "b_" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which);
 }
 
-static std::string NameCondConst(int block, int stmt) {
+static std::string NameCondConst(const int block, const int stmt) {
   return "b_" + std::to_string(block) + "_" + std::to_string(stmt);
 }
 

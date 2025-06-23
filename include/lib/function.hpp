@@ -29,99 +29,76 @@
 #include <optional>
 #include <string>
 #include <vector>
-#include <z3++.h>
 
 #include "lib/block.hpp"
 #include "lib/ctrlflow.hpp"
 #include "lib/dbgutils.hpp"
+#include "lib/ubfexec.hpp"
+#include "logger.hpp"
 
 class BlkGen;
+class UBFreeExec;
 
 /// FunGen is a function generator which populates each the whole function with real statements
 class FunGen {
 public:
-  explicit FunGen(int numBBs, int numVars, int maxNumLoops, int maxNumBblsPerLoop) :
-      cfg(numBBs), numVars(numVars), maxNumLoops(maxNumLoops),
+  explicit FunGen(int numBBs, int numParams, int maxNumLoops, int maxNumBblsPerLoop) :
+      cfg(numBBs), numParams(numParams), maxNumLoops(maxNumLoops),
       maxNumBblsPerLoop(maxNumBblsPerLoop) {}
 
-  FunGen(const FunGen &) = delete;
-  FunGen &operator=(const FunGen &) = delete;
+  // FunGen(const FunGen &) = delete;
+  // FunGen &operator=(const FunGen &) = delete;
 
+  // Get the underlying control flow graph
   [[nodiscard]] const auto &GetCfg() const { return cfg; }
 
-  [[nodiscard]] int NumBbls() const { return cfg.NumBbls(); }
-
-  [[nodiscard]] int NumVars() const { return numVars; }
-
+  // Get the basic block generators in the function
   [[nodiscard]] const auto &GetBbls() const { return bblGens; }
 
+  // Get the basic block generator for a specific basic block
+  [[nodiscard]] const auto &GetBbl(int bblNo) const { return bblGens[bblNo]; }
+
+  // Get the symbols defined by the function
+  [[nodiscard]] const auto &GetSymbols() const { return symbols; }
+
+  // Get the number of basic blocks in the function
+  [[nodiscard]] int NumBbls() const { return cfg.NumBbls(); }
+
+  // Get the number of parameters used by the function
+  [[nodiscard]] int NumParams() const { return numParams; }
+
+  // Define a symbol used by the function
+  void DefSymbol(const std::string &name) {
+    Assert(!symbols.contains(name), "Symbol with name %s was already defined!", name.c_str());
+    symbols.insert(name);
+    Log::Get().Out() << "Define symbol into function: " << name << std::endl;
+  }
+
+  // Generate the function with random control-flow, statements, and symbols
   void Generate();
 
-  [[nodiscard]] std::vector<int> SampleExec(int execStep, bool consistent);
+  // Sample an execution of the function.
+  std::vector<int> SampleExec(int execStep, bool consistent);
 
-  ///////////////////////////////////////////////////////////////////
-  /////// Constraint Initialization and Finalization
-  ///////////////////////////////////////////////////////////////////
+  // Generate the function code of the function for a given execution
+  std::string GenerateFunCode(const std::string &funName, const UBFreeExec &exec) const;
 
-  [[nodiscard]] bool ParamDefined(const std::string &name) {
-    return state.find(name) != state.end() && state[name].has_value();
-  }
+  // Generate the main code of the function for a given execution
+  std::string
+  GenerateMainCode(const std::string &funName, const UBFreeExec &exec, bool debug = false) const;
 
-  [[nodiscard]] int GetParamVal(const std::string &name) {
-    Assert(ParamDefined(name), "Parameter %s not defined", name.c_str());
-    return state[name].value();
-  }
-
-  void InitParam(const std::string &name) { state[name] = std::nullopt; }
-
-  void DefineParam(const std::string &name, int val) { state[name] = val; }
-
-  z3::expr MakeInitialisationsInteresting(z3::context &c) const;
-
-  z3::expr AddRandomInitialisations(z3::context &c);
-
-  z3::expr DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) const;
-
-  // Function to extract parameters from the model, so that we can store the
-  // coefficients and constants that the solver found an interpretation for
-  void ExtractParametersFromModel(z3::model &model, z3::context &ctx);
-
-  // Extract the initial values of each variable that's an input to the function from the model
-  std::vector<int> ExtractInitialisationsFromModel(z3::model &model, z3::context &ctx) const;
-
-  // i wanted a bit of flexibility for the checksum function in the future so i
-  // decided to just store the final values of all the variables (at the end basic
-  // block) instead of just the checksum
-  std::vector<int> ExtractFinalizationsFromModel(
-      z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
-  ) const;
-
-  ///////////////////////////////////////////////////////////////////
-  /////// Code Generation
-  ///////////////////////////////////////////////////////////////////
-
-  std::string GenerateFunCode(const std::string &sno, const std::string &uuid) const;
-
-  std::string GenerateMainCode(
-      const std::string &sno, const std::string &uuid,
-      const std::vector<std::vector<int>> &initialisations,
-      const std::vector<std::vector<int>> &finalizations, bool debug = false
-  ) const;
-
-  static std::string
-  GenerateMapping(const std::vector<int> &initialisation, const std::vector<int> &finalisation);
+  // Generate the map of initialisation-finalisation for a given execution
+  static std::string GenerateMappingCode(const UBFreeExec &exec);
 
 private:
   CfgSketch cfg; // The sketch of our CFG, where each bbl maps to a blockgen in bbs
 
-  int numVars;           // The number of variables that the function can define
+  int numParams;         // The number of parameters that the function has
   int maxNumLoops;       // The maximum number of loops that the function can have
   int maxNumBblsPerLoop; // The maximum number of basic blocks in a loop
 
   std::vector<BlkGen> bblGens{}; // The basic block generators (in the same order as basic blocks)
-
-  std::unordered_map<std::string, std::optional<int>> state{
-  }; // Value of variables, coefficients or constants computed so far
+  std::set<std::string> symbols; // The symbols (i.e., coefficient) defined by this function.
 };
 
 

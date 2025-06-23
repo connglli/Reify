@@ -36,16 +36,16 @@ from utils import run_proc
 
 
 def gen_func(
-        exec,
-        *,
-        output,
-        sano,
-        uuid_val,
-        with_main=False,
-        verbose=False,
-        seed=None,
-        extra_opts=None,
-        timeout=60,
+    exec,
+    *,
+    output,
+    sano,
+    uuid_val,
+    with_main=False,
+    verbose=False,
+    seed=None,
+    extra_opts=None,
+    timeout=60,
 ):
     try:
         st_time = time.time()
@@ -89,7 +89,7 @@ def main(*, output, limit, seed, mainf, check, timeout, extra_opts):
         f"UUID={func_uuid}, output={output}, "
         f"limit={limit if limit != 0 else '<INF>'}, "
         f"seed={seed if seed >= 0 else '<RND>'}, "
-        f"check={check}, timeout={timeout}s"
+        f"check={check}, timeout={timeout}s, "
         f"extra='{extra_opts}'"
     )
     while limit == 0 or func_sano < limit:
@@ -103,7 +103,7 @@ def main(*, output, limit, seed, mainf, check, timeout, extra_opts):
             verbose=check,
             with_main=mainf,
             seed=next_seed(),
-            extra_opts=extra_opts
+            extra_opts=extra_opts,
         )
         if succ:
             print(f"SUCC (time={elapsed}s)")
@@ -158,10 +158,7 @@ if __name__ == "__main__":
         help="timeout (in seconds) for generating a program",
     )
     parser.add_argument(
-        "--extra",
-        type=str,
-        default="",
-        help="extra options passed to fgen"
+        "--extra", type=str, default="", help="extra options passed to fgen"
     )
 
     args = parser.parse_args()
@@ -173,5 +170,5 @@ if __name__ == "__main__":
         mainf=args.main,
         check=args.check,
         timeout=args.timeout,
-        extra_opts=args.extra
+        extra_opts=args.extra,
     )

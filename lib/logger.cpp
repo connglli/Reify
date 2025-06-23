@@ -28,6 +28,8 @@
 #include <fstream>
 #include <iostream>
 
+#include "lib/dbgutils.hpp"
+
 Log::Log() : fout_(new std::ofstream("/dev/null")) { out = fout_; }
 
 Log::~Log() { deleteFoutSafely(); }
@@ -48,6 +50,18 @@ void Log::SetFout(const std::string &file) {
   deleteFoutSafely();
   fout_ = new std::ofstream(file);
   out = fout_;
+}
+
+void Log::OpenSection(const std::string &name) {
+  section++;
+  Out() << std::string((section + 1) * 2, '-') << name << std::string(50 - section * 2, '-')
+        << std::endl
+        << std::flush;
+}
+
+void Log::CloseSection() {
+  section--;
+  Assert(section >= 0, "More close sections than open sections");
 }
 
 void Log::deleteFoutSafely() {

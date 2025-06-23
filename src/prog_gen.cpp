@@ -28,6 +28,7 @@
 
 #include "cxxopts.hpp"
 #include "global.hpp"
+#include "lib/logger.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 
@@ -121,6 +122,9 @@ int main(int argc, char *argv[]) {
 
   int genLimit = cliOpts.limits;
   bool enableDebug = cliOpts.debug;
+  if (enableDebug) {
+    Log::Get().SetCout();
+  }
 
   // Read all function files from the input directory
   std::vector<std::string> allFunPaths;
@@ -135,7 +139,7 @@ int main(int argc, char *argv[]) {
   std::sort(allFunPaths.begin(), allFunPaths.end());
 
   for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
-    std::cout << "[" << sampNo << "] Generating ... " << std::endl;
+    Log::Get().Out() << "[" << sampNo << "] Generating ... " << std::endl;
 
     // Randomly select FUNCTION_DEPTH functions for the new program
     std::set<int> selFunInds;
@@ -149,8 +153,8 @@ int main(int argc, char *argv[]) {
       if (selFunInds.contains(index)) {
         continue;
       }
-      std::cout << "[" << sampNo << "] Selecting func#" << index << ": " << allFunPaths[index]
-                << std::endl;
+      Log::Get().Out() << "[" << sampNo << "] Selecting func#" << index << ": "
+                       << allFunPaths[index] << std::endl;
       selFunInds.insert(index);
       selFunPaths.push_back(allFunPaths[index]);
     }
@@ -159,7 +163,7 @@ int main(int argc, char *argv[]) {
     auto prog = std::make_unique<ProgGen>(progUuid, sampNo, selFunPaths);
     prog->Generate();
 
-    std::cout << "[" << sampNo << "] Storing" << std::endl;
+    Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
     prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + ".c"), enableDebug);
     prog->GenerateCode(

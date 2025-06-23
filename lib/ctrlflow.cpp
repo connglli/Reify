@@ -25,9 +25,9 @@
 
 #include "lib/ctrlflow.hpp"
 
-#include <iostream>
 #include <queue>
 
+#include "lib/logger.hpp"
 #include "lib/random.hpp"
 
 std::vector<int> BiLoop::SampleOneIter(int stepLimit, bool consistent, bool inclExit) const {
@@ -216,22 +216,26 @@ CfgSketch::SampleExec(const int stepLimit, const bool consistent, const int maxL
 }
 
 void CfgSketch::Print() const {
-  std::cout << "======== Unflattened CFG Sketch ========" << std::endl;
+  Log::Get().OpenSection("CfgSketch: Unflattened CFG Sketch");
   for (int i = 0; i < numBimpos(); i++) {
-    std::cout << "Bimpo: type=" << bimpos[i]->GetType() << ", id=" << i
-              << ", size=" << bimpos[i]->NumBbls() << ", start=" << indexInBbls[i] << std::endl;
+    Log::Get().Out() << "Bimpo: type=" << bimpos[i]->GetType() << ", id=" << i
+                     << ", size=" << bimpos[i]->NumBbls() << ", start=" << indexInBbls[i]
+                     << std::endl;
   }
-  std::cout << "======== Flattened CFG Sketch ========" << std::endl;
+  Log::Get().CloseSection();
+
+  Log::Get().OpenSection("CfgSketch: Flattened CFG Sketch");
   for (int u = 0; u < basicblocks.size(); u++) {
-    std::cout << "Block: " << u << " -> [";
+    Log::Get().Out() << "Block: " << u << " -> [";
     int j = 0;
-    for (auto v: basicblocks[u].successors) {
-      std::cout << v;
+    for (const auto v: basicblocks[u].successors) {
+      Log::Get().Out() << v;
       if (j != basicblocks[u].successors.size() - 1) {
-        std::cout << ", ";
+        Log::Get().Out() << ", ";
       }
       j++;
     }
-    std::cout << "]" << std::endl;
+    Log::Get().Out() << "]" << std::endl;
   }
+  Log::Get().CloseSection();
 }

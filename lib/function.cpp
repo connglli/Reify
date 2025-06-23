@@ -32,205 +32,55 @@
 #include "lib/logger.hpp"
 #include "lib/naming.hpp"
 #include "lib/random.hpp"
-#include "lib/samputils.hpp"
 
 void FunGen::Generate() {
+  Log::Get().OpenSection("FunGen: Function Generation");
   // Generate the sketch of our control flow graph
   cfg.Generate();
-  auto rand = Random::Get().Uniform(0, maxNumLoops);
-  for (int i = 0; i < rand(); i++) {
+  for (int i = 0; i < Random::Get().Uniform(0, maxNumLoops)(); i++) {
     cfg.GenerateReduLoop(maxNumBblsPerLoop);
   }
+  cfg.Print();
   // Map each basic block in the CFG to a basic block generator
   for (int i = 0; i < NumBbls(); i++) {
     bblGens.emplace_back(*this, i, cfg.GetBbl(i));
     bblGens.back().Generate();
   }
+  Log::Get().CloseSection();
 }
 
 std::vector<int> FunGen::SampleExec(int execStep, bool consistent) {
-  std::vector<int> sampleWalk = cfg.SampleExec(execStep, consistent);
-  int endNode = NumBbls() - 1;
-  int stopNode = sampleWalk.back();
-  if (stopNode == endNode) {
-    return sampleWalk;
-  }
-  // This means that the stop node is not the end node, probably because we're
-  // going in a cycle, so we need to add a pass counter to the stop node (as
-  // if we're artificially creating an edge to the end node).
-  // Modify the basic block at the end of the sample walk to have pass counter
-  // equal to the number of times that basic block has been visited.
-  int passCounter =
-      static_cast<int>(std::ranges::count_if(sampleWalk, [=](auto n) { return n == stopNode; }));
-  bblGens[stopNode].SetPassCounter(passCounter);
-  state[NamePassCounter()] = passCounter;
-  sampleWalk.push_back(endNode);
-  Log::Get().Out() << "Sample walk has been modified to end at the last node." << std::endl;
-  return sampleWalk;
+  return cfg.SampleExec(execStep, consistent);
 }
 
-///////////////////////////////////////////////////////////////////
-/////// Constraint Initialization and Finalization
-///////////////////////////////////////////////////////////////////
-
-z3::expr FunGen::MakeInitialisationsInteresting(z3::context &c) const {
-  std::vector<z3::expr> allVars;
-  for (int i = 0; i < numVars; i++) {
-    allVars.push_back(c.int_const((NameVar(i) + "_0").c_str()));
-  }
-  // let's assign each variable a random value between -100 and 10
-  return AtMostKZeroes(c, allVars, numVars / 2);
-}
-
-z3::expr FunGen::AddRandomInitialisations(z3::context &c) {
-  auto rand = Random::Get().Uniform(
-      GlobalOptions::Get().LowerInitBound, GlobalOptions::Get().UpperInitBound
-  );
-  std::vector<z3::expr> allVars;
-  z3::expr allAssignedConstraint = c.bool_val(true);
-  for (int i = 0; i < numVars; i++) {
-    std::string varName = NameVar(i);
-    allVars.push_back(c.int_const((varName + "_0").c_str()));
-    z3::expr randomInit = c.bool_val(true);
-    if (ParamDefined(varName)) {
-      randomInit = (allVars[i] == GetParamVal(varName));
-    } else {
-      int randomValue = rand();
-      DefineParam(varName, randomValue);
-      randomInit = (allVars[i] == randomValue);
-    }
-    allAssignedConstraint = allAssignedConstraint && randomInit;
-  }
-  // let's assign each variable a random value between -100 and 10
-  return allAssignedConstraint;
-}
-
-z3::expr
-FunGen::DifferentInitialisationConstraint(std::vector<int> initialisation, z3::context &c) const {
-  // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
-  std::vector<z3::expr> differentInitialisationConstraints;
-  for (int i = 0; i < numVars; i++) {
-    int boundedValue1 = initialisation[i];
-    z3::expr boundedValue2 = c.int_const((NameVar(i) + "_0").c_str());
-    differentInitialisationConstraints.push_back(
-        z3::ite(boundedValue1 != boundedValue2, c.int_val(1), c.int_val(0))
-    );
-  }
-  z3::expr differentInitialisationConstraint =
-      AtMostKZeroes(c, differentInitialisationConstraints, std::min(3, numVars / 2));
-  return differentInitialisationConstraint;
-}
-
-// Function to extract parameters from the model, so that we can store the
-// coefficients and constants that the solver found an interpretation for
-void FunGen::ExtractParametersFromModel(z3::model &model, z3::context &ctx) {
-  for (const auto &param: state) {
-    const std::string &name = param.first;
-    const auto key = ctx.int_const(name.c_str()).decl();
-
-    if (model.has_interp(key)) {
-      z3::expr value = model.get_const_interp(key);
-
-      // For int values
-      if (value.is_numeral()) {
-        int int_value;
-        if (Z3_get_numeral_int(ctx, value, &int_value)) {
-          state[name] = int_value;
-          Log::Get().Out() << "Parameter " << name << " is in the model with value: " << int_value
-                           << std::endl;
-        }
-      }
-    } else {
-      Log::Get().Out() << "Parameter " << name << " is not explicitly defined in the model"
-                       << std::endl;
-    }
-  }
-}
-
-// Extract the initial values of each variable that's an input to the function from the model
-std::vector<int> FunGen::ExtractInitialisationsFromModel(z3::model &model, z3::context &ctx) const {
-  std::vector<int> initialisations;
-  for (int i = 0; i < numVars; i++) {
-    std::string varName = NameVar(i) + "_0";
-    z3::expr varExpr = ctx.int_const(varName.c_str());
-    Assert(model.has_interp(varExpr.decl()), "Variable %s not found in model", varName.c_str());
-    if (model.has_interp(varExpr.decl())) {
-      z3::expr value = model.get_const_interp(varExpr.decl());
-      if (value.is_numeral()) {
-        int intValue;
-        if (Z3_get_numeral_int(ctx, value, &intValue)) {
-          initialisations.push_back(intValue);
-        } else {
-          initialisations.push_back(0); // Default value
-        }
-      } else {
-        initialisations.push_back(0); // Default value
-      }
-    } else {
-      initialisations.push_back(0); // Default value
-    }
-  }
-  return initialisations;
-}
-
-// i wanted a bit of flexibility for the checksum function in the future so i
-// decided to just store the final values of all the variables (at the end basic
-// block) instead of just the checksum
-std::vector<int> FunGen::ExtractFinalizationsFromModel(
-    z3::model &model, z3::context &ctx, std::unordered_map<std::string, int> &versions
-) const {
-  std::vector<int> finalisations;
-  for (int i = 0; i < numVars; i++) {
-    std::string varName = NameVar(i) + "_" + std::to_string(versions[NameVar(i)]);
-    z3::expr varExpr = ctx.int_const(varName.c_str());
-    Assert(model.has_interp(varExpr.decl()), "Variable %s not found in model", varName.c_str());
-    if (model.has_interp(varExpr.decl())) {
-      z3::expr value = model.get_const_interp(varExpr.decl());
-      if (value.is_numeral()) {
-        int intValue;
-        if (Z3_get_numeral_int(ctx, value, &intValue)) {
-          finalisations.push_back(intValue);
-        } else {
-          finalisations.push_back(0); // Default value
-        }
-      } else {
-        finalisations.push_back(0); // Default value
-      }
-    } else {
-      finalisations.push_back(0); // Default value
-    }
-  }
-  return finalisations;
-}
-
-///////////////////////////////////////////////////////////////////
-/////// Code Generation
-///////////////////////////////////////////////////////////////////
-
-std::string FunGen::GenerateFunCode(const std::string &sno, const std::string &uuid) const {
+std::string FunGen::GenerateFunCode(const std::string &funName, const UBFreeExec &exec) const {
   std::ostringstream code;
-  code << "int function_" << uuid << "_" << sno << "(";
-  for (int i = 0; i < numVars; ++i) {
+  code << "int " << funName << "(";
+  for (int i = 0; i < numParams; ++i) {
     code << "int " << NameVar(i);
-    if (i < numVars - 1) {
+    if (i < numParams - 1) {
       code << ", ";
     }
   }
   code << ")" << std::endl;
   code << "{" << std::endl;
-  code << "    int " << NamePassCounter() << " = 0;" << std::endl;
-  for (const auto &gen: bblGens) {
-    code << gen.GenerateCode() << std::endl;
+  if (exec.NeedPassCounter()) {
+    code << "    int " << NamePassCounter() << " = 0;" << std::endl;
+  } else {
+    code << "    // No pass counter needed" << std::endl;
+  }
+
+  for (const auto &bbl: bblGens) {
+    code << bbl.GenerateCode(exec) << std::endl;
   }
   code << "}" << std::endl;
   return code.str();
 }
 
-std::string FunGen::GenerateMainCode(
-    const std::string &sno, const std::string &uuid,
-    const std::vector<std::vector<int>> &initialisations,
-    const std::vector<std::vector<int>> &finalizations, bool debug
-) const {
+std::string
+FunGen::GenerateMainCode(const std::string &funName, const UBFreeExec &exec, bool debug) const {
+  const auto &initialisations = exec.GetInitializations();
+  const auto &finalizations = exec.GetFinalizations();
   Assert(
       initialisations.size() == finalizations.size(),
       "Initialisations and finalizations must have the same size"
@@ -251,13 +101,12 @@ std::string FunGen::GenerateMainCode(
   for (auto i = 0; i < initialisations.size(); i++) {
     const auto &init = initialisations[i];
     const auto &fina = finalizations[i];
-    auto numVars = init.size();
+    auto numParams = init.size();
     std::ostringstream chk_oss;
-    main << "    check_checksum(" << StatelessChecksum::Compute(fina) << ", " << "function_" << uuid
-         << "_" << sno << "(";
-    for (auto i = 0; i < numVars; i++) {
+    main << "    check_checksum(" << StatelessChecksum::Compute(fina) << ", " << funName << "(";
+    for (auto i = 0; i < numParams; i++) {
       main << init[i];
-      if (i < numVars - 1) {
+      if (i < numParams - 1) {
         main << ", ";
       }
     }
@@ -268,17 +117,17 @@ std::string FunGen::GenerateMainCode(
   return main.str();
 }
 
-std::string FunGen::GenerateMapping(
-    const std::vector<int> &initialisation, const std::vector<int> &finalisation
-) {
+std::string FunGen::GenerateMappingCode(const UBFreeExec &exec) {
   std::ostringstream mapping;
-  for (auto x: initialisation) {
-    mapping << x << ",";
+  for (int i = 0; i < exec.GetInitializations().size(); i++) {
+    for (auto x: exec.GetInitializations()[i]) {
+      mapping << x << ",";
+    }
+    mapping << " : ";
+    for (auto x: exec.GetFinalizations()[i]) {
+      mapping << x << ",";
+    }
+    mapping << std::endl;
   }
-  mapping << " : ";
-  for (auto x: finalisation) {
-    mapping << x << ",";
-  }
-  mapping << std::endl;
   return mapping.str();
 }

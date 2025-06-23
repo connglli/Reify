@@ -39,6 +39,9 @@ public:
   void SetCout();
   void SetFout(const std::string &file);
 
+  void OpenSection(const std::string &name);
+  void CloseSection();
+
 private:
   Log();
 
@@ -48,6 +51,7 @@ private:
 private:
   std::basic_ostream<char> *out;
   std::basic_ofstream<char> *fout_;
+  int section = 0;
 };
 
 #endif // GRAPHFUZZ_LOGGER_H

@@ -27,6 +27,8 @@
 
 #include <fstream>
 
+#include "lib/logger.hpp"
+
 std::unique_ptr<Function> Function::Of(const fs::path &funPath, const fs::path &mapPath) {
   std::string tmpLine;
 
@@ -164,8 +166,9 @@ void ProgGen::Generate() const {
     auto host = functions[i].get();
     int numRepCoeffs = host->GetNumRepCoeffs();
 
-    std::cout << "[" << sno << "] Replacing function" << ": index=" << i
-              << ", name=" << host->GetName() << ", num_replaceable=" << numRepCoeffs << std::endl;
+    Log::Get().Out() << "[" << sno << "] Replacing function" << ": index=" << i
+                     << ", name=" << host->GetName() << ", num_replaceable=" << numRepCoeffs
+                     << std::endl;
 
     // Sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
@@ -178,11 +181,11 @@ void ProgGen::Generate() const {
       if (!host->RepFirstCoeff(guest->GetName(), initialisation, finalization)) {
         break; // TODO: break or continue? We can continue to the next, can't we?
       }
-      std::cout << "[" << sno << "]   var#" << k << " -> func#" << j << ": " << guest->GetName()
-                << std::endl;
+      Log::Get().Out() << "[" << sno << "]   var#" << k << " -> func#" << j << ": "
+                       << guest->GetName() << std::endl;
     }
 
-    std::cout << "[" << sno << "]   Done" << std::endl;
+    Log::Get().Out() << "[" << sno << "]   Done" << std::endl;
   }
 }
 

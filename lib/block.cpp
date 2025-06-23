@@ -26,7 +26,6 @@
 #include "lib/block.hpp"
 
 #include <sstream>
-#include <z3++.h>
 
 #include "global.hpp"
 #include "lib/chksum.hpp"
@@ -36,52 +35,57 @@
 #include "lib/samputils.hpp"
 
 void BlkGen::Generate() {
-  auto rand = Random::Get().Uniform(0, f.NumVars() - 1);
+  Log::Get().OpenSection(std::string("BlkGen: Block #") + std::to_string(bblNo));
+
+  const auto rand = Random::Get().Uniform(0, fun.NumParams() - 1);
 
   // We define a variable for each statement using other variables
   const auto numAssPerBbl = GlobalOptions::Get().NumAssignsPerBBL;
-  assignmentOrder = SampleKDistinct(f.NumVars(), numAssPerBbl);
+  assignments = SampleKDistinct(fun.NumParams(), numAssPerBbl);
   for (int stmtIndex = 0; stmtIndex < numAssPerBbl; stmtIndex++) {
-    int varIndex = assignmentOrder[stmtIndex];
+    int varIndex = assignments[stmtIndex];
+    Log::Get().Out() << varIndex << " <- ";
 
     // Sample the variables which will be used in the RHS of the assignment statement
     const auto numVarsPerAss = GlobalOptions::Get().NumVarsPerAssign;
-    defUsedVars[varIndex] = SampleKDistinct(f.NumVars(), numVarsPerAss);
+    defUsedVars[varIndex] = SampleKDistinct(fun.NumParams(), numVarsPerAss);
 
-    // Check every element present in vector is less than f.NumVars()
-    for (auto var: defUsedVars[varIndex]) {
-      if (var >= f.NumVars()) {
-        throw std::invalid_argument("Error: variable index out of bounds");
+    // Check every element present in vector is less than fun.NumParams()
+    for (int i = 0; i < numVarsPerAss; i++) {
+      const int var = defUsedVars[varIndex][i];
+      Log::Get().Out() << var;
+      if (i != numVarsPerAss - 1) {
+        Log::Get().Out() << ", ";
       }
+      Assert(
+          var < fun.NumParams(), "Variable index (=%d) out of bounds (=%d)", var, fun.NumParams()
+      );
     }
+    Log::Get().Out() << std::endl;
 
-    // We assign a coefficient for each variable that contributes to the current one
+    // Assign a coefficient for each variable that contributes to the current one
     for (int i = 0; i < numVarsPerAss; i++) {
       // Statement index is the index of the assignment statement in a
       // basic block, and i is the index of the variable in the RHS of
       // the assignment statement
-      std::string coefficientKey = NameCoeff(bblNo, stmtIndex, i);
-      f.InitParam(coefficientKey);
+      fun.DefSymbol(NameCoef(bblNo, stmtIndex, i));
     }
 
     // We also assign a constant to the current variable being defined
-    std::string constantKey = NameConst(bblNo, stmtIndex);
-    f.InitParam(constantKey);
+    fun.DefSymbol(NameConst(bblNo, stmtIndex));
   }
 
   // Our conditional is controlled by all variables defined in this basic block.
   // In case we need more variables beyond the number of variables we already defined,
   // let's refer to some variables defined in other basic blocks.
-  condUsedVars = assignmentOrder;
+  condUsedVars = assignments;
   for (int i = 0; i < GlobalOptions::Get().NumVarsInCond - numAssPerBbl; i++) {
     int randomVariable = rand();
-    while (std::find(condUsedVars.begin(), condUsedVars.end(), randomVariable) != condUsedVars.end()
-    ) {
+    while (std::ranges::find(condUsedVars, randomVariable) != condUsedVars.end()) {
       randomVariable = rand();
     }
     condUsedVars.push_back(randomVariable);
   }
-  Log::Get().Out() << "Size of conditional variables: " << condUsedVars.size() << std::endl;
 
   // Define a specific target that our conditional controls
   if (bblSkt.GetSuccessors().size() > 1) {
@@ -92,282 +96,18 @@ void BlkGen::Generate() {
       // let's just not touch this), and i is the index of the
       // variable in the actual conditional.
       // (... perhaps because it is the first conditional statement)
-      std::string coefficientKey = NameCondCoeff(bblNo, 0, i);
-      f.InitParam(coefficientKey);
+      fun.DefSymbol(NameCondCoef(bblNo, 0, i));
     }
-    // target block is a parameter here if we ever
-    // wanted to support more that 2 potential targets
-    // for the same basic block
-    std::string constantKey = NameCondConst(bblNo, bblSkt.GetSuccessors()[0]);
-    f.InitParam(constantKey);
+    // Target block is a parameter here if we ever wanted to support more that
+    // 2 potential targets for the same basic block. We will always branch to
+    // the very first successor in the conditional.
+    fun.DefSymbol(NameCondConst(bblNo, 0));
   }
+
+  Log::Get().CloseSection();
 }
 
-///////////////////////////////////////////////////////////////////
-/////// Constraint Generation
-///////////////////////////////////////////////////////////////////
-
-// void BlkGen::pushAfterSearch(std::vector<z3::expr> &coeffs, std::string name, z3::context &ctx) {
-//   // If we've already extracted the value from the model, we use that value,
-//   //  otherwise it's an uninterpreted constant which the solver needs to figure
-//   //  out the value for
-//     if (parameters.find(name) != parameters.end() && parameters[name].has_value()) {
-//       coeffs.push_back(ctx.int_val(parameters[name].value()));
-//     } else if (parameters.find(name) == parameters.end() ||
-//                (parameters.find(name) != parameters.end() && parameters[name] == std::nullopt)) {
-//       coeffs.push_back(ctx.int_const((name).c_str()));
-//       parameters[name] = std::nullopt;
-//     } else {
-//       assert(false && "This should not happen");
-//     }
-// }
-
-z3::expr BlkGen::createParameterExpr(std::string name, z3::context &ctx) const {
-  // If we've already extracted the value from the model, we use that value,
-  //  otherwise it's an uninterpreted constant which the solver needs to figure
-  //  out the value for
-  if (f.ParamDefined(name)) {
-    return ctx.int_val(f.GetParamVal(name));
-  } else {
-    f.InitParam(name);
-    return ctx.int_const((name).c_str());
-  }
-}
-
-z3::expr BlkGen::makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3::context &c) {
-  // z3::expr allZero = c.bool_const(("true"));
-  // for(auto coeff: coeffs)
-  // {
-  //     allZero = allZero && (coeff == 0);
-  // }
-  // return !allZero;
-  if (!GlobalOptions::Get().EnableInterestCoefs) {
-    return c.bool_val(true);
-  }
-  return AtMostKZeroes(c, coeffs, coeffs.size() / 2);
-}
-
-z3::expr BlkGen::boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs) {
-  z3::expr allAssignedConstraint = c.bool_val(true);
-  for (const auto &coeff: coeffs) {
-    allAssignedConstraint =
-        allAssignedConstraint && (coeff >= GlobalOptions::Get().LowerCoefBound &&
-                                  coeff <= GlobalOptions::Get().UpperCoefBound);
-  }
-  return allAssignedConstraint;
-}
-
-void BlkGen::GenerateConstraints(
-    int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
-) {
-  // TODO: Remove redundant code
-
-  // Ensure all terms in each variable definition are free of Undefined Behaviour
-  int stmtIndex = 0;
-  for (const auto &[varIndex, dependencies]: defUsedVars) {
-    std::string varName = NameVar(varIndex);
-
-    // Define integer variables and coefficients
-    std::vector<z3::expr> vars;   // [var_i]
-    std::vector<z3::expr> coeffs; // [a_i] or [b_i]
-    std::vector<z3::expr> terms;  // [a_i * var_i] or [b_i] for the final addition
-
-    // UB checks for RHS of the assignment statement. Each term is either a
-    // multiplication of a coefficient and a variable, or a constant.
-    // All should be between LOWER_BOUND and UPPER_BOUND
-
-    // Taking care of coefficients and the multiplication
-    for (int i = 0; i < dependencies.size(); i++) {
-      std::string depVarName = NameVar(dependencies[i]);
-      std::string depVarVer = std::to_string(versions[depVarName]);
-      vars.push_back(c.int_const((depVarName + "_" + depVarVer).c_str()));
-      solver.add(
-          vars.back() >= GlobalOptions::Get().LowerBound &&
-          vars.back() <= GlobalOptions::Get().UpperBound
-      );
-      coeffs.push_back(createParameterExpr(NameCoeff(bblNo, stmtIndex, i), c));
-      terms.push_back(coeffs.back() * vars.back()); // a_i * var_i
-    }
-    solver.add(boundCoefficients(c, coeffs));
-    solver.add(makeCoefficientsInteresting(coeffs, c));
-
-    // Taking care of the constant
-    coeffs.push_back(createParameterExpr(NameConst(bblNo, stmtIndex), c));
-    terms.push_back(coeffs.back());
-    solver.add(
-        coeffs.back() >= GlobalOptions::Get().LowerBound &&
-        coeffs.back() <= GlobalOptions::Get().UpperBound
-    );
-
-    // Taking care of the terms and their addition
-    z3::expr sum = terms[0];
-    z3::expr term_constraint = (terms[0] <= GlobalOptions::Get().UpperBound) &&
-                               (terms[0] >= GlobalOptions::Get().LowerBound);
-    if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(term_constraint);
-    }
-    for (int i = 1; i < terms.size(); i++) {
-      // Addition is left associative, so in an addition of k terms, the subexpressions with the
-      // first 1, 2,
-      // ...k terms added should all be between LOWER_BOUND and UPPER_BOUND as well
-      z3::expr constraint =
-          (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
-      if (GlobalOptions::Get().EnableSafetyChecks) {
-        solver.add(constraint);
-      }
-      sum = sum + terms[i];
-      term_constraint = (terms[i] <= GlobalOptions::Get().UpperBound) &&
-                        (terms[i] >= GlobalOptions::Get().LowerBound);
-      if (GlobalOptions::Get().EnableSafetyChecks) {
-        solver.add(term_constraint);
-      }
-    }
-    z3::expr constraint =
-        (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
-    if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(constraint);
-    }
-
-    versions[varName]++;
-    std::string varVerNext = std::to_string(++versions[varName]);
-
-    // Unrolled the entire graph and tracking the versions of each variable
-    // because they change adter assignment statements LHS of the assignment
-    // statement's version number is changed
-    z3::expr assignment = c.int_const((varName + "_" + varVerNext).c_str());
-    solver.add(assignment == sum);
-    // TODO: Redundant? We've already make coeffs interesting,
-    //       except for the constant. The prior one can be safely removed?
-    solver.add(makeCoefficientsInteresting(coeffs, c));
-
-    stmtIndex++;
-  }
-
-  Log::Get().Out() << bblSkt.GetSuccessors().size() << std::endl;
-  Log::Get().Out() << "Target: " << target << std::endl;
-
-  if (bblSkt.GetSuccessors().size() <= 1) {
-    return;
-  }
-
-  // Now, we need to generate the conditional constraint
-  // Define integer variables and coefficients
-  std::vector<z3::expr> vars;
-  std::vector<z3::expr> coeffs;
-  std::vector<z3::expr> terms;
-
-  // Coefficients and the multiplication
-  for (int i = 0; i < condUsedVars.size(); i++) {
-    std::string depVarName = NameVar(condUsedVars[i]);
-    std::string depVarVer = std::to_string(versions[depVarName]);
-    vars.push_back(c.int_const((depVarName + "_" + depVarVer).c_str()));
-    solver.add(
-        vars.back() >= GlobalOptions::Get().LowerBound &&
-        vars.back() <= GlobalOptions::Get().UpperBound
-    );
-    coeffs.push_back(createParameterExpr(NameCondCoeff(bblNo, 0, i), c));
-    terms.push_back(coeffs.back() * vars.back());
-  }
-  solver.add(boundCoefficients(c, coeffs));
-  solver.add(makeCoefficientsInteresting(coeffs, c));
-
-  // The constant
-  coeffs.push_back(createParameterExpr(NameCondConst(bblNo, bblSkt.GetSuccessors()[0]), c));
-  terms.push_back(coeffs.back());
-  solver.add(
-      coeffs.back() >= GlobalOptions::Get().LowerBound &&
-      coeffs.back() <= GlobalOptions::Get().UpperBound
-  );
-
-  // Terms and their addition
-  z3::expr sum = terms[0];
-  z3::expr term_constraint = (terms[0] <= GlobalOptions::Get().UpperBound) &&
-                             (terms[0] >= GlobalOptions::Get().LowerBound);
-  if (GlobalOptions::Get().EnableSafetyChecks) {
-    solver.add(term_constraint);
-  }
-  for (int i = 1; i < terms.size(); i++) {
-    z3::expr constraint =
-        (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
-    if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(constraint);
-    }
-    sum = sum + terms[i];
-    term_constraint = (terms[i] <= GlobalOptions::Get().UpperBound) &&
-                      (terms[i] >= GlobalOptions::Get().LowerBound);
-    if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(term_constraint);
-    }
-  }
-  z3::expr constraint =
-      (sum <= GlobalOptions::Get().UpperBound) && (sum >= GlobalOptions::Get().LowerBound);
-  if (GlobalOptions::Get().EnableSafetyChecks) {
-    solver.add(constraint);
-  }
-
-  // The jump: We always jump to the first successor for sum >= 0
-  if (target == bblSkt.GetSuccessors()[0]) {
-    solver.add(sum >= 0);
-  } else {
-    solver.add(sum < 0);
-  }
-}
-
-///////////////////////////////////////////////////////////////////
-/////// Code Generation
-///////////////////////////////////////////////////////////////////
-
-
-std::string
-BlkGen::generateConditionalConstraint(int bblNo, int target, std::vector<int> condUsedVars) const {
-  std::ostringstream constraint;
-  auto rand =
-      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
-  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_LATCH) {
-    constraint << "    } while (";
-  } else {
-    constraint << "    if (";
-  }
-  int ctr = 0;
-  for (auto i: condUsedVars) {
-    std::string coefficientKey = NameCondCoeff(bblNo, 0, ctr);
-    int coefficient;
-    if (f.ParamDefined(coefficientKey)) {
-      coefficient = f.GetParamVal(coefficientKey);
-    } else {
-      coefficient = rand();
-      f.DefineParam(coefficientKey, coefficient); // Store it in parameters
-    }
-    constraint << coefficient << " * " << NameVar(i);
-    constraint << " + ";
-    ++ctr;
-  }
-  std::string constantKey = NameCondConst(bblNo, target);
-  int constant;
-  if (f.ParamDefined(constantKey)) {
-    constant = f.GetParamVal(constantKey);
-  } else {
-    constant = rand();
-    f.DefineParam(constantKey, constant);
-  }
-  constraint << constant;
-  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_LATCH) {
-    constraint << " >= 0);" << std::endl; // We latch to the loop header
-  } else {
-    constraint << " >= 0) goto " << NameLabel(target) << ";" << std::endl;
-  }
-
-  // Output the constraint
-  return constraint.str();
-}
-
-std::string BlkGen::generateUnconditionalGoto(int target) const {
-  std::ostringstream code;
-  code << "    goto " << NameLabel(target) << ";" << std::endl;
-  return code.str();
-}
-
-std::string BlkGen::GenerateCode() const {
+std::string BlkGen::GenerateCode(const UBFreeExec &exec) const {
   std::ostringstream code;
 
   // Generate the label for the basic block
@@ -375,69 +115,111 @@ std::string BlkGen::GenerateCode() const {
     code << "    do {" << std::endl;
   }
   code << NameLabel(bblNo) << ":" << std::endl;
-  if (needPassCounter) {
+
+  // Check if we need a pass counter
+  if (exec.GetPassCounterBbl() == bblNo) {
     code << NamePassCounter() << "++;" << std::endl;
   }
 
   // Generate the statements one by one
   auto rand =
       Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
-  int stmtIndex = 0;
-  for (const auto &[varIndex, dependencies]: defUsedVars) {
+  for (int stmtIndex = 0; stmtIndex < static_cast<int>(assignments.size()); stmtIndex++) {
+    int varIndex = assignments[stmtIndex];
+    const auto &dependencies = GetDeps(varIndex);
+
     code << "    " << NameVar(varIndex) << " = ";
     for (size_t i = 0; i < dependencies.size(); ++i) {
       // Look up the coefficient in the parameters map
-      std::string coefficientKey = NameCoeff(bblNo, stmtIndex, i);
-      int coefficient;
-      if (f.ParamDefined(coefficientKey)) {
-        coefficient = f.GetParamVal(coefficientKey);
-      } else {
-        // Dead code that the model didn't find an interpretation for so we can do whatever,
-        // assign a random value to these coefficients
-        // TODO: Perhaps adding some checks to ensure that, if we are in the sampled execution,
-        //       all our parameters should already be computed.
-        coefficient = rand();
-        f.DefineParam(coefficientKey, coefficient); // Store it in parameters
-      }
+      std::string coefSym = NameCoef(bblNo, stmtIndex, i);
+      Assert(
+          exec.SymDefined(coefSym), "The symbol for coefficient %s is not yet resolved",
+          coefSym.c_str()
+      );
       // Multiply the dependency by the coefficient
-      code << coefficient << " * " << NameVar(dependencies[i]);
+      code << exec.GetSymVal(coefSym) << " * " << NameVar(dependencies[i]);
       if (i < dependencies.size() - 1) {
-        code << " + "; // Example operation
+        code << " + ";
       }
     }
-    // Add a constant term
-    std::string constantKey = NameConst(bblNo, stmtIndex);
-    int constant;
-    if (f.ParamDefined(constantKey)) {
-      constant = f.GetParamVal(constantKey);
-    } else {
-      constant = rand();
-      f.DefineParam(constantKey, constant); // Store it in parameters
-    }
-    code << " + " << constant << ";" << std::endl;
+
+    std::string constSym = NameConst(bblNo, stmtIndex);
+    Assert(
+        exec.SymDefined(constSym), "The symbol for constant %s is not yet resolved",
+        constSym.c_str()
+    );
+    code << " + " << exec.GetSymVal(constSym) << ";" << std::endl;
     ++stmtIndex;
   }
-  if (needPassCounter) {
-    code << "    if(" << NamePassCounter() << " >= " << passCounterValue << ")" << std::endl;
+
+  // Handle pass counters
+  if (exec.GetPassCounterBbl() == bblNo) {
+    code << "    if(" << NamePassCounter() << " >= " << exec.GetPassCounter() << ")" << std::endl;
     code << "    {" << std::endl;
-    code << "        goto " << NameLabel(f.NumBbls() - 1) << ";" << std::endl;
+    code << "        goto " << NameLabel(fun.NumBbls() - 1) << ";" << std::endl;
     code << "    }" << std::endl;
   }
+
+  // Handle conditional and unconditional jumps
   if (bblSkt.GetSuccessors().size() > 1) {
-    code << generateConditionalConstraint(bblNo, bblSkt.GetSuccessors()[0], condUsedVars);
-    code << generateUnconditionalGoto(bblSkt.GetSuccessors()[1]);
+    code << generateCondCode(exec, bblSkt.GetSuccessors()[0]);
+    code << generateUncondCode(bblSkt.GetSuccessors()[1]);
   } else if (bblSkt.GetSuccessors().size() == 1) {
-    code << generateUnconditionalGoto(bblSkt.GetSuccessors()[0]);
+    code << generateUncondCode(bblSkt.GetSuccessors()[0]);
   } else {
-    code << "    return " << StatelessChecksum::GetComputeName() << "(" << f.NumVars() << ", (int["
-         << f.NumVars() << "]){ ";
-    for (int i = 0; i < f.NumVars(); ++i) {
+    code << "    return " << StatelessChecksum::GetComputeName() << "(" << fun.NumParams()
+         << ", (int[" << fun.NumParams() << "]){ ";
+    for (int i = 0; i < fun.NumParams(); ++i) {
       code << NameVar(i);
-      if (i < f.NumVars() - 1) {
+      if (i < fun.NumParams() - 1) {
         code << ", ";
       }
     }
     code << " });" << std::endl;
   }
+  return code.str();
+}
+
+std::string BlkGen::generateCondCode(const UBFreeExec &exec, const int successor) const {
+  std::ostringstream constraint;
+  auto rand =
+      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
+
+  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_LATCH) {
+    constraint << "    } while (";
+  } else {
+    constraint << "    if (";
+  }
+
+  int index = 0;
+  for (auto i: condUsedVars) {
+    std::string coefSym = NameCondCoef(bblNo, 0, index);
+    Assert(
+        exec.SymDefined(coefSym), "The symbol for coefficient %s is not yet resolved",
+        coefSym.c_str()
+    );
+    constraint << exec.GetSymVal(coefSym) << " * " << NameVar(i);
+    constraint << " + ";
+    ++index;
+  }
+
+  std::string constSym = NameCondConst(bblNo, 0);
+  Assert(
+      exec.SymDefined(constSym), "The symbol for constant %s is not yet resolved", constSym.c_str()
+  );
+  constraint << exec.GetSymVal(constSym);
+  if (bblSkt.GetType() == BblSketch::BLOCK_LOOP_LATCH) {
+    constraint << " >= 0);" << std::endl; // We latch to the loop header
+  } else {
+    constraint << " >= 0) goto " << NameLabel(successor) << ";" << std::endl;
+  }
+
+  // Output the constraint
+  return constraint.str();
+}
+
+std::string BlkGen::generateUncondCode(const int successor) const {
+  std::ostringstream code;
+  code << "    goto " << NameLabel(successor) << ";" << std::endl;
   return code.str();
 }

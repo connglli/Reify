@@ -71,31 +71,10 @@ public:
   [[nodiscard]] std::vector<int> SampleGraph(bool consistent, int maxSteps = 100) const;
 
   // Add a new entry node to the graph, which points to the old entry node
-  void AddNewEntry() {
-    // Update all the successors of all the old nodes
-    for (int node = 0; node < NumNodes(); ++node) {
-      // Update the successors of node by adding each successor's value by 1
-      auto &oldSuccessors = adjTab[node];
-      std::vector<int> newSuccessors(oldSuccessors.size());
-      std::transform(oldSuccessors.begin(), oldSuccessors.end(), newSuccessors.begin(), [](int v) {
-        return v + 1;
-      });
-      oldSuccessors.clear();
-      oldSuccessors.insert(newSuccessors.begin(), newSuccessors.end());
-    }
-    // Add an entry node to the graph
-    adjTab.insert(adjTab.begin(), std::set<int>());
-    // Point the entry node to the old entry node
-    adjTab.front().insert(1);
-  }
+  void AddNewEntry();
 
   // Add a new exit node to the graph, which is pointed by the old exit node
-  void AddNewExit() {
-    // Point the old exit node to the new exit node
-    adjTab.back().insert(NumNodes());
-    // Add an exit node to the graph
-    adjTab.emplace_back();
-  }
+  void AddNewExit();
 
   // Generate the backbone graph randomly.
   void Generate(bool acyclic = false);

@@ -30,69 +30,61 @@
 #include <map>
 #include <string>
 #include <vector>
+
 #include "lib/ctrlflow.hpp"
 #include "lib/function.hpp"
-#include "z3++.h"
 
 class FunGen;
+class UBFreeExec;
 
 /// BlkGen is a basic block generator which populates each basic block with real statements
 class BlkGen {
 
 public:
-  BlkGen(FunGen &f, int bblNo, BblSketch bblSkt) : f(f), bblNo(bblNo), bblSkt(std::move(bblSkt)) {}
+  BlkGen(FunGen &fun, int bblNo, BblSketch bblSkt) :
+      fun(fun), bblNo(bblNo), bblSkt(std::move(bblSkt)) {}
 
-  void Generate();
+  // Get the ID of the basic block
+  [[nodiscard]] int GetBblNo() const { return bblNo; }
 
-  void SetPassCounter(int value) {
-    needPassCounter = true;
-    passCounterValue = value;
+  // Get the underlying basic block
+  [[nodiscard]] const BblSketch &GetBblSketch() const { return bblSkt; }
+
+  // Get all the assigned variables in this basic block in order
+  [[nodiscard]] const std::vector<int> &GetDefs() const { return assignments; }
+
+  // Get the dependencies of an assigned variable
+  [[nodiscard]] const std::vector<int> &GetDeps(int def) const {
+    Assert(defUsedVars.contains(def), "Variable %d is not defined in this block", def);
+    return defUsedVars.find(def)->second;
   }
 
-  ///////////////////////////////////////////////////////////////////
-  /////// Constraint Generation
-  ///////////////////////////////////////////////////////////////////
+  // Get the dependencies of the conditional
+  [[nodiscard]] const std::vector<int> &GetCondDeps() const { return condUsedVars; }
 
-public:
-  void GenerateConstraints(
-      int target, z3::solver &solver, z3::context &c, std::unordered_map<std::string, int> &versions
-  );
+  // Get the successors of this basic block
+  [[nodiscard]] const std::vector<int> &GetSuccessors() const { return bblSkt.GetSuccessors(); }
 
-private:
-  z3::expr createParameterExpr(std::string name, z3::context &ctx) const;
+  // Generate the basic block with random statements and symbols
+  void Generate();
 
-  static z3::expr makeCoefficientsInteresting(const std::vector<z3::expr> &coeffs, z3::context &c);
-
-  static z3::expr boundCoefficients(z3::context &c, const std::vector<z3::expr> &coeffs);
-
-  ///////////////////////////////////////////////////////////////////
-  /////// Code Generation
-  ///////////////////////////////////////////////////////////////////
-
-public:
-  [[nodiscard]] std::string GenerateCode() const;
+  // Generate the code of this basic block for a given execution
+  [[nodiscard]] std::string GenerateCode(const UBFreeExec &exec) const;
 
 private:
-  [[nodiscard]] std::string generateConditionalConstraint(
-      int blockno, int target, std::vector<int> conditionalVariables
-  ) const;
+  [[nodiscard]] std::string generateCondCode(const UBFreeExec &exec, int successor) const;
 
-  [[nodiscard]] std::string generateUnconditionalGoto(int target) const;
+  [[nodiscard]] std::string generateUncondCode(int successor) const;
 
 private:
-  FunGen &f;        // The residing function of this basic block
+  FunGen &fun;      // The residing function of this basic block
   int bblNo;        // The identifier of this basic block
   BblSketch bblSkt; // The sketch of this basic block
 
-  std::vector<int> assignmentOrder{}; // The order of the definition of each variable
+  std::vector<int> assignments{}; // The order of the definition of each variable
   std::map<int, std::vector<int>> defUsedVars{
   }; // The list of used variables for each defined variables
   std::vector<int> condUsedVars{}; // The list of used variables for the conditional
-
-  // MOTIVATION: We need to generate a pass counter name for the block in case we
-  // end up in a consistent walk with a loop which never reaches the end node
-  bool needPassCounter = false;
-  int passCounterValue = 0;
 };
 
 #endif // GRAPHFUZZ_BLOCK_HPP

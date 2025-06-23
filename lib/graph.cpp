@@ -173,7 +173,7 @@ void GraphPlus::Generate(const bool acyclic) {
   tryMakeReachToExit();
 
   if (!IsReachable(0, NumNodes() - 1)) {
-    std::cerr << "Warning: The generated graph is not reachable from the entry to the exit"
+    std::cout << "Warning: The generated graph is not reachable from the entry to the exit"
               << std::endl;
   }
 }
@@ -212,6 +212,29 @@ void GraphPlus::Reset() {
   for (auto &adj: adjTab) {
     adj.clear();
   }
+}
+
+void GraphPlus::AddNewEntry() {
+  // Update all the successors of all the old nodes
+  for (int node = 0; node < NumNodes(); ++node) {
+    // Update the successors of node by adding each successor's value by 1
+    auto &oldSuccessors = adjTab[node];
+    std::vector<int> newSuccessors(oldSuccessors.size());
+    std::ranges::transform(oldSuccessors, newSuccessors.begin(), [](int v) { return v + 1; });
+    oldSuccessors.clear();
+    oldSuccessors.insert(newSuccessors.begin(), newSuccessors.end());
+  }
+  // Add an entry node to the graph
+  adjTab.insert(adjTab.begin(), std::set<int>());
+  // Point the entry node to the old entry node
+  adjTab.front().insert(1);
+}
+
+void GraphPlus::AddNewExit() {
+  // Point the old exit node to the new exit node
+  adjTab.back().insert(NumNodes());
+  // Add an exit node to the graph
+  adjTab.emplace_back();
 }
 
 bool GraphPlus::addEdge(const int u, const int v) {

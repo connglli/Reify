@@ -70,19 +70,19 @@ struct GlobalOptions {
   int NumNodesPerFun = 10;
   // The number of allowed variables for each function
   int NumVarsPerFun = 8;
-  // The number of execution steps per function. Empirically, this should be a number
-  // that is considerably larger than the number of nodes in the function so that we
-  // can eventually sample an reasonable execution.
-  int MaxNumExecStepsPerFun = 100;
   // The allowed number of loops per function
   int MaxNumLoopsPerFun = 2;
   // The maximum number of basic blocks in a loop
   int MaxNumBblsPerLoop = 5;
 
+  // The number of execution steps per function. Empirically, this should be a number
+  // that is considerably larger than the number of nodes in the function so that we
+  // can eventually sample an reasonable execution.
+  int MaxNumExecStepsPerFun = 1000;
   // Empirically, if random initialisations are enabled, then the smt solver isn't able to generate
   // more initialisations for the same set of coefficients. I would recommend to either have a
-  // reasonably high number of NumInitsPerWalk and set this to false, or set this to true and set
-  // NumInitsPerWalk to 1
+  // reasonably high number of NumInitsPerExec and set this to false, or set this to true and set
+  // NumInitsPerExec to 1
   bool EnableRandomInits = false;
   // I don't want all initialisations to be 0, so this constraint takes care of that
   bool EnableInterestInits = true;
@@ -92,9 +92,9 @@ struct GlobalOptions {
   // or:
   //   initially all edges taken will be 3, followed by all edges taken to 1
   // There will be no out-edge interleaving.
-  bool EnableConsistentWalks = true;
+  bool EnableConsistentExecs = true;
   // The number of different initialisation sets we want the solver to find for a given function
-  int NumInitsPerWalk = 3;
+  int NumInitsPerExec = 3;
 
   ////////////////////////////////////////////////////////////
   ////// Program Generation Parameters
@@ -126,7 +126,7 @@ struct GlobalOptions {
       // Function generation
       ("Xnum-nodes-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xnum-vars-per-fun", "The number of allowed variables for each function", cxxopts::value<int>())
-      ("Xnum-inits-per-walk", "Number of initialisation sets to find per walk", cxxopts::value<int>());
+      ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>());
     // clang-format on
   }
 
@@ -212,14 +212,14 @@ struct GlobalOptions {
       }
     }
 
-    if (args.count("Xnum-inits-per-walk")) {
-      NumInitsPerWalk = args["Xnum-inits-per-walk"].as<int>();
-      if (NumInitsPerWalk > 5) {
+    if (args.count("Xnum-inits-per-exec")) {
+      NumInitsPerExec = args["Xnum-inits-per-exec"].as<int>();
+      if (NumInitsPerExec > 5) {
         std::cerr
-            << "Warning: Too many initialisations per walk would make the generation much slower"
+            << "Warning: Too many initialisations per exec would make the generation much slower"
             << std::endl;
       }
-      EnsurePositive(NumInitsPerWalk, "num-inits-per-walk");
+      EnsurePositive(NumInitsPerExec, "num-inits-per-exec");
     }
   }
 
@@ -300,8 +300,8 @@ static std::filesystem::path GetMappingPath(
   return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
-) {
+static std::filesystem::path
+GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
 }
@@ -337,8 +337,8 @@ static std::filesystem::path GetGenLogPath(
   }
 }
 
-static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
-) {
+static std::filesystem::path
+GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetLoggingsDir(functionPath.parent_path().parent_path()) /
          GetLoggingNameForFunctionName(functionPath.stem());
 }

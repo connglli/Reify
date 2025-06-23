@@ -23,17 +23,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <bits/stdc++.h>
 #include <csignal>
-#include <sstream>
-#include <z3++.h>
-#include "cxxopts.hpp"
+#include <cxxopts.hpp>
+#include <filesystem>
+#include <fstream>
+
 #include "global.hpp"
-#include "lib/block.hpp"
 #include "lib/chksum.hpp"
 #include "lib/function.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
+#include "lib/ubfexec.hpp"
 
 std::ofstream functionFile;
 std::ofstream mappingFile;
@@ -134,7 +134,7 @@ struct FunGenOpts {
     } else {
       sno = args["sno"].as<std::string>();
       if (std::stoi(sno) < 0) {
-        std::cout << "Error: The sample number (--sno) must be non-negative." << std::endl;
+        std::cerr << "Error: The sample number (--sno) must be non-negative." << std::endl;
         exit(1);
       }
     }
@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
 
   std::string uuid = cliOpts.uuid;
   std::string sno = cliOpts.sno;
-  bool genMain = cliOpts.main;
+  bool mainfun = cliOpts.main;
   bool verbose = cliOpts.verbose;
 
   std::filesystem::path outputDirectory = cliOpts.output;
@@ -175,8 +175,6 @@ int main(int argc, char **argv) {
 
   funcFilePath = GetFunctionPath(uuid, sno, outputDirectory);
   mapFilePath = GetMappingPath(uuid, sno, outputDirectory);
-  functionFile = std::ofstream(funcFilePath);
-  mappingFile = std::ofstream(mapFilePath);
   Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/!verbose));
 
   std::signal(SIGINT, signalHandler);
@@ -185,148 +183,48 @@ int main(int argc, char **argv) {
 
   z3::set_param("parallel.enable", true);
 
-  Log::Get().Out() << "==== Generation =============================" << std::endl;
-
+  // Generate the function code
   FunGen fun(
       GlobalOptions::Get().NumNodesPerFun, GlobalOptions::Get().NumVarsPerFun,
       GlobalOptions::Get().MaxNumLoopsPerFun, GlobalOptions::Get().MaxNumBblsPerLoop
   );
   fun.Generate();
 
-  const auto &cfg = fun.GetCfg();
-  auto bbls = fun.GetBbls();
-
-  auto execution = fun.SampleExec(
-      GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentWalks
+  // Sample an execution path from the function
+  std::vector<int> execPath = fun.SampleExec(
+      GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentExecs
   );
-  Log::Get().Out() << "Exec: ";
-  for (int i: execution) {
-    Log::Get().Out() << i << ",";
-  }
-  Log::Get().Out() << std::endl;
 
-  z3::context c;
-  z3::solver solver(c);
+  // Populate symbols through the the execution path
+  UBFreeExec exec(fun, execPath);
+  int numSolved = exec.Solve(
+      GlobalOptions::Get().NumInitsPerExec, GlobalOptions::Get().EnableInterestInits,
+      GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs
+  );
 
-  Log::Get().Out() << "==== Initialization 0 =============================" << std::endl;
-
-  // Let each parameter (coefficient or constant) interesting initially
-  if (GlobalOptions::Get().EnableInterestInits) {
-    solver.add(fun.MakeInitialisationsInteresting(c));
-  }
-  if (GlobalOptions::Get().EnableRandomInits) {
-    solver.add(fun.AddRandomInitialisations(c));
+  if (numSolved == 0) {
+    return -1; // Unable find any good solutions for the execution
+    // TODO: Perhaps we can sample a new execution and fail after N samples?
   }
 
-  Log::Get().Out() << "Initialization SMT: " << solver.to_smt2() << std::endl;
-
-  // Generate UB constraint for each statement in the executed basic block
-  std::unordered_map<std::string, int> versions; // SSA version for each definition
-  for (int i = 0; i < execution.size() - 1; i++) {
-    Log::Get().Out() << "Constraint BB#" << i << std::endl;
-    int current_bb = execution[i];
-    int next_bb = execution[i + 1];
-    // Generate constraints for the current basic block so that
-    // no UB occurs and it can reach the next basic block
-    bbls[current_bb].GenerateConstraints(next_bb, solver, c, versions);
-  }
-  bbls[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
-
-  // Dump the SMT queries for debugging
-  Log::Get().Out() << "Execution SMT: " << solver.to_smt2() << std::endl;
-
-  if (solver.check() == z3::unsat) {
-    Log::Get().Out() << "UNSAT" << std::endl;
-    // Remove the output file and mapping file from the filesystem because no model was found
-    functionFile.close();
-    mappingFile.close();
-    std::remove((funcFilePath).c_str());
-    std::remove((mapFilePath).c_str());
-    return 1;
-  }
-
-  isFormulaSatisfiable = true;
-  Log::Get().Out() << "SAT" << std::endl;
-
-  z3::model model = solver.get_model();
-  Log::Get().Out() << "Execution Model: " << model << std::endl;
-
-  // Extract all parameters from the model down to the function
-  fun.ExtractParametersFromModel(model, c);
-
-  const std::string funCode = fun.GenerateFunCode(sno, uuid);
+  // Generate our code with respect to the UB-free execution
+  std::string funCode = fun.GenerateFunCode(GetFunctionName(uuid, sno), exec);
+  functionFile = std::ofstream(funcFilePath);
   functionFile << funCode << std::endl;
   functionFile.close();
 
-  std::vector<std::vector<int>> initialisations;
-  std::vector<std::vector<int>> finalisations;
-
-  std::vector<int> initialisation = fun.ExtractInitialisationsFromModel(model, c);
-  std::vector<int> finalisation = fun.ExtractFinalizationsFromModel(model, c, versions);
-  mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
-
-  initialisations.emplace_back(initialisation);
-  finalisations.emplace_back(finalisation);
-
-  // Now, let's try to generate a couple more mappings (initialisation sets).
-  // First, let's regenerate the SMT query by repopulating the solver with the
-  // same constraints, except this time - the solver would use the coefficients
-  // and constants we already generated from the model.
-  solver.reset();
-  if (GlobalOptions::Get().EnableInterestInits) {
-    solver.add(fun.MakeInitialisationsInteresting(c));
-  }
-  if (GlobalOptions::Get().EnableRandomInits) {
-    solver.add(fun.AddRandomInitialisations(c));
-  }
-
-  versions.clear();
-  for (int i = 0; i < execution.size() - 1; i++) {
-    int current_bb = execution[i];
-    int next_bb = execution[i + 1];
-    bbls[current_bb].GenerateConstraints(next_bb, solver, c, versions);
-  }
-  bbls[execution[execution.size() - 1]].GenerateConstraints(-1, solver, c, versions);
-
-  for (int i = 0; i < GlobalOptions::Get().NumInitsPerWalk - 1; i++) {
-    Log::Get().Out() << "==== Initialization " << i + 1
-                     << " =============================" << std::endl;
-
-    // Ensure that the initialisation is sufficiently different from the previous one
-    solver.add(fun.DifferentInitialisationConstraint(initialisation, c));
-
-    Log::Get().Out() << "Execution SMT: " << solver.to_smt2() << std::endl;
-
-    if (solver.check() == z3::unsat) {
-      Log::Get().Out() << "UNSAT" << std::endl;
-      std::cout << "WARNING: UNSAT at " << i + 1 << "-th initialization" << std::endl;
-      break; // There's no need to report an error to our caller
-    }
-
-    isFormulaSatisfiable = true;
-    Log::Get().Out() << "SAT" << std::endl;
-
-    model = solver.get_model();
-    Log::Get().Out() << "Execution Model: " << model << std::endl;
-
-    fun.ExtractParametersFromModel(model, c);
-    initialisation = fun.ExtractInitialisationsFromModel(model, c);
-    finalisation = fun.ExtractFinalizationsFromModel(model, c, versions);
-    mappingFile << FunGen::GenerateMapping(initialisation, finalisation);
-    initialisations.emplace_back(initialisation);
-    finalisations.emplace_back(finalisation);
-  }
-
+  // Generate the initialization-finalization mapping
+  mappingFile = std::ofstream(mapFilePath);
+  mappingFile << FunGen::GenerateMappingCode(exec);
   mappingFile.close();
 
-  if (genMain) {
+  // Generate an executable program if necessary
+  if (mainfun) {
     std::filesystem::create_directories(GetProgramsDir(outputDirectory));
     std::ofstream programFile = std::ofstream(GetProgramPath(uuid, sno, outputDirectory));
     programFile << StatelessChecksum::GetRawCode() << std::endl;
     programFile << funCode << std::endl;
-    programFile << fun.GenerateMainCode(
-                       sno, uuid, initialisations, finalisations, /*debug=*/verbose
-                   )
+    programFile << fun.GenerateMainCode(GetFunctionName(uuid, sno), exec, /*debug=*/verbose)
                 << std::endl;
     programFile.close();
   }
