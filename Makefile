@@ -17,8 +17,8 @@ ifeq ($(FOUND_Z3),n)
 $(error libz3.so not found! Please install it)
 endif
 
-C_STD   := c17
-CPP_STD := c++20
+CSTD   := c17
+CXXSTD := c++20
 
 INC_DIR := include
 LIB_DIR := lib
@@ -65,8 +65,8 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 ########################################################################
 
 DBGFLAGS := $(if $(DEBUG),-g,)
-CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -std=${CPP_STD} -O0 -I$(INC_DIR)
-CFLAGS   := $(DBGFLAGS) -Wall -Wextra -std=${C_STD} -O0
+CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-functions -std=${CXXSTD} -O0 -I$(INC_DIR)
+CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-functions -std=${CSTD} -O0
 LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread
 
 
