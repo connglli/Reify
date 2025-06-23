@@ -129,7 +129,7 @@ std::string BlkGen::GenerateCode(const UBFreeExec &exec) const {
     const auto &dependencies = GetDeps(varIndex);
 
     code << "    " << NameVar(varIndex) << " = ";
-    for (size_t i = 0; i < dependencies.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(dependencies.size()); ++i) {
       // Look up the coefficient in the parameters map
       std::string coefSym = NameCoef(bblNo, stmtIndex, i);
       Assert(
@@ -149,7 +149,6 @@ std::string BlkGen::GenerateCode(const UBFreeExec &exec) const {
         constSym.c_str()
     );
     code << " + " << exec.GetSymVal(constSym) << ";" << std::endl;
-    ++stmtIndex;
   }
 
   // Handle pass counters

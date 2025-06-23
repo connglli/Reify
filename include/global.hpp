@@ -164,7 +164,7 @@ struct GlobalOptions {
             << "Warning: Too many assignments per basic block would make the generation much slower"
             << std::endl;
       }
-      EnsurePositive(NumAssignsPerBBL, "Xnum-assigns-per-bbl");
+      ensurePositive(NumAssignsPerBBL, "Xnum-assigns-per-bbl");
     }
 
     if (args.count("Xnum-vars-per-assign")) {
@@ -174,7 +174,7 @@ struct GlobalOptions {
             << "Warning: Too many variables per assignment would make the generation much slower"
             << std::endl;
       }
-      EnsurePositive(NumVarsPerAssign, "Xnum-vars-per-assign");
+      ensurePositive(NumVarsPerAssign, "Xnum-vars-per-assign");
     }
 
     if (args.count("Xnum-vars-in-cond")) {
@@ -184,7 +184,7 @@ struct GlobalOptions {
             << "Warning: Too many variables per conditional would make the generation much slower"
             << std::endl;
       }
-      EnsurePositive(NumVarsInCond, "Xnum-vars-in-cond");
+      ensurePositive(NumVarsInCond, "Xnum-vars-in-cond");
     }
 
     if (args.count("Xnum-nodes-per-fun")) {
@@ -194,7 +194,7 @@ struct GlobalOptions {
                      "much slower"
                   << std::endl;
       }
-      EnsurePositive(NumNodesPerFun, "Xnum-nodes-per-fun");
+      ensurePositive(NumNodesPerFun, "Xnum-nodes-per-fun");
     }
 
     if (args.count("Xnum-vars-per-fun")) {
@@ -204,7 +204,7 @@ struct GlobalOptions {
             << "Warning: Too many variables per function would make the generation much slower"
             << std::endl;
       }
-      EnsurePositive(NumVarsPerFun, "Xnum-vars-per-fun");
+      ensurePositive(NumVarsPerFun, "Xnum-vars-per-fun");
       if (NumAssignsPerBBL >= NumVarsPerFun) {
         std::cerr
             << "Error: The number of assignments per basic block (--Xnum-assigns-per-bbl) cannot "
@@ -221,7 +221,7 @@ struct GlobalOptions {
             << "Warning: Too many initialisations per exec would make the generation much slower"
             << std::endl;
       }
-      EnsurePositive(NumInitsPerExec, "num-inits-per-exec");
+      ensurePositive(NumInitsPerExec, "num-inits-per-exec");
     }
   }
 
@@ -248,7 +248,7 @@ struct GlobalOptions {
   }
 
 private:
-  static void EnsurePositive(const int v, const char *opt) {
+  static void ensurePositive(const int v, const char *opt) {
     if (v < 0) {
       std::cerr << "Error: The option --" << opt << " must be a positive value" << std::endl;
       exit(1);
