@@ -193,15 +193,7 @@ void ProgGen::GenerateCode(const fs::path &file, bool debug, bool staticModifier
   std::ofstream oss(file);
   oss << StatelessChecksum::GetRawCode() << std::endl;
   oss << "#include <stdio.h>" << std::endl;
-  if (debug) {
-    oss << "#include <assert.h>" << std::endl << std::endl;
-    oss << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum "
-           "not equal\"), (actual))"
-        << std::endl
-        << std::endl;
-  } else {
-    oss << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
-  }
+  oss << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
   auto rand = Random::Get().UniformReal();
   for (int i = static_cast<int>(functions.size()) - 1; i >= 0; --i) {
     // Output inline with 60% probability
@@ -223,8 +215,8 @@ void ProgGen::GenerateCode(const fs::path &file, bool debug, bool staticModifier
   std::vector<int> finalization;
   functions[0]->ExtractMapping(initialisation, finalization);
   int checksum = StatelessChecksum::Compute(finalization);
-  oss << "    printf(\"%d,\", check_checksum(" << checksum << ", " << functions[0]->GetName()
-      << "(";
+  oss << "    printf(\"%d,\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
+      << ", " << functions[0]->GetName() << "(";
   for (int i = 0; i < initialisation.size(); ++i) {
     oss << initialisation[i];
     if (i != initialisation.size() - 1) {

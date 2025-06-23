@@ -33,9 +33,20 @@
 class StatelessChecksum {
 
 public:
+  // Compute the checksum of the given values
   static int Compute(const std::vector<int> &values);
+
+  // Get the function name for the checksum computing function
   static std::string GetComputeName();
+
+  // Get the raw C code for the  checksum computing function and its dependencies
   static std::string GetRawCode();
+
+  // Get the function name for checking the checksum function
+  static std::string GetCheckChksumName();
+
+  // Get the code for check and return the checksum
+  static std::string GetCheckChksumCode(bool debug);
 
 private:
   StatelessChecksum() {}

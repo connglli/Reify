@@ -109,7 +109,7 @@ public:
     int coeff_val = std::stoi(GetCoeff());
     int chk_val = StatelessChecksum::Compute(finalization);
     std::ostringstream chk_oss;
-    chk_oss << "check_checksum(" << chk_val << ", " << funName << "(";
+    chk_oss << StatelessChecksum::GetCheckChksumName() << "(" << chk_val << ", " << funName << "(";
     for (int i = 0; i < static_cast<int>(initialisation.size()) - 1; ++i) {
       chk_oss << initialisation[i] << ", ";
     }

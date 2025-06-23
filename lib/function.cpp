@@ -79,34 +79,26 @@ std::string FunGen::GenerateFunCode(const std::string &funName, const UBFreeExec
 
 std::string
 FunGen::GenerateMainCode(const std::string &funName, const UBFreeExec &exec, bool debug) const {
-  const auto &initialisations = exec.GetInitializations();
+  const auto &initializations = exec.GetInitializations();
   const auto &finalizations = exec.GetFinalizations();
   Assert(
-      initialisations.size() == finalizations.size(),
-      "Initialisations and finalizations must have the same size"
+      initializations.size() == finalizations.size(),
+      "Initializations and finalizations must have the same size"
   );
-  // TODO: Remove duplicate
   std::ostringstream main;
-  if (debug) {
-    main << "#include <assert.h>" << std::endl << std::endl;
-    main << "#define check_checksum(expected, actual) (assert((expected)==(actual) && \"Checksum "
-            "not equal\"), (actual))"
-         << std::endl
-         << std::endl;
-  } else {
-    main << "#define check_checksum(expected, actual) (actual)" << std::endl << std::endl;
-  }
+  main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
   main << "int main(int argc, int* argv[])" << std::endl;
   main << "{" << std::endl;
-  for (auto i = 0; i < initialisations.size(); i++) {
-    const auto &init = initialisations[i];
+  for (auto i = 0; i < initializations.size(); i++) {
+    const auto &init = initializations[i];
     const auto &fina = finalizations[i];
-    auto numParams = init.size();
+    const auto numParams = static_cast<int>(init.size());
     std::ostringstream chk_oss;
-    main << "    check_checksum(" << StatelessChecksum::Compute(fina) << ", " << funName << "(";
-    for (auto i = 0; i < numParams; i++) {
-      main << init[i];
-      if (i < numParams - 1) {
+    main << "    " << StatelessChecksum::GetCheckChksumName() << "("
+         << StatelessChecksum::Compute(fina) << ", " << funName << "(";
+    for (auto j = 0; j < numParams; j++) {
+      main << init[j];
+      if (j < numParams - 1) {
         main << ", ";
       }
     }

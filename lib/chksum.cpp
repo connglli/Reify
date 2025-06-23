@@ -25,6 +25,7 @@
 
 #include "lib/chksum.hpp"
 
+#include <sstream>
 #include <string>
 
 #include "lib/dbgutils.hpp"
@@ -50,4 +51,20 @@ std::string StatelessChecksum::GetRawCode() {
 #else
   return STATELESS_CHECKSUM_CODE;
 #endif
+}
+
+std::string StatelessChecksum::GetCheckChksumName() { return "check_chksum"; }
+
+std::string StatelessChecksum::GetCheckChksumCode(bool debug) {
+  std::ostringstream oss;
+  if (debug) {
+    oss << "#include <assert.h>" << std::endl << std::endl;
+    oss << "#define " << GetCheckChksumName()
+        << "(expected, actual) (assert((expected)==(actual) && \"Checksum "
+           "not equal\"), (actual))"
+        << std::endl;
+  } else {
+    oss << "#define " << GetCheckChksumName() << "(expected, actual) (actual)" << std::endl;
+  }
+  return oss.str();
 }
