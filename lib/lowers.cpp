@@ -39,8 +39,10 @@ namespace symir {
   void SymSexpLower::Visit(const Term &t) {
     out << "(" << Term::GetOpShort(t.GetOp()) << " ";
     t.GetCoef()->Accept(*this);
-    out << " ";
-    t.GetVar()->Accept(*this);
+    if (t.GetOp() != Term::Op::OP_CST) {
+      out << " ";
+      t.GetVar()->Accept(*this);
+    }
     out << ")";
   }
 
@@ -151,8 +153,10 @@ namespace symir {
 
   void SymCxLower::Visit(const Term &t) {
     t.GetCoef()->Accept(*this);
-    out << " " << Term::GetOpSym(t.GetOp()) << " ";
-    t.GetVar()->Accept(*this);
+    if (t.GetOp() != Term::Op::OP_CST) {
+      out << " " << Term::GetOpSym(t.GetOp()) << " ";
+      t.GetVar()->Accept(*this);
+    }
   }
 
   void SymCxLower::Visit(const Expr &e) {

@@ -391,9 +391,10 @@ namespace symir {
   }
 
   void SymSexpParser::buildTerm(Term::Op op) {
-    const auto *varToken = popArg<SymSexpLexer::Token>();
+    SymSexpLexer::Token *varToken =
+        op != Term::Op::OP_CST ? popArg<SymSexpLexer::Token>() : nullptr;
     Assert(
-        varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+        varToken == nullptr || varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
         "The 2nd child (%s) of the term node is not an identifier, while it should be the "
         "variable of the term",
         varToken->FullInfo().c_str()
@@ -407,11 +408,13 @@ namespace symir {
     );
     auto *numTerms = popArg<int>();
     (*numTerms)++;
-    const auto varDef = funBd->FindVar(varToken->ToStr());
-    const auto termType = varDef->GetType();
+    const auto varDef = varToken != nullptr ? funBd->FindVar(varToken->ToStr()) : nullptr;
+    const auto termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
     pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(op, buildCoef(coefToken, termType), varDef));
     pushArg<int>(*numTerms);
-    delete varToken;
+    if (varToken != nullptr) {
+      delete varToken;
+    }
     delete coefToken;
     delete numTerms;
   }

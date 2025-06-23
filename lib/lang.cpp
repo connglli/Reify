@@ -31,7 +31,11 @@ namespace symir {
   SymIRBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const Coef *coef, const VarDef *var) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     TermID tid = numCreatedTerms++;
-    createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var));
+    if (op == Term::Op::OP_CST) {
+      createdTerms[tid] = std::make_unique<Term>(op, coef, nullptr);
+    } else {
+      createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var));
+    }
     return tid;
   }
 
@@ -63,8 +67,7 @@ namespace symir {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
-    stmts.push_back(
-        std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+    stmts.push_back(std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
     );
     createdExprs.erase(it);
   }
