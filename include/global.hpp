@@ -75,6 +75,8 @@ struct GlobalOptions {
   // The maximum number of basic blocks in a loop
   int MaxNumBblsPerLoop = 5;
 
+  // The max number of executions that we can try sampling for each function
+  int MaxNumExecsPerFun = 3;
   // The number of execution steps per function. Empirically, this should be a number
   // that is considerably larger than the number of nodes in the function so that we
   // can eventually sample an reasonable execution.

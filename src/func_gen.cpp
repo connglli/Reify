@@ -190,32 +190,43 @@ int main(int argc, char **argv) {
   );
   fun.Generate();
 
-  // Sample an execution path from the function
-  std::vector<int> execPath = fun.SampleExec(
-      GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentExecs
-  );
-
   // Populate symbols through the the execution path
-  UBFreeExec exec(fun, execPath);
-  int numSolved = exec.Solve(
-      GlobalOptions::Get().NumInitsPerExec, GlobalOptions::Get().EnableInterestInits,
-      GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs
-  );
+  // We keep trying unless when we succeeded
+  std::unique_ptr<UBFreeExec> exec = nullptr;
+  for (int tries = 0; tries < GlobalOptions::Get().MaxNumExecsPerFun; ++tries) {
+    // Sample an execution path from the function
+    std::vector<int> execPath = fun.SampleExec(
+        GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentExecs
+    );
+    // Try solving the execution following the path
+    exec = std::make_unique<UBFreeExec>(fun, execPath);
+    int numSolved = exec->Solve(
+        GlobalOptions::Get().NumInitsPerExec, GlobalOptions::Get().EnableInterestInits,
+        GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs
+    );
+    if (numSolved != 0) {
+      break;
+    }
+    exec = nullptr;
+  }
 
-  if (numSolved == 0) {
+  // We are unable to find any available executable executions
+  if (exec == nullptr) {
+    std::cerr << "Unable to obtain any UB-free solutions within "
+              << GlobalOptions::Get().MaxNumExecsPerFun << " execution samples" << std::endl;
     return -1; // Unable find any good solutions for the execution
     // TODO: Perhaps we can sample a new execution and fail after N samples?
   }
 
   // Generate our code with respect to the UB-free execution
-  std::string funCode = fun.GenerateFunCode(GetFunctionName(uuid, sno), exec);
+  std::string funCode = fun.GenerateFunCode(GetFunctionName(uuid, sno), *exec);
   functionFile = std::ofstream(funcFilePath);
   functionFile << funCode << std::endl;
   functionFile.close();
 
   // Generate the initialization-finalization mapping
   mappingFile = std::ofstream(mapFilePath);
-  mappingFile << FunGen::GenerateMappingCode(exec);
+  mappingFile << FunGen::GenerateMappingCode(*exec);
   mappingFile.close();
 
   // Generate an executable program if necessary
@@ -224,7 +235,7 @@ int main(int argc, char **argv) {
     std::ofstream programFile = std::ofstream(GetProgramPath(uuid, sno, outputDirectory));
     programFile << StatelessChecksum::GetRawCode() << std::endl;
     programFile << funCode << std::endl;
-    programFile << fun.GenerateMainCode(GetFunctionName(uuid, sno), exec, /*debug=*/verbose)
+    programFile << fun.GenerateMainCode(GetFunctionName(uuid, sno), *exec, /*debug=*/verbose)
                 << std::endl;
     programFile.close();
   }

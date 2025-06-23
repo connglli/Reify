@@ -40,7 +40,7 @@ std::vector<int> BiLoop::SampleOneIter(int stepLimit, bool consistent, bool incl
       return exec;
     }
   }
-  Assert(false, "Failed to sample a valid execution from the loop after 100 tries");
+  Panic("Failed to sample a valid execution from the loop after 100 tries");
   return {};
 }
 
@@ -209,7 +209,7 @@ CfgSketch::SampleExec(const int stepLimit, const bool consistent, const int maxL
         fineExec.push_back(loop->GetExit() + indexInBbls[biInd]);
       }
     } else {
-      Assert(false, "Unknown bimpo type %d", bi->GetType());
+      Panic("Unknown bimpo type %d", bi->GetType());
     }
   }
   return fineExec;
