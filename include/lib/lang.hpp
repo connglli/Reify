@@ -424,7 +424,7 @@ namespace symir {
 
     [[nodiscard]] Op GetOp() const { return op; }
 
-    [[nodiscard]] size_t GetNumTerms() const { return terms.size(); }
+    [[nodiscard]] size_t NumTerms() const { return terms.size(); }
 
     [[nodiscard]] std::vector<const Term *> GetTerms() const {
       std::vector<const Term *> r;
@@ -539,7 +539,7 @@ namespace symir {
     explicit RetStmt(std::vector<std::unique_ptr<VarUse>> vars) :
         Stmt(SIR_STMT_RET), vars(std::move(vars)) {}
 
-    [[nodiscard]] size_t GetNumVars() const { return vars.size(); }
+    [[nodiscard]] size_t NumVars() const { return vars.size(); }
 
     [[nodiscard]] const VarUse *GetVar(size_t i) const {
       Assert(i < vars.size(), "The accessing index (%lu) is out of bounds (%lu)", i, vars.size());
@@ -565,7 +565,7 @@ namespace symir {
   public:
     explicit Target(ID irId) : Stmt(irId) {}
 
-    [[nodiscard]] virtual size_t GetNumSuccessors() const = 0;
+    [[nodiscard]] virtual size_t NumSuccessors() const = 0;
   };
 
   /// A Branch represents jumping to which targets are controlled by a condition.
@@ -581,7 +581,7 @@ namespace symir {
 
     [[nodiscard]] const std::string &GetFalseTarget() const { return falLab; }
 
-    [[nodiscard]] size_t GetNumSuccessors() const override { return 2; };
+    [[nodiscard]] size_t NumSuccessors() const override { return 2; };
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
@@ -598,7 +598,7 @@ namespace symir {
 
     [[nodiscard]] const std::string &GetTarget() const { return label; }
 
-    [[nodiscard]] size_t GetNumSuccessors() const override { return 1; };
+    [[nodiscard]] size_t NumSuccessors() const override { return 1; };
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
@@ -652,20 +652,18 @@ namespace symir {
 
     [[nodiscard]] const Target *GetTarget() const { return target.get(); }
 
-    [[nodiscard]] size_t GetNumSuccessors() const {
+    [[nodiscard]] size_t NumSuccessors() const {
       if (target == nullptr) {
         return 0;
       } else {
-        return target->GetNumSuccessors();
+        return target->NumSuccessors();
       }
     }
 
-    [[nodiscard]] size_t GetNumStmts() const { return stmts.size() + (target.get() ? 0 : 1); }
+    [[nodiscard]] size_t NumStmts() const { return stmts.size() + (target.get() ? 0 : 1); }
 
     [[nodiscard]] Stmt *GetStmt(size_t i) const {
-      Assert(
-          i < GetNumStmts(), "The accessing index (%lu) is out of bound (%lu)", i, GetNumStmts()
-      );
+      Assert(i < NumStmts(), "The accessing index (%lu) is out of bound (%lu)", i, NumStmts());
       return i < stmts.size() ? stmts[i].get() : target.get();
     }
 
@@ -751,6 +749,8 @@ namespace symir {
 
     [[nodiscard]] const std::string &GetName() const { return name; }
 
+    [[nodiscard]] int NumParams() const { return params.size(); }
+
     [[nodiscard]] std::vector<const Param *> GetParams() const {
       std::vector<const Param *> r;
       for (const auto &v: params) {
@@ -766,6 +766,8 @@ namespace symir {
         return nullptr;
       }
     }
+
+    [[nodiscard]] int NumSymbols() const { return symbols.size(); }
 
     [[nodiscard]] std::vector<SymDef *> GetSymbols() const {
       std::vector<SymDef *> r;
@@ -783,6 +785,8 @@ namespace symir {
       }
     }
 
+    [[nodiscard]] int NumLocals() const { return localMap.size(); }
+
     [[nodiscard]] std::vector<const Local *> GetLocals() const {
       std::vector<const Local *> r;
       for (const auto &v: locals) {
@@ -798,6 +802,8 @@ namespace symir {
         return nullptr;
       }
     }
+
+    [[nodiscard]] int NumBlocks() const { return blocks.size(); }
 
     [[nodiscard]] std::vector<const Block *> GetBlocks() const {
       std::vector<const Block *> r;
