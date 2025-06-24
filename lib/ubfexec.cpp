@@ -328,8 +328,8 @@ z3::expr UBFreeExec::differentiateInitFrom(std::vector<int> initialisation) {
 }
 
 void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
-  for (const auto &param: symbols) {
-    const std::string &symName = param.first;
+  for (const auto &symbol: symbols) {
+    const std::string &symName = symbol.first;
     const auto symKey = ctx.int_const(symName.c_str()).decl();
     if (SymDefined(symName)) {
       continue;
@@ -355,17 +355,25 @@ void UBFreeExec::extractInitFromModel(z3::model &model) {
   for (int i = 0; i < fun.NumParams(); i++) {
     z3::expr paramKey = createVarExpr(i, 0);
     const auto paramName = paramKey.decl().name().str().c_str();
-    Assert(model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName);
-    z3::expr paramConst = model.get_const_interp(paramKey.decl());
-    Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
-    int paramVal;
-    Assert(
-        Z3_get_numeral_int(ctx, paramConst, &paramVal),
-        "Failed to obtain the value of parameter %s from the model", paramName
-    );
-    init.push_back(paramVal);
-    Log::Get().Out() << "Extract initialization: param=" << paramName << ", value=" << paramVal
-                     << std::endl;
+    if (model.has_interp(paramKey.decl())) {
+      z3::expr paramConst = model.get_const_interp(paramKey.decl());
+      Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
+      int paramVal;
+      Assert(
+          Z3_get_numeral_int(ctx, paramConst, &paramVal),
+          "Failed to obtain the value of parameter %s from the model", paramName
+      );
+      init.push_back(paramVal);
+      Log::Get().Out() << "Extract initialization: param=" << paramName << ", value=" << paramVal
+                       << std::endl;
+    } else {
+      // The parameter is never used by any executed block. We assign it a default value.
+      // Note, the assigned value should be the same as its value in finalization (as it
+      // is never used means it is never evaluated/changed).
+      init.push_back(GlobalOptions::Get().LowerBound);
+      Log::Get().Out() << "Extract initialization: param=" << paramName << ", value=<unused>"
+                       << std::endl;
+    }
   }
   initializations.push_back(init);
 }
@@ -375,17 +383,25 @@ void UBFreeExec::extractFinalFromModel(z3::model &model) {
   for (int paramIndex = 0; paramIndex < fun.NumParams(); paramIndex++) {
     z3::expr paramKey = createVarExpr(paramIndex);
     const auto paramName = paramKey.decl().name().str().c_str();
-    Assert(model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName);
-    z3::expr paramConst = model.get_const_interp(paramKey.decl());
-    Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
-    int paramVal;
-    Assert(
-        Z3_get_numeral_int(ctx, paramConst, &paramVal),
-        "Failed to obtain the value of parameter %s from the model", paramName
-    );
-    fina.push_back(paramVal);
-    Log::Get().Out() << "Extract finalization: param=" << paramName << ", value=" << paramVal
-                     << std::endl;
+    if (model.has_interp(paramKey.decl())) {
+      z3::expr paramConst = model.get_const_interp(paramKey.decl());
+      Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
+      int paramVal;
+      Assert(
+          Z3_get_numeral_int(ctx, paramConst, &paramVal),
+          "Failed to obtain the value of parameter %s from the model", paramName
+      );
+      fina.push_back(paramVal);
+      Log::Get().Out() << "Extract finalization: param=" << paramName << ", value=" << paramVal
+                       << std::endl;
+    } else {
+      // The parameter is never used by any executed block. We assign it a default value.
+      // Note, the assigned value should be the same as its value in initialization (as it
+      // is never used means it is never evaluated/changed).
+      fina.push_back(GlobalOptions::Get().LowerBound);
+      Log::Get().Out() << "Extract finalization: param=" << paramName << ", value=<unused>"
+                       << std::endl;
+    }
   }
   finalizations.push_back(fina);
 }

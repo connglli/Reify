@@ -89,12 +89,12 @@ void Function::ParseMapping(const std::string &mapping) {
   for (int tries = 0; tries < 1000; tries++) {
     const int index = rand();
     const auto &stmt = statements[index];
-    // Idea: 80% of the replacements should be in the IF statements, and 20% in assignments
+    // Idea: 80% of the replacements should be in the conditional statements, and 20% in assignments
     double threshold;
     switch (stmt->GetStmtType()) {
       case Statement::Type::IFGOTO:
       case Statement::Type::WHILE:
-        threshold = 0.4;
+        threshold = 0.8;
         break;
       case Statement::Type::ASSIGN:
         threshold = 0.2;
