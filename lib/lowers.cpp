@@ -24,6 +24,7 @@
 // SOFTWARE.
 
 #include "lib/lowers.hpp"
+#include "lib/chksum.hpp"
 
 namespace symir {
   void SymSexpLower::Visit(const VarUse &v) { out << v.GetName(); }
@@ -186,16 +187,16 @@ namespace symir {
 
   void SymCxLower::Visit(const RetStmt &r) {
     indent();
-    out << "return computeStatelessChecksum(";
     auto vars = r.GetVars();
+    out << "return " << StatelessChecksum::GetComputeName() << "(" << vars.size() << ", (int["
+        << vars.size() << "]){";
     for (auto i = 0; i < vars.size(); ++i) {
-      out << SymIR::GetTypeSName(vars[i]->GetType()) << " ";
       vars[i]->Accept(*this);
       if (i != vars.size() - 1) {
         out << ", ";
       }
     }
-    out << ");" << std::endl;
+    out << "});" << std::endl;
   }
 
   void SymCxLower::Visit(const Branch &b) {
@@ -209,7 +210,7 @@ namespace symir {
 
   void SymCxLower::Visit(const Goto &g) {
     indent();
-    out << "goto " << g.GetTarget() << std::endl;
+    out << "goto " << g.GetTarget() << ";" << std::endl;
   }
 
   void SymCxLower::Visit(const Param &p) {
