@@ -5,9 +5,9 @@
 #include "z3++.h"
 
 namespace z3 {
-  static inline expr cxx_idiv(const expr &m, const expr &n) {
-    Assert(z3::is_int(m), "The dividend m is not an integer expression: %s", m.to_string().c_str());
-    Assert(z3::is_int(n), "The divisor n is not an integer expression: %s", n.to_string().c_str());
+  static expr cxx_idiv(const expr &m, const expr &n) {
+    Assert(m.is_int(), "The dividend m is not an integer expression: %s", m.to_string().c_str());
+    Assert(n.is_int(), "The divisor n is not an integer expression: %s", n.to_string().c_str());
     // Z3's division semantics differ from C/C++, for "m / n":
     // + Z3: Regardless of sign of m,
     //   - when n is positive, (div m n) is the floor of the rational number m/n;
@@ -21,10 +21,10 @@ namespace z3 {
     // - m<=0,n>0 => m/n<0, Z3 takes floor(m/n)   => different => we change to ceiling() or +1
     // - m<=0,n<0 => m/n>0, Z3 takes ceiling(m/n) => different => we change to floor() or -1
     auto t = m / n;
-    return z3::ite(m % n == 0, t, z3::ite(m >= 0, t, z3::ite(n > 0, t + 1, t - 1)));
+    return ite(m % n == 0, t, ite(m >= 0, t, ite(n > 0, t + 1, t - 1)));
   }
 
-  static inline expr cxx_irem(const expr &m, const expr &n) {
+  static expr cxx_irem(const expr &m, const expr &n) {
     // Z3's remainder semantics differ from C/C++, for "m % n":
     // - Z3: (rem m n) == (if (>= n 0) (mod m n) (- (mod m n))
     //   - Refs: https://github.com/Z3Prover/z3/issues/6462#issuecomment-1324842907
