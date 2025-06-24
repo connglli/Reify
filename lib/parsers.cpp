@@ -110,9 +110,10 @@ namespace symir {
 
       // Coefficients and variables
       // Since we do not support non-text operators, string, and comment, all others are identifiers
+      // TODO: Support rather more complex identifiers and replace below checks with regexes
       [](const std::string_view &str) {
         return std::ranges::all_of(str, [](const char c) {
-          return c == '-' || c == '+' || c == SymSexpLower::KW_COEF_VAL_SYM || std::isalnum(c);
+          return c == '-' || c == '+' || c == SymSexpLower::KW_COEF_VAL_SYM || c == '_' || std::isalnum(c);
         });
       },
 
