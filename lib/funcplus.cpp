@@ -188,6 +188,7 @@ public:
   void Visit(const symir::Branch &b) override {
     insertPassCounterJump(b);
     if (exec.GetFun().GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_LATCH) {
+      decIndent();
       out << getIndent() << "} while (";
       b.GetCond()->Accept(*this);
       out << getIndent() << ");" << std::endl;
@@ -208,6 +209,7 @@ public:
     insertPassCounterDefinition();
     if (exec.GetFun().GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_HEAD) {
       out << getIndent() << "do {" << std::endl;
+      incIndent();
     }
     SymCxLower::Visit(b);
     curBbl = "";
@@ -230,10 +232,10 @@ private:
     if (pcBbl == "" || curBbl != pcBbl) {
       return;
     }
-    out << getIndent() << NamePassCounter() << "++;" << std::endl;
-    out << getIndent() << "if(" << NamePassCounter() << " >= " << pcVal << ")" << std::endl;
-    out << getIndent() << "{" << std::endl;
-    out << getIndent() << "    goto " << exitBbl << ";" << std::endl;
+    out << getIndent() << "if((++" << NamePassCounter() << ") >= " << pcVal << ") {" << std::endl;
+    incIndent();
+    out << getIndent() << "goto " << exitBbl << ";" << std::endl;
+    decIndent();
     out << getIndent() << "}" << std::endl;
   }
 

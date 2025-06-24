@@ -157,9 +157,9 @@ bool UBFreeExec::solve(
 }
 
 void UBFreeExec::fixUnterminatedExecution() {
-  const int endBbl = fun.GetExitBblId();
-  const int stopBlk = execution.back();
-  if (stopBlk == endBbl) {
+  const int exitBbl = fun.GetExitBblId();
+  const int stopBbl = execution.back();
+  if (stopBbl == exitBbl) {
     return;
   }
   // This means that the stop node is not the end node, probably because we're
@@ -167,10 +167,10 @@ void UBFreeExec::fixUnterminatedExecution() {
   // if we're artificially creating an edge to the end node).
   // Modify the basic block at the end of the sample walk to have pass counter
   // equal to the number of times that basic block has been visited.
-  passCounterBbl = stopBlk;
+  passCounterBbl = stopBbl;
   passCounterVal =
-      static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBlk; }));
-  execution.push_back(endBbl);
+      static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBbl; }));
+  execution.push_back(exitBbl);
   Log::Get().Out() << "Sample walk has been modified to end at the last basic block." << std::endl;
 }
 
