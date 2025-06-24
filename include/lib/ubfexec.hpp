@@ -26,7 +26,7 @@
 #ifndef GRAPHFUZZ_UBFEXEC_HPP
 #define GRAPHFUZZ_UBFEXEC_HPP
 
-#include "lib/funcplus.hpp"
+#include "lib/function.hpp"
 #include "lib/ubfree.hpp"
 #include "z3++.h"
 

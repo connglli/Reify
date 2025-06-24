@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "lib/funcplus.hpp"
+#include "lib/function.hpp"
 
 #include "global.hpp"
 #include "lib/chksum.hpp"
