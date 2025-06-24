@@ -122,6 +122,14 @@ namespace symir {
     /// Get the token stream of the lexed code
     TokenStream Lex();
 
+    /// Reset the lexer to facilitate re-lexing
+    void Reset() {
+      stream = std::istringstream(source);
+      curInd = 0;
+      curRow = 0;
+      curCol = 0;
+    }
+
   private:
     /// Check the following num characters without forwarding our pointers
     std::vector<char> lookahead(int num = 1);
@@ -164,6 +172,13 @@ namespace symir {
 
     /// Return the parsed AST or nullptr
     [[nodiscard]] Func *GetFunc() const { return func.get(); }
+
+    /// Return the parsed AST or nullptr. Different from GetFunc(), we transfer
+    /// the ownership of the function to the user.
+    std::unique_ptr<Func> TakeFunc() {
+      lexer.Reset();
+      return std::move(func);
+    }
 
   private:
     void pushOp(SymSexpLexer::Token::Kind op) { opStack.push(op); }
