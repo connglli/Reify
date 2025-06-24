@@ -300,7 +300,7 @@ namespace symir {
   XX(SUB, Sub, sub, -)                                                                             \
   XX(MUL, Mul, mul, *)                                                                             \
   XX(DIV, Div, div, /)                                                                             \
-  XX(MOD, Mod, mod, %)
+  XX(REM, Rem, rem, %)
 
     enum Op {
 

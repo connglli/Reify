@@ -28,6 +28,7 @@
 #include "global.hpp"
 #include "lib/chksum.hpp"
 #include "lib/logger.hpp"
+#include "lib/lowers.hpp"
 #include "lib/naming.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
@@ -168,4 +169,67 @@ void FunPlus::generateBasicBlock(symir::FuncBuilder *funBd, int bblId, const Bbl
   funBd->CloseBlock(bblBd);
 
   Log::Get().CloseSection();
+}
+
+// Generate the function code of the function for a given execution
+std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
+
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////////////
+  "PassCounter";
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  std::ostringstream oss;
+  symir::SymCxLower lower(oss);
+  fun->Accept(lower);
+  return oss.str();
+}
+
+// Generate the main code of the function for a given execution
+std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const {
+  const auto &initializations = exec.GetInitializations();
+  const auto &finalizations = exec.GetFinalizations();
+  Assert(
+      initializations.size() == finalizations.size(),
+      "Initializations and finalizations must have the same size"
+  );
+  std::ostringstream main;
+  main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
+  main << "int main(int argc, int* argv[])" << std::endl;
+  main << "{" << std::endl;
+  for (auto i = 0; i < initializations.size(); i++) {
+    const auto &init = initializations[i];
+    const auto &fina = finalizations[i];
+    const auto numParams = static_cast<int>(init.size());
+    std::ostringstream chk_oss;
+    main << "    " << StatelessChecksum::GetCheckChksumName() << "("
+         << StatelessChecksum::Compute(fina) << ", " << name << "(";
+    for (auto j = 0; j < numParams; j++) {
+      main << init[j];
+      if (j < numParams - 1) {
+        main << ", ";
+      }
+    }
+    main << "));" << std::endl;
+  }
+  main << "  return 0;" << std::endl;
+  main << "}" << std::endl;
+  return main.str();
+}
+
+// Generate the map of initialisation-finalisation for a given execution
+std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) {
+  std::ostringstream mapping;
+  for (int i = 0; i < exec.GetInitializations().size(); i++) {
+    for (auto x: exec.GetInitializations()[i]) {
+      mapping << x << ",";
+    }
+    mapping << " : ";
+    for (auto x: exec.GetFinalizations()[i]) {
+      mapping << x << ",";
+    }
+    mapping << std::endl;
+  }
+  return mapping.str();
 }

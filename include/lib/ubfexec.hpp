@@ -26,22 +26,18 @@
 #ifndef GRAPHFUZZ_UBFEXEC_HPP
 #define GRAPHFUZZ_UBFEXEC_HPP
 
-#include "lib/function.hpp"
-#include "lib/naming.hpp"
+#include "lib/funcplus.hpp"
+#include "lib/ubfree.hpp"
 #include "z3++.h"
 
-class BlkGen;
-class FunGen;
+class FunPlus;
 
 class UBFreeExec {
 public:
-  explicit UBFreeExec(const FunGen &fun, std::vector<int> execution) :
-      fun(fun), execution(std::move(execution)) {
-    fixUnterminatedExecution();
-  }
+  explicit UBFreeExec(const FunPlus &fun, std::vector<int> execution);
 
   // Get the function generator
-  [[nodiscard]] const FunGen &GetFun() const { return fun; }
+  [[nodiscard]] const FunPlus &GetFun() const { return fun; }
 
   // Get the execution path of the function
   [[nodiscard]] const std::vector<int> &GetExecution() const { return execution; }
@@ -56,23 +52,6 @@ public:
     return finalizations;
   }
 
-  // Check if a symbol is defined
-  [[nodiscard]] bool SymDefined(const std::string &name) const {
-    return symbols.contains(name) && symbols.find(name)->second.has_value();
-  }
-
-  // Get the value of a symbol
-  [[nodiscard]] int GetSymVal(const std::string &name) const {
-    Assert(SymDefined(name), "Symbol %s not defined", name.c_str());
-    return symbols.find(name)->second.value();
-  }
-
-  // Initialize a symbol with an undefined value
-  void InitSym(const std::string &name) { symbols[name] = std::nullopt; }
-
-  // Define a symbol with a specific value
-  void DefineSym(const std::string &name, int val) { symbols[name] = val; }
-
   // Check if we need a pass counter for the execution
   [[nodiscard]] bool NeedPassCounter() const { return passCounterBbl != -1; }
 
@@ -80,7 +59,7 @@ public:
   [[nodiscard]] int GetPassCounterBbl() const { return passCounterBbl; }
 
   // Get the value of the pass counter
-  [[nodiscard]] int GetPassCounter() const { return GetSymVal(NamePassCounter()); }
+  [[nodiscard]] int GetPassCounter() const { return passCounterVal; }
 
   // Solve all symbols in the function to obtain an UB-free function with a number
   // of initialization-fianlization mapping. Return the number of obtained mapping.
@@ -112,18 +91,6 @@ private:
       // clang-format on
   );
 
-  // Generate constraints for the basic block at u and target the basic block at v
-  void generateConstraintsForBasicBlock(int u, int v, bool withInterestCoefs);
-
-  // Generate constraints for the term sum of the coefficients and variables
-  z3::expr generateConstraintsForTermSum(
-      // clang-format off
-      int blkIndex, int stmtIndex, bool isInCond,
-      const std::vector<int> &dependencies,
-      bool withInterestCoefs
-      // clang-format on
-  );
-
   // Function to extract all symbols from the model, so that we can instantiate
   // all the symbols that the solver successfully found an interpretation for
   void extractSymbolsFromModel(z3::model &model);
@@ -134,65 +101,28 @@ private:
   // Extract the finalization values from the model and save it
   void extractFinalFromModel(z3::model &model);
 
-  // Generate constraints for making the initialization interesting
-  z3::expr makeInitInteresting();
-
-  // Generate constraints so that the initialization has random values
-  z3::expr makeInitWithRandomValue();
-
-  // Generate constraints to differentiate the initialization from the given one
-  z3::expr differentiateInitFrom(std::vector<int> initialisation);
-
-  // Create a versioned variable expression for the given variable
-  // When version==-1, the current version in the version table is used
-  z3::expr createVarExpr(int varIndex, int version = -1);
-
-  // Generate a bound constraint for each variable
-  z3::expr boundVariables(const std::vector<z3::expr> &vars);
-
-  // Create a coefficient expression for the given name
-  z3::expr createCoefExpr(const std::string &name);
-
-  // Generate constraints to make the coefficients interesting
-  z3::expr makeCoefsInteresting(const std::vector<z3::expr> &coefs);
-
-  // Generate a bound constraint for each coefficient
-  z3::expr boundCoefficients(const std::vector<z3::expr> &coefs);
-
-  // Generate a bound constraint for each term
-  z3::expr boundTerms(const std::vector<z3::expr> &terms);
-
   // Insert undefined behaviors into unexecuted basic blocks
   void insertUBsIntoUnexecutedBbls();
 
 private:
-  const FunGen &fun;
+  const FunPlus &fun;
 
   // Execution path of the function
-  std::vector<int> execution{};
+  std::vector<int> execution;
+
+  // Constraints collector for signed overflow
+  std::unique_ptr<SignedOverflow> ubSov; // TODO: Add more UB types in the future
 
   // Whether we need a pass counter for the execution.
   // This help ensure we reach the end of a function for unterminated executions.
   int passCounterBbl = -1; // -1 means we do not need any pass counter
-
-  // Name and value of each coefficient (including constants) when executing
-  // the function following the above execution. Their values ensure that
-  // the execution of the function is UB-free given any of the following
-  // initialization as input arguments.
-  std::unordered_map<std::string, std::optional<int>> symbols{};
+  int passCounterVal = -1; // The value of the pass counter
 
   // The value of each input parameter at the entry of the function.
   std::vector<std::vector<int>> initializations{};
 
   // The value of each input parameter at the exit of the function.
   std::vector<std::vector<int>> finalizations{};
-
-  // The SSA version table for each parameter (and variable in future).
-  std::map<int, int> versions{};
-
-  // Our SMT solver for symbol resolution
-  z3::context ctx = z3::context();
-  z3::solver solver = z3::solver(ctx);
 };
 
 #endif // GRAPHFUZZ_UBFEXEC_HPP

@@ -51,13 +51,11 @@ namespace symir {
     explicit SymIRLower(std::ostream &out) : out(out) {}
 
   protected:
-    void indent() const {
-      for (int i = 0; i < numIndent; i++) {
-        for (int j = 0; j < SYMIR_LOWER_INDENTATION_SIZE; j++) {
-          out << " ";
-        }
-      }
+    std::string getIndent() const {
+      return std::string(numIndent * SYMIR_LOWER_INDENTATION_SIZE, ' ');
     }
+
+    void indent() const { out << getIndent(); }
 
     void incIndent(int inc = 1) { numIndent += inc; }
 

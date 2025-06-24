@@ -36,7 +36,10 @@
 #include "lib/logger.hpp"
 #include "lib/ubfexec.hpp"
 
-/// FunPlus is a function generator which populates each the whole function with real statements
+class UBFreeExec;
+
+/// FunPlus is a generator which populates the generates a function with
+/// random contrl flow, variables, and statements
 class FunPlus {
 public:
   explicit FunPlus(
@@ -57,15 +60,19 @@ public:
   // Get the underlying control flow graph
   [[nodiscard]] const auto &GetCfg() const { return cfg; }
 
+  // Get the ID of the entry basic block of the function
+  [[nodiscard]] int GetEntryBblId() const {
+    return 0; // Following our CFG, the entry block is always the first basic block
+  }
+
+  // Get the ID of the exit basic block of the function
+  [[nodiscard]] int GetExitBblId() const {
+    return NumBbls() - 1; // Following our CFG, the exit block is always the last basic block
+  }
+
   [[nodiscard]] symir::Func *GetFun() const {
     Assert(fun != nullptr, "The function has not yet been generated");
     return fun.get();
-  }
-
-  // Get the symbols defined by the function
-  [[nodiscard]] auto GetSymbols() const {
-    Assert(fun != nullptr, "The function has not yet been generated");
-    return fun->GetSymbols();
   }
 
   // Generate the function with random control-flow, statements, and symbols
@@ -73,6 +80,15 @@ public:
 
   // Sample an execution of the function.
   std::vector<int> SampleExec(int execStep, bool consistent);
+
+  // Generate the function code of the function for a given execution
+  std::string GenerateFunCode(const UBFreeExec &exec) const;
+
+  // Generate the main code of the function for a given execution
+  std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false) const;
+
+  // Generate the map of initialisation-finalisation for a given execution
+  static std::string GenerateMappingCode(const UBFreeExec &exec);
 
 private:
   // Generate a new basic block with random statements and symbols

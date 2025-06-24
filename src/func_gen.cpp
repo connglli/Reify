@@ -30,7 +30,6 @@
 
 #include "global.hpp"
 #include "lib/chksum.hpp"
-#include "lib/function.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 #include "lib/ubfexec.hpp"
@@ -184,9 +183,10 @@ int main(int argc, char **argv) {
   z3::set_param("parallel.enable", true);
 
   // Generate the function code
-  FunGen fun(
-      GlobalOptions::Get().NumNodesPerFun, GlobalOptions::Get().NumVarsPerFun,
-      GlobalOptions::Get().MaxNumLoopsPerFun, GlobalOptions::Get().MaxNumBblsPerLoop
+  FunPlus fun(
+      GetFunctionName(uuid, sno), GlobalOptions::Get().NumVarsPerFun,
+      GlobalOptions::Get().NumBblsPerFun, GlobalOptions::Get().MaxNumLoopsPerFun,
+      GlobalOptions::Get().MaxNumBblsPerLoop
   );
   fun.Generate();
 
@@ -220,14 +220,14 @@ int main(int argc, char **argv) {
   }
 
   // Generate our code with respect to the UB-free execution
-  std::string funCode = fun.GenerateFunCode(GetFunctionName(uuid, sno), *exec);
+  std::string funCode = fun.GenerateFunCode(*exec);
   functionFile = std::ofstream(funcFilePath);
   functionFile << funCode << std::endl;
   functionFile.close();
 
   // Generate the initialization-finalization mapping
   mappingFile = std::ofstream(mapFilePath);
-  mappingFile << FunGen::GenerateMappingCode(*exec);
+  mappingFile << FunPlus::GenerateMappingCode(*exec);
   mappingFile.close();
 
   // Generate an executable program if necessary
@@ -236,8 +236,7 @@ int main(int argc, char **argv) {
     std::ofstream programFile = std::ofstream(GetProgramPath(uuid, sno, outputDirectory));
     programFile << StatelessChecksum::GetRawCode() << std::endl;
     programFile << funCode << std::endl;
-    programFile << fun.GenerateMainCode(GetFunctionName(uuid, sno), *exec, /*debug=*/verbose)
-                << std::endl;
+    programFile << fun.GenerateMainCode(*exec, /*debug=*/verbose) << std::endl;
     programFile.close();
   }
 

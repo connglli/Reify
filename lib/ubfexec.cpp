@@ -27,9 +27,14 @@
 
 #include "global.hpp"
 #include "lib/logger.hpp"
-#include "lib/naming.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
+
+UBFreeExec::UBFreeExec(const FunPlus &fun, std::vector<int> execution) :
+    fun(fun), execution(std::move(execution)), ubSov(nullptr) {
+  fixUnterminatedExecution();
+  ubSov = std::make_unique<SignedOverflow>(*fun.GetFun(), this->execution);
+}
 
 int UBFreeExec::Solve(
     int numMap, bool withInterestInit, bool withRandomInit, bool withInterestCoefs, bool debug
@@ -75,78 +80,58 @@ bool UBFreeExec::solve(
   // Generate or re-generate the constraints for the function execution
   if (initializations.size() <= 1) {
     Log::Get().Out() << "Generating or re-generating UB-free constraints" << std::endl;
-    solver.reset();
-    versions.clear();
+    ubSov->Reset();
 
     // Let each parameter (coefficient or constant) interesting initially
     if (withInterestInit) {
-      solver.add(makeInitInteresting());
+      ubSov->MakeInitInteresting();
     }
     if (withRandomInit) {
-      solver.add(makeInitWithRandomValue());
+      ubSov->MakeInitWithRandomValue();
+    }
+    if (withInterestCoefs) {
+      ubSov->EnableInterestCoefs(true);
     }
 
     if (debug) {
-      Log::Get().Out() << "Initial constraints: " << std::endl
-                       << "```" << std::endl
-                       << solver.to_smt2() << "```" << std::endl;
+      Log::Get().Out() << "Initial constraints: " << std::endl;
+      Log::Get().Out() << "```" << std::endl;
+      ubSov->PrintConstraints();
+      Log::Get().Out() << "```" << std::endl;
     }
 
-    // Generate UB constraint for each statement in the executed basic block
-    for (int i = 0; i < execution.size() - 1; i++) {
-      // Generate constraints for the current basic block so that
-      // no UB occurs and it can reach the next basic block
-      generateConstraintsForBasicBlock(execution[i], execution[i + 1], withInterestCoefs);
-    }
-    generateConstraintsForBasicBlock(execution[execution.size() - 1], -1, withInterestCoefs);
+    ubSov->Collect();
   }
 
   // We are solving the input parameters; let's sample for a different solution
   if (!initializations.empty()) {
     // Ensure that the initialisation is sufficiently different from the previous one
-    solver.add(differentiateInitFrom(initializations.back()));
+    ubSov->MakeInitDifferentFrom(initializations.back());
   }
 
   if (debug) {
-    Log::Get().Out() << "Final constraints: " << std::endl
-                     << "```" << std::endl
-                     << solver.to_smt2() << "```" << std::endl;
+    Log::Get().Out() << "Final constraints: " << std::endl;
+    Log::Get().Out() << "```" << std::endl;
+    ubSov->PrintConstraints();
+    Log::Get().Out() << "```" << std::endl;
   }
 
   // We are solving the symbols for the first time; let's try simplifying the constraints
   if (initializations.empty()) {
-    // Accumulate all our assertions obtained so far
-    z3::goal goal(ctx);
-    for (auto assertion: solver.assertions()) {
-      goal.add(assertion);
-    }
-
-    // Create a chain of optimization passes (or tactics in Z3) for constraint optimization
-    // Note, we only consider tactics that can preserve constant (i.e., symbols) here as
-    // we'll extract them later. So we should exclude for example solve-eqs.
-    z3::tactic opt =
-        z3::repeat(z3::tactic(ctx, "simplify") & z3::tactic(ctx, "propagate-values"), /*max=*/3);
-
-    // Apply all the assertions on our optimization chain to obtain a new set of constraints
-    auto optimized = opt(goal);
-    // All tactics we used generate one subgoal
-    Assert(optimized.size() == 1u, "More than one (=%u) subgoals are generated!", optimized.size());
-
-    // Re-add all assertions after optimization into our solver
-    solver.reset();
-    for (int i = 0; i < static_cast<int>(optimized[0].size()); i++) {
-      solver.add(optimized[0][i]);
-    }
+    ubSov->Optimize();
 
     if (debug) {
       // Dump the optimized SMT queries for debugging
-      Log::Get().Out() << "Optimized constraints: " << std::endl
-                       << "```" << std::endl
-                       << solver.to_smt2() << "```" << std::endl;
+      Log::Get().Out() << "Optimized constraints: " << std::endl;
+      Log::Get().Out() << "```" << std::endl;
+      ubSov->PrintConstraints();
+      Log::Get().Out() << "```" << std::endl;
     }
   }
 
   // Solve the generated constraints and see if we succeeded
+  z3::solver solver(ubSov->GetContext());
+  solver.add(ubSov->GetConstraints());
   if (solver.check() == z3::unsat) {
     Log::Get().Out() << "UNSAT" << std::endl;
     return false;
@@ -155,9 +140,10 @@ bool UBFreeExec::solve(
   Log::Get().Out() << "SAT" << std::endl;
 
   z3::model model = solver.get_model();
-  Log::Get().Out() << "Execution model: ```" << std::endl
-                   << model << std::endl
-                   << "```" << std::endl;
+  Log::Get().Out() << "Execution model: " << std::endl;
+  Log::Get().Out() << "```" << std::endl;
+  Log::Get().Out() << model << std::endl;
+  Log::Get().Out() << "```" << std::endl;
 
   // Extract values for the resolved symbols to facilitate subsequent solving
   extractSymbolsFromModel(model);
@@ -170,105 +156,8 @@ bool UBFreeExec::solve(
   return true;
 }
 
-void UBFreeExec::generateConstraintsForBasicBlock(int u, int v, bool withInterestCoefs) {
-  auto &bblU = fun.GetBbl(u);
-
-  // UB checks for the assignment statements and conditional. Each term is either a
-  // multiplication of a coefficient and a variable, or a constant coefficient.
-
-  // Ensure all terms in each variable definition are free of undefined behaviours
-  {
-    int stmtIndex = 0;
-    for (const int varIndex: bblU.GetDefs()) {
-      z3::expr sum = generateConstraintsForTermSum(
-          u, stmtIndex, false, bblU.GetDeps(varIndex), withInterestCoefs
-      );
-      // An assignment makes a new SSA variable with the same name but updated version
-      z3::expr newVar = createVarExpr(varIndex, ++versions[varIndex]);
-      solver.add(newVar == sum);
-      stmtIndex++;
-    }
-  }
-
-  if (bblU.GetSuccessors().size() <= 1) {
-    return; // We don't need any further constraints for unconditional jumps
-  }
-
-  Assert(v != -1, "The target successor of %d (with 2 successors) cannot be -1", u);
-  Assert(
-      // The target v must be either the exit block (because we have pass counters)
-      // or one of our successors already defined in our CFG.
-      (v == fun.NumBbls() - 1 && passCounterBbl == u) ||
-          std::ranges::find(bblU.GetSuccessors(), v) != bblU.GetSuccessors().end(),
-      "The target successor %d of basic block %d is not a valid successor", v, u
-  );
-
-  // Ensure all terms in the conditional are free of undefined behaviours
-  const z3::expr sum =
-      generateConstraintsForTermSum(u, 0, true, bblU.GetCondDeps(), withInterestCoefs);
-  // The jump: We always jump to the first successor for sum >= 0
-  if (v == bblU.GetSuccessors()[0]) {
-    solver.add(sum >= 0);
-  } else {
-    solver.add(sum < 0);
-  }
-}
-
-z3::expr UBFreeExec::generateConstraintsForTermSum(
-    // clang-format off
-    int blkIndex, int stmtIndex, bool isInCond,
-    const std::vector<int> &dependencies,
-    bool withInterestCoefs
-    // clang-format on
-) {
-  const auto nameCoef = isInCond ? NameCondCoef : NameCoef;
-  const auto nameConst = isInCond ? NameCondConst : NameConst;
-
-  // Define integer variables and coefficients
-  std::vector<z3::expr> vars;  // [vi] for variables
-  std::vector<z3::expr> coefs; // [ci] for coefficients
-  std::vector<z3::expr> terms; // [ci * ai] or [ci] for the final addition
-
-  // Taking care of coefficients and the multiplication
-  for (int i = 0; i < dependencies.size(); i++) {
-    vars.push_back(createVarExpr(dependencies[i]));
-    coefs.push_back(createCoefExpr(nameCoef(blkIndex, stmtIndex, i)));
-    terms.push_back(coefs.back() * vars.back()); // a_i * var_i
-  }
-  solver.add(boundVariables(vars));
-  solver.add(boundCoefficients(coefs));
-
-  // Taking care of the constant coefficient
-  coefs.push_back(createCoefExpr(nameConst(blkIndex, stmtIndex)));
-  terms.push_back(coefs.back());
-  solver.add(
-      coefs.back() >= GlobalOptions::Get().LowerBound &&
-      coefs.back() <= GlobalOptions::Get().UpperBound
-  );
-  solver.add(boundTerms(terms));
-
-  // Ensure that the coefficients are interesting
-  if (withInterestCoefs) {
-    solver.add(makeCoefsInteresting(coefs));
-  }
-
-  // Taking care of the terms and their addition
-  z3::expr sum = terms[0];
-  for (int i = 1; i < terms.size(); i++) {
-    // Addition is left associative, so in an addition of k terms, the subexpressions with the
-    // first 1, 2, ..., k terms added should all be between LOWER_BOUND and UPPER_BOUND as well
-    sum = sum + terms[i];
-    if (GlobalOptions::Get().EnableSafetyChecks) {
-      solver.add(sum <= GlobalOptions::Get().UpperBound && sum >= GlobalOptions::Get().LowerBound);
-    }
-  }
-
-  // Return the sum of the terms
-  return sum;
-}
-
 void UBFreeExec::fixUnterminatedExecution() {
-  const int endBbl = fun.NumBbls() - 1;
+  const int endBbl = fun.GetExitBblId();
   const int stopBlk = execution.back();
   if (stopBlk == endBbl) {
     return;
@@ -278,73 +167,33 @@ void UBFreeExec::fixUnterminatedExecution() {
   // if we're artificially creating an edge to the end node).
   // Modify the basic block at the end of the sample walk to have pass counter
   // equal to the number of times that basic block has been visited.
-  int passCounter =
-      static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBlk; }));
   passCounterBbl = stopBlk;
-  DefineSym(NamePassCounter(), passCounter);
+  passCounterVal =
+      static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBlk; }));
   execution.push_back(endBbl);
   Log::Get().Out() << "Sample walk has been modified to end at the last basic block." << std::endl;
 }
 
-z3::expr UBFreeExec::makeInitInteresting() {
-  std::vector<z3::expr> params;
-  for (int i = 0; i < fun.NumParams(); i++) {
-    params.push_back(createVarExpr(i, 0));
-  }
-  return AtMostKZeroes(ctx, params, fun.NumParams() / 2);
-}
-
-z3::expr UBFreeExec::makeInitWithRandomValue() {
-  auto rand = Random::Get().Uniform(
-      GlobalOptions::Get().LowerInitBound, GlobalOptions::Get().UpperInitBound
-  );
-  std::vector<z3::expr> params;
-  z3::expr constraints = ctx.bool_val(true);
-  for (int i = 0; i < fun.NumParams(); i++) {
-    params.push_back(createVarExpr(i, 0));
-    const std::string &paramName = params.back().decl().name().str();
-    z3::expr randomInit = ctx.bool_val(true);
-    if (SymDefined(paramName)) {
-      randomInit = (params[i] == GetSymVal(paramName));
-    } else {
-      int randomValue = rand();
-      DefineSym(paramName, randomValue);
-      randomInit = (params[i] == randomValue);
-    }
-    constraints = constraints && randomInit;
-  }
-  return constraints;
-}
-
-z3::expr UBFreeExec::differentiateInitFrom(std::vector<int> initialisation) {
-  // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
-  std::vector<z3::expr> constraints;
-  for (int i = 0; i < fun.NumParams(); i++) {
-    int oldValue = initialisation[i];
-    z3::expr newValue = createVarExpr(i, 0);
-    constraints.push_back(z3::ite(oldValue != newValue, ctx.int_val(1), ctx.int_val(0)));
-  }
-  return AtMostKZeroes(ctx, constraints, std::min(3, fun.NumParams() / 2));
-}
-
 void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
-  for (const auto &symbol: symbols) {
-    const std::string &symName = symbol.first;
-    const auto symKey = ctx.int_const(symName.c_str()).decl();
-    if (SymDefined(symName)) {
+  for (auto symbol: fun.GetFun()->GetSymbols()) {
+    if (symbol->IsSolved()) {
       continue;
     }
+    const auto symName = symbol->GetName().c_str();
+    // Currently, we only support coefficients
+    const auto symKey = ubSov->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol)).decl();
     if (model.has_interp(symKey)) {
       z3::expr symConst = model.get_const_interp(symKey);
-      Assert(symConst.is_numeral(), "Symbol %s is not a numeral", symName.c_str());
+      Assert(symConst.is_numeral(), "Symbol %s is not a numeral", symName);
       int symVal;
       Assert(
-          Z3_get_numeral_int(ctx, symConst, &symVal),
-          "Failed to obtain the symVal of symbol %s from the model", symName.c_str()
+          Z3_get_numeral_int(ubSov->GetContext(), symConst, &symVal),
+          "Failed to obtain the symVal of symbol %s from the model", symName
       );
-      DefineSym(symName, symVal);
+      symbol->SetValue(std::to_string(symVal));
       Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
     } else {
+      // The symbol is never used by any basic blocks being executed
       Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=<unresolved>" << std::endl;
     }
   }
@@ -352,15 +201,16 @@ void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
 
 void UBFreeExec::extractInitFromModel(z3::model &model) {
   std::vector<int> init;
-  for (int i = 0; i < fun.NumParams(); i++) {
-    z3::expr paramKey = createVarExpr(i, 0);
-    const auto paramName = paramKey.decl().name().str().c_str();
+
+  for (auto param: fun.GetFun()->GetParams()) {
+    const auto paramName = param->GetName().c_str();
+    z3::expr paramKey = ubSov->CreateVarExpr(param, 0);
     if (model.has_interp(paramKey.decl())) {
       z3::expr paramConst = model.get_const_interp(paramKey.decl());
       Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
       int paramVal;
       Assert(
-          Z3_get_numeral_int(ctx, paramConst, &paramVal),
+          Z3_get_numeral_int(ubSov->GetContext(), paramConst, &paramVal),
           "Failed to obtain the value of parameter %s from the model", paramName
       );
       init.push_back(paramVal);
@@ -380,15 +230,15 @@ void UBFreeExec::extractInitFromModel(z3::model &model) {
 
 void UBFreeExec::extractFinalFromModel(z3::model &model) {
   std::vector<int> fina;
-  for (int paramIndex = 0; paramIndex < fun.NumParams(); paramIndex++) {
-    z3::expr paramKey = createVarExpr(paramIndex);
-    const auto paramName = paramKey.decl().name().str().c_str();
-    if (model.has_interp(paramKey.decl())) {
+  for (auto param: fun.GetFun()->GetParams()) {
+    const auto paramName = param->GetName().c_str();
+    z3::expr paramKey = ubSov->CreateVarExpr(param);
+    if (model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName) {
       z3::expr paramConst = model.get_const_interp(paramKey.decl());
       Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
       int paramVal;
       Assert(
-          Z3_get_numeral_int(ctx, paramConst, &paramVal),
+          Z3_get_numeral_int(ubSov->GetContext(), paramConst, &paramVal),
           "Failed to obtain the value of parameter %s from the model", paramName
       );
       fina.push_back(paramVal);
@@ -406,58 +256,6 @@ void UBFreeExec::extractFinalFromModel(z3::model &model) {
   finalizations.push_back(fina);
 }
 
-z3::expr UBFreeExec::createVarExpr(const int varIndex, int version) {
-  if (version == -1) {
-    version = versions[varIndex];
-  }
-  return ctx.int_const(NameVar(varIndex, version).c_str());
-}
-
-z3::expr UBFreeExec::boundVariables(const std::vector<z3::expr> &vars) {
-  z3::expr constraints = ctx.bool_val(true);
-  for (const auto &var: vars) {
-    constraints = constraints && (var >= GlobalOptions::Get().LowerBound &&
-                                  var <= GlobalOptions::Get().UpperBound);
-  }
-  return constraints;
-}
-
-z3::expr UBFreeExec::createCoefExpr(const std::string &name) {
-  // If we've already extracted the value from the model, we use that value,
-  // otherwise it's an uninterpreted constant which the solver needs to figure
-  // out the value for
-  if (SymDefined(name)) {
-    return ctx.int_val(GetSymVal(name));
-  } else {
-    InitSym(name);
-    return ctx.int_const(name.c_str());
-  }
-}
-
-z3::expr UBFreeExec::makeCoefsInteresting(const std::vector<z3::expr> &coefs) {
-  return AtMostKZeroes(ctx, coefs, static_cast<int>(coefs.size()) / 2);
-}
-
-z3::expr UBFreeExec::boundCoefficients(const std::vector<z3::expr> &coefs) {
-  z3::expr constraints = ctx.bool_val(true);
-  for (const auto &coef: coefs) {
-    if (coef.is_const()) {
-      constraints = constraints && (coef >= GlobalOptions::Get().LowerCoefBound &&
-                                    coef <= GlobalOptions::Get().UpperCoefBound);
-    }
-  }
-  return constraints;
-}
-
-z3::expr UBFreeExec::boundTerms(const std::vector<z3::expr> &terms) {
-  z3::expr constraints = ctx.bool_val(true);
-  for (const auto &term: terms) {
-    constraints = constraints && (term <= GlobalOptions::Get().UpperBound &&
-                                  term >= GlobalOptions::Get().LowerBound);
-  }
-  return constraints;
-}
-
 void UBFreeExec::insertUBsIntoUnexecutedBbls() {
   // TODO: insert UBs into unexecuted basic blocks
   // for (int i = 0; i < fun.NumBbls(); i++) {
@@ -470,13 +268,13 @@ void UBFreeExec::insertUBsIntoUnexecutedBbls() {
   const auto rand = Random::Get().Uniform(
       GlobalOptions::Get().LowerCoefBound, GlobalOptions::Get().UpperCoefBound
   );
-  for (const auto &sym: fun.GetSymbols()) {
-    if (SymDefined(sym)) {
+  for (const auto &sym: fun.GetFun()->GetSymbols()) {
+    if (sym->IsSolved()) {
       continue; // If the symbol is already defined, we don't need to smash it
     }
     const int val = rand();
-    DefineSym(sym, val);
-    Log::Get().Out() << "Define symbols: sym=" << sym << ", val=" << val
+    sym->SetValue(std::to_string(val));
+    Log::Get().Out() << "Define symbols: sym=" << sym->GetName() << ", val=" << val
                      << " (for unexecuted basic blocks)" << std::endl;
   }
 }

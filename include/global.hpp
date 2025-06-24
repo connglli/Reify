@@ -66,8 +66,8 @@ struct GlobalOptions {
   ////// Function Generation Parameters
   ////////////////////////////////////////////////////////////
 
-  // The number of nodes for each control flow graph
-  int NumNodesPerFun = 10;
+  // The number of basic blocks for each control flow graph
+  int NumBblsPerFun = 10;
   // The number of allowed variables for each function
   int NumVarsPerFun = 8;
   // The allowed number of loops per function
@@ -126,7 +126,7 @@ struct GlobalOptions {
       ("Xnum-vars-per-assign", "The number of variables in each assignment statement", cxxopts::value<int>())
       ("Xnum-vars-in-cond", "The number of variables in each conditional statement", cxxopts::value<int>())
       // Function generation
-      ("Xnum-nodes-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
+      ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xnum-vars-per-fun", "The number of allowed variables for each function", cxxopts::value<int>())
       ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>());
     // clang-format on
@@ -187,14 +187,15 @@ struct GlobalOptions {
       ensurePositive(NumVarsInCond, "Xnum-vars-in-cond");
     }
 
-    if (args.count("Xnum-nodes-per-fun")) {
-      NumNodesPerFun = args["Xnum-nodes-per-fun"].as<int>();
-      if (NumNodesPerFun > 20) {
-        std::cerr << "Warning: Too many nodes per control flow graph would make the generation "
-                     "much slower"
-                  << std::endl;
+    if (args.count("Xnum-bbls-per-fun")) {
+      NumBblsPerFun = args["Xnum-bbls-per-fun"].as<int>();
+      if (NumBblsPerFun > 20) {
+        std::cerr
+            << "Warning: Too many basic blocks per control flow graph would make the generation "
+               "much slower"
+            << std::endl;
       }
-      ensurePositive(NumNodesPerFun, "Xnum-nodes-per-fun");
+      ensurePositive(NumBblsPerFun, "Xnum-bbls-per-fun");
     }
 
     if (args.count("Xnum-vars-per-fun")) {
@@ -302,8 +303,8 @@ static std::filesystem::path GetMappingPath(
   return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path
-GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
+static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
+) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
 }
@@ -339,8 +340,8 @@ static std::filesystem::path GetGenLogPath(
   }
 }
 
-static std::filesystem::path
-GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
+static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
+) {
   return GetLoggingsDir(functionPath.parent_path().parent_path()) /
          GetLoggingNameForFunctionName(functionPath.stem());
 }
