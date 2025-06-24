@@ -171,23 +171,80 @@ void FunPlus::generateBasicBlock(symir::FuncBuilder *funBd, int bblId, const Bbl
   Log::Get().CloseSection();
 }
 
+/// A SymIR to Cxx lower with patches like pass counter.
+class PatchedCLower : public symir::SymCxLower {
+public:
+  explicit PatchedCLower(std::ostream &os, const UBFreeExec &exec) :
+      symir::SymCxLower(os),
+      pcBbl(
+          exec.NeedPassCounter()
+              ? exec.GetFun().GetFun()->GetBlocks()[exec.GetPassCounterBbl()]->GetLabel()
+              : ""
+      ),
+      pcVal(exec.GetPassCounter()),
+      entryBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetEntryBblId()]->GetLabel()),
+      exitBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetExitBblId()]->GetLabel()) {}
+
+  void Visit(const symir::Branch &b) override {
+    insertPassCounterJump(b);
+    SymCxLower::Visit(b);
+  }
+
+  void Visit(const symir::Goto &g) override {
+    insertPassCounterJump(g);
+    SymCxLower::Visit(g);
+  }
+
+  void Visit(const symir::Block &b) override {
+    curBbl = b.GetLabel();
+    insertPassCounterDefinition();
+    SymCxLower::Visit(b);
+    curBbl = "";
+  }
+
+private:
+  // Insert the pass counter definition at the start of the first basic block
+  void insertPassCounterDefinition() {
+    if (curBbl == entryBbl) {
+      if (pcBbl == "") {
+        out << getIndent() << "// No pass counter needed" << std::endl;
+      } else {
+        out << getIndent() << "int " << NamePassCounter() << " = 0;" << std::endl;
+      }
+    }
+  }
+
+  // Insert a pass counter jump if the current basic block is the one that needs pass counter
+  void insertPassCounterJump(const symir::Target &t) {
+    if (pcBbl == "" || curBbl != pcBbl) {
+      return;
+    }
+    out << getIndent() << NamePassCounter() << "++;" << std::endl;
+    out << getIndent() << "if(" << NamePassCounter() << " >= " << pcVal << ")" << std::endl;
+    out << getIndent() << "{" << std::endl;
+    out << getIndent() << "    goto " << exitBbl << ";" << std::endl;
+    out << getIndent() << "}" << std::endl;
+  }
+
+private:
+  const std::string pcBbl;
+  int pcVal;
+  const std::string entryBbl, exitBbl;
+  std::string curBbl;
+};
+
 // Generate the function code of the function for a given execution
 std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
-
-
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////////////////
-  "PassCounter";
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+  Assert(fun != nullptr, "Function is not generated yet!");
   std::ostringstream oss;
-  symir::SymCxLower lower(oss);
+  PatchedCLower lower(oss, exec);
   fun->Accept(lower);
   return oss.str();
 }
 
 // Generate the main code of the function for a given execution
 std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const {
+  Assert(fun != nullptr, "Function is not generated yet!");
   const auto &initializations = exec.GetInitializations();
   const auto &finalizations = exec.GetFinalizations();
   Assert(
