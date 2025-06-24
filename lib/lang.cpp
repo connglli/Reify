@@ -26,7 +26,7 @@
 #include "lib/lang.hpp"
 
 namespace symir {
-  SymIRBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const Coef *coef, const VarDef *var) {
+  SymIRBuilder::TermID BlockBuilder::SymTerm(Term::Op op, Coef *coef, const VarDef *var) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     TermID tid = numCreatedTerms++;
     if (op == Term::Op::OP_CST) {
@@ -100,7 +100,7 @@ namespace symir {
   }
 
   /// Define and commit a new unsolved coefficient
-  const Coef *FuncBuilder::SymCoef(const std::string &name, SymIR::Type type) {
+  Coef *FuncBuilder::SymCoef(const std::string &name, SymIR::Type type) {
     Assert(isActive(), "The FuncBuilder is no longer active");
     Assert(
         !symMap.contains(name), "Coefficients with the same name \"%s\" is already defined",
@@ -113,8 +113,7 @@ namespace symir {
   }
 
   /// Define and commit a new solved coefficient
-  const Coef *
-  FuncBuilder::SymCoef(const std::string &name, const std::string &value, SymIR::Type type) {
+  Coef *FuncBuilder::SymCoef(const std::string &name, const std::string &value, SymIR::Type type) {
     Assert(isActive(), "The FuncBuilder is no longer active");
     Assert(
         !symMap.contains(name), "Coefficients with the same name \"%s\" is already defined",
@@ -142,7 +141,7 @@ namespace symir {
     return v;
   }
 
-  const Local *FuncBuilder::SymLocal(const std::string &name, const Coef *coef, SymIR::Type type) {
+  const Local *FuncBuilder::SymLocal(const std::string &name, Coef *coef, SymIR::Type type) {
     Assert(isActive(), "The FuncBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",

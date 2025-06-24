@@ -152,11 +152,13 @@ namespace symir {
   }
 
   void SymCxLower::Visit(const Term &t) {
+    out << "(";
     t.GetCoef()->Accept(*this);
     if (t.GetOp() != Term::Op::OP_CST) {
       out << " " << Term::GetOpSym(t.GetOp()) << " ";
       t.GetVar()->Accept(*this);
     }
+    out << ")";
   }
 
   void SymCxLower::Visit(const Expr &e) {

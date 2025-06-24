@@ -557,7 +557,7 @@ namespace symir {
     funBd = nullptr;
   }
 
-  const Coef *SymSexpParser::buildCoef(const SymSexpLexer::Token *token, SymIR::Type type) {
+  Coef *SymSexpParser::buildCoef(const SymSexpLexer::Token *token, SymIR::Type type) {
     if (token->str.starts_with(SymSexpLower::KW_COEF_VAL_SYM)) {
       std::string tempName = std::string("__c") + std::to_string(funBd->GetSymbols().size());
       return funBd->SymCoef(tempName, token->ToStr().substr(1), type);

@@ -307,6 +307,7 @@ namespace symir {
 #define XX(val, capt, smal, sym) OP_##val,
       SYMIR_TERMOP_LIST(XX)
 #undef XX
+          NUM_OPS
     };
 
     static std::string GetOpName(Op op) {
@@ -336,7 +337,7 @@ namespace symir {
       return symbols[op];
     }
 
-    Term(const Op op, const Coef *coef, std::unique_ptr<VarUse> var) :
+    Term(const Op op, Coef *coef, std::unique_ptr<VarUse> var) :
         SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(std::move(var)) {
       if (op == OP_CST) {
         Assert(this->var == nullptr, "CST can only be used without a variable");
@@ -353,7 +354,7 @@ namespace symir {
 
     [[nodiscard]] Op GetOp() const { return op; }
 
-    [[nodiscard]] const Coef *GetCoef() const { return coef; }
+    [[nodiscard]] Coef *GetCoef() const { return coef; }
 
     [[nodiscard]] const VarUse *GetVar() const { return var.get(); }
 
@@ -361,7 +362,7 @@ namespace symir {
 
   private:
     Op op;
-    const Coef *coef;
+    Coef *coef;
     std::unique_ptr<VarUse> var;
   };
 
@@ -377,6 +378,7 @@ namespace symir {
 #define XX(val, capt, smal, sym) OP_##val,
       SYMIR_EXPROP_LIST(XX)
 #undef XX
+          NUM_OPS
     };
 
     static std::string GetOpName(Op op) {
@@ -457,6 +459,7 @@ namespace symir {
 #define XX(val, capt, smal, sym) OP_##val,
       SYMIR_CONDOP_LIST(XX)
 #undef XX
+          NUM_OPS
     };
 
     static std::string GetOpName(Op op) {
@@ -615,7 +618,7 @@ namespace symir {
   /// A Local is a declaration of a local variable with an initial value within the function.
   class Local : public Stmt, public VarDef {
   public:
-    explicit Local(std::string name, const Coef *init, Type type = Type::I32) :
+    explicit Local(std::string name, Coef *init, Type type = Type::I32) :
         Stmt(SIR_LOCAL), VarDef(std::move(name), type), coef(std::move(init)) {
       Assert(this->coef != nullptr, "The coef is given a nullptr");
       Assert(
@@ -624,12 +627,12 @@ namespace symir {
       );
     }
 
-    [[nodiscard]] const Coef *GetCoef() const { return coef; }
+    [[nodiscard]] Coef *GetCoef() const { return coef; }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
-    const Coef *coef;
+    Coef *coef;
   };
 
   /// A Block represents a basic block of a series of statements and a target
@@ -764,15 +767,15 @@ namespace symir {
       }
     }
 
-    [[nodiscard]] std::vector<const SymDef *> GetSymbols() const {
-      std::vector<const SymDef *> r;
+    [[nodiscard]] std::vector<SymDef *> GetSymbols() const {
+      std::vector<SymDef *> r;
       for (const auto &v: symbols) {
         r.push_back(v.get());
       }
       return r;
     }
 
-    [[nodiscard]] const SymDef *GetSymbol(const std::string &name) const {
+    [[nodiscard]] SymDef *GetSymbol(const std::string &name) {
       if (symMap.contains(name)) {
         return symMap.find(name)->second;
       } else {
@@ -833,7 +836,7 @@ namespace symir {
     std::vector<std::unique_ptr<Local>> locals;
     std::map<std::string, const Local *> localMap;
     std::vector<std::unique_ptr<SymDef>> symbols;
-    std::map<std::string, const SymDef *> symMap;
+    std::map<std::string, SymDef *> symMap;
     std::vector<std::unique_ptr<Block>> blocks;
     std::map<std::string, const Block *> blockMap;
   };
@@ -916,9 +919,9 @@ namespace symir {
     [[nodiscard]] const std::string &GetLabel() const { return label; }
 
     /// Create a Term with a coef and return the ID to use it. The term can be used only once.
-    TermID SymTerm(Term::Op op, const Coef *coef, const VarDef *var);
+    TermID SymTerm(Term::Op op, Coef *coef, const VarDef *var);
 #define XX(val, capt, ...)                                                                         \
-  TermID Sym##capt##Term(const Coef *coef, const VarDef *var) {                                    \
+  TermID Sym##capt##Term(Coef *coef, const VarDef *var) {                                          \
     return SymTerm(Term::OP_##val, coef, var);                                                     \
   }
     SYMIR_TERMOP_LIST(XX)
@@ -1034,8 +1037,8 @@ namespace symir {
     }
 
     /// Get all defined symbols
-    [[nodiscard]] std::vector<const SymDef *> GetSymbols() const {
-      std::vector<const SymDef *> r;
+    [[nodiscard]] std::vector<SymDef *> GetSymbols() const {
+      std::vector<SymDef *> r;
       for (auto i = 0; i < symbols.size(); i++) {
         r.push_back(symbols[i].get());
       }
@@ -1061,7 +1064,7 @@ namespace symir {
     }
 
     /// Find a defined symbol
-    [[nodiscard]] const SymDef *FindSymbol(const std::string &name) const {
+    [[nodiscard]] SymDef *FindSymbol(const std::string &name) const {
       if (symMap.contains(name)) {
         return symMap.find(name)->second;
       } else {
@@ -1088,17 +1091,16 @@ namespace symir {
     }
 
     /// Define and commit a new unsolved coefficient
-    const Coef *SymCoef(const std::string &name, SymIR::Type type = SymIR::I32);
+    Coef *SymCoef(const std::string &name, SymIR::Type type = SymIR::I32);
 
     /// Define and commit a new solved coefficient
-    const Coef *
-    SymCoef(const std::string &name, const std::string &value, SymIR::Type type = SymIR::I32);
+    Coef *SymCoef(const std::string &name, const std::string &value, SymIR::Type type = SymIR::I32);
 
     /// Define and commit a new Param
     const Param *SymParam(const std::string &name, SymIR::Type type = SymIR::I32);
 
     /// Define and commit a new Local
-    const Local *SymLocal(const std::string &name, const Coef *coef, SymIR::Type type = SymIR::I32);
+    const Local *SymLocal(const std::string &name, Coef *coef, SymIR::Type type = SymIR::I32);
 
     /// Define and commit a new basic block with defined body
     const Block *SymBlock(const std::string &label, const BlockBuilder::BlockBody &body);
@@ -1123,7 +1125,7 @@ namespace symir {
     std::vector<std::unique_ptr<Block>> blocks{};
 
     // For ease of managing and manipulating
-    std::map<std::string, const SymDef *> symMap{};
+    std::map<std::string, SymDef *> symMap{};
     std::map<std::string, const Param *> paramMap{};
     std::map<std::string, const Local *> localMap{};
     std::map<std::string, const Block *> blockMap{};
