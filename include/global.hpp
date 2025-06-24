@@ -94,7 +94,7 @@ struct GlobalOptions {
   // or:
   //   initially all edges taken will be 3, followed by all edges taken to 1
   // There will be no out-edge interleaving.
-  bool EnableConsistentExecs = true;
+  bool EnableConsistentExecs = false;
   // The number of different initialisation sets we want the solver to find for a given function
   int NumInitsPerExec = 3;
 
