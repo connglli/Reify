@@ -105,8 +105,8 @@ namespace symir {
    * Name    -> f1, f2, f3, ...
    * Label   -> BB1, BB2, BB3, ...
    * Type    -> int
-   * Var     -> '1', v1, v2, v3, ... // '1' to make Term a bias
-   * Coef    -> 0, 1, 2, ...
+   * Var     -> v1, v2, v3, ...
+   * Coef    -> c1, c2, 0, 1, 2, ...
    * CondOp  -> >, <, ==             // Remove other ops as they are identical
    * ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
    * TermOp  -> +, -, *, /, %        // Avoid bit-wise ops as we are not using bv theories
@@ -115,25 +115,17 @@ namespace symir {
    * Example:
    *
    * -----------------------------------------------
-   * (func f (int (int v1) (int v2) (int v3))
-   *   (BB3
-   * 	   (assign v1 (eadd
-   * 	   	(add 12 v1)
-   * 	   	(sub 23 v2)
-   * 	   	(mul 132 1)
-   * 	   ))
-   * 	   (assign v1 (eadd
-   * 	   	(add 12 v1)
-   * 	   	(mul 23 v2)
-   * 	   ))
-   * 	   (branch (geq (eadd
-   * 	   	(add 12 v1)
-   * 	   	(sub 23 v2)
-   * 	   	(mul 132 1)
-   * 	   )) 2 BB4)
-   * 	   (goto BB3)
+   * (fun f0 i32 ((par v0 i32) (par v1 i32))
+   *   (loc v2 #100 i32)
+   *   (loc v3 c2 i32)
+   *   (bbl BB1
+   *     (asn v0 (eadd (mul #12 v1) (mul c4 v1)))
+   *     (brh BB1 BB2 (gtz (eadd (mul c5 v2) (mul #33 v1))))
    *   )
-   *   ...
+   *   (bbl BB2
+   *     (asn v3 (eadd (mul #9 v1) (mul c8 v2)))
+   *     (ret)
+   *   )
    * )
    * -----------------------------------------------
    */
