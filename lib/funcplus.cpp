@@ -171,11 +171,11 @@ void FunPlus::generateBasicBlock(symir::FuncBuilder *funBd, int bblId, const Bbl
   Log::Get().CloseSection();
 }
 
-/// A SymIR to Cxx lower with patches like pass counter.
+/// A SymIR to Cxx lower with patches like pass counter, reducible loops, etc.
 class PatchedCLower : public symir::SymCxLower {
 public:
   explicit PatchedCLower(std::ostream &os, const UBFreeExec &exec) :
-      symir::SymCxLower(os),
+      symir::SymCxLower(os), exec(exec),
       pcBbl(
           exec.NeedPassCounter()
               ? exec.GetFun().GetFun()->GetBlocks()[exec.GetPassCounterBbl()]->GetLabel()
@@ -187,7 +187,14 @@ public:
 
   void Visit(const symir::Branch &b) override {
     insertPassCounterJump(b);
-    SymCxLower::Visit(b);
+    if (exec.GetFun().GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_LATCH) {
+      out << getIndent() << "} while (";
+      b.GetCond()->Accept(*this);
+      out << getIndent() << ");" << std::endl;
+      out << getIndent() << "goto " << b.GetFalseTarget() << ";" << std::endl;
+    } else {
+      SymCxLower::Visit(b);
+    }
   }
 
   void Visit(const symir::Goto &g) override {
@@ -197,7 +204,11 @@ public:
 
   void Visit(const symir::Block &b) override {
     curBbl = b.GetLabel();
+    curBblId++;
     insertPassCounterDefinition();
+    if (exec.GetFun().GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_HEAD) {
+      out << getIndent() << "do {" << std::endl;
+    }
     SymCxLower::Visit(b);
     curBbl = "";
   }
@@ -227,10 +238,12 @@ private:
   }
 
 private:
+  const UBFreeExec &exec;
   const std::string pcBbl;
   int pcVal;
   const std::string entryBbl, exitBbl;
-  std::string curBbl;
+  std::string curBbl = "";
+  int curBblId = -1;
 };
 
 // Generate the function code of the function for a given execution
