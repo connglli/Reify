@@ -114,7 +114,7 @@ class BblSketch {
 
 public:
   enum Type {
-    BLOCK_ORDINARY = 0, // Oridinary block
+    BLOCK_ORDINARY = 0, // Ordinary block
     BLOCK_LOOP_HEAD,    // Loop head block
     BLOCK_LOOP_LATCH,   // Loop latch block
     BLOCK_LOOP_EXIT,    // Loop exit block

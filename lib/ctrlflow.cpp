@@ -29,6 +29,7 @@
 
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
+#include "lib/strutils.hpp"
 
 std::vector<int> BiLoop::SampleOneIter(int stepLimit, bool consistent, bool inclExit) const {
   for (int tries = 0; tries < 100; tries++) {
@@ -67,6 +68,8 @@ void CfgSketch::Generate() {
 }
 
 void CfgSketch::GenerateReduLoop(const int numBbls) {
+  Log::Get().OpenSection("CfgSketch::GenerateReduLoop");
+
   // Randomly select a block and transform it into a loop, except for the entry and exit
   const auto rand = Random::Get().Uniform(1, numBimpos() - 2);
   int biInd;
@@ -76,6 +79,7 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
       break;
     }
   } while (true);
+
   // TODO: Currently, we did not support nested loops as otherwise
   // we'll often get into cycles when sampling executions.
   bimpos[biInd] = std::make_unique<BiLoop>(numBbls, /*allowNestedLoops=*/false);
@@ -99,25 +103,39 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
   // The insertion point in the basicblocks array is flatBiInd
   const auto flatBiIt = basicblocks.begin() + flatBiInd;
 
+  Log::Get().Out() << "Started replacing bimpo #" << biInd << " (successors=["
+                   << JoinInt(flatBiIt->GetSuccessors(), ", ")
+                   << "]) with a reducible loop of size=" << numBbls << std::endl;
+
   // Now we are going to construct the basicblocks array of the newly inserted
   // loop. The newly inserted loop's basic blocks will be inserted starting from
   // flatBiInd. So it is obvious that the basicbloks-array index of all
   // bimpos after biInd will march by the number of blocks in the loop
   const auto *loop = dynamic_cast<const BiLoop *>(bimpos[biInd].get());
   const int loopSize = loop->NumBbls();
+  int numUpdated = 0;
   for (int i = biInd + 1; i < numBimpos(); i++) {
     indexInBbls[i] = indexInBbls[i] + loopSize - 1;
+    numUpdated++;
   }
 
+  Log::Get().Out() << "Updated " << numUpdated << " bimpos' indices by +" << (loopSize - 1)
+                   << " if it is behind #" << biInd << " in our unflattened CFG" << std::endl;
+
   // Since blkSuccessorsInLoop will be inserted into the basicblocks array,
-  // all blocks' successors that are > flatBiInd should march loopSize-1:
+  // all blocks' successors that are > flatBiInd should march loopSize-1
+  numUpdated = 0;
   for (auto &bbl: basicblocks) {
     for (auto &succ: bbl.successors) {
       if (succ > flatBiInd) {
         succ = succ + loopSize - 1;
+        numUpdated++;
       }
     }
   }
+
+  Log::Get().Out() << "Updated " << numUpdated << " bimpos' successors by +" << (loopSize - 1)
+                   << " if it is behind #" << flatBiInd << " in our flattened CFG" << std::endl;
 
   // Map each block in the loop into a BblSketch.
   // Since blkSuccessorsInLoop will be inserted into the basicblocks array,
@@ -151,6 +169,8 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
       !loop->GetSuccessor(loop->GetLatch()).contains(loop->GetEntry()),
       "The original loop graph's latch should remain untouched"
   );
+  Log::Get().Out() << "Updated the successors of the loop's latch to ["
+                   << JoinInt(loopBbls[loop->GetLatch()].successors, ", ") << "]" << std::endl;
   // The loop exiting node should branch to all the old successors
   Assert(
       loopBbls[loop->GetExit()].successors.empty(),
@@ -164,10 +184,17 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
       loop->GetSuccessor(loop->GetExit()).empty(),
       "The original loop graph's exit should remain untouched"
   );
+  Log::Get().Out() << "Updated the successors of the loop's exit to ["
+                   << JoinInt(loopBbls[loop->GetExit()].successors, ", ") << "]" << std::endl;
+
+  Log::Get().Out() << "Constructed the basic blocks of the newly inserted loop" << std::endl;
 
   // Insert loopBbls into the basicblocks array
   basicblocks.erase(flatBiIt);
   basicblocks.insert(flatBiIt, loopBbls.begin(), loopBbls.end());
+
+  Log::Get().Out() << "Inserted all the loop's basic blocks into the flattened CFG" << std::endl;
+  Log::Get().CloseSection();
 }
 
 std::vector<int>
@@ -226,16 +253,8 @@ void CfgSketch::Print() const {
 
   Log::Get().OpenSection("CfgSketch: Flattened CFG Sketch");
   for (int u = 0; u < basicblocks.size(); u++) {
-    Log::Get().Out() << "Block: " << u << " -> [";
-    int j = 0;
-    for (const auto v: basicblocks[u].successors) {
-      Log::Get().Out() << v;
-      if (j != basicblocks[u].successors.size() - 1) {
-        Log::Get().Out() << ", ";
-      }
-      j++;
-    }
-    Log::Get().Out() << "]" << std::endl;
+    Log::Get().Out() << "Block: " << u << " -> [" << JoinInt(basicblocks[u].successors, ", ") << "]"
+                     << std::endl;
   }
   Log::Get().CloseSection();
 }

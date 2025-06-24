@@ -28,7 +28,7 @@
 
 #include <ostream>
 
-#include "lang.hpp"
+#include "lib/lang.hpp"
 
 #define SYMIR_LOWER_INDENTATION_SIZE 2
 

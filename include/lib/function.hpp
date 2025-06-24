@@ -33,8 +33,8 @@
 #include "lib/block.hpp"
 #include "lib/ctrlflow.hpp"
 #include "lib/dbgutils.hpp"
+#include "lib/logger.hpp"
 #include "lib/ubfexec.hpp"
-#include "logger.hpp"
 
 class BlkGen;
 class UBFreeExec;

@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-#include "lang.hpp"
 #include "lib/dbgutils.hpp"
 
 namespace symir {

@@ -44,7 +44,7 @@ void BlkGen::Generate() {
   assignments = SampleKDistinct(fun.NumParams(), numAssPerBbl);
   for (int stmtIndex = 0; stmtIndex < numAssPerBbl; stmtIndex++) {
     int varIndex = assignments[stmtIndex];
-    Log::Get().Out() << varIndex << " <- ";
+    Log::Get().Out() << "Generate statement: " << varIndex << " <- ";
 
     // Sample the variables which will be used in the RHS of the assignment statement
     const auto numVarsPerAss = GlobalOptions::Get().NumVarsPerAssign;

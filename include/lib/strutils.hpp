@@ -31,7 +31,8 @@
 #include <string>
 #include <vector>
 
-static std::vector<std::string> SplitStr(const std::string &s, const std::string &delim, bool escapeEmpty = false) {
+static std::vector<std::string>
+SplitStr(const std::string &s, const std::string &delim, bool escapeEmpty = false) {
   std::vector<std::string> tokens;
   std::string::size_type curr = 0;
   auto delSize = delim.size();
@@ -66,10 +67,21 @@ static std::string JoinStr(const std::vector<std::string> &tokens, const std::st
   return oss.str();
 }
 
-static std::string& StripStr(std::string& s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](const auto c) { return !std::isspace(c); }));
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](const auto c) { return !std::isspace(c); }).base(), s.end());
-    return s;
+static std::string JoinInt(const std::vector<int> &tokens, const std::string &delim) {
+  std::vector<std::string> strtokens(tokens.size());
+  std::ranges::transform(tokens, strtokens.begin(), [](const int t) { return std::to_string(t); });
+  return JoinStr(strtokens, delim);
+}
+
+static std::string &StripStr(std::string &s) {
+  s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](const auto c) {
+            return !std::isspace(c);
+          }));
+  s.erase(
+      std::find_if(s.rbegin(), s.rend(), [](const auto c) { return !std::isspace(c); }).base(),
+      s.end()
+  );
+  return s;
 }
 
 #endif // GRAPHFUZZ_STRUTILS_HPP

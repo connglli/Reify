@@ -25,8 +25,6 @@
 
 #include "lib/lang.hpp"
 
-#include <z3++.h>
-
 namespace symir {
   SymIRBuilder::TermID BlockBuilder::SymTerm(Term::Op op, const Coef *coef, const VarDef *var) {
     Assert(isActive(), "The BlockBuilder is no longer active");
@@ -67,7 +65,8 @@ namespace symir {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
-    stmts.push_back(std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+    stmts.push_back(
+        std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
     );
     createdExprs.erase(it);
   }
