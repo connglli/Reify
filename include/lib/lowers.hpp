@@ -89,7 +89,7 @@ namespace symir {
     void Visit(const Param &p) override;
     void Visit(const Local &l) override;
     void Visit(const Block &b) override;
-    void Visit(const Func &f) override;
+    void Visit(const Funct &f) override;
   };
 
   /// An "SymIR -> C/C++" lower
@@ -109,7 +109,7 @@ namespace symir {
     void Visit(const Param &p) override;
     void Visit(const Local &l) override;
     void Visit(const Block &b) override;
-    void Visit(const Func &f) override;
+    void Visit(const Funct &f) override;
   };
 } // namespace symir
 

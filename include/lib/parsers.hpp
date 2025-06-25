@@ -171,13 +171,13 @@ namespace symir {
     void Parse();
 
     /// Return the parsed AST or nullptr
-    [[nodiscard]] Func *GetFunc() const { return func.get(); }
+    [[nodiscard]] Funct *GetFunct() const { return funct.get(); }
 
     /// Return the parsed AST or nullptr. Different from GetFunc(), we transfer
     /// the ownership of the function to the user.
-    std::unique_ptr<Func> TakeFunc() {
+    std::unique_ptr<Funct> TakeFunct() {
       lexer.Reset();
-      return std::move(func);
+      return std::move(funct);
     }
 
   private:
@@ -229,11 +229,11 @@ namespace symir {
     Coef *buildCoef(const SymSexpLexer::Token *token, SymIR::Type type);
 
   private:
-    SymSexpLexer lexer;                   // The lexer we're using
-    std::unique_ptr<Func> func = nullptr; // The AST after parsing
+    SymSexpLexer lexer;                     // The lexer we're using
+    std::unique_ptr<Funct> funct = nullptr; // The AST after parsing
 
     // Context to parse the S expression code
-    std::unique_ptr<FuncBuilder> funBd = nullptr;    // The top level function builder
+    std::unique_ptr<FunctBuilder> funBd = nullptr;   // The top level function builder
     BlockBuilder *bblBd = nullptr;                   // The current block builder
     std::stack<SymSexpLexer::Token::Kind> opStack{}; // The operator stack
     std::stack<void *> argStack{};                   // The operand/argument stack

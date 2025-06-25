@@ -230,7 +230,7 @@ namespace symir {
 
 namespace symir {
   void SymSexpParser::Parse() {
-    if (func != nullptr) {
+    if (funct != nullptr) {
       return;
     }
 
@@ -375,7 +375,7 @@ namespace symir {
         "should be the return type of the function",
         typeToken.FullInfo().c_str()
     );
-    funBd = std::make_unique<FuncBuilder>(
+    funBd = std::make_unique<FunctBuilder>(
         nameToken.ToStr(), SymIR::GetTypeFromSName(typeToken.ToStr())
     );
   }
@@ -554,7 +554,7 @@ namespace symir {
   }
 
   void SymSexpParser::buildFunc() {
-    func = funBd->Build();
+    funct = funBd->Build();
     funBd = nullptr;
   }
 

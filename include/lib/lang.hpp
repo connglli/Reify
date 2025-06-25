@@ -44,8 +44,8 @@ namespace symir {
   // The SymIR Tiny Language
   ///////////////////////////////////////////////////////////////////////
 
-  class VarUse;
   class Coef;
+  class VarUse;
   class Term;
   class Expr;
   class Cond;
@@ -56,7 +56,7 @@ namespace symir {
   class Param;
   class Local;
   class Block;
-  class Func;
+  class Funct;
 
   class SymIRVisitor {
   public:
@@ -73,7 +73,7 @@ namespace symir {
     virtual void Visit(const Param &p) = 0;
     virtual void Visit(const Local &l) = 0;
     virtual void Visit(const Block &b) = 0;
-    virtual void Visit(const Func &f) = 0;
+    virtual void Visit(const Funct &f) = 0;
   };
 
   /**
@@ -85,7 +85,7 @@ namespace symir {
    * Context-Free Grammar:
    *
    * -----------------------------------------------
-   * Func    -> 'func' Name Type (Type Var)+ Local* Block+
+   * Funct   -> 'function' Name Type (Type Var)+ Local* Block+
    * Local   -> 'local' Var Coef Type
    * Block   -> 'block' Label Stmt* Target?
    * ---
@@ -145,7 +145,7 @@ namespace symir {
       SIR_PARAM,
       SIR_LOCAL,
       SIR_BLOCK,
-      SIR_FUNC,
+      SIR_FUNCT,
     };
 
 #define SYMIR_TYPE_LIST(XX) XX(I32, "int", "i32")
@@ -686,10 +686,10 @@ namespace symir {
     std::unique_ptr<Target> target;
   };
 
-  /// A Func is a series of basic blocks
-  class Func : public SymIR, public WithType {
+  /// A Funct is a series of basic blocks
+  class Funct : public SymIR, public WithType {
   public:
-    Func(
+    Funct(
         // clang-format off
         std::string name,
         Type retType,
@@ -699,7 +699,7 @@ namespace symir {
         std::vector<std::unique_ptr<Block>> blocks
         // clang-format on
     ) :
-        SymIR(SIR_FUNC), WithType(retType), name(std::move(name)), params(std::move(params)),
+        SymIR(SIR_FUNCT), WithType(retType), name(std::move(name)), params(std::move(params)),
         locals(std::move(locals)), symbols(std::move(symbols)), blocks(std::move(blocks)) {
       Assert(!this->params.empty(), "No parameters are given");
       Assert(!this->blocks.empty(), "No basic blocks are given");
@@ -889,7 +889,7 @@ namespace symir {
     explicit RootBuilder() : SymIRBuilderGeneric(nullptr) {}
   };
 
-  class FuncBuilder;
+  class FunctBuilder;
 
   /// Builder to facilitate building a basic block
   ///
@@ -914,12 +914,12 @@ namespace symir {
   ///   );  // We cannot call anything any more after Branch
   ///   auto blk = b.Build();
   /// ----------------------------------------------------------
-  class BlockBuilder final : public SymIRBuilderGeneric<FuncBuilder, Block> {
+  class BlockBuilder final : public SymIRBuilderGeneric<FunctBuilder, Block> {
   public:
     using BlockBody = std::function<void(BlockBuilder *)>;
 
-    BlockBuilder(FuncBuilder *ctx, std::string label) :
-        SymIRBuilderGeneric<FuncBuilder, Block>(ctx), label(std::move(label)) {}
+    BlockBuilder(FunctBuilder *ctx, std::string label) :
+        SymIRBuilderGeneric<FunctBuilder, Block>(ctx), label(std::move(label)) {}
 
     /// Return the label of the basic block being built
     [[nodiscard]] const std::string &GetLabel() const { return label; }
@@ -993,7 +993,7 @@ namespace symir {
   /// Example:
   ///
   /// -----------------------------------------------------------
-  ///   auto b = std::make_unique<FuncBuilder>("f0", SymIR::Type::I32)
+  ///   auto b = std::make_unique<FunctBuilder>("f0", SymIR::Type::I32)
   ///   auto v0 = b->SymParam("v0");
   ///   auto v1 = b->SymLocal("v1");
   ///   auto bb1 = b.SymBlock("BB1", [&](BlockBuilder *blk) {
@@ -1009,11 +1009,11 @@ namespace symir {
   ///   });  // We cannot call anything any more after Branch
   ///   auto f0 = b.Build();
   /// ----------------------------------------------------------
-  class FuncBuilder final : SymIRBuilderGeneric<RootBuilder, Func> {
+  class FunctBuilder final : SymIRBuilderGeneric<RootBuilder, Funct> {
 
   public:
-    explicit FuncBuilder(std::string name, SymIR::Type retType = SymIR::I32) :
-        SymIRBuilderGeneric<RootBuilder, Func>(nullptr), name(std::move(name)), retType(retType) {}
+    explicit FunctBuilder(std::string name, SymIR::Type retType = SymIR::I32) :
+        SymIRBuilderGeneric<RootBuilder, Funct>(nullptr), name(std::move(name)), retType(retType) {}
 
     /// Get all defined parameters
     [[nodiscard]] std::vector<const Param *> GetParams() const {
@@ -1119,7 +1119,7 @@ namespace symir {
 
     /// Build the function.
     /// After calling this function, the builder is no longer usable.
-    std::unique_ptr<Func> Build() override;
+    std::unique_ptr<Funct> Build() override;
 
   private:
     // Ingredients for building a function

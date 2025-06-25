@@ -70,7 +70,7 @@ public:
     return NumBbls() - 1; // Following our CFG, the exit block is always the last basic block
   }
 
-  [[nodiscard]] symir::Func *GetFun() const {
+  [[nodiscard]] symir::Funct *GetFun() const {
     Assert(fun != nullptr, "The function has not yet been generated");
     return fun.get();
   }
@@ -92,7 +92,7 @@ public:
 
 private:
   // Generate a new basic block with random statements and symbols
-  void generateBasicBlock(symir::FuncBuilder *funBd, int bblId, const BblSketch &bblSkt);
+  void generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const BblSketch &bblSkt);
 
 private:
   CfgSketch cfg; // The sketch of our CFG, where each bbl maps to a blockgen in bbs
@@ -102,7 +102,7 @@ private:
   int maxNumLoops;       // The maximum number of loops that the function can have
   int maxNumBblsPerLoop; // The maximum number of basic blocks in a loop
 
-  std::unique_ptr<symir::Func> fun = nullptr; // The built function in SymIR
+  std::unique_ptr<symir::Funct> fun = nullptr; // The built function in SymIR
 };
 
 

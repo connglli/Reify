@@ -38,7 +38,7 @@
 /// execution of a function is free of Signed Overflow undefined behavior.
 class SignedOverflow : public symir::SymIRVisitor {
 public:
-  SignedOverflow(symir::Func &fun, const std::vector<int> &execution) :
+  SignedOverflow(symir::Funct &fun, const std::vector<int> &execution) :
       fun(fun), execution(execution.size()) {
     std::ranges::transform(execution, this->execution.begin(), [](int idx) {
       return NameLabel(idx);
@@ -97,7 +97,7 @@ public:
   void Visit(const symir::Param &p) override;
   void Visit(const symir::Local &l) override;
   void Visit(const symir::Block &b) override;
-  void Visit(const symir::Func &f) override;
+  void Visit(const symir::Funct &f) override;
 
   // Print all constraints to the logger
   void PrintConstraints() const {
@@ -121,7 +121,7 @@ private:
   void makeCoefsInteresting(const symir::Expr &expr);
 
 private:
-  symir::Func &fun;                   // The function that we're analyzing
+  symir::Funct &fun;                  // The function that we're analyzing
   std::vector<std::string> execution; // The execution path of the function
 
   z3::context ctx;                  // The context of our constraint collecting

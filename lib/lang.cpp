@@ -65,8 +65,7 @@ namespace symir {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
-    stmts.push_back(
-        std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+    stmts.push_back(std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
     );
     createdExprs.erase(it);
   }
@@ -100,8 +99,8 @@ namespace symir {
   }
 
   /// Define and commit a new unsolved coefficient
-  Coef *FuncBuilder::SymCoef(const std::string &name, SymIR::Type type) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  Coef *FunctBuilder::SymCoef(const std::string &name, SymIR::Type type) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !symMap.contains(name), "Coefficients with the same name \"%s\" is already defined",
         name.c_str()
@@ -113,8 +112,8 @@ namespace symir {
   }
 
   /// Define and commit a new solved coefficient
-  Coef *FuncBuilder::SymCoef(const std::string &name, const std::string &value, SymIR::Type type) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  Coef *FunctBuilder::SymCoef(const std::string &name, const std::string &value, SymIR::Type type) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !symMap.contains(name), "Coefficients with the same name \"%s\" is already defined",
         name.c_str()
@@ -125,8 +124,8 @@ namespace symir {
     return dynamic_cast<Coef *>(s);
   }
 
-  const Param *FuncBuilder::SymParam(const std::string &name, SymIR::Type type) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  const Param *FunctBuilder::SymParam(const std::string &name, SymIR::Type type) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
         name.c_str()
@@ -141,8 +140,8 @@ namespace symir {
     return v;
   }
 
-  const Local *FuncBuilder::SymLocal(const std::string &name, Coef *coef, SymIR::Type type) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  const Local *FunctBuilder::SymLocal(const std::string &name, Coef *coef, SymIR::Type type) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
         name.c_str()
@@ -158,15 +157,15 @@ namespace symir {
   }
 
   const Block *
-  FuncBuilder::SymBlock(const std::string &label, const BlockBuilder::BlockBody &body) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  FunctBuilder::SymBlock(const std::string &label, const BlockBuilder::BlockBody &body) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     BlockBuilder *b = OpenBlock(label);
     body(b);
     return CloseBlock(b);
   }
 
-  BlockBuilder *FuncBuilder::OpenBlock(const std::string &label) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  BlockBuilder *FunctBuilder::OpenBlock(const std::string &label) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !blockMap.contains(label), "Blocks with the same label \"%s\" already exists", label.c_str()
     );
@@ -177,8 +176,8 @@ namespace symir {
     return createdBlocks[label].get();
   }
 
-  const Block *FuncBuilder::CloseBlock(BlockBuilder *builder) {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  const Block *FunctBuilder::CloseBlock(BlockBuilder *builder) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     const std::string &label = builder->GetLabel();
     const auto it = createdBlocks.find(label);
     Assert(
@@ -191,10 +190,10 @@ namespace symir {
     return blocks.back().get();
   }
 
-  std::unique_ptr<Func> FuncBuilder::Build() {
-    Assert(isActive(), "The FuncBuilder is no longer active");
+  std::unique_ptr<Funct> FunctBuilder::Build() {
+    Assert(isActive(), "The FunctBuilder is no longer active");
     deactivate();
-    return std::make_unique<Func>(
+    return std::make_unique<Funct>(
         name, retType, std::move(params), std::move(locals), std::move(symbols), std::move(blocks)
     );
   }

@@ -256,7 +256,7 @@ void SignedOverflow::Visit(const symir::Block &b) {
   }
 }
 
-void SignedOverflow::Visit(const symir::Func &f) {
+void SignedOverflow::Visit(const symir::Funct &f) {
   Assert(
       exprStack.empty(), "Expression stack is not empty before visiting function %s",
       f.GetName().c_str()

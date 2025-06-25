@@ -45,7 +45,7 @@ void FunPlus::Generate() {
   cfg.Print();
 
   // Create the function builder to build the function
-  auto builder = std::make_unique<symir::FuncBuilder>(name, symir::SymIR::I32);
+  auto builder = std::make_unique<symir::FunctBuilder>(name, symir::SymIR::I32);
   for (int i = 0; i < numParams; i++) {
     builder->SymParam(NameVar(i), symir::SymIR::Type::I32);
   }
@@ -65,7 +65,7 @@ std::vector<int> FunPlus::SampleExec(int execStep, bool consistent) {
   return cfg.SampleExec(execStep, consistent);
 }
 
-void FunPlus::generateBasicBlock(symir::FuncBuilder *funBd, int bblId, const BblSketch &bblSkt) {
+void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const BblSketch &bblSkt) {
   Log::Get().OpenSection(std::string("FunPlus: Generate Block #") + std::to_string(bblId));
 
   auto bblBd = funBd->OpenBlock(NameLabel(bblId));

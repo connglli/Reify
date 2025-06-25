@@ -118,7 +118,7 @@ namespace symir {
     out << ")" << std::endl;
   }
 
-  void SymSexpLower::Visit(const Func &f) {
+  void SymSexpLower::Visit(const Funct &f) {
     out << "(" << KW_FUN << " " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
     out << " (";
     auto params = f.GetParams();
@@ -231,7 +231,7 @@ namespace symir {
     }
   }
 
-  void SymCxLower::Visit(const Func &f) {
+  void SymCxLower::Visit(const Funct &f) {
     out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
     auto params = f.GetParams();
     for (auto i = 0; i < params.size(); ++i) {
