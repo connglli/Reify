@@ -80,7 +80,15 @@ namespace symir {
    * SymIR is a simplified, symbolic IR for modeling a C-like function.
    * The main goal of SymIR is to generate code that are easier to model
    * UBs (undefined behavior) and easier for symbolic execution. The
-   * symbols in SymIR including for example, coefficient.
+   * symbols in SymIR including for example, coefficient. Additionally,
+   * we want to ease the pressure on SMT sovlers, so we intentionally
+   * restrict the expressiveness of expressions to only a few operations
+   * on terms (an atomic expression of coefficients and variables),
+   * rather than use all operations that are available in C/C++ and apply
+   * them to terms and also recursively to expressions themselves.
+   * Otherwise, the STM solver face non-linear variable calculations (for
+   * example "var_a x var_b", "var_a ^ var_b") and bit-wise operations,
+   * which are not needed for our purpose.
    *
    * Context-Free Grammar:
    *
@@ -98,7 +106,7 @@ namespace symir {
    * RetStmt -> 'return' Var+
    * ---
    * Cond    -> CondOp Expr
-   * Expr    -> ExprOp Term Term+
+   * Expr    -> ExprOp Term Term+   // We intentionally avoid "Expr -> ExprOp Expr Expr"
    * Term    -> TermOp Coef Var
    * ---
    * Name    -> f1, f2, f3, ...
@@ -127,6 +135,11 @@ namespace symir {
    *   )
    * )
    * -----------------------------------------------
+   *
+   * TODOs:
+   *
+   * 1. Add support for on-stack arrays and structs.
+   * 2. Add support for heap and pointer arithemics.
    */
   class SymIR {
   public:
