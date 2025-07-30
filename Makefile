@@ -35,8 +35,8 @@ LIB_OBJ_DIR := $(OBJ_DIR)/lib
 ## Sources, Objects, and Resources
 ########################################################################
 
-LIB_SRC_CXX := $(wildcard $(LIB_DIR)/*.cpp)
-LIB_SRC_C   := $(wildcard $(LIB_DIR)/*.c)
+LIB_SRC_CXX := $(shell find $(LIB_DIR) -type f -name "*.cpp")
+LIB_SRC_C   := $(shell find $(LIB_DIR) -type f -name "*.c")
 LIB_SRC     := $(LIB_SRC_CXX) $(LIB_SRC_C)
 
 LIB_OBJ_CXX := $(patsubst $(LIB_DIR)/%.cpp,$(LIB_OBJ_DIR)/%.o,$(LIB_SRC_CXX))
@@ -68,8 +68,8 @@ DBGFLAGS := $(if $(DEBUG),-g,)
 OPTFLAGS := $(if $(DEBUG),-O0,-O2)
 
 CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -std=${CXXSTD} ${OPTFLAGS} -I$(INC_DIR)
-CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -std=${CSTD} ${OPTFLAGS}
-LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread
+CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -std=${CSTD} ${OPTFLAGS} -I$(INC_DIR)
+LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread -lz
 
 
 ########################################################################
@@ -81,31 +81,31 @@ LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread
 all: lib bins
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	@mkdir -p $(OBJ_DIR)
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 $(LIB_OBJ_DIR)/%.o: $(LIB_DIR)/%.c
-	@mkdir -p $(LIB_OBJ_DIR)
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 $(LIB_OBJ_DIR)/%.o: $(LIB_DIR)/%.cpp
-	@mkdir -p $(LIB_OBJ_DIR)
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 # Compile checksum implementation specifically as it requires the macro
 $(LIB_OBJ_DIR)/chksum.o: $(LIB_DIR)/chksum.cpp
-	@mkdir -p $(LIB_OBJ_DIR)
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -D$(CHKSUM_CODE_MACRO)=$(CHKSUM_CODE_VALUE) -o $@ -c $<
 
 lib: $(LIB_OBJ)
 
 $(BIN_DIR)/fgen: $(LIB_OBJ) $(OBJ_DIR)/func_gen.o
-	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $(BIN_DIR)/fgen $^ $(LDFLAGS)
+	@mkdir -p $(dirs $@)
+	$(CXX) -o $@ $^ $(LDFLAGS)
 
 $(BIN_DIR)/pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
-	@mkdir -p $(BIN_DIR)
-	$(CXX) -o $(BIN_DIR)/pgen $^ $(LDFLAGS)
+	@mkdir -p $(dirs $@)
+	$(CXX) -o $@ $^ $(LDFLAGS)
 
 fgen: $(BIN_DIR)/fgen
 
@@ -154,7 +154,7 @@ gen-prog-set-check: pgen
 	@mkdir -p $(PGEN_PROGS_DIR)
 	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) --debug $(shell uuidgen)
-	@python3 scripts/ubchk.py $(PGEN_PROGS_DIR)
+	$(PY3) scripts/ubchk.py $(PGEN_PROGS_DIR)
 
 
 ########################################################################

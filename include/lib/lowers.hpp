@@ -26,8 +26,8 @@
 #ifndef GRAPHFUZZ_LOWERS_H
 #define GRAPHFUZZ_LOWERS_H
 
-#include <ostream>
-
+#include <fstream>
+#include "jnif/jnif.hpp"
 #include "lib/lang.hpp"
 
 #define SYMIR_LOWER_INDENTATION_SIZE 2
@@ -46,12 +46,16 @@ namespace symir {
   using namespace symir;
 
   class SymIRLower : public SymIRVisitor {
+  public:
+    static std::ostream devNull;
 
   public:
     explicit SymIRLower(std::ostream &out) : out(out) {}
 
+    virtual void lower(const Funct &f) { f.Accept(*this); }
+
   protected:
-    std::string getIndent() const {
+    [[nodiscard]] std::string getIndent() const {
       return std::string(numIndent * SYMIR_LOWER_INDENTATION_SIZE, ' ');
     }
 
@@ -110,6 +114,49 @@ namespace symir {
     void Visit(const Local &l) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
+  };
+
+  /// An "SymIR -> Java Bytecode" lower
+  class SymJavaBytecodeLower : public SymIRLower {
+
+  public:
+    explicit SymJavaBytecodeLower(const std::string &className, const std::string &outFile) :
+        SymIRLower(devNull), outFile(outFile),
+        clazz(std::make_unique<jnif::ClassFile>(className.c_str())) {
+      main = &clazz->addMethod(
+          "main", "([Ljava/lang/String;)V",
+          jnif::Method::Flags::PUBLIC | jnif::Method::Flags::STATIC
+      );
+      main->instList().addZero(jnif::Opcode::RETURN);
+    }
+
+    void lower(const Funct &f) override {
+      SymIRLower::lower(f);
+      jnif::stream::OClassFileStream s(outFile.c_str(), clazz.get());
+    }
+
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &a) override;
+    void Visit(const RetStmt &r) override;
+    void Visit(const Branch &b) override;
+    void Visit(const Goto &g) override;
+    void Visit(const Param &p) override;
+    void Visit(const Local &l) override;
+    void Visit(const Block &b) override;
+    void Visit(const Funct &f) override;
+
+  private:
+    const std::string &outFile;
+    std::unique_ptr<jnif::ClassFile> clazz;
+    jnif::Method *main = nullptr;
+    jnif::Method *method = nullptr;
+    const Funct *fun = nullptr;
+    std::map<const std::string, int> locals{};
+    std::map<const std::string, jnif::LabelInst *> labels{};
   };
 } // namespace symir
 
