@@ -61,6 +61,9 @@ struct GlobalOptions {
   bool EnableSafetyChecks = true;
   // I don't want all coefficients to be 0, so this constraint takes care of that
   bool EnableInterestCoefs = true;
+  // If true, we allow all operations in the terms and expressions
+  // otherwise we only allow addition for expression and multiplication for terms
+  bool EnableAllOps = false;
 
   ////////////////////////////////////////////////////////////
   ////// Function Generation Parameters
