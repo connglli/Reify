@@ -92,7 +92,25 @@ public:
     std::vector<std::string> tokens = SplitStr(code, "*");
     Assert((tokens.size() == 1 || tokens.size() == 2), "Invalid Term expression: %s", code.c_str());
     c = StripStr(tokens[0]);
+    while (c.starts_with("(")) {
+      c = c.substr(1, c.size() - 1);
+      c = StripStr(c);
+    }
+    while (c.ends_with(")")) {
+      c = c.substr(0, c.size() - 1);
+      c = StripStr(c);
+    }
+    c = StripStr(c);
     v = tokens.size() > 1 ? StripStr(tokens[1]) : "1";
+    while (v.starts_with("(")) {
+      v = v.substr(1, v.size() - 1);
+      v = StripStr(v);
+    }
+    while (v.ends_with(")")) {
+      v = v.substr(0, v.size() - 1);
+      v = StripStr(v);
+    }
+    v = StripStr(v);
     mutated = false;
   }
 
@@ -223,8 +241,8 @@ public:
   void Parse(const std::string &code) override {
     const auto ifKeyword = code.find("if");
     const auto openParen = code.find('(', ifKeyword);
-    const auto gtThEq = code.find(">=", openParen);
-    const auto closeParen = code.find(')', gtThEq);
+    const auto gtThEq = code.find(">", openParen);
+    const auto closeParen = code.rfind(')');
     const auto semicolon = code.find(';', closeParen);
     // TODO: Currently, we only support TermSum
     condExpr = Create<TermSum>(code.substr(openParen + 1, gtThEq - 1 - openParen - 1));
@@ -244,7 +262,7 @@ public:
   }
 
   [[nodiscard]] std::string GenerateCode() const override {
-    return "    if (" + condExpr->GenerateCode() + " >= 0) " + gotoStmt + ";";
+    return "    if (" + condExpr->GenerateCode() + " > 0) " + gotoStmt + ";";
   }
 
 private:
@@ -258,7 +276,7 @@ public:
   void Parse(const std::string &code) override {
     const auto whileKeyword = code.find("while");
     const auto openParen = code.find('(', whileKeyword);
-    const auto gtThEq = code.find(">=", openParen);
+    const auto gtThEq = code.find(">", openParen);
     // TODO: Currently, we only support TermSum
     condExpr = Create<TermSum>(code.substr(openParen + 1, gtThEq - 1 - openParen - 1));
   }
@@ -276,7 +294,7 @@ public:
   }
 
   [[nodiscard]] std::string GenerateCode() const override {
-    return "    } while (" + condExpr->GenerateCode() + " >= 0);";
+    return "    } while (" + condExpr->GenerateCode() + " > 0);";
   }
 
 private:

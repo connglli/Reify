@@ -69,8 +69,14 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
   Log::Get().OpenSection(std::string("FunPlus: Generate Block #") + std::to_string(bblId));
 
   auto bblBd = funBd->OpenBlock(NameLabel(bblId));
-  const auto randTermOp = Random::Get().Uniform(1, symir::Term::Op::NUM_OPS - 1);
-  const auto randExprOp = Random::Get().Uniform(0, symir::Expr::Op::NUM_OPS - 1);
+  const auto randTermOp = Random::Get().Uniform(
+      GlobalOptions::Get().EnableAllOps ? 1 : symir::Term::Op::OP_MUL,
+      GlobalOptions::Get().EnableAllOps ? symir::Term::Op::NUM_OPS - 1 : symir::Term::Op::OP_MUL
+  );
+  const auto randExprOp = Random::Get().Uniform(
+      GlobalOptions::Get().EnableAllOps ? 0 : symir::Expr::Op::OP_ADD,
+      GlobalOptions::Get().EnableAllOps ? symir::Expr::Op::NUM_OPS - 1 : symir::Expr::Op::OP_ADD
+  );
 
   // We define a variable as LHS for each assignment using other variables
   const auto numAssPerBbl = GlobalOptions::Get().NumAssignsPerBBL;
@@ -149,7 +155,10 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
     // Target block is a parameter here if we ever wanted to support more that
     // 2 potential targets for the same basic block. We will always branch to
     // the very first successor in the condition of the conditional evals to true.
-    const auto randCondOp = Random::Get().Uniform(0, symir::Cond::Op::NUM_OPS - 1);
+    const auto randCondOp = Random::Get().Uniform(
+        GlobalOptions::Get().EnableAllOps ? 0 : symir::Cond::Op::OP_GTZ,
+        GlobalOptions::Get().EnableAllOps ? symir::Cond::Op::NUM_OPS - 1 : symir::Cond::Op::OP_GTZ
+    );
     bblBd->SymBranch(
         NameLabel(bblSkt.GetSuccessors()[0]), NameLabel(bblSkt.GetSuccessors()[1]),
         bblBd->SymCond(
