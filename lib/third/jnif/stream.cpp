@@ -16,7 +16,7 @@ namespace jnif {
       if (!ifs.is_open()) {
         int m;
         ifs >> m;
-        throw "File not opened!";
+        throw Exception("File not opened!");
       }
 
       ifs.seekg(0, std::ios::end);
@@ -25,7 +25,7 @@ namespace jnif {
 
       ifs.seekg(0, std::ios::beg);
       if (!ifs.read((char *) buffer, fileSize)) {
-        throw "File not opened!";
+        throw Exception("File not opened!");
       }
 
       parser::ClassFileParser::parse(buffer, fileSize, this);
@@ -34,11 +34,6 @@ namespace jnif {
     }
 
     OClassFileStream::OClassFileStream(const char *fileName, ClassFile *classFile) {
-      classFile->computeFrames(nullptr);
-      std::cout << "File size: " << classFile->computeSize() << std::endl;
-      std::cout << "Code size: " << classFile->getMethod("f0")->codeAttr()->codeLen << std::endl;
-      std::cout << "Max stack: " << classFile->getMethod("f0")->codeAttr()->maxStack << std::endl;
-      std::cout << "Max locals: " << classFile->getMethod("f0")->codeAttr()->maxLocals << std::endl;
       classFile->write(std::string(fileName));
     }
   } // namespace stream

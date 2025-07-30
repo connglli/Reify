@@ -3,6 +3,7 @@
 //
 
 #include "jnif/jnif.hpp"
+#include "lib/dbgutils.hpp"
 
 namespace jnif {
 
@@ -1663,8 +1664,6 @@ namespace jnif {
         }
       }
 
-      // code->cfg = cfgp;
-
       code->attrs.add(smt);
 
       code->maxStack = maxStack;
@@ -1909,7 +1908,7 @@ namespace jnif {
 
 
     void ClassFile::computeFrames(IClassPath *classPath) {
-      computeSize();
+      computeSize(); // Fix every existing attributes
 
       FrameGenerator fg(*this, classPath);
 
@@ -1919,12 +1918,16 @@ namespace jnif {
         if (code != nullptr) {
           bool hasJsrOrRet = code->instList.hasJsrOrRet();
           if (hasJsrOrRet) {
-            return;
+            throw Exception(
+                "JSR or RET have been deprecated since Java 7; do not use them in your code"
+            );
           }
 
           fg.computeFrames(code, &method);
         }
       }
+
+      computeSize(); // Since we may add new attributes, fix them again
     }
 
   } // namespace model

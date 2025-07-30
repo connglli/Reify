@@ -619,9 +619,6 @@ namespace jnif {
             break;
           case KIND_JUMP: {
             int jumppos = instp->_offset;
-            std::cout << "Ours: " << jumppos << ", Label: " << inst.jump()->label2->label()->offset
-                      << std::endl;
-
             bw.writeu2(inst.jump()->label2->label()->offset - jumppos);
             break;
           }
@@ -758,10 +755,6 @@ namespace jnif {
         bw.writeu4(attr.len);
 
         u4 offset = bw.getOffset();
-
-        //			if (attr.kind == ATTR_UNKNOWN) {
-        //		} else {
-        // BufferWriter bw(pos, attr.len);
 
         switch (attr.kind) {
           case ATTR_SOURCEFILE:

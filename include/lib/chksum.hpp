@@ -52,4 +52,18 @@ private:
   StatelessChecksum() {}
 };
 
+class JavaStatelessChecksum {
+
+public:
+  // Get the name of the Java class for checksum
+  static std::string GetClassName();
+
+  // Get the method name for the checksum computing method
+  static std::string GetComputeName();
+
+private:
+  JavaStatelessChecksum() {}
+};
+
+
 #endif // GRAPHFUZZ_CHKSUM_HPP

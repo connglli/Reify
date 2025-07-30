@@ -68,3 +68,7 @@ std::string StatelessChecksum::GetCheckChksumCode(bool debug) {
   }
   return oss.str();
 }
+
+std::string JavaStatelessChecksum::GetClassName() { return "JChecksum"; }
+
+std::string JavaStatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }

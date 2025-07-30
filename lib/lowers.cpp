@@ -261,7 +261,6 @@ namespace symir {
     switch (v.GetType()) {
       case SymIR::Type::I32:
         method->instList().addVar(jnif::Opcode::iload, locals[v.GetName()]);
-        Log::Get().Out() << "iload #" << locals[v.GetName()] << std::endl;
         break;
       default:
         Panic("Unsupported variable type");
@@ -275,7 +274,6 @@ namespace symir {
         const auto value = std::stoi(c.GetValue());
         const auto index = clazz->addInteger(value);
         method->instList().addLdc(jnif::Opcode::ldc, index);
-        Log::Get().Out() << "ldc " << value << std::endl;
         break;
       }
       default:
@@ -293,27 +291,21 @@ namespace symir {
         switch (t.GetOp()) {
           case Term::Op::OP_CST:
             method->instList().addZero(jnif::Opcode::nop);
-            Log::Get().Out() << "nop" << std::endl;
             break;
           case Term::Op::OP_ADD:
             method->instList().addZero(jnif::Opcode::iadd);
-            Log::Get().Out() << "iadd" << std::endl;
             break;
           case Term::Op::OP_SUB:
             method->instList().addZero(jnif::Opcode::isub);
-            Log::Get().Out() << "isub" << std::endl;
             break;
           case Term::Op::OP_MUL:
             method->instList().addZero(jnif::Opcode::imul);
-            Log::Get().Out() << "imul" << std::endl;
             break;
           case Term::Op::OP_DIV:
             method->instList().addZero(jnif::Opcode::idiv);
-            Log::Get().Out() << "idiv" << std::endl;
             break;
           case Term::Op::OP_REM:
             method->instList().addZero(jnif::Opcode::irem);
-            Log::Get().Out() << "irem" << std::endl;
             break;
           default:
             Panic("Unsupported term type %s", Term::GetOpName(t.GetOp()).c_str());
@@ -338,11 +330,9 @@ namespace symir {
       switch (e.GetOp()) {
         case Expr::Op::OP_ADD:
           method->instList().addZero(jnif::Opcode::iadd);
-          Log::Get().Out() << "iadd" << std::endl;
           break;
         case Expr::Op::OP_SUB:
           method->instList().addZero(jnif::Opcode::isub);
-          Log::Get().Out() << "isub" << std::endl;
           break;
         default:
           Panic("Unsupported expression type %s", Expr::GetOpName(e.GetOp()).c_str());
@@ -365,12 +355,60 @@ namespace symir {
       );
     }
     method->instList().addVar(jnif::Opcode::istore, locals[a.GetVar()->GetName()]);
-    Log::Get().Out() << "istore #" << locals[a.GetVar()->GetName()] << std::endl;
   }
 
   void SymJavaBytecodeLower::Visit(const RetStmt &r) {
-    method->instList().addZero(jnif::Opcode::RETURN);
-    Log::Get().Out() << "return" << std::endl;
+    const auto chksumMethodIndex = clazz->addMethodRef(
+        clazz->addClass(JavaStatelessChecksum::GetClassName().c_str()),
+        JavaStatelessChecksum::GetComputeName().c_str(), "([I)I"
+    );
+
+    const auto &args = r.GetVars();
+    int numArgs = static_cast<int>(args.size());
+    method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(numArgs));
+    // See https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-6.html#jvms-6.5.newarray
+    method->instList().addNewArray(10); // 10 for int. TODO: Generalize
+    // Fill the array with the variables that we need to return
+    for (int i = 0; i < numArgs; i++) {
+      const auto &a = args[i];
+      if (a->GetType() != SymIR::Type::I32) {
+        Panic("Unsupported return variable type %s", SymIR::GetTypeName(a->GetType()).c_str());
+      }
+      method->instList().addZero(
+          jnif::Opcode::dup
+      ); // Duplicate the array to avoid frequent load-store and save a local
+      switch (i) {
+        case 0:
+          method->instList().addZero(jnif::Opcode::iconst_0);
+          break;
+        case 1:
+          method->instList().addZero(jnif::Opcode::iconst_1);
+          break;
+        case 2:
+          method->instList().addZero(jnif::Opcode::iconst_2);
+          break;
+        case 3:
+          method->instList().addZero(jnif::Opcode::iconst_3);
+          break;
+        case 4:
+          method->instList().addZero(jnif::Opcode::iconst_4);
+          break;
+        case 5:
+          method->instList().addZero(jnif::Opcode::iconst_5);
+          break;
+        default:
+          method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(i));
+          break;
+      }
+      method->instList().addVar(jnif::Opcode::iload, locals[a->GetName()]);
+      method->instList().addZero(jnif::Opcode::iastore);
+    }
+
+    // Invoke the checksum method with the array of arguments
+    method->instList().addInvoke(jnif::Opcode::invokestatic, chksumMethodIndex);
+
+    // Return the result of the checksum method
+    method->instList().addZero(jnif::Opcode::ireturn);
   }
 
   void SymJavaBytecodeLower::Visit(const Branch &b) {
@@ -379,32 +417,22 @@ namespace symir {
     switch (c.GetOp()) {
       case Cond::Op::OP_GTZ: {
         method->instList().addJump(jnif::Opcode::ifgt, labels[b.GetTrueTarget()]);
-        Log::Get().Out() << "ifgt " << labels[b.GetTrueTarget()] << " (" << b.GetTrueTarget() << ")"
-                         << std::endl;
         break;
       }
       case Cond::OP_LTZ:
         method->instList().addJump(jnif::Opcode::iflt, labels[b.GetTrueTarget()]);
-        Log::Get().Out() << "iflt " << labels[b.GetTrueTarget()] << " (" << b.GetTrueTarget() << ")"
-                         << std::endl;
         break;
       case Cond::OP_EQZ:
         method->instList().addJump(jnif::Opcode::ifeq, labels[b.GetTrueTarget()]);
-        Log::Get().Out() << "ifeq " << labels[b.GetTrueTarget()] << " (" << b.GetTrueTarget() << ")"
-                         << std::endl;
         break;
       default:
         Panic("Unsupported condition for type %s", SymIR::GetTypeName(c.GetType()).c_str());
     }
     method->instList().addJump(jnif::Opcode::GOTO, labels[b.GetFalseTarget()]);
-    Log::Get().Out() << "goto " << labels[b.GetFalseTarget()] << " (" << b.GetFalseTarget() << ")"
-                     << std::endl;
   }
 
   void SymJavaBytecodeLower::Visit(const Goto &g) {
     method->instList().addJump(jnif::Opcode::GOTO, labels[g.GetTarget()]);
-    Log::Get().Out() << "goto " << labels[g.GetTarget()] << " (" << g.GetTarget() << ")"
-                     << std::endl;
   }
 
   void SymJavaBytecodeLower::Visit(const Param &p) {}
@@ -415,21 +443,20 @@ namespace symir {
     }
     l.GetCoef()->Accept(*this);
     method->instList().addVar(jnif::Opcode::istore, locals[l.GetName()]);
-    Log::Get().Out() << "istore #" << locals[l.GetName()] << std::endl;
   }
 
   void SymJavaBytecodeLower::Visit(const Block &b) {
     Assert(method != nullptr, "Method is not set for block visit");
     method->instList().addLabel(labels[b.GetLabel()]);
-    Log::Get().Out() << "<" << labels[b.GetLabel()] << "> (" << b.GetLabel() << ")" << std::endl;
     for (const auto &s: b.GetStmts()) {
       s->Accept(*this);
     }
   }
 
   void SymJavaBytecodeLower::Visit(const Funct &f) {
+    fun = &f;
     const int numParams = static_cast<int>(f.GetParams().size());
-    const std::string methodDesc = "(" + std::string(numParams, 'I') + ")V";
+    const std::string methodDesc = "(" + std::string(numParams, 'I') + ")I";
     method = &clazz->addMethod(
         f.GetName().c_str(), methodDesc.c_str(), jnif::Method::Flags::PUBLIC | jnif::Method::STATIC
     );

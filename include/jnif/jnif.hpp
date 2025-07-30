@@ -2,7 +2,6 @@
 #define JNIF_HPP
 
 
-#include <iostream>
 #include <list>
 #include <map>
 #include <set>
@@ -2614,12 +2613,13 @@ namespace jnif {
 
       /**
        * Computes the size in bytes of this class file of the in-memory
-       * representation.
+       * representation. This may change the attributes of this class file
+       * if they are not correct.
        */
       u4 computeSize();
 
       /**
-       *
+       * Computes the StackMapTable attributes for this class file.
        */
       void computeFrames(IClassPath *classPath);
 

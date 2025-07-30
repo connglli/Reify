@@ -1,4 +1,5 @@
 #include "jnif/jnif.hpp"
+#include "lib/logger.hpp"
 
 namespace jnif {
 
@@ -97,62 +98,62 @@ namespace jnif {
 
       void parse(BufferReader *br, ConstPool *cp) {
         u2 count = br->readu2();
-        std::cout << "Found " << count << " constant pool entries." << std::endl;
+        Log::Get().Out() << "Found " << count << " constant pool entries." << std::endl;
 
         for (int i = 1; i < count; i++) {
           u1 tag = br->readu1();
-          std::cout << "Reading constant pool entry #" << i << ", tag is " << static_cast<u4>(tag)
-                    << " with name ";
+          Log::Get().Out() << "Reading constant pool entry #" << i << ", tag is "
+                           << static_cast<u4>(tag) << " with name ";
 
           switch (tag) {
             case ConstPool::CLASS: {
-              std::cout << "CLASS" << std::endl;
+              Log::Get().Out() << "CLASS" << std::endl;
               u2 classNameIndex = br->readu2();
               cp->addClass(classNameIndex);
               break;
             }
             case ConstPool::FIELDREF: {
-              std::cout << "FIELDREF" << std::endl;
+              Log::Get().Out() << "FIELDREF" << std::endl;
               u2 classIndex = br->readu2();
               u2 nameAndTypeIndex = br->readu2();
               cp->addFieldRef(classIndex, nameAndTypeIndex);
               break;
             }
             case ConstPool::METHODREF: {
-              std::cout << "METHODREF" << std::endl;
+              Log::Get().Out() << "METHODREF" << std::endl;
               u2 classIndex = br->readu2();
               u2 nameAndTypeIndex = br->readu2();
               cp->addMethodRef(classIndex, nameAndTypeIndex);
               break;
             }
             case ConstPool::INTERMETHODREF: {
-              std::cout << "INTERMETHODREF" << std::endl;
+              Log::Get().Out() << "INTERMETHODREF" << std::endl;
               u2 classIndex = br->readu2();
               u2 nameAndTypeIndex = br->readu2();
               cp->addInterMethodRef(classIndex, nameAndTypeIndex);
               break;
             }
             case ConstPool::STRING: {
-              std::cout << "STRING" << std::endl;
+              Log::Get().Out() << "STRING" << std::endl;
               u2 utf8Index = br->readu2();
               cp->addString(utf8Index);
               break;
             }
             case ConstPool::INTEGER: {
-              std::cout << "INTEGER" << std::endl;
+              Log::Get().Out() << "INTEGER" << std::endl;
               u4 value = br->readu4();
               cp->addInteger(value);
               break;
             }
             case ConstPool::FLOAT: {
-              std::cout << "FLOAT" << std::endl;
+              Log::Get().Out() << "FLOAT" << std::endl;
               u4 value = br->readu4();
               float fvalue = *(float *) &value;
               cp->addFloat(fvalue);
               break;
             }
             case ConstPool::LONG: {
-              std::cout << "LONG" << std::endl;
+              Log::Get().Out() << "LONG" << std::endl;
               u4 high = br->readu4();
               u4 low = br->readu4();
               long value = ((long) high << 32) + low;
@@ -161,7 +162,7 @@ namespace jnif {
               break;
             }
             case ConstPool::DOUBLE: {
-              std::cout << "DOUBLE" << std::endl;
+              Log::Get().Out() << "DOUBLE" << std::endl;
               u4 high = br->readu4();
               u4 low = br->readu4();
               long lvalue = ((long) high << 32) + low;
@@ -171,41 +172,41 @@ namespace jnif {
               break;
             }
             case ConstPool::NAMEANDTYPE: {
-              std::cout << "NAMEANDTYPE" << std::endl;
+              Log::Get().Out() << "NAMEANDTYPE" << std::endl;
               u2 nameIndex = br->readu2();
               u2 descIndex = br->readu2();
               cp->addNameAndType(nameIndex, descIndex);
               break;
             }
             case ConstPool::UTF8: {
-              std::cout << "UTF8" << std::endl;
+              Log::Get().Out() << "UTF8" << std::endl;
               u2 len = br->readu2();
               cp->addUtf8((const char *) br->pos(), len);
               br->skip(len);
               break;
             }
             case ConstPool::METHODHANDLE: {
-              std::cout << "METHODHANDLE" << std::endl;
+              Log::Get().Out() << "METHODHANDLE" << std::endl;
               u1 refKind = br->readu1();
               u2 refIndex = br->readu2();
               cp->addMethodHandle(refKind, refIndex);
               break;
             }
             case ConstPool::METHODTYPE: {
-              std::cout << "METHODTYPE" << std::endl;
+              Log::Get().Out() << "METHODTYPE" << std::endl;
               u2 descIndex = br->readu2();
               cp->addMethodType(descIndex);
               break;
             }
             case ConstPool::INVOKEDYNAMIC: {
-              std::cout << "INVOKEDYNAMIC" << std::endl;
+              Log::Get().Out() << "INVOKEDYNAMIC" << std::endl;
               u2 bootMethodAttrIndex = br->readu2();
               u2 nameAndTypeIndex = br->readu2();
               cp->addInvokeDynamic(bootMethodAttrIndex, nameAndTypeIndex);
               break;
             }
             default:
-              std::cout << "UNKNOWN" << std::endl;
+              Log::Get().Out() << "UNKNOWN" << std::endl;
               throw Exception("Error while reading tag: ", tag);
           }
         }
@@ -242,13 +243,13 @@ namespace jnif {
       template<class... TArgs>
       void parse(BufferReader *br, ClassFile *cp, Attrs *as, TArgs... args) {
         u2 attrCount = br->readu2();
-        std::cout << "Found " << attrCount << " attributes." << std::endl;
+        Log::Get().Out() << "Found " << attrCount << " attributes." << std::endl;
 
         for (int i = 0; i < attrCount; i++) {
           u2 nameIndex = br->readu2();
           u4 len = br->readu4();
-          std::cout << "Reading attribute #" << i << ": name=" << cp->getUtf8(nameIndex)
-                    << ", length=" << len << std::endl;
+          Log::Get().Out() << "Reading attribute #" << i << ": name=" << cp->getUtf8(nameIndex)
+                           << ", length=" << len << std::endl;
           const u1 *data = br->pos();
 
           br->skip(len);
@@ -985,11 +986,11 @@ namespace jnif {
 
         ca->maxStack = br->readu2();
         ca->maxLocals = br->readu2();
-        std::cout << "Max stack: " << ca->maxStack << std::endl;
-        std::cout << "Max locals: " << ca->maxLocals << std::endl;
+        Log::Get().Out() << "Max stack: " << ca->maxStack << std::endl;
+        Log::Get().Out() << "Max locals: " << ca->maxLocals << std::endl;
 
         u4 codeLen = br->readu4();
-        std::cout << "Code size (in bytes): " << codeLen << std::endl;
+        Log::Get().Out() << "Code size (in bytes): " << codeLen << std::endl;
 
         JnifError::checks(codeLen > 0, "");
         JnifError::checks(codeLen < (2 << 16), "");
@@ -1002,16 +1003,16 @@ namespace jnif {
         LabelManager labelManager(codeLen, ca->instList);
 
         {
-          std::cout << "Constructing labels in the code ..." << std::endl;
+          Log::Get().Out() << "Constructing labels in the code ..." << std::endl;
           BufferReader br(codeBuf, codeLen);
           parseInstTargets(br, labelManager);
         }
 
-        std::cout << "Reading the exception table ..." << std::endl;
+        Log::Get().Out() << "Reading the exception table ..." << std::endl;
         u2 exceptionTableCount = br->readu2();
-        std::cout << "Found " << exceptionTableCount << " exception entries." << std::endl;
+        Log::Get().Out() << "Found " << exceptionTableCount << " exception entries." << std::endl;
         for (int i = 0; i < exceptionTableCount; i++) {
-          std::cout << "Reading exception entry #" << i << std::endl;
+          Log::Get().Out() << "Reading exception entry #" << i << std::endl;
           u2 startPc = br->readu2();
           u2 endPc = br->readu2();
           u2 handlerPc = br->readu2();
@@ -1029,11 +1030,11 @@ namespace jnif {
           );
         }
 
-        std::cout << "Reading the code's attributes ..." << std::endl;
+        Log::Get().Out() << "Reading the code's attributes ..." << std::endl;
         AttrsParser<TAttrParserList...>().parse(br, cp, &ca->attrs, &labelManager);
 
         {
-          std::cout << "Reading bytecode ..." << std::endl;
+          Log::Get().Out() << "Reading bytecode ..." << std::endl;
           BufferReader br(codeBuf, codeLen);
           parseInstList(br, ca->instList, labelManager);
         }
@@ -1080,6 +1081,8 @@ namespace jnif {
        *
        */
       void parse(BufferReader *br, ClassFile *cf) {
+        Log::Get().Out() << "Reading class file...";
+
         u4 magic = br->readu4();
 
         JnifError::checks(
@@ -1090,9 +1093,10 @@ namespace jnif {
         u2 majorVersion = br->readu2();
 
         cf->version = Version(majorVersion, minorVersion);
-        std::cout << "ClassFile version: " << majorVersion << "." << minorVersion << std::endl;
+        Log::Get().Out() << "ClassFile version: " << majorVersion << "." << minorVersion
+                         << std::endl;
 
-        std::cout << "Reading constant pool..." << std::endl;
+        Log::Get().Out() << "Reading constant pool..." << std::endl;
         TConstPoolParser().parse(br, cf);
 
         cf->accessFlags = br->readu2();
@@ -1100,40 +1104,41 @@ namespace jnif {
         cf->superClassIndex = br->readu2();
 
         u2 interCount = br->readu2();
-        std::cout << "Interfaces count: " << interCount << std::endl;
+        Log::Get().Out() << "Interfaces count: " << interCount << std::endl;
         for (int i = 0; i < interCount; i++) {
           u2 interIndex = br->readu2();
-          std::cout << "Reading " << i << "-th interface, index is " << interIndex << std::endl;
+          Log::Get().Out() << "Reading " << i << "-th interface, index is " << interIndex
+                           << std::endl;
           cf->interfaces.push_back(interIndex);
         }
 
         u2 fieldCount = br->readu2();
-        std::cout << "Fields count: " << fieldCount << std::endl;
+        Log::Get().Out() << "Fields count: " << fieldCount << std::endl;
         for (int i = 0; i < fieldCount; i++) {
           u2 accessFlags = br->readu2();
           u2 nameIndex = br->readu2();
           u2 descIndex = br->readu2();
-          std::cout << "Reading " << i << "-th field: name=" << cf->getUtf8(nameIndex)
-                    << ", type=" << cf->getUtf8(descIndex) << std::endl;
+          Log::Get().Out() << "Reading " << i << "-th field: name=" << cf->getUtf8(nameIndex)
+                           << ", type=" << cf->getUtf8(descIndex) << std::endl;
           Field &f = cf->addField(nameIndex, descIndex, accessFlags);
-          std::cout << "Reading the field's attributes ..." << std::endl;
+          Log::Get().Out() << "Reading the field's attributes ..." << std::endl;
           FieldAttrsParser().parse(br, cf, &f.attrs);
         }
 
         u2 methodCount = br->readu2();
-        std::cout << "Methods count: " << methodCount << std::endl;
+        Log::Get().Out() << "Methods count: " << methodCount << std::endl;
         for (int i = 0; i < methodCount; i++) {
           u2 accessFlags = br->readu2();
           u2 nameIndex = br->readu2();
           u2 descIndex = br->readu2();
-          std::cout << "Reading " << i << "-th method: name=" << cf->getUtf8(nameIndex)
-                    << ", type=" << cf->getUtf8(descIndex) << std::endl;
+          Log::Get().Out() << "Reading " << i << "-th method: name=" << cf->getUtf8(nameIndex)
+                           << ", type=" << cf->getUtf8(descIndex) << std::endl;
           Method &m = cf->addMethod(nameIndex, descIndex, accessFlags);
-          std::cout << "Reading the method's attributes ..." << std::endl;
+          Log::Get().Out() << "Reading the method's attributes ..." << std::endl;
           MethodAttrsParser().parse(br, cf, &m.attrs);
         }
 
-        std::cout << "Reading class attributes ..." << std::endl;
+        Log::Get().Out() << "Reading class attributes ..." << std::endl;
         ClassAttrsParser().parse(br, cf, &cf->attrs);
       }
     };
