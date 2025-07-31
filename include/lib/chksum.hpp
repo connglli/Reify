@@ -58,8 +58,17 @@ public:
   // Get the name of the Java class for checksum
   static std::string GetClassName();
 
+  // Get the method name for checking the checksum method
+  static std::string GetCheckChksumName();
+
+  // Get the method description (signature) for checking the checksum method
+  static std::string GetCheckChksumDesc();
+
   // Get the method name for the checksum computing method
   static std::string GetComputeName();
+
+  // Get the method description (signature)  for the checksum computing method
+  static std::string GetComputeDesc();
 
 private:
   JavaStatelessChecksum() {}

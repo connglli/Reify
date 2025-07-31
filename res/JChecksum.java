@@ -28,7 +28,7 @@ public class JChecksum {
 
   public static class ChecksumNotEqualsException extends RuntimeException {
     public ChecksumNotEqualsException(int expected, int actual) {
-      super("Checksum not equals, expected " + expected + ", actual" + actual + ". ");
+      super("Checksum not equals, expected " + expected + ", actual " + actual + ". ");
     }
   }
 
@@ -49,8 +49,8 @@ public class JChecksum {
     return long_to_int(crc32.getValue());
   }
 
-  public static void check(int expected, int actual) {
-    if (expected != actual) {
+  public static void check(int expected, int actual, int debug) {
+    if (debug == 1 && (expected != actual)) {
       throw new ChecksumNotEqualsException(expected, actual);
     }
   }

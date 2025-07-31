@@ -358,16 +358,17 @@ namespace symir {
   }
 
   void SymJavaBytecodeLower::Visit(const RetStmt &r) {
+    const auto chksumClassIndex = clazz->putClass(JavaStatelessChecksum::GetClassName().c_str());
     const auto chksumMethodIndex = clazz->addMethodRef(
-        clazz->addClass(JavaStatelessChecksum::GetClassName().c_str()),
-        JavaStatelessChecksum::GetComputeName().c_str(), "([I)I"
+        chksumClassIndex, JavaStatelessChecksum::GetComputeName().c_str(),
+        JavaStatelessChecksum::GetComputeDesc().c_str()
     );
 
     const auto &args = r.GetVars();
     int numArgs = static_cast<int>(args.size());
     method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(numArgs));
     // See https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-6.html#jvms-6.5.newarray
-    method->instList().addNewArray(10); // 10 for int. TODO: Generalize
+    method->instList().addNewArray(jnif::model::NewArrayInst::NewArrayType::NEWARRAYTYPE_INT);
     // Fill the array with the variables that we need to return
     for (int i = 0; i < numArgs; i++) {
       const auto &a = args[i];

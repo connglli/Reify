@@ -1,7 +1,6 @@
 #ifndef JNIF_HPP
 #define JNIF_HPP
 
-
 #include <list>
 #include <map>
 #include <set>
@@ -873,213 +872,282 @@ namespace jnif {
      * http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html
      * http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-7.html
      */
+    // clang-format off
+//   opc,  identifier,      name,            kind,            deprecated
+#define BYTECODE_TABLE(XX)                                                                          \
+  XX(0x0,  nop,             nop,             ZERO,            false)                               \
+  XX(0x1,  aconst_null,     aconst_null,     ZERO,            false)                               \
+  XX(0x2,  iconst_m1,       iconst_m1,       ZERO,            false)                               \
+  XX(0x3,  iconst_0,        iconst_0,        ZERO,            false)                               \
+  XX(0x4,  iconst_1,        iconst_1,        ZERO,            false)                               \
+  XX(0x5,  iconst_2,        iconst_2,        ZERO,            false)                               \
+  XX(0x6,  iconst_3,        iconst_3,        ZERO,            false)                               \
+  XX(0x7,  iconst_4,        iconst_4,        ZERO,            false)                               \
+  XX(0x8,  iconst_5,        iconst_5,        ZERO,            false)                               \
+  XX(0x9,  lconst_0,        lconst_0,        ZERO,            false)                               \
+  XX(0xa,  lconst_1,        lconst_1,        ZERO,            false)                               \
+  XX(0xb,  fconst_0,        fconst_0,        ZERO,            false)                               \
+  XX(0xc,  fconst_1,        fconst_1,        ZERO,            false)                               \
+  XX(0xd,  fconst_2,        fconst_2,        ZERO,            false)                               \
+  XX(0xe,  dconst_0,        dconst_0,        ZERO,            false)                               \
+  XX(0xf,  dconst_1,        dconst_1,        ZERO,            false)                               \
+  XX(0x10, bipush,          bipush,          BIPUSH,          false)                               \
+  XX(0x11, sipush,          sipush,          SIPUSH,          false)                               \
+  XX(0x12, ldc,             ldc,             LDC,             false)                               \
+  XX(0x13, ldc_w,           ldc_w,           LDC,             false)                               \
+  XX(0x14, ldc2_w,          ldc2_w,          LDC,             false)                               \
+  XX(0x15, iload,           iload,           VAR,             false)                               \
+  XX(0x16, lload,           lload,           VAR,             false)                               \
+  XX(0x17, fload,           fload,           VAR,             false)                               \
+  XX(0x18, dload,           dload,           VAR,             false)                               \
+  XX(0x19, aload,           aload,           VAR,             false)                               \
+  XX(0x1a, iload_0,         iload_0,         ZERO,            false)                               \
+  XX(0x1b, iload_1,         iload_1,         ZERO,            false)                               \
+  XX(0x1c, iload_2,         iload_2,         ZERO,            false)                               \
+  XX(0x1d, iload_3,         iload_3,         ZERO,            false)                               \
+  XX(0x1e, lload_0,         lload_0,         ZERO,            false)                               \
+  XX(0x1f, lload_1,         lload_1,         ZERO,            false)                               \
+  XX(0x20, lload_2,         lload_2,         ZERO,            false)                               \
+  XX(0x21, lload_3,         lload_3,         ZERO,            false)                               \
+  XX(0x22, fload_0,         fload_0,         ZERO,            false)                               \
+  XX(0x23, fload_1,         fload_1,         ZERO,            false)                               \
+  XX(0x24, fload_2,         fload_2,         ZERO,            false)                               \
+  XX(0x25, fload_3,         fload_3,         ZERO,            false)                               \
+  XX(0x26, dload_0,         dload_0,         ZERO,            false)                               \
+  XX(0x27, dload_1,         dload_1,         ZERO,            false)                               \
+  XX(0x28, dload_2,         dload_2,         ZERO,            false)                               \
+  XX(0x29, dload_3,         dload_3,         ZERO,            false)                               \
+  XX(0x2a, aload_0,         aload_0,         ZERO,            false)                               \
+  XX(0x2b, aload_1,         aload_1,         ZERO,            false)                               \
+  XX(0x2c, aload_2,         aload_2,         ZERO,            false)                               \
+  XX(0x2d, aload_3,         aload_3,         ZERO,            false)                               \
+  XX(0x2e, iaload,          iaload,          ZERO,            false)                               \
+  XX(0x2f, laload,          laload,          ZERO,            false)                               \
+  XX(0x30, faload,          faload,          ZERO,            false)                               \
+  XX(0x31, daload,          daload,          ZERO,            false)                               \
+  XX(0x32, aaload,          aaload,          ZERO,            false)                               \
+  XX(0x33, baload,          baload,          ZERO,            false)                               \
+  XX(0x34, caload,          caload,          ZERO,            false)                               \
+  XX(0x35, saload,          saload,          ZERO,            false)                               \
+  XX(0x36, istore,          istore,          VAR,             false)                               \
+  XX(0x37, lstore,          lstore,          VAR,             false)                               \
+  XX(0x38, fstore,          fstore,          VAR,             false)                               \
+  XX(0x39, dstore,          dstore,          VAR,             false)                               \
+  XX(0x3a, astore,          astore,          VAR,             false)                               \
+  XX(0x3b, istore_0,        istore_0,        ZERO,            false)                               \
+  XX(0x3c, istore_1,        istore_1,        ZERO,            false)                               \
+  XX(0x3d, istore_2,        istore_2,        ZERO,            false)                               \
+  XX(0x3e, istore_3,        istore_3,        ZERO,            false)                               \
+  XX(0x3f, lstore_0,        lstore_0,        ZERO,            false)                               \
+  XX(0x40, lstore_1,        lstore_1,        ZERO,            false)                               \
+  XX(0x41, lstore_2,        lstore_2,        ZERO,            false)                               \
+  XX(0x42, lstore_3,        lstore_3,        ZERO,            false)                               \
+  XX(0x43, fstore_0,        fstore_0,        ZERO,            false)                               \
+  XX(0x44, fstore_1,        fstore_1,        ZERO,            false)                               \
+  XX(0x45, fstore_2,        fstore_2,        ZERO,            false)                               \
+  XX(0x46, fstore_3,        fstore_3,        ZERO,            false)                               \
+  XX(0x47, dstore_0,        dstore_0,        ZERO,            false)                               \
+  XX(0x48, dstore_1,        dstore_1,        ZERO,            false)                               \
+  XX(0x49, dstore_2,        dstore_2,        ZERO,            false)                               \
+  XX(0x4a, dstore_3,        dstore_3,        ZERO,            false)                               \
+  XX(0x4b, astore_0,        astore_0,        ZERO,            false)                               \
+  XX(0x4c, astore_1,        astore_1,        ZERO,            false)                               \
+  XX(0x4d, astore_2,        astore_2,        ZERO,            false)                               \
+  XX(0x4e, astore_3,        astore_3,        ZERO,            false)                               \
+  XX(0x4f, iastore,         iastore,         ZERO,            false)                               \
+  XX(0x50, lastore,         lastore,         ZERO,            false)                               \
+  XX(0x51, fastore,         fastore,         ZERO,            false)                               \
+  XX(0x52, dastore,         dastore,         ZERO,            false)                               \
+  XX(0x53, aastore,         aastore,         ZERO,            false)                               \
+  XX(0x54, bastore,         bastore,         ZERO,            false)                               \
+  XX(0x55, castore,         castore,         ZERO,            false)                               \
+  XX(0x56, sastore,         sastore,         ZERO,            false)                               \
+  XX(0x57, pop,             pop,             ZERO,            false)                               \
+  XX(0x58, pop2,            pop2,            ZERO,            false)                               \
+  XX(0x59, dup,             dup,             ZERO,            false)                               \
+  XX(0x5a, dup_x1,          dup_x1,          ZERO,            false)                               \
+  XX(0x5b, dup_x2,          dup_x2,          ZERO,            false)                               \
+  XX(0x5c, dup2,            dup2,            ZERO,            false)                               \
+  XX(0x5d, dup2_x1,         dup2_x1,         ZERO,            false)                               \
+  XX(0x5e, dup2_x2,         dup2_x2,         ZERO,            false)                               \
+  XX(0x5f, swap,            swap,            ZERO,            false)                               \
+  XX(0x60, iadd,            iadd,            ZERO,            false)                               \
+  XX(0x61, ladd,            ladd,            ZERO,            false)                               \
+  XX(0x62, fadd,            fadd,            ZERO,            false)                               \
+  XX(0x63, dadd,            dadd,            ZERO,            false)                               \
+  XX(0x64, isub,            isub,            ZERO,            false)                               \
+  XX(0x65, lsub,            lsub,            ZERO,            false)                               \
+  XX(0x66, fsub,            fsub,            ZERO,            false)                               \
+  XX(0x67, dsub,            dsub,            ZERO,            false)                               \
+  XX(0x68, imul,            imul,            ZERO,            false)                               \
+  XX(0x69, lmul,            lmul,            ZERO,            false)                               \
+  XX(0x6a, fmul,            fmul,            ZERO,            false)                               \
+  XX(0x6b, dmul,            dmul,            ZERO,            false)                               \
+  XX(0x6c, idiv,            idiv,            ZERO,            false)                               \
+  XX(0x6d, ldiv,            ldiv,            ZERO,            false)                               \
+  XX(0x6e, fdiv,            fdiv,            ZERO,            false)                               \
+  XX(0x6f, ddiv,            ddiv,            ZERO,            false)                               \
+  XX(0x70, irem,            irem,            ZERO,            false)                               \
+  XX(0x71, lrem,            lrem,            ZERO,            false)                               \
+  XX(0x72, frem,            frem,            ZERO,            false)                               \
+  XX(0x73, drem,            drem,            ZERO,            false)                               \
+  XX(0x74, ineg,            ineg,            ZERO,            false)                               \
+  XX(0x75, lneg,            lneg,            ZERO,            false)                               \
+  XX(0x76, fneg,            fneg,            ZERO,            false)                               \
+  XX(0x77, dneg,            dneg,            ZERO,            false)                               \
+  XX(0x78, ishl,            ishl,            ZERO,            false)                               \
+  XX(0x79, lshl,            lshl,            ZERO,            false)                               \
+  XX(0x7a, ishr,            ishr,            ZERO,            false)                               \
+  XX(0x7b, lshr,            lshr,            ZERO,            false)                               \
+  XX(0x7c, iushr,           iushr,           ZERO,            false)                               \
+  XX(0x7d, lushr,           lushr,           ZERO,            false)                               \
+  XX(0x7e, iand,            iand,            ZERO,            false)                               \
+  XX(0x7f, land,            land,            ZERO,            false)                               \
+  XX(0x80, ior,             ior,             ZERO,            false)                               \
+  XX(0x81, lor,             lor,             ZERO,            false)                               \
+  XX(0x82, ixor,            ixor,            ZERO,            false)                               \
+  XX(0x83, lxor,            lxor,            ZERO,            false)                               \
+  XX(0x84, iinc,            iinc,            IINC,            false)                               \
+  XX(0x85, i2l,             i2l,             ZERO,            false)                               \
+  XX(0x86, i2f,             i2f,             ZERO,            false)                               \
+  XX(0x87, i2d,             i2d,             ZERO,            false)                               \
+  XX(0x88, l2i,             l2i,             ZERO,            false)                               \
+  XX(0x89, l2f,             l2f,             ZERO,            false)                               \
+  XX(0x8a, l2d,             l2d,             ZERO,            false)                               \
+  XX(0x8b, f2i,             f2i,             ZERO,            false)                               \
+  XX(0x8c, f2l,             f2l,             ZERO,            false)                               \
+  XX(0x8d, f2d,             f2d,             ZERO,            false)                               \
+  XX(0x8e, d2i,             d2i,             ZERO,            false)                               \
+  XX(0x8f, d2l,             d2l,             ZERO,            false)                               \
+  XX(0x90, d2f,             d2f,             ZERO,            false)                               \
+  XX(0x91, i2b,             i2b,             ZERO,            false)                               \
+  XX(0x92, i2c,             i2c,             ZERO,            false)                               \
+  XX(0x93, i2s,             i2s,             ZERO,            false)                               \
+  XX(0x94, lcmp,            lcmp,            ZERO,            false)                               \
+  XX(0x95, fcmpl,           fcmpl,           ZERO,            false)                               \
+  XX(0x96, fcmpg,           fcmpg,           ZERO,            false)                               \
+  XX(0x97, dcmpl,           dcmpl,           ZERO,            false)                               \
+  XX(0x98, dcmpg,           dcmpg,           ZERO,            false)                               \
+  XX(0x99, ifeq,            ifeq,            JUMP,            false)                               \
+  XX(0x9a, ifne,            ifne,            JUMP,            false)                               \
+  XX(0x9b, iflt,            iflt,            JUMP,            false)                               \
+  XX(0x9c, ifge,            ifge,            JUMP,            false)                               \
+  XX(0x9d, ifgt,            ifgt,            JUMP,            false)                               \
+  XX(0x9e, ifle,            ifle,            JUMP,            false)                               \
+  XX(0x9f, if_icmpeq,       if_icmpeq,       JUMP,            false)                               \
+  XX(0xa0, if_icmpne,       if_icmpne,       JUMP,            false)                               \
+  XX(0xa1, if_icmplt,       if_icmplt,       JUMP,            false)                               \
+  XX(0xa2, if_icmpge,       if_icmpge,       JUMP,            false)                               \
+  XX(0xa3, if_icmpgt,       if_icmpgt,       JUMP,            false)                               \
+  XX(0xa4, if_icmple,       if_icmple,       JUMP,            false)                               \
+  XX(0xa5, if_acmpeq,       if_acmpeq,       JUMP,            false)                               \
+  XX(0xa6, if_acmpne,       if_acmpne,       JUMP,            false)                               \
+  XX(0xa7, GOTO,            goto,            JUMP,            false)                               \
+  XX(0xa8, jsr,             jsr,             JUMP,            true)                                \
+  XX(0xa9, ret,             ret,             VAR,             true)                                \
+  XX(0xaa, tableswitch,     tableswitch,     TABLESWITCH,     false)                               \
+  XX(0xab, lookupswitch,    lookupswitch,    LOOKUPSWITCH,    false)                               \
+  XX(0xac, ireturn,         ireturn,         ZERO,            false)                               \
+  XX(0xad, lreturn,         lreturn,         ZERO,            false)                               \
+  XX(0xae, freturn,         freturn,         ZERO,            false)                               \
+  XX(0xaf, dreturn,         dreturn,         ZERO,            false)                               \
+  XX(0xb0, areturn,         areturn,         ZERO,            false)                               \
+  XX(0xb1, RETURN,          return,          ZERO,            false)                               \
+  XX(0xb2, getstatic,       getstatic,       FIELD,           false)                               \
+  XX(0xb3, putstatic,       putstatic,       FIELD,           false)                               \
+  XX(0xb4, getfield,        getfield,        FIELD,           false)                               \
+  XX(0xb5, putfield,        putfield,        FIELD,           false)                               \
+  XX(0xb6, invokevirtual,   invokevirtual,   INVOKE,          false)                               \
+  XX(0xb7, invokespecial,   invokespecial,   INVOKE,          false)                               \
+  XX(0xb8, invokestatic,    invokestatic,    INVOKE,          false)                               \
+  XX(0xb9, invokeinterface, invokeinterface, INVOKEINTERFACE, false)                               \
+  XX(0xba, invokedynamic,   invokedynamic,   INVOKEDYNAMIC,   false)                               \
+  XX(0xbb, NEW,             new,             TYPE,            false)                               \
+  XX(0xbc, newarray,        newarray,        NEWARRAY,        false)                               \
+  XX(0xbd, anewarray,       anewarray,       TYPE,            false)                               \
+  XX(0xbe, arraylength,     arraylength,     ZERO,            false)                               \
+  XX(0xbf, athrow,          athrow,          ZERO,            false)                               \
+  XX(0xc0, checkcast,       checkcast,       TYPE,            false)                               \
+  XX(0xc1, instanceof,      instanceof,      TYPE,            false)                               \
+  XX(0xc2, monitorenter,    monitorenter,    ZERO,            false)                               \
+  XX(0xc3, monitorexit,     monitorexit,     ZERO,            false)                               \
+  XX(0xc4, wide,            wide,            ZERO,            false)                               \
+  XX(0xc5, multianewarray,  multianewarray,  MULTIARRAY,      false)                               \
+  XX(0xc6, ifnull,          ifnull,          JUMP,            false)                               \
+  XX(0xc7, ifnonnull,       ifnonnull,       JUMP,            false)                               \
+  XX(0xc8, goto_w,          goto_w,          NOTIMPLEMENTED,  false)                               \
+  XX(0xc9, jsr_w,           jsr_w,           NOTIMPLEMENTED,  true)                                \
+  XX(0xca, breakpoint,      breakpoint,      RESERVED,        false)                               \
+  XX(0xcb, reservedcb,      reservedcb,      RESERVED,        false)                               \
+  XX(0xcc, reservedcc,      reservedcc,      RESERVED,        false)                               \
+  XX(0xcd, reservedcd,      reservedcd,      RESERVED,        false)                               \
+  XX(0xce, reservedce,      reservedce,      RESERVED,        false)                               \
+  XX(0xcf, reservedcf,      reservedcf,      RESERVED,        false)                               \
+  XX(0xd0, reservedd0,      reservedd0,      RESERVED,        false)                               \
+  XX(0xd1, reservedd1,      reservedd1,      RESERVED,        false)                               \
+  XX(0xd2, reservedd2,      reservedd2,      RESERVED,        false)                               \
+  XX(0xd3, reservedd3,      reservedd3,      RESERVED,        false)                               \
+  XX(0xd4, reservedd4,      reservedd4,      RESERVED,        false)                               \
+  XX(0xd5, reservedd5,      reservedd5,      RESERVED,        false)                               \
+  XX(0xd6, reservedd6,      reservedd6,      RESERVED,        false)                               \
+  XX(0xd7, reservedd7,      reservedd7,      RESERVED,        false)                               \
+  XX(0xd8, reservedd8,      reservedd8,      RESERVED,        false)                               \
+  XX(0xd9, reservedd9,      reservedd9,      RESERVED,        false)                               \
+  XX(0xda, reservedda,      reservedda,      RESERVED,        false)                               \
+  XX(0xdb, reserveddb,      reserveddb,      RESERVED,        false)                               \
+  XX(0xdc, reserveddc,      reserveddc,      RESERVED,        false)                               \
+  XX(0xdd, reserveddd,      reserveddd,      RESERVED,        false)                               \
+  XX(0xde, reservedde,      reservedde,      RESERVED,        false)                               \
+  XX(0xdf, reserveddf,      reserveddf,      RESERVED,        false)                               \
+  XX(0xe0, reservede0,      reservede0,      RESERVED,        false)                               \
+  XX(0xe1, reservede1,      reservede1,      RESERVED,        false)                               \
+  XX(0xe2, reservede2,      reservede2,      RESERVED,        false)                               \
+  XX(0xe3, reservede3,      reservede3,      RESERVED,        false)                               \
+  XX(0xe4, reservede4,      reservede4,      RESERVED,        false)                               \
+  XX(0xe5, reservede5,      reservede5,      RESERVED,        false)                               \
+  XX(0xe6, reservede6,      reservede6,      RESERVED,        false)                               \
+  XX(0xe7, reservede7,      reservede7,      RESERVED,        false)                               \
+  XX(0xe8, reservede8,      reservede8,      RESERVED,        false)                               \
+  XX(0xe9, reservede9,      reservede9,      RESERVED,        false)                               \
+  XX(0xea, reservedea,      reservedea,      RESERVED,        false)                               \
+  XX(0xeb, reservedeb,      reservedeb,      RESERVED,        false)                               \
+  XX(0xec, reservedec,      reservedec,      RESERVED,        false)                               \
+  XX(0xed, reserveded,      reserveded,      RESERVED,        false)                               \
+  XX(0xee, reservedee,      reservedee,      RESERVED,        false)                               \
+  XX(0xef, reservedef,      reservedef,      RESERVED,        false)                               \
+  XX(0xf0, reservedf0,      reservedf0,      RESERVED,        false)                               \
+  XX(0xf1, reservedf1,      reservedf1,      RESERVED,        false)                               \
+  XX(0xf2, reservedf2,      reservedf2,      RESERVED,        false)                               \
+  XX(0xf3, reservedf3,      reservedf3,      RESERVED,        false)                               \
+  XX(0xf4, reservedf4,      reservedf4,      RESERVED,        false)                               \
+  XX(0xf5, reservedf5,      reservedf5,      RESERVED,        false)                               \
+  XX(0xf6, reservedf6,      reservedf6,      RESERVED,        false)                               \
+  XX(0xf7, reservedf7,      reservedf7,      RESERVED,        false)                               \
+  XX(0xf8, reservedf8,      reservedf8,      RESERVED,        false)                               \
+  XX(0xf9, reservedf9,      reservedf9,      RESERVED,        false)                               \
+  XX(0xfa, reservedfa,      reservedfa,      RESERVED,        false)                               \
+  XX(0xfb, reservedfb,      reservedfb,      RESERVED,        false)                               \
+  XX(0xfc, reservedfc,      reservedfc,      RESERVED,        false)                               \
+  XX(0xfd, reservedfd,      reservedfd,      RESERVED,        false)                               \
+  XX(0xfe, impdep1,         impdep1,         RESERVED,        false)                               \
+  XX(0xff, impdep2,         impdep2,         RESERVED,        false)
+
+    // clang-format on
+
     enum class Opcode {
-      nop = 0x00,
-      aconst_null = 0x01,
-      iconst_m1 = 0x02,
-      iconst_0 = 0x03,
-      iconst_1 = 0x04,
-      iconst_2 = 0x05,
-      iconst_3 = 0x06,
-      iconst_4 = 0x07,
-      iconst_5 = 0x08,
-      lconst_0 = 0x09,
-      lconst_1 = 0x0a,
-      fconst_0 = 0x0b,
-      fconst_1 = 0x0c,
-      fconst_2 = 0x0d,
-      dconst_0 = 0x0e,
-      dconst_1 = 0x0f,
-      bipush = 0x10,
-      sipush = 0x11,
-      ldc = 0x12,
-      ldc_w = 0x13,
-      ldc2_w = 0x14,
-      iload = 0x15,
-      lload = 0x16,
-      fload = 0x17,
-      dload = 0x18,
-      aload = 0x19,
-      iload_0 = 0x1a,
-      iload_1 = 0x1b,
-      iload_2 = 0x1c,
-      iload_3 = 0x1d,
-      lload_0 = 0x1e,
-      lload_1 = 0x1f,
-      lload_2 = 0x20,
-      lload_3 = 0x21,
-      fload_0 = 0x22,
-      fload_1 = 0x23,
-      fload_2 = 0x24,
-      fload_3 = 0x25,
-      dload_0 = 0x26,
-      dload_1 = 0x27,
-      dload_2 = 0x28,
-      dload_3 = 0x29,
-      aload_0 = 0x2a,
-      aload_1 = 0x2b,
-      aload_2 = 0x2c,
-      aload_3 = 0x2d,
-      iaload = 0x2e,
-      laload = 0x2f,
-      faload = 0x30,
-      daload = 0x31,
-      aaload = 0x32,
-      baload = 0x33,
-      caload = 0x34,
-      saload = 0x35,
-      istore = 0x36,
-      lstore = 0x37,
-      fstore = 0x38,
-      dstore = 0x39,
-      astore = 0x3a,
-      istore_0 = 0x3b,
-      istore_1 = 0x3c,
-      istore_2 = 0x3d,
-      istore_3 = 0x3e,
-      lstore_0 = 0x3f,
-      lstore_1 = 0x40,
-      lstore_2 = 0x41,
-      lstore_3 = 0x42,
-      fstore_0 = 0x43,
-      fstore_1 = 0x44,
-      fstore_2 = 0x45,
-      fstore_3 = 0x46,
-      dstore_0 = 0x47,
-      dstore_1 = 0x48,
-      dstore_2 = 0x49,
-      dstore_3 = 0x4a,
-      astore_0 = 0x4b,
-      astore_1 = 0x4c,
-      astore_2 = 0x4d,
-      astore_3 = 0x4e,
-      iastore = 0x4f,
-      lastore = 0x50,
-      fastore = 0x51,
-      dastore = 0x52,
-      aastore = 0x53,
-      bastore = 0x54,
-      castore = 0x55,
-      sastore = 0x56,
-      pop = 0x57,
-      pop2 = 0x58,
-      dup = 0x59,
-      dup_x1 = 0x5a,
-      dup_x2 = 0x5b,
-      dup2 = 0x5c,
-      dup2_x1 = 0x5d,
-      dup2_x2 = 0x5e,
-      swap = 0x5f,
-      iadd = 0x60,
-      ladd = 0x61,
-      fadd = 0x62,
-      dadd = 0x63,
-      isub = 0x64,
-      lsub = 0x65,
-      fsub = 0x66,
-      dsub = 0x67,
-      imul = 0x68,
-      lmul = 0x69,
-      fmul = 0x6a,
-      dmul = 0x6b,
-      idiv = 0x6c,
-      ldiv = 0x6d,
-      fdiv = 0x6e,
-      ddiv = 0x6f,
-      irem = 0x70,
-      lrem = 0x71,
-      frem = 0x72,
-      drem = 0x73,
-      ineg = 0x74,
-      lneg = 0x75,
-      fneg = 0x76,
-      dneg = 0x77,
-      ishl = 0x78,
-      lshl = 0x79,
-      ishr = 0x7a,
-      lshr = 0x7b,
-      iushr = 0x7c,
-      lushr = 0x7d,
-      iand = 0x7e,
-      land = 0x7f,
-      ior = 0x80,
-      lor = 0x81,
-      ixor = 0x82,
-      lxor = 0x83,
-      iinc = 0x84,
-      i2l = 0x85,
-      i2f = 0x86,
-      i2d = 0x87,
-      l2i = 0x88,
-      l2f = 0x89,
-      l2d = 0x8a,
-      f2i = 0x8b,
-      f2l = 0x8c,
-      f2d = 0x8d,
-      d2i = 0x8e,
-      d2l = 0x8f,
-      d2f = 0x90,
-      i2b = 0x91,
-      i2c = 0x92,
-      i2s = 0x93,
-      lcmp = 0x94,
-      fcmpl = 0x95,
-      fcmpg = 0x96,
-      dcmpl = 0x97,
-      dcmpg = 0x98,
-      ifeq = 0x99,
-      ifne = 0x9a,
-      iflt = 0x9b,
-      ifge = 0x9c,
-      ifgt = 0x9d,
-      ifle = 0x9e,
-      if_icmpeq = 0x9f,
-      if_icmpne = 0xa0,
-      if_icmplt = 0xa1,
-      if_icmpge = 0xa2,
-      if_icmpgt = 0xa3,
-      if_icmple = 0xa4,
-      if_acmpeq = 0xa5,
-      if_acmpne = 0xa6,
-      GOTO = 0xa7,
-      jsr = 0xa8,
-      ret = 0xa9,
-      tableswitch = 0xaa,
-      lookupswitch = 0xab,
-      ireturn = 0xac,
-      lreturn = 0xad,
-      freturn = 0xae,
-      dreturn = 0xaf,
-      areturn = 0xb0,
-      RETURN = 0xb1,
-      getstatic = 0xb2,
-      putstatic = 0xb3,
-      getfield = 0xb4,
-      putfield = 0xb5,
-      invokevirtual = 0xb6,
-      invokespecial = 0xb7,
-      invokestatic = 0xb8,
-      invokeinterface = 0xb9,
-      invokedynamic = 0xba,
-      NEW = 0xbb,
-      newarray = 0xbc,
-      anewarray = 0xbd,
-      arraylength = 0xbe,
-      athrow = 0xbf,
-      checkcast = 0xc0,
-      instanceof = 0xc1,
-      monitorenter = 0xc2,
-      monitorexit = 0xc3,
-      wide = 0xc4,
-      multianewarray = 0xc5,
-      ifnull = 0xc6,
-      ifnonnull = 0xc7,
-      goto_w = 0xc8,
-      jsr_w = 0xc9,
-      breakpoint = 0xca,
-      impdep1 = 0xfe,
-      impdep2 = 0xff
+#define XX(opc, identifier, ...) identifier = opc,
+      BYTECODE_TABLE(XX)
+#undef XX
     };
+
+    static std::string GetOpcodeName(Opcode opcode) {
+      static std::string nameTable[256] = {
+#define XX(a, b, name, ...) #name,
+          BYTECODE_TABLE(XX)
+#undef XX
+      };
+      return nameTable[static_cast<int>(opcode)];
+    }
 
     ostream &operator<<(ostream &os, Opcode opcode);
 
@@ -1109,11 +1177,20 @@ namespace jnif {
       KIND_TYPE,
       KIND_NEWARRAY,
       KIND_MULTIARRAY,
-      KIND_PARSE4TODO,
+      KIND_NOTIMPLEMENTED,
       KIND_RESERVED,
       KIND_LABEL,
       KIND_FRAME
     };
+
+    static OpKind GetOpcodeKind(Opcode opcode) {
+      static OpKind kindTable[256] = {
+#define XX(a, b, c, kind, ...) KIND_##kind,
+          BYTECODE_TABLE(XX)
+#undef XX
+      };
+      return kindTable[static_cast<int>(opcode)];
+    }
 
     /**
      * Represent a bytecode instruction.
@@ -1293,6 +1370,8 @@ namespace jnif {
         return cast<MultiArrayInst>(isMultiArray(), "multiarray");
       }
 
+      virtual std::string toString() const { return GetOpcodeName(opcode); }
+
       set<Inst *> consumes;
       set<Inst *> produces;
       int id = 0;
@@ -1351,6 +1430,8 @@ namespace jnif {
 
     public:
       ZeroInst(Opcode opcode, ConstPool *constPool) : Inst(opcode, KIND_ZERO, constPool) {}
+
+      std::string toString() const override { return GetOpcodeName(opcode); }
     };
 
     /**
@@ -1364,6 +1445,10 @@ namespace jnif {
           Inst(opcode, kind, constPool), value(value) {}
 
       const int value;
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " " + std::to_string(value) + "// real value";
+      }
     };
 
     /**
@@ -1377,6 +1462,10 @@ namespace jnif {
           Inst(opcode, KIND_LDC, constPool), valueIndex(valueIndex) {}
 
       const ConstPool::Index valueIndex;
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(valueIndex) + " // const index";
+      }
     };
 
     /**
@@ -1390,6 +1479,10 @@ namespace jnif {
           Inst(opcode, KIND_VAR, constPool), lvindex(lvindex) {}
 
       const u1 lvindex;
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(lvindex) + " // local index";
+      }
     };
 
     /**
@@ -1404,6 +1497,11 @@ namespace jnif {
 
       const u1 index;
       const u1 value;
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(index) + " " + std::to_string(value) +
+               " // local index and increment value";
+      }
     };
 
     /**
@@ -1430,6 +1528,8 @@ namespace jnif {
 
       const Opcode subOpcode;
 
+      std::string toString() const override { return GetOpcodeName(opcode); }
+
       union {
         struct {
           u2 lvindex;
@@ -1452,6 +1552,10 @@ namespace jnif {
       JumpInst(Opcode opcode, LabelInst *targetLabel, ConstPool *constPool) :
           Inst(opcode, KIND_JUMP, constPool), label2(targetLabel) {}
 
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " " + std::to_string(label2->_offset) + " // target offset";
+      }
+
       const Inst *label2;
     };
 
@@ -1465,6 +1569,10 @@ namespace jnif {
       FieldInst(Opcode opcode, ConstPool::Index fieldRefIndex, ConstPool *constPool) :
           Inst(opcode, KIND_FIELD, constPool), fieldRefIndex(fieldRefIndex) {}
 
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(fieldRefIndex) + " // field index";
+      }
+
       const ConstPool::Index fieldRefIndex;
     };
 
@@ -1477,6 +1585,10 @@ namespace jnif {
     public:
       InvokeInst(Opcode opcode, ConstPool::Index methodRefIndex, ConstPool *constPool) :
           Inst(opcode, KIND_INVOKE, constPool), methodRefIndex(methodRefIndex) {}
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(methodRefIndex) + " // method index";
+      }
 
       const ConstPool::Index methodRefIndex;
     };
@@ -1492,6 +1604,11 @@ namespace jnif {
           Inst(Opcode::invokeinterface, KIND_INVOKEINTERFACE, constPool),
           interMethodRefIndex(interMethodRefIndex), count(count) {}
 
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(interMethodRefIndex) +
+               " // method index";
+      }
+
       const u2 interMethodRefIndex;
       const u1 count;
     };
@@ -1505,6 +1622,10 @@ namespace jnif {
     public:
       InvokeDynamicInst(ConstPool::Index callSite, ConstPool *constPool) :
           Inst(Opcode::invokedynamic, KIND_INVOKEDYNAMIC, constPool), _callSite(callSite) {}
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(_callSite) + " // bootstrap index";
+      }
 
       /**
        * Returns the call site for this invokedynamic instruction.
@@ -1524,6 +1645,10 @@ namespace jnif {
     public:
       TypeInst(Opcode opcode, ConstPool::Index classIndex, ConstPool *constPool) :
           Inst(opcode, KIND_TYPE, constPool), classIndex(classIndex) {}
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(classIndex) + " // class index";
+      }
 
       /**
        * Index in the constant pool of a class entry.
@@ -1555,6 +1680,10 @@ namespace jnif {
       NewArrayInst(Opcode opcode, u1 atype, ConstPool *constPool) :
           Inst(opcode, KIND_NEWARRAY, constPool), atype(atype) {}
 
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " " + std::to_string(atype) + " // element type";
+      }
+
       u1 atype;
     };
 
@@ -1567,6 +1696,11 @@ namespace jnif {
     public:
       MultiArrayInst(Opcode opcode, ConstPool::Index classIndex, u1 dims, ConstPool *constPool) :
           Inst(opcode, KIND_MULTIARRAY, constPool), classIndex(classIndex), dims(dims) {}
+
+      std::string toString() const override {
+        return GetOpcodeName(opcode) + " #" + std::to_string(classIndex) + " " +
+               std::to_string(dims) + " // class index, dims";
+      }
 
       ConstPool::Index classIndex;
       u1 dims;
@@ -1604,6 +1738,21 @@ namespace jnif {
           SwitchInst(Opcode::tableswitch, KIND_TABLESWITCH, constPool), def(def), low(low),
           high(high) {}
 
+      std::string toString() const override {
+        std::ostringstream ss;
+        ss << GetOpcodeName(opcode) + " " + std::to_string(low) + " " + std::to_string(high) +
+                  " // low, high, default: " + std::to_string(def->_offset);
+        if (targets.size() > 0) {
+          ss << ", targets: [ ";
+          for (const auto &target: targets) {
+            ss << target->_offset << " ";
+          }
+          ss << "]";
+        }
+
+        return ss.str();
+      }
+
       Inst *def;
       int low;
       int high;
@@ -1619,6 +1768,21 @@ namespace jnif {
       LookupSwitchInst(LabelInst *def, u4 npairs, ConstPool *constPool) :
           SwitchInst(Opcode::lookupswitch, KIND_LOOKUPSWITCH, constPool), defbyte(def),
           npairs(npairs) {}
+
+      std::string toString() const override {
+        std::ostringstream ss;
+        ss << GetOpcodeName(opcode) + " " + std::to_string(npairs) +
+                  " // npairs, default: " + std::to_string(defbyte->_offset);
+        if (targets.size() > 0) {
+          ss << ", targets: [ ";
+          for (const auto &target: targets) {
+            ss << target->_offset << " ";
+          }
+          ss << "]";
+        }
+
+        return ss.str();
+      }
 
       Inst *defbyte;
       u4 npairs;
@@ -1715,6 +1879,20 @@ namespace jnif {
       Iterator end() const { return Iterator(nullptr, last); }
 
       Inst *getInst(int offset);
+
+      std::string toString(bool offset = false) const {
+        std::ostringstream oss;
+        for (Inst *i: *this) {
+          if (i->isLabel()) {
+            continue;
+          }
+          if (offset) {
+            oss << i->_offset << ": ";
+          }
+          oss << i->toString() << "\n";
+        }
+        return oss.str();
+      }
 
       ClassFile *const constPool;
 

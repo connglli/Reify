@@ -4,6 +4,7 @@
 
 #include "jnif/jnif.hpp"
 #include "lib/dbgutils.hpp"
+#include "lib/logger.hpp"
 
 namespace jnif {
 
@@ -1383,6 +1384,11 @@ namespace jnif {
       JnifError::asserts(how.valid, "how valid");
       // JnifError::asserts(bb.in.valid == bb.out.valid, "in.valid != out.valid");
 
+      Log::Get().Out() << "Computing state for basic block: name=" << bb.name
+                       << ", offset=" << bb.start->_offset << std::endl;
+      Log::Get().Out() << "  IN State (before merge): " << bb.in << ", valid=" << bb.in.valid
+                       << std::endl;
+
       bool change;
       if (!bb.in.valid) {
         bb.in = how;
@@ -1390,6 +1396,9 @@ namespace jnif {
       } else {
         change = join(bb.in, how, classPath, method);
       }
+
+      Log::Get().Out() << "  IN State (after merge): " << bb.in << ", valid=" << bb.in.valid
+                       << ", changed=" << change << std::endl;
 
       if (change) {
         Frame out = bb.in;
@@ -1411,6 +1420,8 @@ namespace jnif {
 
         bb.out = out;
         Frame h = bb.out;
+
+        Log::Get().Out() << "  OUT State: " << bb.out << ", valid=" << bb.out.valid << std::endl;
 
         for (BasicBlock *nid: bb) {
           computeState(*nid, h, instList, cf, code, classPath, method);
@@ -1451,6 +1462,8 @@ namespace jnif {
     }
 
     void computeFrames(CodeAttr *code, Method *method) {
+      Log::Get().Out() << "Computing frames for method: index=" << method
+                       << ", name=" << _cf.getUtf8(method->nameIndex) << std::endl;
       for (auto it = code->attrs.begin(); it != code->attrs.end(); it++) {
         Attr *attr = *it;
         if (attr->kind == ATTR_SMT) {
@@ -1492,6 +1505,7 @@ namespace jnif {
       for (Type t: argsType) {
         initFrame.setVar(&lvindex, t, nullptr);
       }
+      Log::Get().Out() << "Frame INIT: " << initFrame.lva.size() << std::endl;
 
       ControlFlowGraph *cfgp = new ControlFlowGraph(code->instList);
       code->cfg = cfgp;
@@ -1584,9 +1598,23 @@ namespace jnif {
 
         if (bb->start != code->instList.end()) {
           Inst *start = *bb->start;
-          if (start->isLabel() &&
-              (start->label()->isBranchTarget || start->label()->isCatchHandler)) {
+          // FIX: It looks like we need a stack map for every label, not only for branch targets.
+          // if (start->isLabel() &&
+          //     (start->label()->isBranchTarget || start->label()->isCatchHandler)) {
+          if (start->isLabel()) {
+            Log::Get().Out() << "Generating frames for basic block: name=" << bb->name
+                             << ", offset=" << bb->start->label()->offset
+                             << ", isBranchTarget=" << start->label()->isBranchTarget
+                             << ", isCatchHandler=" << start->label()->isCatchHandler << std::endl;
+
             Frame &current = bb->in;
+
+            // The current from is not valid. It might be dead code
+            // that we missed to analyze.
+            if (!current.valid) {
+              Log::Get().Out() << "Invalid frame detected, replacing with Frame INIT." << std::endl;
+              current = initFrame;
+            }
 
             current.cleanTops();
 
@@ -1598,26 +1626,31 @@ namespace jnif {
 
             totalOffset += 1;
             int offsetDelta = start->label()->offset - totalOffset;
+            std::string frameType = "";
 
             int diff;
 
             if (s.isSame(current, *f)) {
               if (offsetDelta <= 63) {
                 e.frameType = offsetDelta;
+                frameType = "same_frame";
               } else {
                 e.frameType = 251;
                 e.same_frame_extended.offset_delta = offsetDelta;
+                frameType = "same_frame_extended";
               }
             } else if (s.isSameLocals1StackItem(current, *f)) {
               if (offsetDelta <= 63) {
                 e.frameType = 64 + offsetDelta;
                 const Type &t = current.stack.front().first;
                 e.sameLocals_1_stack_item_frame.stack.push_back(t);
+                frameType = "same_locals_1_stack_item_frame";
               } else {
                 e.frameType = 247;
                 const Type &t = current.stack.front().first;
                 e.same_locals_1_stack_item_frame_extended.stack.push_back(t);
                 e.same_locals_1_stack_item_frame_extended.offset_delta = offsetDelta;
+                frameType = "same_locals_1_stack_item_frame_extended";
               }
             } else if ((diff = s.isChopAppend(current, *f)) != 0) {
               JnifError::asserts(diff != 0 && diff >= -3 && diff <= 3);
@@ -1636,8 +1669,10 @@ namespace jnif {
                 // e.append_frame.locals.push_back(t);
                 // }
                 // e.append_frame.locals.re
+                frameType = "append_frame";
               } else {
                 e.chop_frame.offset_delta = offsetDelta;
+                frameType = "chop_frame";
               }
             } else {
               e.frameType = 255;
@@ -1655,7 +1690,12 @@ namespace jnif {
                 e.full_frame.stack.push_back(t.first);
                 // e.full_frame.stack.push_front(t);
               }
+
+              frameType = "full_frame";
             }
+
+            Log::Get().Out() << "Frame " << "@" << start->label()->offset << ": type=" << frameType
+                             << ", " << current << std::endl;
 
             totalOffset += offsetDelta;
             smt->entries.push_back(e);

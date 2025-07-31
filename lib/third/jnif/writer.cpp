@@ -554,7 +554,7 @@ namespace jnif {
             sz.writeu2(static_cast<u2>(0));
             sz.writeu1(static_cast<u1>(0));
             break;
-          case KIND_PARSE4TODO:
+          case KIND_NOTIMPLEMENTED:
             throw Exception("not implemetd");
             break;
           case KIND_RESERVED:
@@ -694,7 +694,7 @@ namespace jnif {
             bw.writeu2(inst.multiarray()->classIndex);
             bw.writeu1(inst.multiarray()->dims);
             break;
-          case KIND_PARSE4TODO:
+          case KIND_NOTIMPLEMENTED:
             throw Exception("not implemetd");
             break;
           case KIND_RESERVED:

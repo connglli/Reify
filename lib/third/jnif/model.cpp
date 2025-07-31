@@ -3,6 +3,7 @@
 //
 
 #include "jnif/jnif.hpp"
+#include "lib/logger.hpp"
 
 namespace jnif {
 
@@ -557,6 +558,12 @@ namespace jnif {
           (first == nullptr) == (_size == 0), "Invalid head/tail/size: head: ", first,
           ", tail: ", last, ", size: ", _size
       );
+
+      if (pos == nullptr) {
+        Log::Get().Out() << "Appending bytecode: " << inst->toString() << std::endl;
+      } else {
+        Log::Get().Out() << "Inserting bytecode: " << inst->toString() << std::endl;
+      }
 
       Inst *p;
       Inst *n;

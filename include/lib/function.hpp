@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "jnif/jnif.hpp"
 #include "lib/ctrlflow.hpp"
 #include "lib/dbgutils.hpp"
 #include "lib/lang.hpp"
@@ -81,11 +82,16 @@ public:
   // Sample an execution of the function.
   std::vector<int> SampleExec(int execStep, bool consistent);
 
-  // Generate the function code of the function for a given execution
-  std::string GenerateFunCode(const UBFreeExec &exec) const;
+  // Generate the C code of the function for a given execution
+  [[nodiscard]] std::string GenerateFunCode(const UBFreeExec &exec) const;
 
-  // Generate the main code of the function for a given execution
-  std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false) const;
+  // Generate the C main() code of the function for a given execution
+  [[nodiscard]] std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false) const;
+
+  // Generate the Java code of the function for a given execution with or without main()
+  [[nodiscard]] std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
+      const std::string &className, const UBFreeExec &exec, bool main = false, bool debug = false
+  ) const;
 
   // Generate the map of initialisation-finalisation for a given execution
   static std::string GenerateMappingCode(const UBFreeExec &exec);

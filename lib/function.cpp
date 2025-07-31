@@ -257,18 +257,149 @@ private:
   int curBblId = -1;
 };
 
-// Generate the function code of the function for a given execution
+/// A SymIR to Java bytecode lower with patches like pass counter, etc.
+class PatchedJavaBytecodeLower : public symir::SymJavaBytecodeLower {
+public:
+  explicit PatchedJavaBytecodeLower(const std::string &className, const UBFreeExec &exec) :
+      SymJavaBytecodeLower(className), exec(exec),
+      pcBbl(
+          exec.NeedPassCounter()
+              ? exec.GetFun().GetFun()->GetBlocks()[exec.GetPassCounterBbl()]->GetLabel()
+              : ""
+      ),
+      pcVal(exec.GetPassCounter()),
+      entryBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetEntryBblId()]->GetLabel()),
+      exitBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetExitBblId()]->GetLabel()) {}
+
+  void Visit(const symir::Branch &b) override {
+    insertPassCounterJump(b);
+    SymJavaBytecodeLower::Visit(b);
+  }
+
+  void Visit(const symir::Goto &g) override {
+    insertPassCounterJump(g);
+    SymJavaBytecodeLower::Visit(g);
+  }
+
+  void Visit(const symir::Block &b) override {
+    curBbl = b.GetLabel();
+    curBblId++;
+    insertPassCounterDefinition();
+    SymJavaBytecodeLower::Visit(b);
+    curBbl = "";
+  }
+
+private:
+  // Insert the pass counter definition at the start of the first basic block
+  void insertPassCounterDefinition() {
+    if (curBbl == entryBbl) {
+      if (pcBbl == "") {
+        // Do nothing
+      } else {
+        locals[NamePassCounter()] = static_cast<int>(locals.size());
+        method->instList().addZero(jnif::Opcode::iconst_0);
+        method->instList().addVar(jnif::Opcode::istore, locals[NamePassCounter()]);
+      }
+    }
+  }
+
+  // Insert a pass counter jump if the current basic block is the one that needs pass counter
+  void insertPassCounterJump(const symir::Target &t) {
+    if (pcBbl == "" || curBbl != pcBbl) {
+      return;
+    }
+    method->instList().addVar(jnif::Opcode::iload, locals[NamePassCounter()]);
+    method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(pcVal));
+    method->instList().addJump(jnif::Opcode::if_icmpge, labels[exitBbl]);
+  }
+
+private:
+  const UBFreeExec &exec;
+  const std::string pcBbl;
+  int pcVal;
+  const std::string entryBbl, exitBbl;
+  std::string curBbl = "";
+  int curBblId = -1;
+};
+
 std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
   Assert(fun != nullptr, "Function is not generated yet!");
   std::ostringstream oss;
   PatchedCLower lower(oss, exec);
-  fun->Accept(lower);
+  lower.Lower(*fun);
   return oss.str();
 }
 
-// Generate the main code of the function for a given execution
-std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const {
+std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
+    const std::string &className, const UBFreeExec &exec, bool main, bool debug
+) const {
   Assert(fun != nullptr, "Function is not generated yet!");
+
+  Log::Get().OpenSection("Function " + fun->GetName() + " => Class " + className);
+
+  PatchedJavaBytecodeLower lower(className, exec);
+  lower.Lower(*fun);
+
+  Log::Get().OpenSection("Bytecode");
+  Log::Get().Out() << lower.GetJavaMethod()->instList().toString(/*offset=*/true);
+  Log::Get().CloseSection();
+
+  Log::Get().CloseSection();
+
+  jnif::ClassFile *clazz = lower.GetJavaClass();
+  if (!main) {
+    return lower.TakeJavaClass();
+  }
+
+  Log::Get().OpenSection("Main Method");
+
+  const auto &initializations = exec.GetInitializations();
+  const auto &finalizations = exec.GetFinalizations();
+  Assert(
+      initializations.size() == finalizations.size(),
+      "Initializations and finalizations must have the same size"
+  );
+
+  const auto &mainMethod = lower.GetJavaMainMethod();
+  const auto &methodRef = lower.GetJavaMethodIndex();
+  const auto checkMethodRef = clazz->addMethodRef(
+      clazz->getIndexOfClass(JavaStatelessChecksum::GetClassName().c_str()),
+      JavaStatelessChecksum::GetCheckChksumName().c_str(),
+      JavaStatelessChecksum::GetCheckChksumDesc().c_str()
+  );
+
+  for (auto i = 0; i < initializations.size(); i++) {
+    const auto &init = initializations[i];
+    const auto &fina = finalizations[i];
+    // TODO: The checksum computation should be using Java as Java and C might be different
+    const auto checksum = StatelessChecksum::Compute(fina);
+    mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(checksum));
+    for (const int &a: init) {
+      mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(a));
+    }
+    mainMethod->instList().addInvoke(jnif::Opcode::invokestatic, methodRef);
+    if (debug) {
+      mainMethod->instList().addZero(jnif::Opcode::iconst_1);
+    } else {
+      mainMethod->instList().addZero(jnif::Opcode::iconst_0);
+    }
+    mainMethod->instList().addInvoke(jnif::Opcode::invokestatic, checkMethodRef);
+  }
+
+  mainMethod->instList().addZero(jnif::Opcode::RETURN);
+
+  clazz->computeFrames(nullptr);
+
+  Log::Get().OpenSection("Bytecode");
+  Log::Get().Out() << mainMethod->instList().toString(/*offset=*/true);
+  Log::Get().CloseSection();
+
+  Log::Get().CloseSection();
+
+  return lower.TakeJavaClass();
+}
+
+std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const {
   const auto &initializations = exec.GetInitializations();
   const auto &finalizations = exec.GetFinalizations();
   Assert(
@@ -299,7 +430,6 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   return main.str();
 }
 
-// Generate the map of initialisation-finalisation for a given execution
 std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) {
   std::ostringstream mapping;
   for (int i = 0; i < exec.GetInitializations().size(); i++) {

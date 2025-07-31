@@ -263,95 +263,6 @@ namespace jnif {
       }
     };
 
-    OpKind OPKIND[256] = {
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_BIPUSH,   KIND_SIPUSH,
-        KIND_LDC,           KIND_LDC,      KIND_LDC,
-        KIND_VAR,           KIND_VAR,      KIND_VAR,
-        KIND_VAR,           KIND_VAR,      KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_VAR,           KIND_VAR,      KIND_VAR,
-        KIND_VAR,           KIND_VAR,      KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_IINC,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_JUMP,          KIND_JUMP,     KIND_JUMP,
-        KIND_JUMP,          KIND_JUMP,     KIND_JUMP,
-        KIND_JUMP,          KIND_JUMP,     KIND_JUMP,
-        KIND_JUMP,          KIND_JUMP,     KIND_JUMP,
-        KIND_JUMP,          KIND_JUMP,     KIND_JUMP,
-        KIND_JUMP,          KIND_VAR,      KIND_TABLESWITCH,
-        KIND_LOOKUPSWITCH,  KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_ZERO,
-        KIND_ZERO,          KIND_FIELD,    KIND_FIELD,
-        KIND_FIELD,         KIND_FIELD,    KIND_INVOKE,
-        KIND_INVOKE,        KIND_INVOKE,   KIND_INVOKEINTERFACE,
-        KIND_INVOKEDYNAMIC, KIND_TYPE,     KIND_NEWARRAY,
-        KIND_TYPE,          KIND_ZERO,     KIND_ZERO,
-        KIND_TYPE,          KIND_TYPE,     KIND_ZERO,
-        KIND_ZERO,          KIND_ZERO,     KIND_MULTIARRAY,
-        KIND_JUMP,          KIND_JUMP,     KIND_PARSE4TODO,
-        KIND_PARSE4TODO,    KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,      KIND_RESERVED, KIND_RESERVED,
-        KIND_RESERVED,
-    };
-
     class LabelManager {
     public:
       LabelManager(u4 codeLen, InstList &instList) :
@@ -693,7 +604,7 @@ namespace jnif {
           int offset = br.offset();
 
           Opcode opcode = (Opcode) br.readu1();
-          OpKind kind = OPKIND[(int) opcode];
+          OpKind kind = GetOpcodeKind(opcode);
 
           switch (kind) {
             case KIND_ZERO:
@@ -814,7 +725,7 @@ namespace jnif {
         labelManager.putLabelIfExists(offset);
 
         Opcode opcode = (Opcode) br.readu1();
-        u1 kind = OPKIND[(int) opcode];
+        u1 kind = GetOpcodeKind(opcode);
 
         // Inst* instp = new Inst(opcode, kind);
         // instp->_offset = offset;
@@ -964,8 +875,8 @@ namespace jnif {
           u1 dims = br.readu1();
 
           return instList.addMultiArray(classIndex, dims);
-        } else if (kind == KIND_PARSE4TODO) {
-          throw Exception("FrParse4__TODO__Instr not implemented");
+        } else if (kind == KIND_NOTIMPLEMENTED) {
+          throw Exception("FrParseNotImplementedInstr not implemented");
         } else if (kind == KIND_RESERVED) {
           throw Exception("FrParseReservedInstr not implemented");
         } else {
