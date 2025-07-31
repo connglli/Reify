@@ -256,6 +256,7 @@ int main(int argc, char **argv) {
   if (javaclass) {
     std::filesystem::create_directories(GetJavaClassesDir(outputDirectory));
     Log::Get().OpenSection("Java Class Generation");
+    // TODO: Copy the checksum classes to the output directory if they are not already there
     auto javaClass = fun.GenerateFunJavaCode(GetJavaClassName(uuid, sno), *exec, mainfun, verbose);
     Log::Get().CloseSection();
     jnif::stream::OClassFileStream ofs(
