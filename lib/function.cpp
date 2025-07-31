@@ -335,7 +335,7 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
 ) const {
   Assert(fun != nullptr, "Function is not generated yet!");
 
-  Log::Get().OpenSection("Function " + fun->GetName() + " => Class " + className);
+  Log::Get().OpenSection("Function to Class");
 
   PatchedJavaBytecodeLower lower(className, exec);
   lower.Lower(*fun);
