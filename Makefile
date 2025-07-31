@@ -100,11 +100,11 @@ $(LIB_OBJ_DIR)/chksum.o: $(LIB_DIR)/chksum.cpp
 lib: $(LIB_OBJ)
 
 $(BIN_DIR)/fgen: $(LIB_OBJ) $(OBJ_DIR)/func_gen.o
-	@mkdir -p $(dirs $@)
+	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 $(BIN_DIR)/pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
-	@mkdir -p $(dirs $@)
+	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
 fgen: $(BIN_DIR)/fgen
