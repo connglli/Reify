@@ -45,7 +45,7 @@
 namespace symir {
   using namespace symir;
 
-  class SymIRLower : public SymIRVisitor {
+  class SymIRLower : protected SymIRVisitor {
   public:
     static std::ostream devNull;
 
@@ -81,6 +81,7 @@ namespace symir {
   public:
     explicit SymSexpLower(std::ostream &out) : SymIRLower(out) {}
 
+  protected:
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
     void Visit(const Term &t) override;
@@ -101,6 +102,7 @@ namespace symir {
   public:
     explicit SymCxLower(std::ostream &out) : SymIRLower(out) {}
 
+  protected:
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
     void Visit(const Term &t) override;
@@ -176,6 +178,7 @@ namespace symir {
       jnif::stream::OClassFileStream s(file.c_str(), clazz.get());
     }
 
+  protected:
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
     void Visit(const Term &t) override;
