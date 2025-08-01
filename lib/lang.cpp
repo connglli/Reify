@@ -190,6 +190,27 @@ namespace symir {
     return blocks.back().get();
   }
 
+  const Block *FunctBuilder::CloseBlockAt(BlockBuilder *builder, const Block *atBlk) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    const std::string &label = builder->GetLabel();
+    const auto it = createdBlocks.find(label);
+    Assert(
+        it != createdBlocks.end(), "Blocks with the same label \"%s\" does not exists",
+        label.c_str()
+    );
+    Assert(atBlk != nullptr, "The given block to insert before cannot be null");
+    const auto atPos =
+        std::ranges::find_if(blocks, [=](const auto &b) { return b.get() == atBlk; });
+    Assert(
+        atPos != blocks.end(), "The given block with label \"%s\" is not part of the function",
+        atBlk->GetLabel().c_str()
+    );
+    blocks.insert(atPos, builder->Build());
+    blockMap[label] = (*(atPos - 1)).get();
+    createdBlocks.erase(it);
+    return (*(atPos - 1)).get();
+  }
+
   std::unique_ptr<Funct> FunctBuilder::Build() {
     Assert(isActive(), "The FunctBuilder is no longer active");
     deactivate();

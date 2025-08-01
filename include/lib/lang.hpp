@@ -1127,8 +1127,11 @@ namespace symir {
     /// Open a basic block to define new statements
     BlockBuilder *OpenBlock(const std::string &label);
 
-    /// Close an existing basic block
+    /// Close an existing basic block and append it into the current end of function.
     const Block *CloseBlock(BlockBuilder *bbl);
+
+    /// Close an existing basic block and insert it before the given block.
+    const Block *CloseBlockAt(BlockBuilder *bbl, const Block *atBlk);
 
     /// Build the function.
     /// After calling this function, the builder is no longer usable.
