@@ -32,6 +32,7 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <stack>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1154,6 +1155,78 @@ namespace symir {
 
     // For managing created basic blocks
     std::map<std::string, std::unique_ptr<BlockBuilder>> createdBlocks{};
+  };
+
+  /// Utility to deep-copy a built function.
+  class FunctCopier : protected SymIRVisitor, SymIRBuilder {
+  public:
+    explicit FunctCopier(const Funct *src) : src(src) {}
+
+    /// Copy the function and return a new Funct object.
+    std::unique_ptr<Funct> Copy();
+
+    /// Copy the function and return a new FunctBuilder object.
+    std::unique_ptr<FunctBuilder> CopyAsBuilder();
+
+  protected:
+    void Visit(const VarUse &v);
+    void Visit(const Coef &c);
+    void Visit(const Term &t);
+    void Visit(const Expr &e);
+    void Visit(const Cond &c);
+    void Visit(const AssStmt &a);
+    void Visit(const RetStmt &r);
+    void Visit(const Branch &b);
+    void Visit(const Goto &g);
+    void Visit(const Param &p);
+    void Visit(const Local &l);
+    void Visit(const Block &b);
+    void Visit(const Funct &f);
+
+  private:
+    void pushCoef(Coef *c) { coefStack.push(c); }
+
+    Coef *popCoef() {
+      Coef *c = coefStack.top();
+      coefStack.pop();
+      return c;
+    }
+
+    void pushTerm(TermID tid) { termStack.push(tid); }
+
+    TermID popTerm() {
+      TermID tid = termStack.top();
+      termStack.pop();
+      return tid;
+    }
+
+    void pushExpr(ExprID eid) { exprStack.push(eid); }
+
+    ExprID popExpr() {
+      ExprID eid = exprStack.top();
+      exprStack.pop();
+      return eid;
+    }
+
+    void pushCond(CondID cid) { condStack.push(cid); }
+
+    CondID popCond() {
+      CondID cid = condStack.top();
+      condStack.pop();
+      return cid;
+    }
+
+  private:
+    // The function being copied/cloned
+    const Funct *src;
+    // The function builder to build the copied function
+    std::unique_ptr<FunctBuilder> builder = nullptr;
+    // The builder for the current block being built
+    BlockBuilder *currentBlock = nullptr;
+    std::stack<Coef *> coefStack{};
+    std::stack<TermID> termStack{};
+    std::stack<ExprID> exprStack{};
+    std::stack<CondID> condStack{};
   };
 } // namespace symir
 

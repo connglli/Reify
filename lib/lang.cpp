@@ -218,4 +218,132 @@ namespace symir {
         name, retType, std::move(params), std::move(locals), std::move(symbols), std::move(blocks)
     );
   }
+
+  std::unique_ptr<Funct> FunctCopier::Copy() {
+    src->Accept(*this);
+    Assert(builder != nullptr, "The FunctCopier failed to create a function builder");
+    auto fun = builder->Build();
+    builder = nullptr;
+    return std::move(fun);
+  }
+
+  std::unique_ptr<FunctBuilder> FunctCopier::CopyAsBuilder() {
+    src->Accept(*this);
+    Assert(builder != nullptr, "The FunctCopier failed to create a function builder");
+    return std::move(builder);
+  }
+
+  void FunctCopier::Visit(const VarUse &v) {
+    Panic("Cannot reach here, VarUse should be handled by its parent");
+  }
+
+  void FunctCopier::Visit(const Coef &c) {
+    if (c.IsSolved()) {
+      pushCoef(builder->SymCoef(c.GetName(), c.GetValue(), c.GetType()));
+    } else {
+      pushCoef(builder->SymCoef(c.GetName(), c.GetType()));
+    }
+  }
+
+  void FunctCopier::Visit(const Term &t) {
+    t.GetCoef()->Accept(*this);
+    const VarDef *var = nullptr;
+    if (t.GetOp() != Term::Op::OP_CST) {
+      const auto name = t.GetVar()->GetName();
+      var = builder->FindVar(name);
+      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+    }
+    pushTerm(currentBlock->SymTerm(t.GetOp(), popCoef(), var));
+  }
+
+  void FunctCopier::Visit(const Expr &e) {
+    const auto &terms = e.GetTerms();
+    std::vector<TermID> termIds;
+    for (const auto &t: terms) {
+      t->Accept(*this);
+      termIds.push_back(popTerm());
+    }
+    pushExpr(currentBlock->SymExpr(e.GetOp(), termIds));
+  }
+
+  void FunctCopier::Visit(const Cond &c) {
+    c.GetExpr()->Accept(*this);
+    auto exprId = popExpr();
+    pushCond(currentBlock->SymCond(c.GetOp(), exprId));
+  }
+
+  void FunctCopier::Visit(const AssStmt &a) {
+    const auto name = a.GetVar()->GetName();
+    const auto var = builder->FindVar(name);
+    Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+    a.GetExpr()->Accept(*this);
+    auto exprId = popExpr();
+    currentBlock->SymAssign(var, exprId);
+  }
+
+  void FunctCopier::Visit(const RetStmt &r) { currentBlock->SymReturn(); }
+
+  void FunctCopier::Visit(const Branch &b) {
+    b.GetCond()->Accept(*this);
+    auto condId = popCond();
+    currentBlock->SymBranch(b.GetTrueTarget(), b.GetFalseTarget(), condId);
+  }
+
+  void FunctCopier::Visit(const Goto &g) { currentBlock->SymGoto(g.GetTarget()); }
+
+  void FunctCopier::Visit(const Param &p) { builder->SymParam(p.GetName(), p.GetType()); }
+
+  void FunctCopier::Visit(const Local &l) {
+    l.GetCoef()->Accept(*this);
+    builder->SymLocal(l.GetName(), popCoef(), l.GetType());
+  }
+
+  void FunctCopier::Visit(const Block &b) {
+    Assert(currentBlock == nullptr, "The FunctCopier already has a current block");
+    currentBlock = builder->OpenBlock(b.GetLabel());
+    for (const auto &s: b.GetStmts()) {
+      s->Accept(*this);
+    }
+    builder->CloseBlock(currentBlock);
+    currentBlock = nullptr;
+  }
+
+  void FunctCopier::Visit(const Funct &f) {
+    Assert(builder == nullptr, "The FunctCopier already has a builder");
+    Assert(currentBlock == nullptr, "The FunctCopier already has a current block");
+    Assert(coefStack.empty(), "The FunctCopier has a non-empty coefficient stack");
+    Assert(termStack.empty(), "The FunctCopier has a non-empty term stack");
+    Assert(exprStack.empty(), "The FunctCopier has a non-empty expression stack");
+    Assert(condStack.empty(), "The FunctCopier has a non-empty condition stack");
+    builder = std::make_unique<FunctBuilder>(f.GetName(), f.GetRetType());
+    for (const auto &p: f.GetParams()) {
+      p->Accept(*this);
+    }
+    for (const auto &l: f.GetLocals()) {
+      l->Accept(*this);
+    }
+    for (const auto &b: f.GetBlocks()) {
+      b->Accept(*this);
+    }
+    Assert(
+        currentBlock == nullptr,
+        "The FunctCopier finished unexpectedly: It still already has a current block"
+    );
+    Assert(
+        coefStack.empty(), "The FunctCopier finished unexpectedly: It still has a non-empty "
+                           "coefficient stack"
+    );
+    Assert(
+        termStack.empty(), "The FunctCopier finished unexpectedly: It still has a non-empty term "
+                           "stack"
+    );
+    Assert(
+        exprStack.empty(), "The FunctCopier finished unexpectedly: It still has a non-empty "
+                           "expression stack"
+    );
+    Assert(
+        condStack.empty(), "The FunctCopier finished unexpectedly: It still has a non-empty "
+                           "condition stack"
+    );
+  }
 } // namespace symir
