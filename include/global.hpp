@@ -269,9 +269,14 @@ private:
 ////////////////////////////////////////////////////////////
 
 #define FUNCTION_NAME_PREFIX "function"
+#define JAVA_CLASS_NAME_PREFIX "Class"
 
 static std::filesystem::path GetFunctionsDir(const std::filesystem::path &output) {
   return output / "functions";
+}
+
+static std::filesystem::path GetJavaClassesDir(const std::filesystem::path &output) {
+  return output / "javaclasses";
 }
 
 static std::filesystem::path GetMappingsDir(const std::filesystem::path &output) {
@@ -290,10 +295,20 @@ static std::string GetFunctionName(const std::string &uuid, const std::string &s
   return std::string(FUNCTION_NAME_PREFIX) + "_" + uuid + "_" + sno;
 }
 
+static std::string GetJavaClassName(const std::string &uuid, const std::string &sno) {
+  return std::string(JAVA_CLASS_NAME_PREFIX) + "_" + uuid + "_" + sno;
+}
+
 static std::filesystem::path GetFunctionPath(
     const std::string &uuid, const std::string &sno, const std::filesystem::path &output
 ) {
   return GetFunctionsDir(output) / (GetFunctionName(uuid, sno) + ".c");
+}
+
+static std::filesystem::path GetJavaClassPath(
+    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
+) {
+  return GetJavaClassesDir(output) / (GetJavaClassName(uuid, sno) + ".class");
 }
 
 static std::string GetMappingNameForFunctionName(const std::string &functionName) {
@@ -306,8 +321,8 @@ static std::filesystem::path GetMappingPath(
   return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
-) {
+static std::filesystem::path
+GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
 }
@@ -343,8 +358,8 @@ static std::filesystem::path GetGenLogPath(
   }
 }
 
-static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
-) {
+static std::filesystem::path
+GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetLoggingsDir(functionPath.parent_path().parent_path()) /
          GetLoggingNameForFunctionName(functionPath.stem());
 }

@@ -57,6 +57,8 @@ int UBFreeExec::Solve(
     Log::Get().OpenSection("UBFreeExec: Iteration " + std::to_string(i));
     if (!solve(withInterestInit, withRandomInit, withInterestCoefs, debug)) {
       std::cout << "WARNING: UNSAT at " << i << "-th initialization" << std::endl;
+      Log::Get().CloseSection();
+      Log::Get().CloseSection();
       return i; // There's no need to report an error to our caller
     }
     Log::Get().CloseSection();

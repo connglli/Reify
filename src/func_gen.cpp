@@ -81,6 +81,7 @@ struct FunGenOpts {
   std::string uuid, sno;
   std::string output;
   bool main;
+  bool javaclass;
   bool verbose;
 
   static FunGenOpts Parse(int argc, char **argv) {
@@ -92,6 +93,7 @@ struct FunGenOpts {
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("J,javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -151,11 +153,19 @@ struct FunGenOpts {
     }
 
     const bool main = args["main"].as<bool>();
+    const bool javaclass = args["javaclass"].as<bool>();
     const bool verbose = args["verbose"].as<bool>();
 
     GlobalOptions::Get().HandleFuncArgs(args);
 
-    return {.uuid = uuid, .sno = sno, .output = output, .main = main, .verbose = verbose};
+    return {
+        .uuid = uuid,
+        .sno = sno,
+        .output = output,
+        .main = main,
+        .javaclass = javaclass,
+        .verbose = verbose
+    };
   }
 };
 
@@ -165,12 +175,14 @@ int main(int argc, char **argv) {
   std::string uuid = cliOpts.uuid;
   std::string sno = cliOpts.sno;
   bool mainfun = cliOpts.main;
+  bool javaclass = cliOpts.javaclass;
   bool verbose = cliOpts.verbose;
 
   std::filesystem::path outputDirectory = cliOpts.output;
   std::filesystem::create_directories(outputDirectory);
   std::filesystem::create_directories(GetFunctionsDir(outputDirectory));
   std::filesystem::create_directories(GetMappingsDir(outputDirectory));
+  std::filesystem::create_directories(GetLoggingsDir(outputDirectory));
 
   funcFilePath = GetFunctionPath(uuid, sno, outputDirectory);
   mapFilePath = GetMappingPath(uuid, sno, outputDirectory);
@@ -238,6 +250,18 @@ int main(int argc, char **argv) {
     programFile << funCode << std::endl;
     programFile << fun.GenerateMainCode(*exec, /*debug=*/verbose) << std::endl;
     programFile.close();
+  }
+
+  // Generate a Java class if necessary
+  if (javaclass) {
+    std::filesystem::create_directories(GetJavaClassesDir(outputDirectory));
+    Log::Get().OpenSection("Java Class Generation");
+    // TODO: Copy the checksum classes to the output directory if they are not already there
+    auto javaClass = fun.GenerateFunJavaCode(GetJavaClassName(uuid, sno), *exec, mainfun, verbose);
+    Log::Get().CloseSection();
+    jnif::stream::OClassFileStream ofs(
+        GetJavaClassPath(uuid, sno, outputDirectory).c_str(), javaClass.get()
+    );
   }
 
   return 0;

@@ -26,8 +26,8 @@
 #ifndef GRAPHFUZZ_LOWERS_H
 #define GRAPHFUZZ_LOWERS_H
 
-#include <ostream>
-
+#include <fstream>
+#include "jnif/jnif.hpp"
 #include "lib/lang.hpp"
 
 #define SYMIR_LOWER_INDENTATION_SIZE 2
@@ -46,12 +46,16 @@ namespace symir {
   using namespace symir;
 
   class SymIRLower : public SymIRVisitor {
+  public:
+    static std::ostream devNull;
 
   public:
     explicit SymIRLower(std::ostream &out) : out(out) {}
 
+    virtual void Lower(const Funct &f) { f.Accept(*this); }
+
   protected:
-    std::string getIndent() const {
+    [[nodiscard]] std::string getIndent() const {
       return std::string(numIndent * SYMIR_LOWER_INDENTATION_SIZE, ' ');
     }
 
@@ -110,6 +114,92 @@ namespace symir {
     void Visit(const Local &l) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
+  };
+
+  /// An "SymIR -> Java Bytecode" lower
+  class SymJavaBytecodeLower : public SymIRLower {
+
+  public:
+    explicit SymJavaBytecodeLower(const std::string &className) :
+        SymIRLower(devNull), clazz(std::make_unique<jnif::ClassFile>(className.c_str())) {}
+
+    [[nodiscard]] jnif::ClassFile *GetJavaClass() const { return clazz.get(); }
+
+    [[nodiscard]] std::unique_ptr<jnif::ClassFile> TakeJavaClass() {
+      Assert(fun != nullptr, "No function has been lowered yet, cannot take the generated class");
+      Assert(
+          method != nullptr, "No functions have been lowered yet, cannot take the generated class"
+      );
+      Assert(clazz != nullptr, "The class has already been taken");
+      return std::move(clazz);
+    }
+
+    void Lower(const Funct &f) override {
+      Assert(fun == nullptr, "There has been a lowered function, cannot lower another function");
+      Assert(method == nullptr, "There has been a lowered function, cannot another function");
+      SymIRLower::Lower(f);
+      clazz->computeFrames(nullptr);
+    }
+
+    [[nodiscard]] jnif::Method *GetJavaMethod() {
+      Assert(fun != nullptr, "No function has been lowered yet, cannot obtain the method");
+      Assert(method != nullptr, "No functions have been lowered yet,, cannot obtain the method");
+      return method;
+    }
+
+    [[nodiscard]] jnif::ConstPool::Index GetJavaMethodIndex() {
+      Assert(fun != nullptr, "No function has been lowered yet, cannot obtain the method index");
+      Assert(
+          method != nullptr, "No functions have been lowered yet,, cannot obtain the method index"
+      );
+      if (methodIndex == jnif::ConstPool::NULLENTRY) {
+        methodIndex = clazz->addMethodRef(
+            clazz->thisClassIndex, clazz->addNameAndType(method->nameIndex, method->descIndex)
+        );
+      }
+      return methodIndex;
+    }
+
+    [[nodiscard]] jnif::Method *GetJavaMainMethod() {
+      Assert(fun != nullptr, "No function has been lowered yet, cannot get the main method");
+      Assert(method != nullptr, "No functions have been lowered yet, cannot get the main method");
+      if (main == nullptr) {
+        main = &clazz->addMethod(
+            "main", "([Ljava/lang/String;)V",
+            jnif::Method::Flags::PUBLIC | jnif::Method::Flags::STATIC
+        );
+      }
+      return main;
+    }
+
+    void Export(const std::string &file) const {
+      jnif::stream::OClassFileStream s(file.c_str(), clazz.get());
+    }
+
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &a) override;
+    void Visit(const RetStmt &r) override;
+    void Visit(const Branch &b) override;
+    void Visit(const Goto &g) override;
+    void Visit(const Param &p) override;
+    void Visit(const Local &l) override;
+    void Visit(const Block &b) override;
+    void Visit(const Funct &f) override;
+
+  protected:
+    std::unique_ptr<jnif::ClassFile> clazz;
+    jnif::Method *main = nullptr;   // The main method of the class
+    jnif::Method *method = nullptr; // The method that we're to generate bytecode for
+    jnif::ConstPool::Index methodIndex =
+        jnif::ConstPool::NULLENTRY;            // The method index in the constant pool
+    const Funct *fun = nullptr;                // The function that we're currently lowering
+    std::map<const std::string, int> locals{}; // Map from variable names to local variable indices
+    std::map<const std::string, jnif::LabelInst *> labels{
+    }; // Map from block labels to bytecode labels
   };
 } // namespace symir
 

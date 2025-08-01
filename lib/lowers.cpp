@@ -25,8 +25,11 @@
 
 #include "lib/lowers.hpp"
 #include "lib/chksum.hpp"
+#include "lib/logger.hpp"
 
 namespace symir {
+  std::ostream SymIRLower::devNull(nullptr);
+
   void SymSexpLower::Visit(const VarUse &v) { out << v.GetName(); }
 
   void SymSexpLower::Visit(const Coef &c) {
@@ -252,5 +255,229 @@ namespace symir {
       decIndent();
     }
     out << "}" << std::endl;
+  }
+
+  void SymJavaBytecodeLower::Visit(const VarUse &v) {
+    switch (v.GetType()) {
+      case SymIR::Type::I32:
+        method->instList().addVar(jnif::Opcode::iload, locals[v.GetName()]);
+        break;
+      default:
+        Panic("Unsupported variable type");
+    }
+  }
+
+  void SymJavaBytecodeLower::Visit(const Coef &c) {
+    Assert(c.IsSolved(), "The coefficient has not been solved, cannot lower to bytecode");
+    switch (c.GetType()) {
+      case SymIR::Type::I32: {
+        const auto value = std::stoi(c.GetValue());
+        const auto index = clazz->addInteger(value);
+        method->instList().addLdc(jnif::Opcode::ldc, index);
+        break;
+      }
+      default:
+        Panic("Unsupported variable type");
+    }
+  }
+
+  void SymJavaBytecodeLower::Visit(const Term &t) {
+    t.GetCoef()->Accept(*this);
+    if (t.GetVar() != nullptr) {
+      t.GetVar()->Accept(*this);
+    }
+    switch (t.GetType()) {
+      case SymIR::Type::I32: {
+        switch (t.GetOp()) {
+          case Term::Op::OP_CST:
+            method->instList().addZero(jnif::Opcode::nop);
+            break;
+          case Term::Op::OP_ADD:
+            method->instList().addZero(jnif::Opcode::iadd);
+            break;
+          case Term::Op::OP_SUB:
+            method->instList().addZero(jnif::Opcode::isub);
+            break;
+          case Term::Op::OP_MUL:
+            method->instList().addZero(jnif::Opcode::imul);
+            break;
+          case Term::Op::OP_DIV:
+            method->instList().addZero(jnif::Opcode::idiv);
+            break;
+          case Term::Op::OP_REM:
+            method->instList().addZero(jnif::Opcode::irem);
+            break;
+          default:
+            Panic("Unsupported term type %s", Term::GetOpName(t.GetOp()).c_str());
+        }
+        break;
+      }
+      default:
+        Panic("Unsupported term for type %s", SymIR::GetTypeName(t.GetType()).c_str());
+    }
+  }
+
+  void SymJavaBytecodeLower::Visit(const Expr &e) {
+    if (e.GetType() != SymIR::I32) {
+      Panic("Unsupported expression for type %s", SymIR::GetTypeName(e.GetType()).c_str());
+    }
+    int numTerms = static_cast<int>(e.GetTerms().size());
+    if (numTerms > 0) {
+      e.GetTerm(0)->Accept(*this);
+    }
+    for (int i = 1; i < numTerms; ++i) {
+      e.GetTerm(i)->Accept(*this);
+      switch (e.GetOp()) {
+        case Expr::Op::OP_ADD:
+          method->instList().addZero(jnif::Opcode::iadd);
+          break;
+        case Expr::Op::OP_SUB:
+          method->instList().addZero(jnif::Opcode::isub);
+          break;
+        default:
+          Panic("Unsupported expression type %s", Expr::GetOpName(e.GetOp()).c_str());
+      }
+    }
+  }
+
+  void SymJavaBytecodeLower::Visit(const Cond &c) {
+    if (c.GetType() != SymIR::I32) {
+      Panic("Unsupported condition for type %s", SymIR::GetTypeName(c.GetType()).c_str());
+    }
+    c.GetExpr()->Accept(*this);
+  }
+
+  void SymJavaBytecodeLower::Visit(const AssStmt &a) {
+    a.GetExpr()->Accept(*this);
+    if (a.GetVar()->GetType() != SymIR::Type::I32) {
+      Panic(
+          "Unsupported assignment for type %s", SymIR::GetTypeName(a.GetVar()->GetType()).c_str()
+      );
+    }
+    method->instList().addVar(jnif::Opcode::istore, locals[a.GetVar()->GetName()]);
+  }
+
+  void SymJavaBytecodeLower::Visit(const RetStmt &r) {
+    const auto chksumClassIndex = clazz->putClass(JavaStatelessChecksum::GetClassName().c_str());
+    const auto chksumMethodIndex = clazz->addMethodRef(
+        chksumClassIndex, JavaStatelessChecksum::GetComputeName().c_str(),
+        JavaStatelessChecksum::GetComputeDesc().c_str()
+    );
+
+    const auto &args = r.GetVars();
+    int numArgs = static_cast<int>(args.size());
+    method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(numArgs));
+    // See https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-6.html#jvms-6.5.newarray
+    method->instList().addNewArray(jnif::model::NewArrayInst::NewArrayType::NEWARRAYTYPE_INT);
+    // Fill the array with the variables that we need to return
+    for (int i = 0; i < numArgs; i++) {
+      const auto &a = args[i];
+      if (a->GetType() != SymIR::Type::I32) {
+        Panic("Unsupported return variable type %s", SymIR::GetTypeName(a->GetType()).c_str());
+      }
+      method->instList().addZero(
+          jnif::Opcode::dup
+      ); // Duplicate the array to avoid frequent load-store and save a local
+      switch (i) {
+        case 0:
+          method->instList().addZero(jnif::Opcode::iconst_0);
+          break;
+        case 1:
+          method->instList().addZero(jnif::Opcode::iconst_1);
+          break;
+        case 2:
+          method->instList().addZero(jnif::Opcode::iconst_2);
+          break;
+        case 3:
+          method->instList().addZero(jnif::Opcode::iconst_3);
+          break;
+        case 4:
+          method->instList().addZero(jnif::Opcode::iconst_4);
+          break;
+        case 5:
+          method->instList().addZero(jnif::Opcode::iconst_5);
+          break;
+        default:
+          method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(i));
+          break;
+      }
+      method->instList().addVar(jnif::Opcode::iload, locals[a->GetName()]);
+      method->instList().addZero(jnif::Opcode::iastore);
+    }
+
+    // Invoke the checksum method with the array of arguments
+    method->instList().addInvoke(jnif::Opcode::invokestatic, chksumMethodIndex);
+
+    // Return the result of the checksum method
+    method->instList().addZero(jnif::Opcode::ireturn);
+  }
+
+  void SymJavaBytecodeLower::Visit(const Branch &b) {
+    b.GetCond()->Accept(*this);
+    const auto &c = *b.GetCond();
+    switch (c.GetOp()) {
+      case Cond::Op::OP_GTZ: {
+        method->instList().addJump(jnif::Opcode::ifgt, labels[b.GetTrueTarget()]);
+        break;
+      }
+      case Cond::OP_LTZ:
+        method->instList().addJump(jnif::Opcode::iflt, labels[b.GetTrueTarget()]);
+        break;
+      case Cond::OP_EQZ:
+        method->instList().addJump(jnif::Opcode::ifeq, labels[b.GetTrueTarget()]);
+        break;
+      default:
+        Panic("Unsupported condition for type %s", SymIR::GetTypeName(c.GetType()).c_str());
+    }
+    method->instList().addJump(jnif::Opcode::GOTO, labels[b.GetFalseTarget()]);
+  }
+
+  void SymJavaBytecodeLower::Visit(const Goto &g) {
+    method->instList().addJump(jnif::Opcode::GOTO, labels[g.GetTarget()]);
+  }
+
+  void SymJavaBytecodeLower::Visit(const Param &p) {}
+
+  void SymJavaBytecodeLower::Visit(const Local &l) {
+    if (l.GetType() != SymIR::Type::I32) {
+      Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
+    }
+    l.GetCoef()->Accept(*this);
+    method->instList().addVar(jnif::Opcode::istore, locals[l.GetName()]);
+  }
+
+  void SymJavaBytecodeLower::Visit(const Block &b) {
+    Assert(method != nullptr, "Method is not set for block visit");
+    method->instList().addLabel(labels[b.GetLabel()]);
+    for (const auto &s: b.GetStmts()) {
+      s->Accept(*this);
+    }
+  }
+
+  void SymJavaBytecodeLower::Visit(const Funct &f) {
+    fun = &f;
+    const int numParams = static_cast<int>(f.GetParams().size());
+    const std::string methodDesc = "(" + std::string(numParams, 'I') + ")I";
+    method = &clazz->addMethod(
+        f.GetName().c_str(), methodDesc.c_str(), jnif::Method::Flags::PUBLIC | jnif::Method::STATIC
+    );
+    for (const auto &p: f.GetParams()) {
+      locals[p->GetName()] = static_cast<int>(locals.size());
+    }
+    for (const auto &l: f.GetLocals()) {
+      locals[l->GetName()] = static_cast<int>(locals.size());
+    }
+    for (const auto &b: f.GetBlocks()) {
+      labels[b->GetLabel()] = method->instList().createLabel();
+    }
+    for (const auto &p: f.GetParams()) {
+      p->Accept(*this);
+    }
+    for (const auto &l: f.GetLocals()) {
+      l->Accept(*this);
+    }
+    for (const auto &b: f.GetBlocks()) {
+      b->Accept(*this);
+    }
   }
 } // namespace symir
