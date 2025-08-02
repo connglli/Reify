@@ -43,6 +43,9 @@ class UBFreeExec;
 /// random contrl flow, variables, and statements
 class FunPlus {
 public:
+  using InitFinaMap = std::pair<std::vector<std::vector<int>>, std::vector<std::vector<int>>>;
+
+public:
   explicit FunPlus(
       std::string name, int numParams, int numBBs, int maxNumLoops, int maxNumBblsPerLoop
   ) :
@@ -98,6 +101,12 @@ public:
 
   // Generate the map of initialisation-finalisation for a given execution
   [[nodiscard]] std::string GenerateMappingCode(const UBFreeExec &exec) const;
+
+  // Parse the S Expression code of a function and return the Funct object
+  [[nodiscard]] static std::unique_ptr<symir::Funct> ParseFunSexpCode(const std::string &funPath);
+
+  // Parse the map of initialisation-finalisation and return them
+  [[nodiscard]] static InitFinaMap ParseMappingCode(const std::string &mapPath);
 
 private:
   // Generate a new basic block with random statements and symbols

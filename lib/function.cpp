@@ -30,6 +30,7 @@
 #include "lib/logger.hpp"
 #include "lib/lowers.hpp"
 #include "lib/naming.hpp"
+#include "lib/parsers.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
@@ -361,4 +362,53 @@ std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
     mapping << std::endl;
   }
   return mapping.str();
+}
+
+std::unique_ptr<symir::Funct> FunPlus::ParseFunSexpCode(const std::string &sexpPath) {
+  Log::Get().Out() << "Parsing S Expression code from: " << sexpPath << std::endl;
+  std::ifstream sifs(sexpPath);
+  std::ostringstream oss;
+  std::string line;
+  while (std::getline(sifs, line)) {
+    oss << line << std::endl;
+  }
+  sifs.close();
+  auto parser = symir::SymSexpParser(oss.str());
+  parser.Parse();
+  return parser.TakeFunct();
+}
+
+FunPlus::InitFinaMap FunPlus::ParseMappingCode(const std::string &mapPath) {
+  std::ostringstream moss;
+  std::ifstream mifs(mapPath);
+  Assert(mifs.is_open(), "Error: failed to open file: %s", mapPath.c_str());
+
+  std::vector<std::vector<int>> initialisations;
+  std::vector<std::vector<int>> finalizations;
+
+  std::string line;
+  while (std::getline(mifs, line)) {
+    std::vector<std::string> iniFin = SplitStr(line, " : ", true);
+    Assert(
+        iniFin.size() == 2,
+        "Invalid mapping line, each line should be in the format of initialisation : finalization"
+    );
+
+    std::vector<std::string> ini = SplitStr(iniFin[0], ",", true);
+    std::vector<std::string> fin = SplitStr(iniFin[1], ",", true);
+    Assert(ini.size() == fin.size(), "The size of initialisation and finalization is different");
+
+    initialisations.emplace_back(ini.size());
+    std::ranges::transform(ini, initialisations.back().begin(), [](const auto &s) -> int {
+      return std::stoi(s);
+    });
+    finalizations.emplace_back(fin.size());
+    std::ranges::transform(fin, finalizations.back().begin(), [](const auto &s) -> int {
+      return std::stoi(s);
+    });
+  }
+
+  mifs.close();
+
+  return InitFinaMap(std::move(initialisations), std::move(finalizations));
 }
