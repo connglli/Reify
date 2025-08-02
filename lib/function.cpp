@@ -180,164 +180,24 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
   Log::Get().CloseSection();
 }
 
-/// A SymIR to Cxx lower with patches like pass counter, reducible loops, etc.
-class PatchedCLower : public symir::SymCxLower {
-public:
-  explicit PatchedCLower(std::ostream &os, const UBFreeExec &exec) :
-      symir::SymCxLower(os), exec(exec),
-      pcBbl(
-          exec.NeedPassCounter()
-              ? exec.GetFun().GetFun()->GetBlocks()[exec.GetPassCounterBbl()]->GetLabel()
-              : ""
-      ),
-      pcVal(exec.GetPassCounter()),
-      entryBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetEntryBblId()]->GetLabel()),
-      exitBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetExitBblId()]->GetLabel()) {}
-
-  void Visit(const symir::Branch &b) override {
-    insertPassCounterJump(b);
-    if (exec.GetFun().GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_LATCH) {
-      decIndent();
-      out << getIndent() << "} while (";
-      b.GetCond()->Accept(*this);
-      out << getIndent() << ");" << std::endl;
-      out << getIndent() << "goto " << b.GetFalseTarget() << ";" << std::endl;
-    } else {
-      SymCxLower::Visit(b);
-    }
-  }
-
-  void Visit(const symir::Goto &g) override {
-    insertPassCounterJump(g);
-    SymCxLower::Visit(g);
-  }
-
-  void Visit(const symir::Block &b) override {
-    curBbl = b.GetLabel();
-    curBblId++;
-    insertPassCounterDefinition();
-    if (exec.GetFun().GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_HEAD) {
-      out << getIndent() << "do {" << std::endl;
-      incIndent();
-    }
-    SymCxLower::Visit(b);
-    curBbl = "";
-  }
-
-private:
-  // Insert the pass counter definition at the start of the first basic block
-  void insertPassCounterDefinition() {
-    if (curBbl == entryBbl) {
-      if (pcBbl == "") {
-        out << getIndent() << "// No pass counter needed" << std::endl;
-      } else {
-        out << getIndent() << "int " << NamePassCounter() << " = 0;" << std::endl;
-      }
-    }
-  }
-
-  // Insert a pass counter jump if the current basic block is the one that needs pass counter
-  void insertPassCounterJump(const symir::Target &t) {
-    if (pcBbl == "" || curBbl != pcBbl) {
-      return;
-    }
-    out << getIndent() << "if((++" << NamePassCounter() << ") >= " << pcVal << ") {" << std::endl;
-    incIndent();
-    out << getIndent() << "goto " << exitBbl << ";" << std::endl;
-    decIndent();
-    out << getIndent() << "}" << std::endl;
-  }
-
-private:
-  const UBFreeExec &exec;
-  const std::string pcBbl;
-  int pcVal;
-  const std::string entryBbl, exitBbl;
-  std::string curBbl = "";
-  int curBblId = -1;
-};
-
-/// A SymIR to Java bytecode lower with patches like pass counter, etc.
-class PatchedJavaBytecodeLower : public symir::SymJavaBytecodeLower {
-public:
-  explicit PatchedJavaBytecodeLower(const std::string &className, const UBFreeExec &exec) :
-      SymJavaBytecodeLower(className), exec(exec),
-      pcBbl(
-          exec.NeedPassCounter()
-              ? exec.GetFun().GetFun()->GetBlocks()[exec.GetPassCounterBbl()]->GetLabel()
-              : ""
-      ),
-      pcVal(exec.GetPassCounter()),
-      entryBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetEntryBblId()]->GetLabel()),
-      exitBbl(exec.GetFun().GetFun()->GetBlocks()[exec.GetFun().GetExitBblId()]->GetLabel()) {}
-
-  void Visit(const symir::Branch &b) override {
-    insertPassCounterJump(b);
-    SymJavaBytecodeLower::Visit(b);
-  }
-
-  void Visit(const symir::Goto &g) override {
-    insertPassCounterJump(g);
-    SymJavaBytecodeLower::Visit(g);
-  }
-
-  void Visit(const symir::Block &b) override {
-    curBbl = b.GetLabel();
-    curBblId++;
-    insertPassCounterDefinition();
-    SymJavaBytecodeLower::Visit(b);
-    curBbl = "";
-  }
-
-private:
-  // Insert the pass counter definition at the start of the first basic block
-  void insertPassCounterDefinition() {
-    if (curBbl == entryBbl) {
-      if (pcBbl == "") {
-        // Do nothing
-      } else {
-        locals[NamePassCounter()] = static_cast<int>(locals.size());
-        method->instList().addZero(jnif::Opcode::iconst_0);
-        method->instList().addVar(jnif::Opcode::istore, locals[NamePassCounter()]);
-      }
-    }
-  }
-
-  // Insert a pass counter jump if the current basic block is the one that needs pass counter
-  void insertPassCounterJump(const symir::Target &t) {
-    if (pcBbl == "" || curBbl != pcBbl) {
-      return;
-    }
-    method->instList().addVar(jnif::Opcode::iload, locals[NamePassCounter()]);
-    method->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(pcVal));
-    method->instList().addJump(jnif::Opcode::if_icmpge, labels[exitBbl]);
-  }
-
-private:
-  const UBFreeExec &exec;
-  const std::string pcBbl;
-  int pcVal;
-  const std::string entryBbl, exitBbl;
-  std::string curBbl = "";
-  int curBblId = -1;
-};
-
-std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
+std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) {
+  const auto *fun = exec.GetFun();
   Assert(fun != nullptr, "Function is not generated yet!");
   std::ostringstream oss;
-  PatchedCLower lower(oss, exec);
-  lower.Lower(*fun);
+  symir::SymCxLower lower(oss);
+  lower.Lower(*exec.GetFun());
   return oss.str();
 }
 
 std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
-    const std::string &className, const UBFreeExec &exec, bool main, bool debug
-) const {
+    const UBFreeExec &exec, const std::string &className, bool main, bool debug
+) {
+  const auto *fun = exec.GetFun();
   Assert(fun != nullptr, "Function is not generated yet!");
 
   Log::Get().OpenSection("Function to Class");
 
-  PatchedJavaBytecodeLower lower(className, exec);
+  symir::SymJavaBytecodeLower lower(className);
   lower.Lower(*fun);
 
   Log::Get().OpenSection("Bytecode");
@@ -399,7 +259,10 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
   return lower.TakeJavaClass();
 }
 
-std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const {
+std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) {
+  const auto *fun = exec.GetFun();
+  Assert(fun != nullptr, "Function is not generated yet!");
+
   const auto &initializations = exec.GetInitializations();
   const auto &finalizations = exec.GetFinalizations();
   Assert(
@@ -416,7 +279,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
     const auto numParams = static_cast<int>(init.size());
     std::ostringstream chk_oss;
     main << "    " << StatelessChecksum::GetCheckChksumName() << "("
-         << StatelessChecksum::Compute(fina) << ", " << name << "(";
+         << StatelessChecksum::Compute(fina) << ", " << fun->GetName() << "(";
     for (auto j = 0; j < numParams; j++) {
       main << init[j];
       if (j < numParams - 1) {

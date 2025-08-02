@@ -83,18 +83,18 @@ public:
   std::vector<int> SampleExec(int execStep, bool consistent);
 
   // Generate the C code of the function for a given execution
-  [[nodiscard]] std::string GenerateFunCode(const UBFreeExec &exec) const;
+  [[nodiscard]] static std::string GenerateFunCode(const UBFreeExec &exec);
 
   // Generate the C main() code of the function for a given execution
-  [[nodiscard]] std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false) const;
+  [[nodiscard]] static std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false);
 
   // Generate the Java code of the function for a given execution with or without main()
-  [[nodiscard]] std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
-      const std::string &className, const UBFreeExec &exec, bool main = false, bool debug = false
-  ) const;
+  [[nodiscard]] static std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
+      const UBFreeExec &exec, const std::string &className, bool main = false, bool debug = false
+  );
 
   // Generate the map of initialisation-finalisation for a given execution
-  static std::string GenerateMappingCode(const UBFreeExec &exec);
+  [[nodiscard]] static std::string GenerateMappingCode(const UBFreeExec &exec);
 
 private:
   // Generate a new basic block with random statements and symbols

@@ -36,14 +36,10 @@
 
 /// SignedOverflow is a visitor that collects constraints to ensure that the
 /// execution of a function is free of Signed Overflow undefined behavior.
-class SignedOverflow : public symir::SymIRVisitor {
+class SignedOverflow : protected symir::SymIRVisitor {
 public:
-  SignedOverflow(symir::Funct &fun, const std::vector<int> &execution) :
-      fun(fun), execution(execution.size()) {
-    std::ranges::transform(execution, this->execution.begin(), [](int idx) {
-      return NameLabel(idx);
-    });
-  }
+  SignedOverflow(const symir::Funct &fun, std::vector<std::string> execution) :
+      fun(fun), execution(std::move(execution)) {}
 
   // Get the collected constraints that ensures the execution to be UB-free over integer arithmetic
   [[nodiscard]] const z3::expr_vector &GetConstraints() const { return constraints; }
@@ -85,6 +81,14 @@ public:
   // Generate constraints to differentiate the initialization of the parameters from the given one
   void MakeInitDifferentFrom(const std::vector<int> &init);
 
+  // Print all constraints to the logger
+  void PrintConstraints() const {
+    for (const auto &c: constraints) {
+      Log::Get().Out() << c << std::endl;
+    }
+  }
+
+protected:
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;
   void Visit(const symir::Term &t) override;
@@ -98,13 +102,6 @@ public:
   void Visit(const symir::Local &l) override;
   void Visit(const symir::Block &b) override;
   void Visit(const symir::Funct &f) override;
-
-  // Print all constraints to the logger
-  void PrintConstraints() const {
-    for (const auto &c: constraints) {
-      Log::Get().Out() << c << std::endl;
-    }
-  }
 
 private:
   // Push an expression to the expression stack
@@ -121,7 +118,7 @@ private:
   void makeCoefsInteresting(const symir::Expr &expr);
 
 private:
-  symir::Funct &fun;                  // The function that we're analyzing
+  const symir::Funct &fun;            // The function that we're analyzing
   std::vector<std::string> execution; // The execution path of the function
 
   z3::context ctx;                  // The context of our constraint collecting

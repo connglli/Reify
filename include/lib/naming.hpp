@@ -28,8 +28,6 @@
 
 #include <string>
 
-static std::string NamePassCounter() { return "pass_counter"; }
-
 static std::string NameLabel(const int block) { return "BB" + std::to_string(block); }
 
 static std::string NameVar(const int index, const int version = -1) {

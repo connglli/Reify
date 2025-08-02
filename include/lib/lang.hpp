@@ -580,6 +580,10 @@ namespace symir {
     explicit Target(ID irId) : Stmt(irId) {}
 
     [[nodiscard]] virtual size_t NumSuccessors() const = 0;
+
+    [[nodiscard]] virtual bool HasTarget(const std::string &label) const = 0;
+
+    virtual void ReplaceTarget(const std::string &from, const std::string &to) = 0;
   };
 
   /// A Branch represents jumping to which targets are controlled by a condition.
@@ -597,6 +601,25 @@ namespace symir {
 
     [[nodiscard]] size_t NumSuccessors() const override { return 2; };
 
+    [[nodiscard]] virtual bool HasTarget(const std::string &label) const {
+      return label == truLab || label == falLab;
+    }
+
+    virtual void ReplaceTarget(const std::string &from, const std::string &to) {
+      if (from != truLab && from != falLab) {
+        Assert(
+            false, "The target label (%s) is not found in the branch targets (true=%s, false=%s)",
+            from.c_str(), truLab.c_str(), falLab.c_str()
+        );
+      }
+      if (from == truLab) {
+        truLab = to;
+      }
+      if (from == falLab) {
+        falLab = to;
+      }
+    }
+
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
@@ -613,6 +636,21 @@ namespace symir {
     [[nodiscard]] const std::string &GetTarget() const { return label; }
 
     [[nodiscard]] size_t NumSuccessors() const override { return 1; };
+
+    [[nodiscard]] virtual bool HasTarget(const std::string &label) const {
+      return label == this->label;
+    }
+
+    virtual void ReplaceTarget(const std::string &from, const std::string &to) {
+      if (from == label) {
+        label = to;
+      } else {
+        Assert(
+            false, "The target label (%s) is not found in the goto target (%s)", from.c_str(),
+            label.c_str()
+        );
+      }
+    }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
@@ -818,6 +856,46 @@ namespace symir {
     }
 
     [[nodiscard]] int NumBlocks() const { return blocks.size(); }
+
+    [[nodiscard]] const VarDef *FindVar(const std::string &name) const {
+      const VarDef *s = FindParam(name);
+      if (s != nullptr) {
+        return s;
+      }
+      return FindLocal(name);
+    }
+
+    [[nodiscard]] const Param *FindParam(const std::string &name) const {
+      if (paramMap.contains(name)) {
+        return paramMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    [[nodiscard]] SymDef *FindSymbol(const std::string &name) const {
+      if (symMap.contains(name)) {
+        return symMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    [[nodiscard]] const Local *FindLocal(const std::string &name) const {
+      if (localMap.contains(name)) {
+        return localMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
+    [[nodiscard]] const Block *FindBlock(const std::string &label) const {
+      if (blockMap.contains(label)) {
+        return blockMap.find(label)->second;
+      } else {
+        return nullptr;
+      }
+    }
 
     [[nodiscard]] std::vector<const Block *> GetBlocks() const {
       std::vector<const Block *> r;

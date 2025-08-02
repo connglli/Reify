@@ -233,9 +233,6 @@ void SignedOverflow::Visit(const symir::Branch &b) {
     constraints.push_back(condExpr);
   } else if (b.GetFalseTarget() == nextBbl) {
     constraints.push_back(!condExpr);
-  } else if (nextBbl == execution.back()) {
-    // This means we have to stop earlier
-    return;
   } else {
     Panic(
         "The branch (true: \"%s\", false: \"%s\") does not have targets called \"%s\"",

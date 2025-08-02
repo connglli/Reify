@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
   }
 
   // Generate our code with respect to the UB-free execution
-  std::string funCode = fun.GenerateFunCode(*exec);
+  std::string funCode = FunPlus::GenerateFunCode(*exec);
   functionFile = std::ofstream(funcFilePath);
   functionFile << funCode << std::endl;
   functionFile.close();
@@ -257,7 +257,8 @@ int main(int argc, char **argv) {
     std::filesystem::create_directories(GetJavaClassesDir(outputDirectory));
     Log::Get().OpenSection("Java Class Generation");
     // TODO: Copy the checksum classes to the output directory if they are not already there
-    auto javaClass = fun.GenerateFunJavaCode(GetJavaClassName(uuid, sno), *exec, mainfun, verbose);
+    auto javaClass =
+        FunPlus::GenerateFunJavaCode(*exec, GetJavaClassName(uuid, sno), mainfun, verbose);
     Log::Get().CloseSection();
     jnif::stream::OClassFileStream ofs(
         GetJavaClassPath(uuid, sno, outputDirectory).c_str(), javaClass.get()

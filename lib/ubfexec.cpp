@@ -25,15 +25,110 @@
 
 #include "lib/ubfexec.hpp"
 
+#include <ranges>
 #include "global.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
+#include "lib/strutils.hpp"
 
-UBFreeExec::UBFreeExec(const FunPlus &fun, std::vector<int> execution) :
-    fun(fun), execution(std::move(execution)), ubSov(nullptr) {
-  fixUnterminatedExecution();
-  ubSov = std::make_unique<SignedOverflow>(*fun.GetFun(), this->execution);
+static const int passCounterBblId =
+    2147483647; // A large number to avoid conflicts with real basic block IDs
+static const std::string passCounterBblLabel = NameLabel(passCounterBblId);
+
+UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
+  // Detect unterminated execution and fix it to terminate
+  const int exitBbl = fun.GetExitBblId();
+  const int stopBbl = execution.back();
+  if (stopBbl == exitBbl) {
+    this->fun = fun.GetFun();
+    this->execution = execution;
+  } else {
+    Log::Get().OpenSection("UBFreeExec: Fixing Unterminated Execution");
+    // Whether we need a pass counter for the execution.
+    // This help ensure we reach the end of a function for unterminated executions.
+    // This means that the stop node is not the end node, probably because we're
+    // going in a cycle, so we need to add a pass counter to the stop node (as
+    // if we're artificially creating an edge to the end node).
+    // Modify the basic block at the end of the sample walk to have pass counter
+    // equal to the number of times that basic block has been visited.
+    int passCounterBbl = stopBbl;
+    int passCounterVal =
+        static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBbl; }));
+
+    Log::Get().Out() << "Adding pass counter to the stop block " << NameLabel(stopBbl) << std::endl;
+    Log::Get().Out() << "The pass counter's block is " << passCounterBblLabel << std::endl;
+    Log::Get().Out() << "The pass counter's value is " << passCounterVal << std::endl;
+
+    // Cooy the function into a builder to modify it
+    auto funBd = symir::FunctCopier(fun.GetFun()).CopyAsBuilder();
+    const auto *stopBlock = funBd->FindBlock(NameLabel(stopBbl));
+    Assert(stopBlock != nullptr, "Stop block %d does not exist in the function", stopBbl);
+    const auto *exitBlock = funBd->FindBlock(NameLabel(exitBbl));
+    Assert(exitBlock != nullptr, "Exit block %d does not exist in the function", exitBbl);
+
+    // Insert a basic block to count and check the pass counter right before the stop block
+    auto passCounterBlockBd = funBd->OpenBlock(passCounterBblLabel);
+    auto passCounter = funBd->SymLocal("passCounterLocal", funBd->SymCoef("zero", "0"));
+    passCounterBlockBd->SymAssign(
+        passCounter, passCounterBlockBd->SymAddExpr(
+                         {passCounterBlockBd->SymMulTerm(funBd->SymCoef("one1", "1"), passCounter),
+                          passCounterBlockBd->SymCstTerm(funBd->SymCoef("one2", "1"), nullptr)}
+                     )
+    );
+    // Jump to the exit block if the pass counter is greater than the value
+    passCounterBlockBd->SymBranch(
+        exitBlock->GetLabel(), stopBlock->GetLabel(),
+        passCounterBlockBd->SymGtzCond(passCounterBlockBd->SymAddExpr(
+            {passCounterBlockBd->SymMulTerm(funBd->SymCoef("one3", "1"), passCounter),
+             passCounterBlockBd->SymCstTerm(
+                 funBd->SymCoef("passCounterValue", std::to_string(-passCounterVal + 1)), nullptr
+             )}
+        ))
+    );
+    funBd->CloseBlockAt(passCounterBlockBd, stopBlock);
+
+    // Updates the targets of the existing basic blocks in the function
+    // If they point to the stop block, redirect them to the pass counter block
+    for (auto *blk: funBd->GetBlocks()) {
+      if (blk->GetLabel() == passCounterBblLabel) {
+        continue; // Skip the pass counter block itself
+      }
+      const auto *target = blk->GetTarget();
+      if (target != nullptr && target->HasTarget(stopBlock->GetLabel())) {
+        // FIXME: This is a workaround for the fact that the target is const.
+        (const_cast<symir::Target *>(target))
+            ->ReplaceTarget(stopBlock->GetLabel(), passCounterBblLabel);
+      }
+    }
+
+    // Build the function with the pass counter block
+    this->fun = funBd->Build().release();
+
+    Log::Get().Out() << "Modifying the sample execution to early stop." << std::endl;
+    Log::Get().Out() << "Before modification: " << JoinInt(execution, "->") << std::endl;
+
+    // Update the execution path to include the pass counter block
+    this->execution = std::vector<int>();
+    for (const auto b: execution) {
+      if (b == stopBbl) {
+        this->execution.push_back(passCounterBblId);
+      }
+      this->execution.push_back(b);
+    }
+    this->execution.pop_back();         // Remove the last element, which is the stop block
+    this->execution.push_back(exitBbl); // Add the exit block at the end to early stop
+
+    Log::Get().Out() << "After modification: " << JoinInt(this->execution, "->") << std::endl;
+
+    this->enabledPassCounter = true;
+    Log::Get().CloseSection();
+  }
+  std::vector<std::string> execByLabels(this->execution.size());
+  std::ranges::transform(this->execution, execByLabels.begin(), [](int idx) {
+    return idx == passCounterBblId ? passCounterBblLabel : NameLabel(idx);
+  });
+  this->ubSov = std::make_unique<SignedOverflow>(*(this->fun), execByLabels);
 }
 
 int UBFreeExec::Solve(
@@ -158,26 +253,8 @@ bool UBFreeExec::solve(
   return true;
 }
 
-void UBFreeExec::fixUnterminatedExecution() {
-  const int exitBbl = fun.GetExitBblId();
-  const int stopBbl = execution.back();
-  if (stopBbl == exitBbl) {
-    return;
-  }
-  // This means that the stop node is not the end node, probably because we're
-  // going in a cycle, so we need to add a pass counter to the stop node (as
-  // if we're artificially creating an edge to the end node).
-  // Modify the basic block at the end of the sample walk to have pass counter
-  // equal to the number of times that basic block has been visited.
-  passCounterBbl = stopBbl;
-  passCounterVal =
-      static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBbl; }));
-  execution.push_back(exitBbl);
-  Log::Get().Out() << "Sample walk has been modified to end at the last basic block." << std::endl;
-}
-
 void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
-  for (auto symbol: fun.GetFun()->GetSymbols()) {
+  for (auto symbol: fun->GetSymbols()) {
     if (symbol->IsSolved()) {
       continue;
     }
@@ -203,8 +280,7 @@ void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
 
 void UBFreeExec::extractInitFromModel(z3::model &model) {
   std::vector<int> init;
-
-  for (auto param: fun.GetFun()->GetParams()) {
+  for (auto param: fun->GetParams()) {
     const auto paramName = param->GetName().c_str();
     z3::expr paramKey = ubSov->CreateVarExpr(param, 0);
     if (model.has_interp(paramKey.decl())) {
@@ -232,7 +308,7 @@ void UBFreeExec::extractInitFromModel(z3::model &model) {
 
 void UBFreeExec::extractFinalFromModel(z3::model &model) {
   std::vector<int> fina;
-  for (auto param: fun.GetFun()->GetParams()) {
+  for (auto param: fun->GetParams()) {
     const auto paramName = param->GetName().c_str();
     z3::expr paramKey = ubSov->CreateVarExpr(param);
     if (model.has_interp(paramKey.decl()), "Parameter %s is not found in model", paramName) {
@@ -270,7 +346,7 @@ void UBFreeExec::insertUBsIntoUnexecutedBbls() {
   const auto rand = Random::Get().Uniform(
       GlobalOptions::Get().LowerCoefBound, GlobalOptions::Get().UpperCoefBound
   );
-  for (const auto &sym: fun.GetFun()->GetSymbols()) {
+  for (const auto &sym: fun->GetSymbols()) {
     if (sym->IsSolved()) {
       continue; // If the symbol is already defined, we don't need to smash it
     }
