@@ -42,6 +42,7 @@ def gen_func(
     sano,
     uuid_val,
     with_main=False,
+    with_sexp=False,
     verbose=False,
     seed=None,
     extra_opts=None,
@@ -52,6 +53,8 @@ def gen_func(
         cmd = [exec]
         if with_main:
             cmd += ["-m"]
+        if with_sexp:
+            cmd += ["-S"]
         if verbose:
             cmd += ["-v"]
         if seed:
@@ -78,7 +81,7 @@ def gen_func(
         return False, None
 
 
-def main(*, output, limit, seed, mainf, check, timeout, extra_opts):
+def main(*, output, limit, seed, sexp, mainf, check, timeout, extra_opts):
     if seed >= 0:
         random.seed(seed)
         next_seed = lambda: random.randint(0, 2147483647)
@@ -89,6 +92,7 @@ def main(*, output, limit, seed, mainf, check, timeout, extra_opts):
         f"UUID={func_uuid}, output={output}, "
         f"limit={limit if limit != 0 else '<INF>'}, "
         f"seed={seed if seed >= 0 else '<RND>'}, "
+        f"sexp={sexp}, main={mainf}, "
         f"check={check}, timeout={timeout}s, "
         f"extra='{extra_opts}'"
     )
@@ -102,6 +106,7 @@ def main(*, output, limit, seed, mainf, check, timeout, extra_opts):
             timeout=timeout,
             verbose=check,
             with_main=mainf,
+            with_sexp=sexp,
             seed=next_seed(),
             extra_opts=extra_opts,
         )
@@ -140,6 +145,12 @@ if __name__ == "__main__":
         help="the seed for generation (negative for truly random)",
     )
     parser.add_argument(
+        "--sexp",
+        action="store_true",
+        default=False,
+        help="enable the generation of the S Expression",
+    )
+    parser.add_argument(
         "--main",
         action="store_true",
         default=False,
@@ -170,6 +181,7 @@ if __name__ == "__main__":
         output=args.output,
         limit=args.limit,
         seed=args.seed,
+        sexp=args.sexp,
         mainf=args.main,
         check=args.check,
         timeout=args.timeout,

@@ -127,16 +127,17 @@ FGEN_FUNS_DIR := $(FGEN_OUT_DIR)/functions
 FGEN_MAPS_DIR := $(FGEN_OUT_DIR)/mappings
 FGEN_LOGS_DIR := $(FGEN_OUT_DIR)/loggings
 FGEN_LIMIT    ?= 1000000
+FGEN_SEXP_OPT := $(if $(FGEN_GEN_SEXP),--sexp,)
 FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
 FGEN_EX_OPTS  := $(if $(FGEN_EX_OPTS),--extra $(FGEN_EX_OPTS),)
 
 gen-func-set: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_EX_OPTS)
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_EX_OPTS)
 
 gen-func-set-check-ubs: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR) $(FGEN_LOGS_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_EX_OPTS) --check
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_EX_OPTS) --check
 
 ## Program Generation
 

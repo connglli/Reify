@@ -81,6 +81,7 @@ struct FunGenOpts {
   std::string uuid, sno;
   std::string output;
   bool main;
+  bool sexpression;
   bool javaclass;
   bool verbose;
 
@@ -93,6 +94,7 @@ struct FunGenOpts {
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("S,sexpression", "Also generate the S Expression of the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
@@ -153,6 +155,7 @@ struct FunGenOpts {
     }
 
     const bool main = args["main"].as<bool>();
+    const bool sexpression = args["sexpression"].as<bool>();
     const bool javaclass = args["unstable-javaclass"].as<bool>();
     const bool verbose = args["verbose"].as<bool>();
 
@@ -163,6 +166,7 @@ struct FunGenOpts {
         .sno = sno,
         .output = output,
         .main = main,
+        .sexpression = sexpression,
         .javaclass = javaclass,
         .verbose = verbose
     };
@@ -175,6 +179,7 @@ int main(int argc, char **argv) {
   std::string uuid = cliOpts.uuid;
   std::string sno = cliOpts.sno;
   bool mainfun = cliOpts.main;
+  bool sexpression = cliOpts.sexpression;
   bool javaclass = cliOpts.javaclass;
   bool verbose = cliOpts.verbose;
 
@@ -182,11 +187,15 @@ int main(int argc, char **argv) {
   std::filesystem::create_directories(outputDirectory);
   std::filesystem::create_directories(GetFunctionsDir(outputDirectory));
   std::filesystem::create_directories(GetMappingsDir(outputDirectory));
-  std::filesystem::create_directories(GetLoggingsDir(outputDirectory));
 
   funcFilePath = GetFunctionPath(uuid, sno, outputDirectory);
   mapFilePath = GetMappingPath(uuid, sno, outputDirectory);
-  Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/!verbose));
+  if (verbose) {
+    std::filesystem::create_directories(GetLoggingsDir(outputDirectory));
+    Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/false));
+  } else {
+    Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/true));
+  }
 
   std::signal(SIGINT, signalHandler);
   std::signal(SIGTERM, signalHandler);
@@ -236,6 +245,15 @@ int main(int argc, char **argv) {
   functionFile = std::ofstream(funcFilePath);
   functionFile << funCode << std::endl;
   functionFile.close();
+
+  // Generate the s-expressions if necessary
+  if (sexpression) {
+    std::string sexpCode = FunPlus::GenerateFunSexpCode(*exec);
+    std::filesystem::create_directories(GetSexpressionsDir(outputDirectory));
+    std::ofstream sexpressionFile = std::ofstream(GetSexpressionPath(uuid, sno, outputDirectory));
+    sexpressionFile << sexpCode << std::endl;
+    sexpressionFile.close();
+  }
 
   // Generate the initialization-finalization mapping
   mappingFile = std::ofstream(mapFilePath);

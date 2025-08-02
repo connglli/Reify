@@ -88,6 +88,9 @@ public:
   // Generate the C main() code of the function for a given execution
   [[nodiscard]] static std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false);
 
+  // Generate the S Expression code of the function for a given execution
+  [[nodiscard]] static std::string GenerateFunSexpCode(const UBFreeExec &exec);
+
   // Generate the Java code of the function for a given execution with or without main()
   [[nodiscard]] static std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
       const UBFreeExec &exec, const std::string &className, bool main = false, bool debug = false

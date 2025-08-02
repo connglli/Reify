@@ -275,6 +275,10 @@ static std::filesystem::path GetFunctionsDir(const std::filesystem::path &output
   return output / "functions";
 }
 
+static std::filesystem::path GetSexpressionsDir(const std::filesystem::path &output) {
+  return output / "sexpressions";
+}
+
 static std::filesystem::path GetJavaClassesDir(const std::filesystem::path &output) {
   return output / "javaclasses";
 }
@@ -303,6 +307,22 @@ static std::filesystem::path GetFunctionPath(
     const std::string &uuid, const std::string &sno, const std::filesystem::path &output
 ) {
   return GetFunctionsDir(output) / (GetFunctionName(uuid, sno) + ".c");
+}
+
+static std::string GetSexpressionNameForFunctionName(const std::string &functionName) {
+  return functionName + ".sexp";
+}
+
+static std::filesystem::path GetSexpressionPath(
+    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
+) {
+  return GetSexpressionsDir(output) / (GetFunctionName(uuid, sno) + ".sexp");
+}
+
+static std::filesystem::path
+GetSexpressionPathForFunctionPath(const std::filesystem::path &functionPath) {
+  return GetSexpressionsDir(functionPath.parent_path().parent_path()) /
+         GetSexpressionNameForFunctionName(functionPath.stem());
 }
 
 static std::filesystem::path GetJavaClassPath(

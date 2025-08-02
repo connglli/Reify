@@ -189,6 +189,15 @@ std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) {
   return oss.str();
 }
 
+std::string FunPlus::GenerateFunSexpCode(const UBFreeExec &exec) {
+  const auto *fun = exec.GetFun();
+  Assert(fun != nullptr, "Function is not generated yet!");
+  std::ostringstream oss;
+  symir::SymSexpLower lower(oss);
+  lower.Lower(*exec.GetFun());
+  return oss.str();
+}
+
 std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
     const UBFreeExec &exec, const std::string &className, bool main, bool debug
 ) {
