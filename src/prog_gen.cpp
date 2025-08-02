@@ -29,7 +29,7 @@
 #include "cxxopts.hpp"
 #include "global.hpp"
 #include "lib/logger.hpp"
-#include "lib/program.hpp"
+#include "lib/progplus.hpp"
 #include "lib/random.hpp"
 
 namespace fs = std::filesystem;
@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Now we construct our new program
-    auto prog = std::make_unique<ProgGen>(progUuid, sampNo, selFunPaths);
+    auto prog = std::make_unique<ProgPlus>(progUuid, sampNo, selFunPaths);
     prog->Generate();
 
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;

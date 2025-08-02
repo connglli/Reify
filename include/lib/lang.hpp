@@ -264,6 +264,47 @@ namespace symir {
       return value.value();
     }
 
+    template<typename T>
+    [[nodiscard]] const T GetTypedValue() const {
+      Assert(IsSolved(), "This coefficient is not yet solved");
+      const auto type = GetType();
+      const auto *typeName = SymIR::GetTypeName(type).c_str();
+      switch (type) {
+        case SymIR::I32:
+          Assert(
+              typeid(T) == typeid(int),
+              "The coefficient \"%s\" is an %s, cannot get its typed value as %d", name.c_str(),
+              typeName, typeid(T).name()
+          );
+          return GetI32Value();
+        default:
+          Panic(
+              "Unsuppported type for coefficient \"%s\": %s, cannot get its typed value",
+              name.c_str(), typeName
+          );
+          break;
+      }
+    }
+
+    [[nodiscard]] const int GetI32Value() const {
+      Assert(IsSolved(), "This coefficient is not yet solved");
+      const auto type = GetType();
+      const auto typeName = SymIR::GetTypeName(type);
+      Assert(
+          type == SymIR::I32,
+          "The coefficient \"%s\" (type=%s) is not an %s, cannot get its value as an %s",
+          name.c_str(), typeName, SymIR::GetTypeName(SymIR::I32).c_str(), "int"
+      );
+      try {
+        return std::stoi(value.value());
+      } catch (const std::invalid_argument &e) {
+        Panic(
+            "Failed to convert the value of the coefficient \"%s\" (type=%s) into an int: %s",
+            name.c_str(), typeName, e.what()
+        );
+      }
+    }
+
     [[nodiscard]] bool IsValueSet() const { return value.has_value(); }
 
     [[nodiscard]] bool IsSolved() const { return IsValueSet(); }

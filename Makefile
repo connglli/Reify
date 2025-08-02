@@ -67,7 +67,7 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 DBGFLAGS := $(if $(DEBUG),-g,)
 OPTFLAGS := $(if $(DEBUG),-O0,-O2)
 
-CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -std=${CXXSTD} ${OPTFLAGS} -I$(INC_DIR)
+CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -std=${CXXSTD} -frtti ${OPTFLAGS} -I$(INC_DIR)
 CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -std=${CSTD} ${OPTFLAGS} -I$(INC_DIR)
 LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread -lz
 
