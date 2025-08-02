@@ -93,7 +93,7 @@ struct FunGenOpts {
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
-      ("J,javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -153,7 +153,7 @@ struct FunGenOpts {
     }
 
     const bool main = args["main"].as<bool>();
-    const bool javaclass = args["javaclass"].as<bool>();
+    const bool javaclass = args["unstable-javaclass"].as<bool>();
     const bool verbose = args["verbose"].as<bool>();
 
     GlobalOptions::Get().HandleFuncArgs(args);
