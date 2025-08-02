@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_DBGUTILS_H
-#define GRAPHFUZZ_DBGUTILS_H
+#ifndef GRAPHFUZZ_DBGUTILS_HPP
+#define GRAPHFUZZ_DBGUTILS_HPP
 
 #include <cassert>
 #include <cstdio>
@@ -43,4 +43,4 @@
 
 #define Panic(fmt, ...) Assert(0, fmt, ##__VA_ARGS__)
 
-#endif // GRAPHFUZZ_DBGUTILS_H
+#endif // GRAPHFUZZ_DBGUTILS_HPP

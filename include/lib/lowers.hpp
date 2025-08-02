@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_LOWERS_H
-#define GRAPHFUZZ_LOWERS_H
+#ifndef GRAPHFUZZ_LOWERS_HPP
+#define GRAPHFUZZ_LOWERS_HPP
 
 #include <fstream>
 #include "jnif/jnif.hpp"
@@ -207,4 +207,4 @@ namespace symir {
 } // namespace symir
 
 
-#endif // GRAPHFUZZ_LOWERS_H
+#endif // GRAPHFUZZ_LOWERS_HPP

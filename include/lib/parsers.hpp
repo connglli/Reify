@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_PARSER_HPP
-#define GRAPHFUZZ_PARSER_HPP
+#ifndef GRAPHFUZZ_PARSERS_HPP
+#define GRAPHFUZZ_PARSERS_HPP
 
 #include <functional>
 #include <iostream>
@@ -239,4 +239,4 @@ namespace symir {
     std::stack<void *> argStack{};                   // The operand/argument stack
   };
 } // namespace symir
-#endif // GRAPHFUZZ_PARSER_HPP
+#endif // GRAPHFUZZ_PARSERS_HPP

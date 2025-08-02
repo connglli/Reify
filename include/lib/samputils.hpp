@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_UTILS_HPP
-#define GRAPHFUZZ_UTILS_HPP
+#ifndef GRAPHFUZZ_SAMPUTILS_HPP
+#define GRAPHFUZZ_SAMPUTILS_HPP
 
 #include <algorithm>
 #include <vector>
@@ -53,4 +53,4 @@ static std::vector<int> SampleKDistinct(int n, int k) {
 }
 
 
-#endif // GRAPHFUZZ_UTILS_HPP
+#endif // GRAPHFUZZ_SAMPUTILS_HPP

@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_PROGRAM_HPP
-#define GRAPHFUZZ_PROGRAM_HPP
+#ifndef GRAPHFUZZ_PROGRAM_OLD_HPP
+#define GRAPHFUZZ_PROGRAM_OLD_HPP
 
 #include <memory>
 #include <vector>
@@ -398,4 +398,4 @@ private:
   std::vector<std::unique_ptr<Function>> functions{};
 };
 
-#endif // GRAPHFUZZ_PROGRAM_HPP
+#endif // GRAPHFUZZ_PROGRAM_OLD_HPP
