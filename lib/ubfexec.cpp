@@ -32,11 +32,12 @@
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
 
-static const int passCounterBblId =
+const int UBFreeExec::PassCounterBblId =
     2147483647; // A large number to avoid conflicts with real basic block IDs
-static const std::string passCounterBblLabel = NameLabel(passCounterBblId);
+const std::string UBFreeExec::PassCounterBblLabel = NameLabel(UBFreeExec::PassCounterBblId);
 
 UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
+  this->owner = &fun;
   // Detect unterminated execution and fix it to terminate
   const int exitBbl = fun.GetExitBblId();
   const int stopBbl = execution.back();
@@ -57,7 +58,7 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
         static_cast<int>(std::ranges::count_if(execution, [=](auto n) { return n == stopBbl; }));
 
     Log::Get().Out() << "Adding pass counter to the stop block " << NameLabel(stopBbl) << std::endl;
-    Log::Get().Out() << "The pass counter's block is " << passCounterBblLabel << std::endl;
+    Log::Get().Out() << "The pass counter's block is " << PassCounterBblLabel << std::endl;
     Log::Get().Out() << "The pass counter's value is " << passCounterVal << std::endl;
 
     // Cooy the function into a builder to modify it
@@ -68,7 +69,7 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
     Assert(exitBlock != nullptr, "Exit block %d does not exist in the function", exitBbl);
 
     // Insert a basic block to count and check the pass counter right before the stop block
-    auto passCounterBlockBd = funBd->OpenBlock(passCounterBblLabel);
+    auto passCounterBlockBd = funBd->OpenBlock(PassCounterBblLabel);
     auto passCounter = funBd->SymLocal("passCounterLocal", funBd->SymCoef("zero", "0"));
     passCounterBlockBd->SymAssign(
         passCounter, passCounterBlockBd->SymAddExpr(
@@ -91,14 +92,14 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
     // Updates the targets of the existing basic blocks in the function
     // If they point to the stop block, redirect them to the pass counter block
     for (auto *blk: funBd->GetBlocks()) {
-      if (blk->GetLabel() == passCounterBblLabel) {
+      if (blk->GetLabel() == PassCounterBblLabel) {
         continue; // Skip the pass counter block itself
       }
       const auto *target = blk->GetTarget();
       if (target != nullptr && target->HasTarget(stopBlock->GetLabel())) {
         // FIXME: This is a workaround for the fact that the target is const.
         (const_cast<symir::Target *>(target))
-            ->ReplaceTarget(stopBlock->GetLabel(), passCounterBblLabel);
+            ->ReplaceTarget(stopBlock->GetLabel(), PassCounterBblLabel);
       }
     }
 
@@ -112,7 +113,7 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
     this->execution = std::vector<int>();
     for (const auto b: execution) {
       if (b == stopBbl) {
-        this->execution.push_back(passCounterBblId);
+        this->execution.push_back(PassCounterBblId);
       }
       this->execution.push_back(b);
     }
@@ -126,7 +127,7 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
   }
   std::vector<std::string> execByLabels(this->execution.size());
   std::ranges::transform(this->execution, execByLabels.begin(), [](int idx) {
-    return idx == passCounterBblId ? passCounterBblLabel : NameLabel(idx);
+    return idx == PassCounterBblId ? PassCounterBblLabel : NameLabel(idx);
   });
   this->ubSov = std::make_unique<SignedOverflow>(*(this->fun), execByLabels);
 }

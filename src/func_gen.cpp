@@ -241,14 +241,14 @@ int main(int argc, char **argv) {
   }
 
   // Generate our code with respect to the UB-free execution
-  std::string funCode = FunPlus::GenerateFunCode(*exec);
+  std::string funCode = fun.GenerateFunCode(*exec);
   functionFile = std::ofstream(funcFilePath);
   functionFile << funCode << std::endl;
   functionFile.close();
 
   // Generate the s-expressions if necessary
   if (sexpression) {
-    std::string sexpCode = FunPlus::GenerateFunSexpCode(*exec);
+    std::string sexpCode = fun.GenerateFunSexpCode(*exec);
     std::filesystem::create_directories(GetSexpressionsDir(outputDirectory));
     std::ofstream sexpressionFile = std::ofstream(GetSexpressionPath(uuid, sno, outputDirectory));
     sexpressionFile << sexpCode << std::endl;
@@ -257,7 +257,7 @@ int main(int argc, char **argv) {
 
   // Generate the initialization-finalization mapping
   mappingFile = std::ofstream(mapFilePath);
-  mappingFile << FunPlus::GenerateMappingCode(*exec);
+  mappingFile << fun.GenerateMappingCode(*exec);
   mappingFile.close();
 
   // Generate an executable program if necessary
@@ -275,8 +275,7 @@ int main(int argc, char **argv) {
     std::filesystem::create_directories(GetJavaClassesDir(outputDirectory));
     Log::Get().OpenSection("Java Class Generation");
     // TODO: Copy the checksum classes to the output directory if they are not already there
-    auto javaClass =
-        FunPlus::GenerateFunJavaCode(*exec, GetJavaClassName(uuid, sno), mainfun, verbose);
+    auto javaClass = fun.GenerateFunJavaCode(*exec, GetJavaClassName(uuid, sno), mainfun, verbose);
     Log::Get().CloseSection();
     jnif::stream::OClassFileStream ofs(
         GetJavaClassPath(uuid, sno, outputDirectory).c_str(), javaClass.get()

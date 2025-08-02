@@ -34,6 +34,10 @@ class FunPlus;
 
 class UBFreeExec {
 public:
+  static const int PassCounterBblId;
+  static const std::string PassCounterBblLabel;
+
+public:
   explicit UBFreeExec(const FunPlus &fun, const std::vector<int> &execution);
 
   ~UBFreeExec() {
@@ -42,7 +46,10 @@ public:
     }
   }
 
-  // Get the function generator
+  // Get the function generator, i.e., owner of this execution
+  [[nodiscard]] const FunPlus *GetOwner() const { return owner; }
+
+  // Get the function that this execution is for (We may modify our owner generated function)
   [[nodiscard]] const symir::Funct *GetFun() const { return fun; }
 
   // Get the execution path of the function
@@ -99,6 +106,7 @@ private:
   void insertUBsIntoUnexecutedBbls();
 
 private:
+  const FunPlus *owner;
   const symir::Funct *fun;
 
   // Execution path of the function
