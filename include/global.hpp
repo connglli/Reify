@@ -63,6 +63,7 @@ struct GlobalOptions {
   bool EnableInterestCoefs = true;
   // If true, we allow all operations in the terms and expressions
   // otherwise we only allow addition for expression and multiplication for terms
+  // When true, the generation process is much harder and thereby might be slower
   bool EnableAllOps = false;
 
   ////////////////////////////////////////////////////////////
@@ -128,6 +129,7 @@ struct GlobalOptions {
       ("Xnum-assigns-per-bbl", "The number of assignment statements in each basic block", cxxopts::value<int>())
       ("Xnum-vars-per-assign", "The number of variables in each assignment statement", cxxopts::value<int>())
       ("Xnum-vars-in-cond", "The number of variables in each conditional statement", cxxopts::value<int>())
+      ("A,Xenable-all-ops", "Enable all operations for terms and expressions (This may make the generation longer and harder)", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xnum-vars-per-fun", "The number of allowed variables for each function", cxxopts::value<int>())
@@ -189,6 +191,8 @@ struct GlobalOptions {
       }
       ensurePositive(NumVarsInCond, "Xnum-vars-in-cond");
     }
+
+    EnableAllOps = args["Xenable-all-ops"].as<bool>();
 
     if (args.count("Xnum-bbls-per-fun")) {
       NumBblsPerFun = args["Xnum-bbls-per-fun"].as<int>();
