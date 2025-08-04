@@ -32,6 +32,15 @@ namespace z3 {
     //   - Refs: https://en.cppreference.com/w/cpp/language/operator_arithmetic.html
     return m - cxx_idiv(m, n) * n;
   }
+
+  static expr cxx_bvdiv(const expr &m, const expr &n) {
+    Assert(m.is_bv(), "The dividend m is not a bitvec expression: %s", m.to_string().c_str());
+    Assert(n.is_bv(), "The divisor n is not a bitvec expression: %s", n.to_string().c_str());
+    auto t = m / n;
+    return ite(m % n == 0, t, ite(m >= 0, t, ite(n > 0, t + 1, t - 1)));
+  }
+
+  static expr cxx_bvrem(const expr &m, const expr &n) { return m - cxx_bvdiv(m, n) * n; }
 } // namespace z3
 
 #endif // GRAPHFUZZ_Z3UTILS_HPP
