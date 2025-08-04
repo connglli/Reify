@@ -29,7 +29,7 @@
 #include "cxxopts.hpp"
 #include "global.hpp"
 #include "lib/logger.hpp"
-#include "lib/progplus.hpp"
+#include "lib/program.hpp"
 #include "lib/random.hpp"
 
 namespace fs = std::filesystem;
