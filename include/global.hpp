@@ -139,7 +139,10 @@ struct GlobalOptions {
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xnum-vars-per-fun", "The number of allowed variables for each function", cxxopts::value<int>())
-      ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>());
+      ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>())
+      ("U,Xenable-ub-inject", "Enable the injection of undefined behaviors to those unexecuted basic blocks", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xinject-ub-proba", "Probability of the selection of unexecuted blocks to inject undefined behaviors", cxxopts::value<double>())
+      ;
     // clang-format on
   }
 
@@ -236,6 +239,25 @@ struct GlobalOptions {
             << std::endl;
       }
       ensurePositive(NumInitsPerExec, "num-inits-per-exec");
+    }
+
+    EnableUBInUnexecutedBbls = args["Xenable-ub-inject"].as<bool>();
+
+    if (args.count("Xinject-ub-proba")) {
+      UBInjectionProba = args["Xinject-ub-proba"].as<double>();
+      if (UBInjectionProba <= 0) {
+        std::cerr
+            << "Error: The probability for selecting basic blocks to inject UBs "
+               "(--Xinject-ub-proba) cannot be less than or equal to 0. It should be within 0 to 1."
+            << std::endl;
+        exit(1);
+      }
+      if (UBInjectionProba > 1) {
+        std::cerr << "Error: The probability for selecting basic blocks to inject UBs "
+                  << "(--Xinject-ub-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
     }
   }
 

@@ -44,6 +44,7 @@ def gen_func(
     with_main=False,
     with_sexp=False,
     with_allops=False,
+    with_injubs=False,
     verbose=False,
     seed=None,
     extra_opts=None,
@@ -58,6 +59,8 @@ def gen_func(
             cmd += ["-S"]
         if with_allops:
             cmd += ["-A"]
+        if with_injubs:
+            cmd += ["-U"]
         if verbose:
             cmd += ["-v"]
         if seed:
@@ -84,7 +87,9 @@ def gen_func(
         return False, None
 
 
-def main(*, output, limit, seed, sexp, mainf, allops, check, timeout, extra_opts):
+def main(
+    *, output, limit, seed, sexp, mainf, allops, injubs, check, timeout, extra_opts
+):
     if seed >= 0:
         random.seed(seed)
         next_seed = lambda: random.randint(0, 2147483647)
@@ -95,7 +100,7 @@ def main(*, output, limit, seed, sexp, mainf, allops, check, timeout, extra_opts
         f"UUID={func_uuid}, output={output}, "
         f"limit={limit if limit != 0 else '<INF>'}, "
         f"seed={seed if seed >= 0 else '<RND>'}, "
-        f"sexp={sexp}, main={mainf}, allops={allops}, "
+        f"sexp={sexp}, main={mainf}, allops={allops}, injubs={injubs}, "
         f"check={check}, timeout={timeout}s, "
         f"extra='{extra_opts}'"
     )
@@ -111,6 +116,7 @@ def main(*, output, limit, seed, sexp, mainf, allops, check, timeout, extra_opts
             with_main=mainf,
             with_sexp=sexp,
             with_allops=allops,
+            with_injubs=injubs,
             seed=next_seed(),
             extra_opts=extra_opts,
         )
@@ -167,6 +173,12 @@ if __name__ == "__main__":
         help="enable using all kinds of term and expression operators",
     )
     parser.add_argument(
+        "--injubs",
+        action="store_true",
+        default=False,
+        help="enable using all kinds of term and expression operators",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         default=False,
@@ -194,6 +206,7 @@ if __name__ == "__main__":
         sexp=args.sexp,
         mainf=args.main,
         allops=args.allops,
+        injubs=args.injubs,
         check=args.check,
         timeout=args.timeout,
         extra_opts=args.extra,
