@@ -101,9 +101,12 @@ struct GlobalOptions {
   bool EnableConsistentExecs = false;
   // The number of different initialisation sets we want the solver to find for a given function
   int NumInitsPerExec = 3;
-  // When enabled, inject some obvious undefined behaviour in the unexecuted blocks
+  // When enabled, inject obvious undefined behaviour in the unexecuted blocks
   // Otherwise, we inject some randome values to their coefficients
   bool EnableUBInUnexecutedBbls = false;
+  // Probability of selecting unexecuted blocks to inject UBs. I'm not making this probability
+  // large since this may lead to a much longer generation time.
+  double UBInjectionProba = 0.3;
 
   ////////////////////////////////////////////////////////////
   ////// Program Generation Parameters

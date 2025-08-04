@@ -355,16 +355,19 @@ void UBFreeExec::insertUBsIntoUnexecutedBbls() {
   std::ranges::transform(fun->GetBlocks(), blocks.begin(), [](const auto *b) {
     return b->GetLabel();
   });
+  auto rand = Random::Get().UniformReal();
   IntUBInject ubInj{};
   for (const auto &label: blocks) {
     if (std::ranges::find(executionByLabels, label) == executionByLabels.end()) {
-      auto newFun = ubInj.InjectUBs(fun, fun->FindBlock(label));
-      if (newFun != nullptr) {
-        // We have created a new function with UBs injected
-        if (fun != owner->GetFun()) {
-          delete fun; // The function is created by us
+      if (rand() < GlobalOptions::Get().UBInjectionProba) {
+        auto newFun = ubInj.InjectUBs(fun, fun->FindBlock(label));
+        if (newFun != nullptr) {
+          // We have created a new function with UBs injected
+          if (fun != owner->GetFun()) {
+            delete fun; // The function is created by us
+          }
+          fun = newFun.release();
         }
-        fun = newFun.release();
       }
     }
   }
