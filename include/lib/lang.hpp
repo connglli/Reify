@@ -265,7 +265,7 @@ namespace symir {
     }
 
     template<typename T>
-    [[nodiscard]] const T GetTypedValue() const {
+    [[nodiscard]] T GetTypedValue() const {
       Assert(IsSolved(), "This coefficient is not yet solved");
       const auto type = GetType();
       const auto *typeName = SymIR::GetTypeName(type).c_str();
@@ -273,34 +273,34 @@ namespace symir {
         case SymIR::I32:
           Assert(
               typeid(T) == typeid(int),
-              "The coefficient \"%s\" is an %s, cannot get its typed value as %d", name.c_str(),
+              "The coefficient \"%s\" is an %s, cannot get its typed value as %s", name.c_str(),
               typeName, typeid(T).name()
           );
           return GetI32Value();
         default:
           Panic(
-              "Unsuppported type for coefficient \"%s\": %s, cannot get its typed value",
+              "Unsupported type for coefficient \"%s\": %s, cannot get its typed value",
               name.c_str(), typeName
           );
           break;
       }
     }
 
-    [[nodiscard]] const int GetI32Value() const {
+    [[nodiscard]] int GetI32Value() const {
       Assert(IsSolved(), "This coefficient is not yet solved");
       const auto type = GetType();
       const auto typeName = SymIR::GetTypeName(type);
       Assert(
           type == SymIR::I32,
           "The coefficient \"%s\" (type=%s) is not an %s, cannot get its value as an %s",
-          name.c_str(), typeName, SymIR::GetTypeName(SymIR::I32).c_str(), "int"
+          name.c_str(), typeName.c_str(), SymIR::GetTypeName(SymIR::I32).c_str(), "int"
       );
       try {
         return std::stoi(value.value());
       } catch (const std::invalid_argument &e) {
         Panic(
             "Failed to convert the value of the coefficient \"%s\" (type=%s) into an int: %s",
-            name.c_str(), typeName, e.what()
+            name.c_str(), typeName.c_str(), e.what()
         );
       }
     }
@@ -413,6 +413,11 @@ namespace symir {
 
     [[nodiscard]] const VarUse *GetVar() const { return var.get(); }
 
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const {
+      return var == nullptr ? std::vector<const VarUse *>{}
+                            : std::vector<const VarUse *>{var.get()};
+    }
+
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
@@ -494,6 +499,15 @@ namespace symir {
       return terms[i].get();
     }
 
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const {
+      std::vector<const VarUse *> uses{};
+      for (const auto &t: terms) {
+        const auto u = t->GetUses();
+        uses.insert(uses.end(), u.begin(), u.end());
+      }
+      return uses;
+    }
+
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
@@ -553,6 +567,8 @@ namespace symir {
 
     [[nodiscard]] const Expr *GetExpr() const { return expr.get(); }
 
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const { return expr->GetUses(); }
+
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
@@ -563,6 +579,12 @@ namespace symir {
   class Stmt : public SymIR {
   public:
     explicit Stmt(SymIR::ID irId) : SymIR(irId) {}
+
+    /// Get the list of used variables it there exists in this statement or an empty list.
+    [[nodiscard]] virtual std::vector<const VarUse *> GetUses() const = 0;
+
+    /// Get the defined variable in this statement if there exists or nullptr.
+    [[nodiscard]] virtual const VarDef *GetDefinition() const = 0;
   };
 
   /// An AssStmt represents the assignment of an expression to a variable
@@ -580,6 +602,10 @@ namespace symir {
     [[nodiscard]] const VarUse *GetVar() const { return var.get(); }
 
     [[nodiscard]] const Expr *GetExpr() const { return expr.get(); }
+
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return expr->GetUses(); }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return var.get()->GetDef(); }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
@@ -608,6 +634,10 @@ namespace symir {
       }
       return r;
     }
+
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return GetVars(); }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
@@ -646,6 +676,10 @@ namespace symir {
       return label == truLab || label == falLab;
     }
 
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return cond->GetUses(); }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
+
     virtual void ReplaceTarget(const std::string &from, const std::string &to) {
       if (from != truLab && from != falLab) {
         Assert(
@@ -681,6 +715,10 @@ namespace symir {
     [[nodiscard]] virtual bool HasTarget(const std::string &label) const {
       return label == this->label;
     }
+
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
 
     virtual void ReplaceTarget(const std::string &from, const std::string &to) {
       if (from == label) {
@@ -721,6 +759,10 @@ namespace symir {
     }
 
     [[nodiscard]] Coef *GetCoef() const { return coef; }
+
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return this; }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
@@ -769,6 +811,54 @@ namespace symir {
         r.push_back(target.get());
       }
       return r;
+    }
+
+    /// Get the list of used variables in this block
+    /// When removeDefs is true, the definitions of variables are removed from the list.
+    [[nodiscard]] std::vector<const VarUse *> GetUses(bool removeDefs = true) const {
+      return GetUses(stmts, removeDefs);
+    }
+
+    /// Get the list of defined variables in this block
+    [[nodiscard]] std::vector<const VarDef *> GetDefinitions() const {
+      return GetDefinitions(stmts);
+    }
+
+    /// Get the list of used variables in this block
+    /// When removeDefs is true, the definitions of variables are removed from the list.
+    [[nodiscard]] static std::vector<const VarUse *>
+    GetUses(const std::vector<std::unique_ptr<Stmt>> &stmts, bool removeDefs = true) {
+      std::vector<const VarDef *> defs;
+      std::vector<const VarUse *> uses;
+      for (const auto &s: stmts) {
+        if (const auto stmtUses = s->GetUses(); !stmtUses.empty()) {
+          for (const auto *u: stmtUses) {
+            if (std::ranges::find(defs, u->GetDef()) == defs.end()) {
+              // If the variable is not defined in this block, add it to the list
+              uses.push_back(u);
+            } else if (!removeDefs) {
+              // If we do not remove definitions, add it to the list
+              uses.push_back(u);
+            }
+          }
+        }
+        if (const auto *d = s->GetDefinition(); d != nullptr) {
+          defs.push_back(d);
+        }
+      }
+      return uses;
+    }
+
+    /// Get the list of defined variables in this block
+    [[nodiscard]] static std::vector<const VarDef *>
+    GetDefinitions(const std::vector<std::unique_ptr<Stmt>> &stmts) {
+      std::vector<const VarDef *> defs;
+      for (const auto &s: stmts) {
+        if (const auto &d = s->GetDefinition(); d != nullptr) {
+          defs.push_back(d);
+        }
+      }
+      return defs;
     }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
@@ -1098,6 +1188,16 @@ namespace symir {
     /// and the builder cannot be used any more to create more SIRs.
     void SymGoto(const std::string &label);
 
+    /// Get the list of used variables in this block
+    [[nodiscard]] std::vector<const VarUse *> GetUses(bool removeDefs = true) const {
+      return Block::GetUses(stmts, removeDefs);
+    }
+
+    /// Get the list of defined variables in this block
+    [[nodiscard]] std::vector<const VarDef *> GetDefinitions() const {
+      return Block::GetDefinitions(stmts);
+    }
+
     /// Build and commit the basic block.
     std::unique_ptr<Block> Build() override;
 
@@ -1279,7 +1379,31 @@ namespace symir {
   /// Utility to deep-copy a built function.
   class FunctCopier : protected SymIRVisitor, SymIRBuilder {
   public:
-    explicit FunctCopier(const Funct *src) : src(src) {}
+    // Hooks right before opening a new block. The input is the label of the new block.
+    using BeforeBlockOpenHook = std::function<void(FunctBuilder *, const std::string &)>;
+    // Hooks right after opening a new block. The input is the block builder of the new block.
+    using AfterBlockOpenedHook = std::function<void(FunctBuilder *, BlockBuilder *)>;
+    // Hooks right before closing a block. The input is the block builder of the block being closed.
+    using BeforeBlockCloseHook = std::function<void(FunctBuilder *, BlockBuilder *)>;
+    // Hooks right after closing a block. The input is the block being closed.
+    using AfterBlockClosedHook = std::function<void(FunctBuilder *, const Block *)>;
+
+  public:
+    explicit FunctCopier(
+        // clang-format off
+        const Funct *src,
+        BeforeBlockOpenHook beforeBlockOpenHook = nullptr,
+        AfterBlockOpenedHook afterBlockOpenedHook = nullptr,
+        BeforeBlockCloseHook beforeBlockCloseHook = nullptr,
+        AfterBlockClosedHook afterBlockClosedHook = nullptr
+        // clang-format on
+    ) :
+        src(src), beforeBlockOpenHook(std::move(beforeBlockOpenHook)),
+        afterBlockOpenedHook(std::move(afterBlockOpenedHook)),
+        beforeBlockCloseHook(std::move(beforeBlockCloseHook)),
+        afterBlockClosedHook(std::move(afterBlockClosedHook)) {
+      Assert(src != nullptr, "The source function is a nullptr");
+    }
 
     /// Copy the function and return a new Funct object.
     std::unique_ptr<Funct> Copy();
@@ -1288,19 +1412,19 @@ namespace symir {
     std::unique_ptr<FunctBuilder> CopyAsBuilder();
 
   protected:
-    void Visit(const VarUse &v);
-    void Visit(const Coef &c);
-    void Visit(const Term &t);
-    void Visit(const Expr &e);
-    void Visit(const Cond &c);
-    void Visit(const AssStmt &a);
-    void Visit(const RetStmt &r);
-    void Visit(const Branch &b);
-    void Visit(const Goto &g);
-    void Visit(const Param &p);
-    void Visit(const Local &l);
-    void Visit(const Block &b);
-    void Visit(const Funct &f);
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &a) override;
+    void Visit(const RetStmt &r) override;
+    void Visit(const Branch &b) override;
+    void Visit(const Goto &g) override;
+    void Visit(const Param &p) override;
+    void Visit(const Local &l) override;
+    void Visit(const Block &b) override;
+    void Visit(const Funct &f) override;
 
   private:
     void pushCoef(Coef *c) { coefStack.push(c); }
@@ -1342,6 +1466,12 @@ namespace symir {
     std::unique_ptr<FunctBuilder> builder = nullptr;
     // The builder for the current block being built
     BlockBuilder *currentBlock = nullptr;
+    // Hooks to change the block being built
+    BeforeBlockOpenHook beforeBlockOpenHook = nullptr;
+    AfterBlockOpenedHook afterBlockOpenedHook = nullptr;
+    BeforeBlockCloseHook beforeBlockCloseHook = nullptr;
+    AfterBlockClosedHook afterBlockClosedHook = nullptr;
+    // Stacks to manage objects during copying
     std::stack<Coef *> coefStack{};
     std::stack<TermID> termStack{};
     std::stack<ExprID> exprStack{};

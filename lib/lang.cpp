@@ -65,7 +65,8 @@ namespace symir {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
-    stmts.push_back(std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+    stmts.push_back(
+        std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
     );
     createdExprs.erase(it);
   }
@@ -224,7 +225,7 @@ namespace symir {
     Assert(builder != nullptr, "The FunctCopier failed to create a function builder");
     auto fun = builder->Build();
     builder = nullptr;
-    return std::move(fun);
+    return fun;
   }
 
   std::unique_ptr<FunctBuilder> FunctCopier::CopyAsBuilder() {
@@ -300,11 +301,23 @@ namespace symir {
 
   void FunctCopier::Visit(const Block &b) {
     Assert(currentBlock == nullptr, "The FunctCopier already has a current block");
+    if (beforeBlockOpenHook) {
+      beforeBlockOpenHook(builder.get(), b.GetLabel());
+    }
     currentBlock = builder->OpenBlock(b.GetLabel());
+    if (afterBlockOpenedHook) {
+      afterBlockOpenedHook(builder.get(), currentBlock);
+    }
     for (const auto &s: b.GetStmts()) {
       s->Accept(*this);
     }
-    builder->CloseBlock(currentBlock);
+    if (beforeBlockCloseHook) {
+      beforeBlockCloseHook(builder.get(), currentBlock);
+    }
+    const auto *nb = builder->CloseBlock(currentBlock);
+    if (afterBlockClosedHook) {
+      afterBlockClosedHook(builder.get(), nb);
+    }
     currentBlock = nullptr;
   }
 

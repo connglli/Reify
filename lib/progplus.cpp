@@ -38,7 +38,7 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     functions.push_back(FunPlus::ParseFunSexpCode(sexpPath));
     fs::path mapPath = GetMappingPathForFunctionPath(funPath);
     mappings.push_back(std::move(FunPlus::ParseMappingCode(mapPath)));
-    Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath);
+    Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
   }
 }
 
@@ -91,7 +91,7 @@ protected:
     Assert(
         p->GetType() == symir::SymIR::I32,
         "Unsupported type %s for the coefficient with name \"%s\"",
-        symir::SymIR::GetTypeName(p->GetType()), p->GetName().c_str()
+        symir::SymIR::GetTypeName(p->GetType()).c_str(), p->GetName().c_str()
     );
     int coeff_val = p->GetI32Value();
     int chk_val = StatelessChecksum::Compute(*finalization);

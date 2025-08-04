@@ -100,6 +100,7 @@ void SignedOverflow::MakeInitDifferentFrom(const std::vector<int> &init) {
 }
 
 void SignedOverflow::Visit(const symir::VarUse &v) {
+  Assert(v.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
   auto varExpr = CreateVarExpr(v.GetDef());
   constraints.push_back(varExpr >= GlobalOptions::Get().LowerBound);
   constraints.push_back(varExpr <= GlobalOptions::Get().UpperBound);
@@ -107,6 +108,7 @@ void SignedOverflow::Visit(const symir::VarUse &v) {
 }
 
 void SignedOverflow::Visit(const symir::Coef &c) {
+  Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
   auto coefExpr = CreateCoefExpr(c);
   constraints.push_back(coefExpr >= GlobalOptions::Get().LowerCoefBound);
   constraints.push_back(coefExpr <= GlobalOptions::Get().UpperCoefBound);
