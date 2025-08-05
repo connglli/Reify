@@ -654,9 +654,7 @@ namespace jnif {
 
       void parseTs(vector<Type> &locs) {
         line(2) << "[" << locs.size() << "] ";
-        for (u1 i = 0; i < locs.size(); i++) {
-          Type &vt = locs[i];
-
+        for (auto &vt: locs) {
           os << vt << " | ";
         }
 
@@ -673,7 +671,7 @@ namespace jnif {
 
           u1 frameType = e.frameType;
 
-          if (0 <= frameType && frameType <= 63) {
+          if (frameType <= 63) {
             toff += frameType + 1;
             os << "offset = " << toff << " ";
 

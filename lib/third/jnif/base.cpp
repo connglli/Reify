@@ -169,9 +169,9 @@ namespace jnif {
   }
 
   ostream &operator<<(ostream &os, const DomMap &ds) {
-    for (const pair<BasicBlock *, set<BasicBlock *>> &d: ds) {
-      os << d.first->name << ": ";
-      for (const BasicBlock *bb: d.second) {
+    for (const auto &[d, b]: ds) {
+      os << d->name << ": ";
+      for (const BasicBlock *bb: b) {
         os << bb->name << " ";
       }
       os << std::endl;

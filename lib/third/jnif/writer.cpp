@@ -6,6 +6,7 @@
  */
 #include <fstream>
 #include "jnif/jnif.hpp"
+#include "lib/typeutils.hpp"
 
 using namespace std;
 
@@ -212,7 +213,7 @@ namespace jnif {
             break;
           case ConstPool::FLOAT: {
             float fvalue = entry->f.value;
-            u4 value = *(u4 *) &fvalue;
+            u4 value = safe_reinterpret_cast<float, u4>(fvalue);
             bw.writeu4(value);
             break;
           }
@@ -225,7 +226,7 @@ namespace jnif {
           }
           case ConstPool::DOUBLE: {
             double dvalue = cp.getDouble(i);
-            long value = *(long *) &dvalue;
+            long value = safe_reinterpret_cast<double, long>(dvalue);
             bw.writeu4(value >> 32);
             bw.writeu4(value & 0xffffffff);
             //			i++;
@@ -318,9 +319,7 @@ namespace jnif {
 
       int toff = -1;
 
-      for (u2 i = 0; i < attr.entries.size(); i++) {
-        SmtAttr::Entry &e = attr.entries[i];
-
+      for (auto &e: attr.entries) {
         u2 offset = e.label->label()->offset;
 
         toff += 1;
@@ -331,7 +330,7 @@ namespace jnif {
 
         u1 frameType = e.frameType;
 
-        if (0 <= frameType && frameType <= 63) {
+        if (frameType <= 63) {
           if (deltaOffset <= 63) {
             frameType = deltaOffset;
           } else {
@@ -349,7 +348,7 @@ namespace jnif {
 
         bw.writeu1(frameType);
 
-        if (0 <= frameType && frameType <= 63) {
+        if (frameType <= 63) {
         } else if (64 <= frameType && frameType <= 127) {
           writeSmtTypes(e.sameLocals_1_stack_item_frame.stack);
         } else if (frameType == 247) {
@@ -382,9 +381,7 @@ namespace jnif {
     }
 
     void writeSmtTypes(const vector<Type> &locs) {
-      for (u1 i = 0; i < locs.size(); i++) {
-        const Type &type = locs[i];
-
+      for (const auto &type: locs) {
         if (type.isTop()) {
           bw.writeu1(TYPE_TOP);
         } else if (type.isIntegral()) {

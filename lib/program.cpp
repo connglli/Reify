@@ -307,7 +307,7 @@ void ProgPlus::GenerateCode(const fs::path &file, bool debug, bool staticModifie
   int checksum = StatelessChecksum::Compute(*finalization);
   oss << "    printf(\"%d,\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
       << ", " << functions[0]->GetName() << "(";
-  for (int i = 0; i < initialisation->size(); ++i) {
+  for (size_t i = 0; i < initialisation->size(); ++i) {
     oss << (*initialisation)[i];
     if (i != initialisation->size() - 1) {
       oss << ", ";

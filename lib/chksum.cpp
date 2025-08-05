@@ -37,7 +37,7 @@ int StatelessChecksum::Compute(const std::vector<int> &values) {
   // Suppose we can only handle to the maximum of 128 values.
   Assert(values.size() <= 128, "Too many (>128) values provided to compute checksum");
   static int args[128];
-  for (int i = 0; i < values.size(); i++) {
+  for (size_t i = 0; i < values.size(); i++) {
     args[i] = values[i];
   }
   return computeStatelessChecksum(static_cast<int>(values.size()), args);

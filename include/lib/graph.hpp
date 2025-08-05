@@ -108,7 +108,7 @@ private:
   void unsafeEnforceReachFromEntry();
 
 private:
-  const int maxOutdeg;
+  const size_t maxOutdeg;
   std::vector<std::set<int>> adjTab{};
 };
 

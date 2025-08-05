@@ -53,7 +53,7 @@ namespace symir {
   void SymSexpLower::Visit(const Expr &e) {
     out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
     auto terms = e.GetTerms();
-    for (auto i = 0; i < terms.size(); i++) {
+    for (size_t i = 0; i < terms.size(); i++) {
       terms[i]->Accept(*this);
       if (i != terms.size() - 1) {
         out << " ";
@@ -125,7 +125,7 @@ namespace symir {
     out << "(" << KW_FUN << " " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
     out << " (";
     auto params = f.GetParams();
-    for (auto i = 0; i < params.size(); ++i) {
+    for (size_t i = 0; i < params.size(); ++i) {
       params[i]->Accept(*this);
       if (i != params.size() - 1) {
         out << " ";
@@ -167,7 +167,7 @@ namespace symir {
 
   void SymCxLower::Visit(const Expr &e) {
     auto terms = e.GetTerms();
-    for (auto i = 0; i < terms.size(); ++i) {
+    for (size_t i = 0; i < terms.size(); ++i) {
       e.GetTerm(i)->Accept(*this);
       if (i != terms.size() - 1) {
         out << " " << Expr::GetOpSym(e.GetOp()) + " ";
@@ -193,7 +193,7 @@ namespace symir {
     auto vars = r.GetVars();
     out << "return " << StatelessChecksum::GetComputeName() << "(" << vars.size() << ", (int["
         << vars.size() << "]){";
-    for (auto i = 0; i < vars.size(); ++i) {
+    for (size_t i = 0; i < vars.size(); ++i) {
       vars[i]->Accept(*this);
       if (i != vars.size() - 1) {
         out << ", ";
@@ -237,7 +237,7 @@ namespace symir {
   void SymCxLower::Visit(const Funct &f) {
     out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
     auto params = f.GetParams();
-    for (auto i = 0; i < params.size(); ++i) {
+    for (size_t i = 0; i < params.size(); ++i) {
       params[i]->Accept(*this);
       if (i != params.size() - 1) {
         out << ", ";

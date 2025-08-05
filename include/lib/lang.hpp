@@ -629,7 +629,7 @@ namespace symir {
 
     [[nodiscard]] std::vector<const VarUse *> GetVars() const {
       std::vector<const VarUse *> r;
-      for (auto i = 0; i < vars.size(); i++) {
+      for (size_t i = 0; i < vars.size(); i++) {
         r.push_back(vars[i].get());
       }
       return r;
@@ -886,7 +886,7 @@ namespace symir {
         locals(std::move(locals)), symbols(std::move(symbols)), blocks(std::move(blocks)) {
       Assert(!this->params.empty(), "No parameters are given");
       Assert(!this->blocks.empty(), "No basic blocks are given");
-      for (auto i = 0; i < this->blocks.size(); i++) {
+      for (size_t i = 0; i < this->blocks.size(); i++) {
         const auto &blk = this->blocks[i];
         const auto &blkLabel = blk->GetLabel();
         Assert(
@@ -895,7 +895,7 @@ namespace symir {
         );
         blockMap[blkLabel] = blk.get();
       }
-      for (auto i = 0; i < this->params.size(); i++) {
+      for (size_t i = 0; i < this->params.size(); i++) {
         const auto &prm = this->params[i];
         const auto &prmName = prm->GetName();
         Assert(
@@ -904,7 +904,7 @@ namespace symir {
         );
         paramMap[prmName] = prm.get();
       }
-      for (auto i = 0; i < this->symbols.size(); i++) {
+      for (size_t i = 0; i < this->symbols.size(); i++) {
         const auto &sym = this->symbols[i];
         const auto &symName = sym->GetName();
         Assert(
@@ -913,7 +913,7 @@ namespace symir {
         );
         symMap[symName] = sym.get();
       }
-      for (auto i = 0; i < this->locals.size(); i++) {
+      for (size_t i = 0; i < this->locals.size(); i++) {
         const auto &loc = this->locals[i];
         const auto &locName = loc->GetName();
         Assert(
@@ -1046,10 +1046,10 @@ namespace symir {
 
     [[nodiscard]] std::vector<const Stmt *> GetStmts() const {
       std::vector<const Stmt *> ret;
-      for (auto i = 0; i < locals.size(); ++i) {
+      for (size_t i = 0; i < locals.size(); ++i) {
         ret.push_back(locals[i].get());
       }
-      for (auto i = 0; i < blocks.size(); ++i) {
+      for (size_t i = 0; i < blocks.size(); ++i) {
         auto sr = blocks[i]->GetStmts();
         ret.insert(ret.end(), sr.begin(), sr.end());
       }
@@ -1251,7 +1251,7 @@ namespace symir {
     /// Get all defined parameters
     [[nodiscard]] std::vector<const Param *> GetParams() const {
       std::vector<const Param *> r;
-      for (auto i = 0; i < params.size(); i++) {
+      for (size_t i = 0; i < params.size(); i++) {
         r.push_back(params[i].get());
       }
       return r;
@@ -1260,7 +1260,7 @@ namespace symir {
     /// Get all defined locals
     [[nodiscard]] std::vector<const Local *> GetLocals() const {
       std::vector<const Local *> r;
-      for (auto i = 0; i < locals.size(); i++) {
+      for (size_t i = 0; i < locals.size(); i++) {
         r.push_back(locals[i].get());
       }
       return r;
@@ -1269,7 +1269,7 @@ namespace symir {
     /// Get all defined blocks
     [[nodiscard]] std::vector<const Block *> GetBlocks() const {
       std::vector<const Block *> r;
-      for (auto i = 0; i < blocks.size(); i++) {
+      for (size_t i = 0; i < blocks.size(); i++) {
         r.push_back(blocks[i].get());
       }
       return r;
@@ -1278,7 +1278,7 @@ namespace symir {
     /// Get all defined symbols
     [[nodiscard]] std::vector<SymDef *> GetSymbols() const {
       std::vector<SymDef *> r;
-      for (auto i = 0; i < symbols.size(); i++) {
+      for (size_t i = 0; i < symbols.size(); i++) {
         r.push_back(symbols[i].get());
       }
       return r;

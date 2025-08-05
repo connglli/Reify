@@ -280,7 +280,7 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
       JavaStatelessChecksum::GetCheckChksumDesc().c_str()
   );
 
-  for (auto i = 0; i < initializations.size(); i++) {
+  for (size_t i = 0; i < initializations.size(); i++) {
     const auto &init = initializations[i];
     const auto &fina = finalizations[i];
     // TODO: The checksum computation should be using Java as Java and C might be different
@@ -327,7 +327,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
   main << "int main(int argc, int* argv[])" << std::endl;
   main << "{" << std::endl;
-  for (auto i = 0; i < initializations.size(); i++) {
+  for (size_t i = 0; i < initializations.size(); i++) {
     const auto &init = initializations[i];
     const auto &fina = finalizations[i];
     const auto numParams = static_cast<int>(init.size());
@@ -351,7 +351,7 @@ std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
 
   std::ostringstream mapping;
-  for (int i = 0; i < exec.GetInitializations().size(); i++) {
+  for (size_t i = 0; i < exec.GetInitializations().size(); i++) {
     for (auto x: exec.GetInitializations()[i]) {
       mapping << x << ",";
     }

@@ -59,7 +59,7 @@ static std::string JoinStr(const std::vector<std::string> &tokens, const std::st
   }
 
   std::ostringstream oss;
-  for (int i = 0; i < tokens.size() - 1; i++) {
+  for (size_t i = 0; i < tokens.size() - 1; i++) {
     oss << tokens[i] << delim;
   }
   oss << tokens[tokens.size() - 1];

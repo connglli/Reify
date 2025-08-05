@@ -252,7 +252,7 @@ void CfgSketch::Print() const {
   Log::Get().CloseSection();
 
   Log::Get().OpenSection("CfgSketch: Flattened CFG Sketch");
-  for (int u = 0; u < basicblocks.size(); u++) {
+  for (size_t u = 0; u < basicblocks.size(); u++) {
     Log::Get().Out() << "Block: " << u << " -> [" << JoinInt(basicblocks[u].successors, ", ") << "]"
                      << std::endl;
   }

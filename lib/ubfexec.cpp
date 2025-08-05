@@ -145,7 +145,7 @@ int UBFreeExec::Solve(
   Log::Get().OpenSection("UBFreeExec: Solve");
 
   Log::Get().Out() << "Execution Path: ";
-  for (int i = 0; i < static_cast<int>(execution.size()); i++) {
+  for (size_t i = 0; i < execution.size(); i++) {
     Log::Get().Out() << execution[i];
     if (i != execution.size() - 1) {
       Log::Get().Out() << "->";

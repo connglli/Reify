@@ -191,7 +191,7 @@ namespace symir {
     for (auto i = 0; !stream.eof() && i < num; i++) {
       chs.push_back(static_cast<char>(stream.get()));
     }
-    for (auto i = 0; i < chs.size(); i++) {
+    for (size_t i = 0; i < chs.size(); i++) {
       stream.unget();
     }
     return chs;

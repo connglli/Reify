@@ -1,5 +1,6 @@
 #include "jnif/jnif.hpp"
 #include "lib/logger.hpp"
+#include "lib/typeutils.hpp"
 
 namespace jnif {
 
@@ -148,7 +149,7 @@ namespace jnif {
             case ConstPool::FLOAT: {
               Log::Get().Out() << "FLOAT" << std::endl;
               u4 value = br->readu4();
-              float fvalue = *(float *) &value;
+              float fvalue = safe_reinterpret_cast<u4, float>(value);
               cp->addFloat(fvalue);
               break;
             }
@@ -166,7 +167,7 @@ namespace jnif {
               u4 high = br->readu4();
               u4 low = br->readu4();
               long lvalue = ((long) high << 32) + low;
-              double dvalue = *(double *) &lvalue;
+              double dvalue = safe_reinterpret_cast<long, double>(lvalue);
               cp->addDouble(dvalue);
               i++;
               break;
@@ -474,7 +475,7 @@ namespace jnif {
           SmtAttr::Entry e;
           e.frameType = frameType;
 
-          if (0 <= frameType && frameType <= 63) {
+          if (frameType <= 63) {
             toff += frameType;
           } else if (64 <= frameType && frameType <= 127) {
             parseTs(br, 1, e.sameLocals_1_stack_item_frame.stack, cp, labelManager);

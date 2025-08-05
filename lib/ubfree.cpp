@@ -166,7 +166,7 @@ void SignedOverflow::Visit(const symir::Term &t) {
 void SignedOverflow::Visit(const symir::Expr &e) {
   auto result = ctx.int_val(0);
   std::vector<symir::Coef *> coefs;
-  for (int i = 0; i < e.NumTerms(); i++) {
+  for (size_t i = 0; i < e.NumTerms(); i++) {
     coefs.push_back(e.GetTerm(i)->GetCoef());
     e.GetTerm(i)->Accept(*this);
     auto termExpr = popExpression();
@@ -261,7 +261,7 @@ void SignedOverflow::Visit(const symir::Funct &f) {
       f.GetName().c_str()
   );
 
-  for (int i = 0; i < execution.size() - 1; i++) {
+  for (size_t i = 0; i < execution.size() - 1; i++) {
     currBbl = execution[i];
     nextBbl = execution[i + 1];
     f.GetBlock(currBbl)->Accept(*this);

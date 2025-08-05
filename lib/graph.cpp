@@ -140,7 +140,7 @@ std::vector<int> GraphPlus::SampleGraph(const bool consistent, const int maxStep
 
 void GraphPlus::Generate(const bool acyclic) {
   auto randTarget = Random::Get().Uniform(0, NumNodes() - 1);
-  auto randTarNum = Random::Get().Uniform(2, maxOutdeg);
+  auto randTarNum = Random::Get().Uniform(2, static_cast<int>(maxOutdeg));
 
   for (int node = 0; node < NumNodes() - 1; node++) {
     if (randTarget() % 2 == 0 || node == NumNodes() - 2) {
