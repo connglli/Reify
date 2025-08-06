@@ -272,7 +272,7 @@ class Worker:
       uuid=self.uuid(),
       sno=0,
       outdir=self.wdir,
-      extra='--Xinject-ub-proba 0.1 --Xnum-assigns-per-bbl 2'
+      extra='--Xinject-ub-proba 0.1'
     )
     popts = ProgGenOptions(
       bin="./build/bin/pgen",
