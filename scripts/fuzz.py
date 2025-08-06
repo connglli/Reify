@@ -78,17 +78,6 @@ class FuncGenOptions:
     }
 
 
-def remove_artifacts(uuid: str, sno: int, gen_dir: Path):
-  for art in params.get_artifacts(uuid, sno, gen_dir=gen_dir).values():
-    art.unlink(missing_ok=True)
-
-
-def store_artifacts(uuid: str, sno: int, gen_dir: Path, to_dir: Path):
-  for art in params.get_artifacts(uuid, sno, gen_dir=gen_dir).values():
-    if art.exists():
-      art.rename(to_dir / art.name)
-
-
 def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
   try:
     cmd = [opts.bin]
@@ -110,18 +99,16 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
     utils.check_out(cmd, timeout=timeout)
     result = params.get_prog_file(opts.uuid, opts.sno, gen_dir=opts.outdir), None
   except CalledProcessError as e:
-    remove_artifacts(opts.uuid, opts.sno, opts.outdir)
     result = None, (
       f"exit with {e.returncode}, message: {e.stdout or '<no output>'}"
     )
   except TimeoutExpired:
-    remove_artifacts(opts.uuid, opts.sno, opts.outdir)
     result = None, f"generation timeout: exceeding {timeout}s"
   except Exception as e:
-    remove_artifacts(opts.uuid, opts.sno, opts.outdir)
     result = None, f"unexpected error: {e}"
   if result[0] is None:
-    remove_artifacts(opts.uuid, opts.sno, opts.outdir)
+    for art in params.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values():
+      art.unlink(missing_ok=True)
   return result
 
 
@@ -562,7 +549,8 @@ def main():
   if limit < 0:
     limit = 2147483647
   elif limit > 2147483647:
-    mlog(f"Warning: Limit ({limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.", color='yellow')
+    mlog(f"Warning: Limit ({limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
+         color='yellow')
     limit = 2147483647
 
   switch_limit = args.switch_limit
@@ -570,8 +558,9 @@ def main():
     mlog(f"Error: Invalid switch limit specified: {switch_limit}. Must be a positive number", color='red')
     sys.exit(1)
   if switch_limit > 2147483647:
-    mlog(f"Warning: Switch limit ({switch_limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
-         color='yellow')
+    mlog(
+      f"Warning: Switch limit ({switch_limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
+      color='yellow')
     switch_limit = 2147483647
 
   prog_limit = args.prog_limit
@@ -579,8 +568,9 @@ def main():
     mlog(f"Error: Invalid program limit specified: {prog_limit}. Must be a positive number", color='red')
     sys.exit(1)
   if prog_limit > 2147483647:
-    mlog(f"Warning: Program limit ({prog_limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
-         color='yellow')
+    mlog(
+      f"Warning: Program limit ({prog_limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
+      color='yellow')
     prog_limit = 2147483647
 
   if switch_limit >= prog_limit:
