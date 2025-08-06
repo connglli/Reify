@@ -59,7 +59,7 @@ FGEN_OUT_DIR=generated                    \
 FGEN_LIMIT=100                            \
 GEN_SEED=1                                \
 FGEN_GEN_SEXP=true                        \
-FGEN_EX_OPS='"-Xnum-vars-per-fun 10"'     \
+FGEN_EX_OPS='"--Xnum-vars-per-fun 10"'    \
 make gen-func-set-check-ub
 ```
 
