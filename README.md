@@ -52,7 +52,8 @@ python3 scripts/ubchk.py <func_dir> <map_dir>
 python3 scripts/ubchk.py <prog_dir>
 ```
 
-For example, generating 100 functions into the `generated` directory with each function having `10` variables defined and each function being checked UB-free, using the seed of `1`:
+For example, generating 100 functions into the `generated` directory with each function having `10` variables defined
+and each function being checked UB-free, using the seed of `1`:
 
 ```sh
 FGEN_OUT_DIR=generated                    \
@@ -63,7 +64,8 @@ FGEN_EX_OPS='"--Xnum-vars-per-fun 10"'    \
 make gen-func-set-check-ub
 ```
 
-The output directory (i.e., directories pointed by `FGEN_OUT_DIR` for function generation or `PGEN_IN_DIR` for program generation) include the following sub-directories:
+The output directory (i.e., directories pointed by `FGEN_OUT_DIR` for function generation or `PGEN_IN_DIR` for program
+generation) include the following sub-directories:
 
 - `functions`: A set of functions that can be correctly compiled into `.o` (but not executable)
 - `mappings`: The input-output mappings for each generated function, ensuring their executions are UB-free
@@ -79,9 +81,19 @@ PGEN_LIMIT=100                            \
 make gen-prog-set-check
 ```
 
-The new programs will be added to the `programs` subdirectory and each program will be checked against undefined behavior.
+The new programs will be added to the `programs` subdirectory and each program will be checked against undefined
+behavior.
 
 ## Fuzz
 
-[TBA]
+The fuzzing process can be started by for example running the following command:
+
+```sh
+python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
+```
+
+This means that the fuzzing process will start 10 jobs in parallel, each compiling the generated programs with the given
+command (i.e., `gcc -O3 -fno-tree-slsr -fno-tree-ch`) and seeding the random number generator with the `0`. All the
+generated programs will be put into the `fuzzdir` directory. Note, useless programs will be removed during the fuzzing
+process to save some space.
 
