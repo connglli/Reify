@@ -47,60 +47,88 @@ CHKSUM_CODE = CHKSUM_FILE.read_text()
 
 
 def get_funcs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-    return Path(gen_dir) / "functions"
+  return Path(gen_dir) / "functions"
 
 
 def get_maps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-    return Path(gen_dir) / "mappings"
+  return Path(gen_dir) / "mappings"
 
 
 def get_progs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-    return Path(gen_dir) / "programs"
+  return Path(gen_dir) / "programs"
+
+
+def get_logs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
+  return Path(gen_dir) / "loggings"
+
+
+def get_sexps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
+  return Path(gen_dir) / "sexpressions"
 
 
 def get_func_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-    fuuid_ = fuuid.replace("-", "_")
-    return get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c"
+  fuuid_ = fuuid.replace("-", "_")
+  return get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c"
 
 
 def get_map_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-    fuuid_ = fuuid.replace("-", "_")
-    return get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map"
+  fuuid_ = fuuid.replace("-", "_")
+  return get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map"
 
 
 def get_prog_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-    fuuid_ = fuuid.replace("-", "_")
-    return get_progs_dir(gen_dir) / f"{fuuid_}_{fsano}.c"
+  fuuid_ = fuuid.replace("-", "_")
+  return get_progs_dir(gen_dir) / f"{fuuid_}_{fsano}.c"
+
+
+def get_log_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+  fuuid_ = fuuid.replace("-", "_")
+  return get_logs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.log"
+
+
+def get_sexp_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+  fuuid_ = fuuid.replace("-", "_")
+  return get_sexps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.sexp"
 
 
 def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-    return (
-        get_func_file(fuuid, fsano, gen_dir=gen_dir),
-        get_map_file(fuuid, fsano, gen_dir=gen_dir),
-    )
+  return (
+    get_func_file(fuuid, fsano, gen_dir=gen_dir),
+    get_map_file(fuuid, fsano, gen_dir=gen_dir),
+  )
 
 
 def get_map_file_for_func_file(func_path, mappings_dir=None):
-    if mappings_dir:
-        return Path(mappings_dir) / f"{Path(func_path).stem}.map"
-    else:
-        return get_maps_dir(func_path.parent.parent) / f"{Path(func_path).stem}.map"
+  if mappings_dir:
+    return Path(mappings_dir) / f"{Path(func_path).stem}.map"
+  else:
+    return get_maps_dir(func_path.parent.parent) / f"{Path(func_path).stem}.map"
+
+
+def get_artifacts(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+  return {
+    "func": get_func_file(fuuid, fsano, gen_dir),
+    "map": get_map_file(fuuid, fsano, gen_dir),
+    "prog": get_prog_file(fuuid, fsano, gen_dir),
+    "log": get_log_file(fuuid, fsano, gen_dir),
+    "sexp": get_sexp_file(fuuid, fsano, gen_dir),
+  }
 
 
 def get_simple_program(func_name, func_code, func_args):
-    return PROG_TPL.format(
-        chksum_code=CHKSUM_CODE,
-        func_code=func_code,
-        func_name=func_name,
-        func_args=", ".join(str(x) for x in func_args),
-    )
+  return PROG_TPL.format(
+    chksum_code=CHKSUM_CODE,
+    func_code=func_code,
+    func_name=func_name,
+    func_args=", ".join(str(x) for x in func_args),
+  )
 
 
 def parse_mapping(map_path):
-    return [
-        (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","))
-        for pair in [
-            tuple(line.split(" : ", maxsplit=1))
-            for line in Path(map_path).read_text().splitlines()
-        ]
+  return [
+    (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","))
+    for pair in [
+      tuple(line.split(" : ", maxsplit=1))
+      for line in Path(map_path).read_text().splitlines()
     ]
+  ]
