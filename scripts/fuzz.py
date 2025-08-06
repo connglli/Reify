@@ -275,8 +275,8 @@ class Worker:
       self.log_file_fd.close()
 
   def run(self, *, iter_limit: int, stop: Event, gen_tmo: int, test_tmo: int):
-    switch_limit = 5  # Switch to program generation every 100 functions
-    prog_limit = 10  # Limit for the number of generated program per switch
+    switch_limit = 100  # Switch to program generation every 100 functions
+    prog_limit = 2500  # Limit for the number of generated program per switch
     fopts = FuncGenOptions(
       bin="./build/bin/fgen",
       uuid=self.uuid(),
@@ -419,7 +419,7 @@ def run_worker(*, cc: str, wid: int, wdir: Path, seed: int, gen_tmo: int, test_t
     worker.close()
 
 
-def run_fuzz_loop(cc: str, *, outdir: Path, workers: int, ilimit: int):
+def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int):
   class SignalInterrupt(Exception):
     def __init__(self, sig):
       super().__init__(f"Process killed by user signal: {sig}")
@@ -571,7 +571,7 @@ def main():
   (outdir / 'command.json').write_text(json.dumps(vars(args), indent=2))
 
   # Start the fuzzing loop
-  run_fuzz_loop(
+  run_fuzz_main(
     compiler,
     workers=workers,
     ilimit=limit,
