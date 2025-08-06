@@ -256,7 +256,7 @@ def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
 # -==========================================================
 
 class Worker:
-  def __init__(self, wid: int, *, cc: str, wdir: Path):
+  def __init__(self, wid: int, *, cc: str, wdir: Path, switch_limit: int, prog_limit: int):
     self.wid = wid
     self.cc = cc
     self.wdir = wdir
@@ -269,14 +269,16 @@ class Worker:
     self.ice_dir.mkdir(parents=True, exist_ok=True)
     self.hang_dir.mkdir(parents=True, exist_ok=True)
     self.wrc_dir.mkdir(parents=True, exist_ok=True)
+    self.switch_limit = switch_limit
+    self.prog_limit = prog_limit
 
   def close(self):
     if not self.log_file_fd.closed:
       self.log_file_fd.close()
 
   def run(self, *, iter_limit: int, stop: Event, gen_tmo: int, test_tmo: int):
-    switch_limit = 100  # Switch to program generation every 100 functions
-    prog_limit = 2500  # Limit for the number of generated program per switch
+    switch_limit = self.switch_limit  # Switch to program generation every 100 functions
+    prog_limit = self.prog_limit  # Limit for the number of generated program per switch
     fopts = FuncGenOptions(
       bin="./build/bin/fgen",
       uuid=self.uuid(),
@@ -291,7 +293,11 @@ class Worker:
       limit=prog_limit,
       extra='--Xreplace-proba 0.4'
     )
-    self.log(f"Worker started: workdir={self.wdir}")
+    self.log(
+      f"Worker started: workdir={self.wdir}, "
+      f"iter_limit={iter_limit}, switch_limit={switch_limit}, prog_limit={prog_limit}, "
+      f"gen_tmo={gen_tmo}s, test_tmo={test_tmo}s"
+    )
     self.iter = 0
     while self.iter < iter_limit and not stop.is_set():
       fopts.seed = random.randint(0, 2147483647)
@@ -405,10 +411,11 @@ class Worker:
 # -==========================================================
 
 
-def run_worker(*, cc: str, wid: int, wdir: Path, seed: int, gen_tmo: int, test_tmo: int, ilimit: int, stop: Event):
+def run_worker(*, cc: str, wid: int, wdir: Path, seed: int, gen_tmo: int, test_tmo: int, ilimit: int, slimit: int,
+               plimit: int, stop: Event):
   wdir.mkdir(parents=False, exist_ok=False)
   random.seed(seed)
-  worker = Worker(wid, cc=cc, wdir=wdir)
+  worker = Worker(wid, cc=cc, wdir=wdir, switch_limit=slimit, prog_limit=plimit)
   try:
     worker.run(iter_limit=ilimit, stop=stop, gen_tmo=gen_tmo, test_tmo=test_tmo)
   except KeyboardInterrupt:
@@ -419,7 +426,7 @@ def run_worker(*, cc: str, wid: int, wdir: Path, seed: int, gen_tmo: int, test_t
     worker.close()
 
 
-def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int):
+def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: int, plimit: int):
   class SignalInterrupt(Exception):
     def __init__(self, sig):
       super().__init__(f"Process killed by user signal: {sig}")
@@ -459,6 +466,8 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int):
         'gen_tmo': gen_tmo,
         'test_tmo': test_tmo,
         'ilimit': ilimit // workers,
+        'plimit': plimit,
+        'slimit': slimit,
         'stop': stop,
       }
     )
@@ -494,25 +503,37 @@ def main():
     "-o", "--outdir",
     type=str,
     default="output",
-    help="Directory to store the output of the fuzzing process",
+    help="Directory to store the output of the fuzzing process (default: 'output')",
   )
   parser.add_argument(
     "-s", "--seed",
     type=int,
     default=-1,
-    help="Seed for the randomness of the fuzzing process (negative means no seed)",
+    help="Seed for the randomness of the fuzzing process, negative meaning no seed (default: -1)",
   )
   parser.add_argument(
     "-j", "--workers",
     type=int,
     default=os.cpu_count(),
-    help="Number of workers to use for fuzzing",
+    help=f"Number of workers to use for fuzzing (default: {os.cpu_count()})",
   )
   parser.add_argument(
     "-l", "--limit",
     type=int,
     default=2147483647,
-    help="The maximum number of fuzz iterations (non-positive means 2147483647)",
+    help="The maximum number of fuzz iterations, non-positive meaning default (default: 2147483647)",
+  )
+  parser.add_argument(
+    "--switch-limit",
+    type=int,
+    default=100,
+    help="Switch to program generation every N functions (default: 100)",
+  )
+  parser.add_argument(
+    "--prog-limit",
+    type=int,
+    default=2500,
+    help="The maximum number of programs to generate per switch (default: 2500)",
   )
   parser.add_argument(
     "compiler", type=str, help="Command to compile the C program (e.g., 'gcc -fsanitize=address -O0')"
@@ -541,6 +562,27 @@ def main():
     mlog(f"Warning: Limit ({limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.", color='yellow')
     limit = 2147483647
 
+  switch_limit = args.switch_limit
+  if switch_limit <= 0:
+    mlog(f"Error: Invalid switch limit specified: {switch_limit}. Must be a positive number", color='red')
+    sys.exit(1)
+  if switch_limit > 2147483647:
+    mlog(f"Warning: Switch limit ({switch_limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
+         color='yellow')
+    switch_limit = 2147483647
+
+  prog_limit = args.prog_limit
+  if prog_limit <= 0:
+    mlog(f"Error: Invalid program limit specified: {prog_limit}. Must be a positive number", color='red')
+    sys.exit(1)
+  if prog_limit > 2147483647:
+    mlog(f"Warning: Program limit ({prog_limit}) exceeds maximum allowed value (2147483647). Setting to 2147483647.",
+         color='yellow')
+    prog_limit = 2147483647
+
+  if switch_limit >= prog_limit:
+    mlog("Warning: Program limit is recommended to be larger than switching limit.")
+
   outdir = Path(args.outdir).resolve().absolute()
   if outdir.exists():
     mlog("Output directory already exists. Would you like to overwrite it? (Y/n)> ", color='yellow', end='',
@@ -562,7 +604,7 @@ def main():
   test_input.unlink()
   test_output.unlink()
   if not test_res.is_success():
-    mlog(f"Invalid due to {test_res.errmsg}", color='red')
+    mlog(f"Invalid: {test_res.errmsg}", color='red')
     sys.exit(1)
   else:
     mlog("Valid")
@@ -575,6 +617,8 @@ def main():
     compiler,
     workers=workers,
     ilimit=limit,
+    slimit=switch_limit,
+    plimit=prog_limit,
     outdir=outdir
   )
 
