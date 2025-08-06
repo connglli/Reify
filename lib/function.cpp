@@ -325,7 +325,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   );
   std::ostringstream main;
   main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
-  main << "int main(int argc, int* argv[])" << std::endl;
+  main << "int main(int argc, char* argv[])" << std::endl;
   main << "{" << std::endl;
   for (size_t i = 0; i < initializations.size(); i++) {
     const auto &init = initializations[i];
