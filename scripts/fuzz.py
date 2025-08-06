@@ -61,6 +61,21 @@ class FuncGenOptions:
   seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
   extra: Optional[str] = None  # Extra options to control the function generation process
 
+  def to_dict(self) -> dict:
+    return {
+      'bin': self.bin,
+      'uuid': self.uuid,
+      'sno': self.sno,
+      'outdir': str(self.outdir),
+      'verbose': self.verbose,
+      'main': self.main,
+      'sexp': self.sexp,
+      'allops': self.allops,
+      'injubs': self.injubs,
+      'seed': self.seed,
+      'extra': self.extra
+    }
+
 
 def remove_artifacts(uuid: str, sno: int, gen_dir: Path):
   for art in params.get_artifacts(uuid, sno, gen_dir=gen_dir).values():
@@ -118,6 +133,17 @@ class ProgGenOptions:
   seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
   debug = False  # Whether to print debug information
   extra: Optional[str] = None  # Extra options to control the program generation process
+
+  def to_dict(self) -> dict:
+    return {
+      'bin': self.bin,
+      'uuid': self.uuid,
+      'indir': str(self.indir),
+      'limit': self.limit,
+      'seed': self.seed,
+      'debug': self.debug,
+      'extra': self.extra
+    }
 
 
 def generate_programs(opts: ProgGenOptions) -> Optional[str]:
@@ -195,6 +221,15 @@ class TestRes:
 
   def is_execution_timeout(self) -> bool:
     return self.type == TestRes.Type.ETO
+
+  def to_dict(self) -> dict:
+    return {
+      'cmd': self.cmd,
+      'type': self.type.value,
+      'exitcode': self.exitcode,
+      'errmsg': self.errmsg or '<no-error-message>',
+      'timestamp': datetime.datetime.now().isoformat()
+    }
 
 
 def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
@@ -284,6 +319,8 @@ class Worker:
       return False
     self.log(f"Generated function: {prog}")
     self.log(f"Test the compiler with the generated function: {prog}")
+    with prog.open('a') as fout:
+      fout.write(f"\n\n// Options: {json.dumps(opts.to_dict())}")
     bina = (prog.parent / (prog.name + '.out'))
     artifacts = list(params.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values()) + [bina]
     self.test(prog, bina, artifacts=artifacts, timeout=test_tmo)
@@ -300,6 +337,8 @@ class Worker:
       if not prog.name.startswith(opts.uuid) or prog.suffix != '.c':
         continue
       self.log(f"Test the compiler with the generated program: {prog}")
+      with prog.open('a') as fout:
+        fout.write(f"\n\n// Options: {json.dumps(opts.to_dict())}")
       bina = (prog.parent / (prog.name + '.out'))
       artifacts = [prog, bina]
       self.test(prog, bina, artifacts=artifacts, timeout=test_tmo)
@@ -318,13 +357,13 @@ class Worker:
     test_res = test_compiler(self.cc, cfile=prog, ofile=bina, timeout=timeout)
     if test_res.is_internal_compiler_error():
       self.log(f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
-      self.store_bug(artifacts, self.ice_dir)
+      self.store_bug(test_res, artifacts, self.ice_dir)
     elif test_res.is_compilation_timeout():
       self.log(f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue")
-      self.store_bug(artifacts, self.hang_dir)
+      self.store_bug(test_res, artifacts, self.hang_dir)
     elif test_res.is_wrong_code():
       self.log(f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
-      self.store_bug(artifacts, self.wrc_dir)
+      self.store_bug(test_res, artifacts, self.wrc_dir)
     elif test_res.is_execution_timeout():
       self.log(f"The generated program timed out: {test_res.errmsg}")
       self.remove_all(artifacts)
@@ -335,10 +374,12 @@ class Worker:
       raise RuntimeError(
         f"Unknown test result: type={test_res.type.name}, exitcode={test_res.exitcode}, errmsg={test_res.errmsg}")
 
-  def store_bug(self, artifacts: List[Path], bug_dir: Path):
+  def store_bug(self, res: TestRes, artifacts: List[Path], bug_dir: Path):
     for art in artifacts:
       if art.exists():
         art.rename(bug_dir / art.name)
+    with (bug_dir / 'result.jsonl').open('a') as fou:
+      fou.write(json.dumps(res.to_dict(), ensure_ascii=False) + '\n')
 
   def remove_all(self, artifacts: List[Path]):
     for art in artifacts:
