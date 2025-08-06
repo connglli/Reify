@@ -31,6 +31,7 @@ import shlex
 import shutil
 import signal
 import sys
+import time
 from argparse import ArgumentParser
 from dataclasses import dataclass
 from multiprocessing import Event, Manager, Pool
@@ -546,6 +547,8 @@ def main():
     mlog(f"Setting seed for random number generation: {seed}")
     random.seed(seed)
   else:
+    seed = time.time_ns()
+    random.seed(seed)
     mlog("No seed provided, using system randomness.")
 
   workers = args.workers
@@ -610,7 +613,10 @@ def main():
     mlog("Valid")
 
   # Save the command line arguments to a JSON file
-  (outdir / 'command.json').write_text(json.dumps(vars(args), indent=2))
+  (outdir / 'command.json').write_text(json.dumps({
+    **vars(args),
+    'seed': seed
+  }, indent=2))
 
   # Start the fuzzing loop
   run_fuzz_main(
