@@ -126,9 +126,9 @@ def get_simple_program(func_name, func_code, func_args):
 
 def parse_mapping(map_path):
   return [
-    (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","))
+    (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","), int(pair[2]))
     for pair in [
-      tuple(line.split(" : ", maxsplit=1))
+      tuple(line.split(" : ", maxsplit=2))
       for line in Path(map_path).read_text().splitlines()
     ]
   ]

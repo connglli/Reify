@@ -101,7 +101,7 @@ def check_ubs_once(c_file):
 def check_ubs(func_path, map_path):
     func_code, func_name = func_path.read_text(), func_path.stem
     tmp_c_path, tmp_o_path = Path("/tmp/a.c"), Path("/tmp/a.o")
-    for map_ind, (func_args, _) in enumerate(parse_mapping(map_path)):
+    for map_ind, (func_args, _, _) in enumerate(parse_mapping(map_path)):
         tmp_c_path.write_text(get_simple_program(func_name, func_code, func_args))
         ub_res, retc, out = _check_ubs(tmp_c_path, o_file=str(tmp_o_path))
         if ub_res == UBChkRes.UB_FOUND:

@@ -359,6 +359,7 @@ std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
     for (auto x: exec.GetFinalizations()[i]) {
       mapping << x << ",";
     }
+    mapping << " : " << StatelessChecksum::Compute(exec.GetFinalizations()[i]);
     mapping << std::endl;
   }
   return mapping.str();
@@ -388,14 +389,16 @@ FunPlus::InitFinaMap FunPlus::ParseMappingCode(const std::string &mapPath) {
 
   std::string line;
   while (std::getline(mifs, line)) {
-    std::vector<std::string> iniFin = SplitStr(line, " : ", true);
+    std::vector<std::string> iniFinChk = SplitStr(line, " : ", true);
     Assert(
-        iniFin.size() == 2,
-        "Invalid mapping line, each line should be in the format of initialisation : finalization"
+        iniFinChk.size() == 3,
+        "Invalid mapping line, each line should be in the format of "
+        "initialisation : finalization : checksum. The invalid line is: %s",
+        line.c_str()
     );
 
-    std::vector<std::string> ini = SplitStr(iniFin[0], ",", true);
-    std::vector<std::string> fin = SplitStr(iniFin[1], ",", true);
+    std::vector<std::string> ini = SplitStr(iniFinChk[0], ",", true);
+    std::vector<std::string> fin = SplitStr(iniFinChk[1], ",", true);
     Assert(ini.size() == fin.size(), "The size of initialisation and finalization is different");
 
     initialisations.emplace_back(ini.size());
@@ -406,6 +409,13 @@ FunPlus::InitFinaMap FunPlus::ParseMappingCode(const std::string &mapPath) {
     std::ranges::transform(fin, finalizations.back().begin(), [](const auto &s) -> int {
       return std::stoi(s);
     });
+
+    // Ensure our checksum is correct
+    // int chksum = std::stoi(iniFinChk[2]);
+    // Assert(
+    //     chksum == StatelessChecksum::Compute(finalizations.back()),
+    //     "The checksum %d does not match the finalization [%s]", chksum, JoinStr(fin, ",").c_str()
+    // );
   }
 
   mifs.close();
