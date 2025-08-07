@@ -42,7 +42,7 @@ def _check_ubs(c_file, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
         return (
             UBChkRes.CMP_ERROR,
             e.returncode,
-            e.stdout.decode("utf-8") or "<no output>",
+            e.stdout or "<no output>",
         )
     except subprocess.TimeoutExpired:
         return UBChkRes.CMP_HANG, 0, f"compilation timeout (>{cmp_tmo}s)"
@@ -54,12 +54,12 @@ def _check_ubs(c_file, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
             check=True,
             timeout=exe_tmo,
         )
-        out = p.stdout.decode("utf-8") or "<no output>"
+        out = p.stdout or "<no output>"
         if _ub_exists_in(out):
             return UBChkRes.UB_FOUND, p.returncode, out
         return UBChkRes.UB_FREE, p.returncode, out
     except subprocess.CalledProcessError as e:
-        out = e.stdout.decode("utf-8") or "<no output>"
+        out = e.stdout or "<no output>"
         if _ub_exists_in(out):
             return UBChkRes.UB_FOUND, e.returncode, out
         return UBChkRes.EXE_ERROR, e.returncode, out

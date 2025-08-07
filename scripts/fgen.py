@@ -79,7 +79,7 @@ def gen_func(
     return True, ed_time - st_time
   except CalledProcessError as e:
     print(
-      f"GEN ERROR ({e.returncode}): {e.stdout.decode('utf-8') or '<no output>'}"
+      f"GEN ERROR ({e.returncode}): {e.stdout or '<no output>'}"
     )
     return False, None
   except subprocess.TimeoutExpired:
