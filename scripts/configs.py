@@ -42,6 +42,7 @@ ROOT_DIR = Path(__file__).parent.parent.absolute()
 
 DEFAULT_OUTPUT_DIR = ROOT_DIR / "generated"
 
+CHKSUM_FUNC = "computeStatelessChecksum"
 CHKSUM_FILE = ROOT_DIR / "res" / "cchksum.txt"
 CHKSUM_CODE = CHKSUM_FILE.read_text()
 
@@ -98,6 +99,10 @@ def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
   )
 
 
+def get_crealdb_file(gen_dir=DEFAULT_OUTPUT_DIR):
+  return gen_dir / "crealdb.json"
+
+
 def get_map_file_for_func_file(func_path, mappings_dir=None):
   if mappings_dir:
     return Path(mappings_dir) / f"{Path(func_path).stem}.map"
@@ -126,7 +131,7 @@ def get_simple_program(func_name, func_code, func_args):
 
 def parse_mapping(map_path):
   return [
-    (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","), int(pair[2]))
+    (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","), pair[2])
     for pair in [
       tuple(line.split(" : ", maxsplit=2))
       for line in Path(map_path).read_text().splitlines()
