@@ -131,7 +131,7 @@ FGEN_SEXP_OPT := $(if $(FGEN_GEN_SEXP),--sexp,)
 FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
 FGEN_AOPS_OPT := $(if $(FGEN_ALL_OPS),--allops,)
 FGEN_UBIJ_OPT := $(if $(FGEN_INJ_UBS),--injubs,)
-FGEN_EX_OPTS  := $(if $(FGEN_EX_OPTS),--extra $(FGEN_EX_OPTS),)
+FGEN_EX_OPTS  := $(if $(FGEN_EX_OPTS),--extra "$(FGEN_EX_OPTS)",)
 
 gen-func-set: fgen
 	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
