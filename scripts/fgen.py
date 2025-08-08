@@ -24,111 +24,56 @@
 #  SOFTWARE.
 
 import random
-import subprocess
 import time
 import uuid
 from argparse import ArgumentParser
-from subprocess import CalledProcessError
+from pathlib import Path
 
+from fuzz import FuncGenOptions, generate_function
 from params import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file
 from ubchk import check_ubs, check_ubs_once
-from utils import run_proc
 
 
-def gen_func(
-    exec,
-    *,
-    output,
-    sano,
-    uuid_val,
-    with_main=False,
-    with_sexp=False,
-    with_allops=False,
-    with_injubs=False,
-    verbose=False,
-    seed=None,
-    extra_opts=None,
-    timeout=60,
-):
-  try:
-    st_time = time.time()
-    cmd = [exec]
-    if with_main:
-      cmd += ["-m"]
-    if with_sexp:
-      cmd += ["-S"]
-    if with_allops:
-      cmd += ["-A"]
-    if with_injubs:
-      cmd += ["-U"]
-    if verbose:
-      cmd += ["-v"]
-    if seed:
-      cmd += ["-s", str(seed)]
-    if extra_opts:
-      cmd += extra_opts.split()
-    cmd += ["-o", str(output), "-n", str(sano), uuid_val]
-    run_proc(
-      cmd,
-      stdout=subprocess.PIPE,
-      stderr=subprocess.STDOUT,
-      check=True,
-      timeout=timeout,
-    )
-    ed_time = time.time()
-    return True, ed_time - st_time
-  except CalledProcessError as e:
-    print(
-      f"GEN ERROR ({e.returncode}): {e.stdout or '<no output>'}"
-    )
+def generate(opts: FuncGenOptions, *, timeout: int = 60):
+  st_time = time.time()
+  func, errmsg = generate_function(opts, timeout=timeout)
+  ed_time = time.time()
+  if func is None:
+    print(f"GEN ERROR (.): {errmsg or '<no output>'}")
     return False, None
-  except subprocess.TimeoutExpired:
-    print(f"GEN HANG (.): generation timeout (>{timeout}s)")
-    return False, None
+  return True, ed_time - st_time
 
 
-def main(
-    *, output, limit, seed, sexp, mainf, allops, injubs, check, timeout, extra_opts
-):
-  if seed >= 0:
-    random.seed(seed)
+def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int):
+  if fopts.seed >= 0:
+    random.seed(fopts.seed)
     next_seed = lambda: random.randint(0, 2147483647)
   else:
     next_seed = lambda: None
-  func_uuid, func_sano = str(uuid.uuid4()), 0
   print(
-    f"UUID={func_uuid}, output={output}, "
+    f"UUID={fopts.uuid}, output={fopts.outdir}, "
     f"limit={limit if limit != 0 else '<INF>'}, "
-    f"seed={seed if seed >= 0 else '<RND>'}, "
-    f"sexp={sexp}, main={mainf}, allops={allops}, injubs={injubs}, "
+    f"seed={fopts.seed if fopts.seed >= 0 else '<RND>'}, "
+    f"sexp={fopts.sexp}, main={fopts.main}, allops={fopts.allops}, injubs={fopts.injubs}, "
     f"check={check}, timeout={timeout}s, "
-    f"extra='{extra_opts}'"
+    f"extra={'\'' + fopts.extra + '\'' if fopts.extra else '<NONE>'}"
   )
-  while limit == 0 or func_sano < limit:
-    print(f"[{func_sano}]: Generate ...", end=" ", flush=True)
-    succ, elapsed = gen_func(
-      "./build/bin/fgen",
-      output=output,
-      sano=func_sano,
-      uuid_val=func_uuid,
-      timeout=timeout,
-      verbose=check,
-      with_main=mainf,
-      with_sexp=sexp,
-      with_allops=allops,
-      with_injubs=injubs,
-      seed=next_seed(),
-      extra_opts=extra_opts,
-    )
+  fopts.sno = 0
+  while limit == 0 or fopts.sno < limit:
+    print(f"[{fopts.sno}]: Generate ...", end=" ", flush=True)
+    fopts.seed = next_seed()
+    succ, elapsed = generate(fopts, timeout=timeout)
     if succ:
       print(f"SUCC (time={elapsed}s)")
     if check and succ:
-      print(f"[{func_sano}]: CheckUBs ...", end=" ", flush=True)
-      check_ubs(*get_func_map_files(func_uuid, func_sano, gen_dir=output))
-      if mainf:
-        check_ubs_once(get_prog_file(func_uuid, func_sano, gen_dir=output))
+      print(f"[{fopts.sno}]: Check UBs ...", end=" ", flush=True)
+      check_ubs(*get_func_map_files(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
+      if fopts.main:
+        check_ubs_once(
+          get_prog_file(fopts.uuid, fopts.sno, gen_dir=fopts.outdir)
+        )
       print("NO UBs")
-    func_sano += 1
+    fopts.sno += 1
 
 
 if __name__ == "__main__":
@@ -191,23 +136,29 @@ if __name__ == "__main__":
     # be generated within 3 seconds, then it won't be generated even given 15 seconds.
     # Thus, using 3s significantly improves the throughput of us.
     default=3,
-    help="timeout (in seconds) for generating a program",
+    help="timeout (in seconds) for generating a function",
   )
   parser.add_argument(
-    "--extra", type=str, default="", help="extra options passed to fgen"
+    "--extra", type=str, default=None, help="extra options passed to fgen"
   )
 
   args = parser.parse_args()
 
-  main(
-    output=args.output,
+  run_gen_loop(
+    FuncGenOptions(
+      bin="./build/bin/fgen",
+      uuid=str(uuid.uuid4()),
+      sno=0,
+      outdir=Path(args.output).resolve().absolute(),
+      verbose=args.check,
+      main=args.main,
+      sexp=args.sexp,
+      allops=args.allops,
+      injubs=args.injubs,
+      seed=args.seed,  # We save it as the initial seed
+      extra=args.extra,
+    ),
     limit=args.limit,
-    seed=args.seed,
-    sexp=args.sexp,
-    mainf=args.main,
-    allops=args.allops,
-    injubs=args.injubs,
     check=args.check,
     timeout=args.timeout,
-    extra_opts=args.extra,
   )
