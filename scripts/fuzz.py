@@ -40,8 +40,8 @@ from subprocess import TimeoutExpired, CalledProcessError, PIPE, STDOUT
 from typing import Optional, Tuple, List
 from uuid import uuid4 as uuidgen
 
-import params
-import utils
+import cmdline
+import configs
 
 
 # -==========================================================
@@ -96,8 +96,8 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
     if opts.extra:
       cmd += shlex.split(opts.extra)
     cmd += ["-o", str(opts.outdir), "-n", str(opts.sno), opts.uuid]
-    utils.check_out(cmd, timeout=timeout)
-    result = params.get_prog_file(opts.uuid, opts.sno, gen_dir=opts.outdir), None
+    cmdline.check_out(cmd, timeout=timeout)
+    result = configs.get_prog_file(opts.uuid, opts.sno, gen_dir=opts.outdir), None
   except CalledProcessError as e:
     result = None, (
       f"exit with {e.returncode}, message: {e.stdout or '<no output>'}"
@@ -107,7 +107,7 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
   except Exception as e:
     result = None, f"unexpected error: {e}"
   if result[0] is None:
-    for art in params.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values():
+    for art in configs.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values():
       art.unlink(missing_ok=True)
   return result
 
@@ -144,7 +144,7 @@ def generate_programs(opts: ProgGenOptions) -> Optional[str]:
     if opts.extra:
       cmd += shlex.split(opts.extra)
     cmd += [opts.uuid]
-    utils.check_out(cmd)
+    cmdline.check_out(cmd)
     return None
   except CalledProcessError as e:
     return f"exit with {e.returncode}, message: {e.stdout or '<no output>'}"
@@ -223,7 +223,7 @@ class TestRes:
 def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
   comp_cmd = f"{cc} -o {ofile} {cfile}"
   try:
-    proc = utils.run_proc(shlex.split(comp_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 10, check=False)
+    proc = cmdline.run_proc(shlex.split(comp_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 10, check=False)
   except TimeoutExpired as e:
     return TestRes(comp_cmd, TestRes.Type.CTO, exitcode=-1, errmsg=str(e))
   if proc.returncode != 0:
@@ -231,7 +231,7 @@ def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
   exec_cmd = f"{ofile}"
   full_cmd = f"{comp_cmd}; {exec_cmd}"
   try:
-    proc = utils.run_proc(shlex.split(exec_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 20, check=False)
+    proc = cmdline.run_proc(shlex.split(exec_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 20, check=False)
   except TimeoutExpired as e:
     return TestRes(full_cmd, TestRes.Type.ETO, exitcode=-1, errmsg=str(e))
   if proc.returncode != 0:
@@ -316,7 +316,7 @@ class Worker:
     with prog.open('a') as fout:
       fout.write(f"\n\n// Options: {json.dumps(opts.to_dict())}")
     bina = (prog.parent / (prog.name + '.out'))
-    artifacts = list(params.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values()) + [bina]
+    artifacts = list(configs.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values()) + [bina]
     self.test(prog, bina, artifacts=artifacts, timeout=test_tmo)
     return True
 
@@ -327,7 +327,7 @@ class Worker:
       self.log(f"Failure: {errmsg}", color="yellow")
       return
     self.log(f"Testing the compiler with the generated programs")
-    for prog in params.get_progs_dir(opts.indir).iterdir():
+    for prog in configs.get_progs_dir(opts.indir).iterdir():
       if not prog.name.startswith(opts.uuid) or prog.suffix != '.c':
         continue
       self.log(f"Test the compiler with the generated program: {prog}")
@@ -339,10 +339,10 @@ class Worker:
 
   def remove_useless_funcs(self, opts: FuncGenOptions):
     for i in range(opts.sno + 1):
-      self.remove_all(params.get_artifacts(opts.uuid, i, gen_dir=opts.outdir).values())
+      self.remove_all(configs.get_artifacts(opts.uuid, i, gen_dir=opts.outdir).values())
 
   def remove_useless_progs(self, opts: ProgGenOptions):
-    for prog in params.get_progs_dir(opts.indir).iterdir():
+    for prog in configs.get_progs_dir(opts.indir).iterdir():
       if not prog.name.startswith(opts.uuid) or prog.suffix != '.c':
         continue
       prog.unlink(missing_ok=True)

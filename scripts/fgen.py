@@ -29,12 +29,12 @@ import uuid
 from argparse import ArgumentParser
 from pathlib import Path
 
+from configs import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file
 from fuzz import FuncGenOptions, generate_function
-from params import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file
 from ubchk import check_ubs, check_ubs_once
 
 
-def generate(opts: FuncGenOptions, *, timeout: int = 60):
+def generate(opts: FuncGenOptions, *, timeout: int):
   st_time = time.time()
   func, errmsg = generate_function(opts, timeout=timeout)
   ed_time = time.time()

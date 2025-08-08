@@ -26,34 +26,33 @@
 import sys
 from pathlib import Path
 
-from params import get_map_file_for_func_file, get_funcs_dir
-
+from configs import get_map_file_for_func_file, get_funcs_dir
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: retouch <gen_dir>")
-        exit(1)
-    # Iterate over all .c files in the procedures directory
-    for func_path in get_funcs_dir(Path(sys.argv[1])).iterdir():
-        if func_path.is_dir() or func_path.suffix != ".c":
-            continue
-        print(f"INSPECT {func_path.stem}")
-        map_path = get_map_file_for_func_file(func_path)
-        # Check if we'd delete the generated function
-        del_cond = (
-            # The .c is empty
-            func_path.stat().st_size == 0
-            or
-            # The .map does not exist
-            not map_path.exists()
-            or
-            # The .map is empty
-            map_path.stat().st_size == 0
-        )
-        if not del_cond:
-            continue
-        # Delete the corresponding mapping file if it exists
-        if map_path.exists():
-            map_path.unlink()
-        func_path.unlink()
-        print(f"DELETE {func_path.stem}")
+  if len(sys.argv) != 2:
+    print("Usage: retouch <gen_dir>")
+    exit(1)
+  # Iterate over all .c files in the procedures directory
+  for func_path in get_funcs_dir(Path(sys.argv[1])).iterdir():
+    if func_path.is_dir() or func_path.suffix != ".c":
+      continue
+    print(f"INSPECT {func_path.stem}")
+    map_path = get_map_file_for_func_file(func_path)
+    # Check if we'd delete the generated function
+    del_cond = (
+      # The .c is empty
+        func_path.stat().st_size == 0
+        or
+        # The .map does not exist
+        not map_path.exists()
+        or
+        # The .map is empty
+        map_path.stat().st_size == 0
+    )
+    if not del_cond:
+      continue
+    # Delete the corresponding mapping file if it exists
+    if map_path.exists():
+      map_path.unlink()
+    func_path.unlink()
+    print(f"DELETE {func_path.stem}")
