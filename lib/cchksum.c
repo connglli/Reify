@@ -93,7 +93,8 @@ static uint32_t context_free_crc32_4bytes(uint32_t context, uint32_t val) {
 
 int computeStatelessChecksum(int num_args, int args[]) {
   uint32_t checksum = 0xFFFFFFFFUL;
-  for (int i = 0; i < num_args; ++i) {
+  int i = 0;
+  for (; i < num_args; ++i) {
     checksum = context_free_crc32_4bytes(checksum, args[i]);
   }
   checksum = uint32_to_int32(checksum ^ 0xFFFFFFFFUL);
