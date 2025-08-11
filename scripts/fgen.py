@@ -113,7 +113,7 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
     f"limit={limit if limit != 0 else '<INF>'}, "
     f"seed={fopts.seed if fopts.seed >= 0 else '<RND>'}, "
     f"sexp={fopts.sexp}, main={fopts.main}, allops={fopts.allops}, injubs={fopts.injubs}, "
-    f"check={check}, crealdb={crealdb} timeout={timeout}s, "
+    f"check={check}, crealdb={crealdb}, timeout={timeout}s, "
     f"extra={'\'' + fopts.extra + '\'' if fopts.extra else '<NONE>'}"
   )
   fopts.sno = 0

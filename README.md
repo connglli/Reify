@@ -28,6 +28,7 @@ We can generate functions and programs using the following `make` commands.
 # When FGEN_GEN_SEXP is set to any value (even false), its S expression will also be generated following each function. This is required when we are going to generate new programs using them as seeds.
 # When FGEN_ALL_OPS is set to any value (even false), the generation will use all kinds of operators for terms and expression
 # When FGEN_INJ_UBS is set to any value (even false), the generation will inject undefined behaviors into the unexecuted basic blocks
+# When FGEN_CREALDB is set to any value (even false), the generation will generate a function database file (JSON) for Creal
 # When tailing with -check-ub, each function (and program) will be checked against undefined behavior
 # Note, the double quotes inside the single quotes cannot be ignored
 [GEN_SEED=0]                                \
@@ -37,6 +38,7 @@ We can generate functions and programs using the following `make` commands.
 [FGEN_GEN_SEXP=true]                        \
 [FGEN_ALL_OPS=true]                         \
 [FGEN_INJ_UBS=true]                         \
+[FGEN_CREALDB=true]                         \
 [FGEN_EX_OPS='...']                         \
 make gen-func-set[-check-ub]
 
@@ -73,6 +75,8 @@ generation) include the following sub-directories:
   generating new programs
 - `programs`: A set of programs that can be solely compiled (into executables), corresponding to those functions in
   the `functions` directory
+- `crealdb.json`: A JSON file describing the generated functions in [Creal](https://github.com/UniCodeSphere/Creal)
+  format, which can serve as a customized function database to Creal. This file exists when `FGEN_CREALDB` is enabled.
 
 Afterward, we can further generate 100 new programs with the above generated functions as seeds:
 
