@@ -195,6 +195,9 @@ def mlog(msg, *, color: Optional[str] = None, end: str = '\n', flush: bool = Fal
 # -==========================================================
 
 
+EXITCODE_TIMEOUT = 100001
+
+
 @dataclass
 class TestRes:
   @enum.unique
@@ -225,12 +228,26 @@ class TestRes:
   def is_execution_timeout(self) -> bool:
     return self.type == TestRes.Type.ETO
 
+  def exitcode_str(self) -> str:
+    if self.exitcode == 0:
+      return "Success"
+    elif self.exitcode == EXITCODE_TIMEOUT:
+      return "Timeout"
+    elif self.exitcode > 0:
+      return "Unknown"
+    else:
+      try:
+        return f"{signal.Signals(-self.exitcode).name} ({signal.strsignal(-self.exitcode)})"
+      except ValueError:
+        return "Unknown"
+
   def to_dict(self) -> dict:
     return {
       'cmd': self.cmd,
       'type': self.type.value,
       'exitcode': self.exitcode,
-      'errmsg': self.errmsg or '<no-error-message>',
+      'exitcode_str': self.exitcode_str(),
+      'error_msg': self.errmsg or '<no-error-message>',
       'timestamp': datetime.datetime.now().isoformat()
     }
 
@@ -240,7 +257,7 @@ def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
   try:
     proc = cmdline.run_proc(shlex.split(comp_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 10, check=False)
   except TimeoutExpired as e:
-    return TestRes(comp_cmd, TestRes.Type.CTO, exitcode=-1, errmsg=str(e))
+    return TestRes(comp_cmd, TestRes.Type.CTO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
     return TestRes(comp_cmd, TestRes.Type.ICE, exitcode=-proc.returncode, errmsg=proc.stdout)
   exec_cmd = f"{ofile}"
@@ -248,7 +265,7 @@ def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
   try:
     proc = cmdline.run_proc(shlex.split(exec_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 20, check=False)
   except TimeoutExpired as e:
-    return TestRes(full_cmd, TestRes.Type.ETO, exitcode=-1, errmsg=str(e))
+    return TestRes(full_cmd, TestRes.Type.ETO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
     return TestRes(full_cmd, TestRes.Type.WRC, exitcode=proc.returncode, errmsg=proc.stdout)
   return TestRes(full_cmd, TestRes.Type.SUC, exitcode=0, errmsg=None)
