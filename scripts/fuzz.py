@@ -576,8 +576,6 @@ class Worker:
 
   def test(self, prog: Path, bina: Path, *, artifacts: List[Path], timeout: int, extra_cc_opts: str = ''):
     test_res = test_compiler(f"{self.wconf.cc} {extra_cc_opts}", cfile=prog, ofile=bina, timeout=timeout)
-    if is_creal_mutant(prog):
-      test_res.type = TestRes.Type.WRC
     if test_res.is_internal_compiler_error():
       self.log(f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
       self.store_bug(test_res, artifacts, self.ice_dir)
