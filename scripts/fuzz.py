@@ -613,7 +613,7 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
     wdir = outdir / f"fuzz_proc_{wid:05}"  # Working directory for each worker
     seed = rand_int()  # Random seed for each worker
     mlog(
-      f"Request worker: "
+      f"Requesting worker: "
       f"wid={wid}, workdir={wdir}, seed={seed}, "
       f"iter_limit={ilimit}, prog_limit={plimit}, switch_limit={slimit}, "
       f"creal.creal={creal.creal_home if creal else 'disabled'}, "
@@ -640,6 +640,7 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
         "seed": seed,
       },
     )
+    mlog("Requested worker successfully")
   pool.close()
 
   mlog("Press Ctrl-C to stop the fuzzing process at any time ...")

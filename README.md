@@ -2,8 +2,8 @@
 
 ## Prerequisite
 
-Z3: Build and install Z3's C++ binding
-following [Build Z3 using Make and GCC/Clang](https://github.com/Z3Prover/z3?tab=readme-ov-file#building-z3-using-make-and-gccclang).
+1. z3: `apt install libz3-dev`.
+2. z: `apt install libz-dev`.
 
 ## Build GraphFuzz
 
@@ -105,7 +105,8 @@ process to save some space.
 
 ## Fuzzing with Creal
 
-Install [Creal](https://github.com/UniCodeSphere/Creal) and then add `--creal /path/to/Creal --csmith /path/to/Csmith` to `fuzz.py` for example:
+Install [Creal](https://github.com/UniCodeSphere/Creal) and then add `--creal /path/to/Creal --csmith /path/to/Csmith`
+to `fuzz.py` for example:
 
 ```sh
 python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 --creal /path/to/Creal --csmith /path/to/Csmith 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
