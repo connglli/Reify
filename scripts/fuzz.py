@@ -34,10 +34,12 @@ import sys
 import time
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from multiprocessing import Manager, Pool
+from multiprocessing import Manager, Pool, Queue
 from multiprocessing.synchronize import Event
 from pathlib import Path
+from queue import Empty as QueueIsEmpty
 from subprocess import TimeoutExpired, CalledProcessError, PIPE, STDOUT
+from threading import Thread
 from typing import Optional, Tuple, List
 from uuid import uuid4 as uuidgen
 
@@ -367,9 +369,10 @@ class WorkerRunOptions:
 
 
 class Worker:
-  def __init__(self, wid: int, *, wconf: WorkerConf):
+  def __init__(self, wid: int, *, wconf: WorkerConf, msgq: Queue):
     self.wid = wid
     self.wconf = wconf
+    self.msgq = msgq
     self.ice_dir = wconf.wdir / 'intern_errors'
     self.hang_dir = wconf.wdir / 'prog_hangs'
     self.wrc_dir = wconf.wdir / 'wrong_codes'
@@ -409,12 +412,14 @@ class Worker:
       dst=self.creal_dir,
       mutants=self.wconf.creal_limit_per_func
     )
-    self.log(
-      f"Worker started: workdir={self.wconf.wdir}, "
+    start_msg = (
+      f"Worker started successfully: workdir={self.wconf.wdir}, "
       f"iter_limit={ropts.limit}, switch_limit={self.wconf.switch_limit}, "
       f"prog_limit={self.wconf.prog_limit}, creal_limit={self.wconf.creal_limit}, "
       f"gen_tmo={ropts.gen_tmo}s, test_tmo={ropts.test_tmo}s, creal_tmo={ropts.creal_tmo}s"
     )
+    self.log(start_msg)
+    self.notify(start_msg)
     self.iter = 0
     while self.iter < ropts.limit and not ropts.stop.is_set():
       fopts.seed = rand_int()
@@ -577,6 +582,9 @@ class Worker:
       if art.exists():
         art.unlink(missing_ok=True)
 
+  def notify(self, msg: str):
+    self.msgq.put(f"Worker@{self.wid}: {msg}")
+
   def log(self, msg: str, *, color: Optional[str] = None, end: str = '\n'):
     log(
       f"Worker@{self.wid}",
@@ -593,18 +601,35 @@ class Worker:
 # -==========================================================
 
 
-def run_worker(*, wid: int, wconf: WorkerConf, ropts: WorkerRunOptions, seed: int):
+def run_worker(*, wid: int, wconf: WorkerConf, ropts: WorkerRunOptions, seed: int, msgq: Queue):
   wconf.wdir.mkdir(parents=False, exist_ok=False)
   random.seed(seed)
-  worker = Worker(wid, wconf=wconf)
+  worker = Worker(wid, wconf=wconf, msgq=msgq)
   try:
     worker.run(ropts)
+    worker.notify(f"Worker exited normally")
   except KeyboardInterrupt:
+    worker.notify(f"Worker interrupted by user's Ctrl-C")
     worker.log(f"Worker interrupted by user's Ctrl-C", color="red")
   except Exception as e:
+    worker.notify(f"Worker interrupted by exception: {e}")
     worker.log(f"Worker interrupted by exception: {e}", color="red")
   finally:
     worker.close()
+
+
+def run_msgq(msgq: Queue, stop: Event):
+  while not stop.is_set():
+    try:
+      msg = msgq.get(timeout=15)  # seconds
+    except QueueIsEmpty:
+      continue
+    mlog(msg)
+  mlog(f"Waiting for remaining messages to come ...", color="yellow")
+  time.sleep(5)  # Give some time for the last messages to be processed
+  while not msgq.empty():
+    msg = msgq.get(timeout=.5)
+    mlog(msg)
 
 
 def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: int, plimit: int,
@@ -623,8 +648,11 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
 
   mlog("Start fuzzing process ...")
   manager = Manager()
-  stop = manager.Event()
-  pool = Pool(workers)
+  stop = manager.Event()  # An event to notify all workers to stop
+  msgq = manager.Queue(maxsize=workers + 1)  # A message queue to notify any events
+  msgq_thread = Thread(target=run_msgq, args=(msgq, stop))
+  msgq_thread.start()
+  worker_pool = Pool(workers)
   results = {}
   for wid in range(workers):
     wdir = outdir / f"fuzz_proc_{wid:05}"  # Working directory for each worker
@@ -638,7 +666,7 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
       f"creal_limit={crlimit if creal else 'disabled'}, "
       f"compiler=`{cc}`"
     )
-    results[wid] = pool.apply_async(
+    results[wid] = worker_pool.apply_async(
       run_worker,
       kwds={
         "wid": wid,
@@ -655,15 +683,17 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
           stop=stop,
         ),
         "seed": seed,
+        "msgq": msgq,
       },
     )
-    mlog("Requested worker successfully")
-  pool.close()
+  worker_pool.close()
 
-  mlog("Press Ctrl-C to stop the fuzzing process at any time ...")
+  mlog("Press Ctrl-C to stop the fuzzing process at any time ...", color="yellow")
 
   try:
-    pool.join()
+    worker_pool.join()
+    mlog("All workers have finished their tasks successfully.")
+    stop.set()
   except SignalInterrupt as e:
     mlog(f"Fuzzing process was interrupted by user signal: {e.sig.name}", color='red')
     stop.set()
@@ -675,8 +705,10 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
     stop.set()
   finally:
     mlog("Fuzzing process is shutting down ...")
-    pool.join()
-    mlog("Exit")
+    worker_pool.join()
+    msgq_thread.join()
+
+  mlog(f"Exit. All results are stored inside {outdir}.", color='green')
 
 
 def main():
