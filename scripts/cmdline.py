@@ -60,6 +60,11 @@ def check_run(cmd: List[str], *, timeout=None, cwd=None):
   return run_proc(cmd, stdout=PIPE, stderr=STDOUT, timeout=timeout, check=True, cwd=cwd).returncode
 
 
+def get_out(cmd: List[str], *, timeout=None, cwd=None):
+  proc = run_proc(cmd, stdout=PIPE, stderr=STDOUT, timeout=timeout, check=False, cwd=cwd)
+  return proc.stdout
+
+
 def check_out(cmd: List[str], *, timeout=None, cwd=None):
   proc = run_proc(cmd, stdout=PIPE, stderr=STDOUT, timeout=timeout, check=True, cwd=cwd)
   return proc.stdout

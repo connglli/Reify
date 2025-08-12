@@ -105,11 +105,11 @@ process to save some space.
 
 ## Fuzzing with Creal
 
-Install [Creal](https://github.com/UniCodeSphere/Creal) and then add `--creal /path/to/Creal --csmith /path/to/Csmith`
-to `fuzz.py` for example:
+Install [Creal](https://github.com/UniCodeSphere/Creal) and then add
+`--creal /path/to/Creal --csmith /path/to/Csmith --ccomp /path/to/CompCert` to `fuzz.py` for example:
 
 ```sh
-python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 --creal /path/to/Creal --csmith /path/to/Csmith 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
+python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 --creal /path/to/Creal --csmith /path/to/Csmith  --ccomp /path/to/CompCert 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
 ```
 
 ## Other Scripts

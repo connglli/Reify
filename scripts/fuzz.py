@@ -304,6 +304,7 @@ class CrealOptions:
 class CrealEnv:
   creal_home: Path  # Path to the Creal home directory
   csmith_home: Path  # Path to the Csmith home directory
+  ccomp_home: Path  # Path to the CompCert home directory
 
   def creal_bin(self) -> Path:
     return self.creal_home / 'creal.py'
@@ -317,6 +318,13 @@ class CrealEnv:
   def csmith_incl_dir(self) -> Path:
     return self.csmith_home / 'include'
 
+  def ccomp_bin(self) -> Path:
+    return self.ccomp_home / 'bin' / 'ccomp'
+
+
+def is_creal_mutant(m: Path) -> bool:
+  return m.is_file() and m.suffix == ".c" and "_syn" in m.stem
+
 
 def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], Optional[str]]:
   cmd = [opts.bin, "--dst", str(opts.dst), "--syn-prob", str(opts.prob), "--num-mutants", str(opts.mutants)]
@@ -328,13 +336,31 @@ def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], O
     cmd += ["--rand-seed", str(opts.seed)]
   try:
     cmdline.check_out(cmd, timeout=timeout)
-    return [m for m in opts.dst.iterdir() if m.is_file() and m.suffix == ".c" and "_syn" in m.stem], None
+    return [m for m in opts.dst.iterdir() if is_creal_mutant(m)], None
   except TimeoutExpired as e:
     return None, f"Creal generation timed out: {e}"
   except CalledProcessError as e:
     return None, f"Creal generation failed with exit code {e.returncode}: {e.stdout or '<no output>'}"
   except Exception as e:
     return None, f"Unexpected error during Creal generation: {e}"
+
+
+# -==========================================================
+# CompCert and its utility functions
+# -==========================================================
+
+
+def verify_ubfree(ccomp: str, prog: str, timeout: int) -> Tuple[bool, Optional[str]]:
+  try:
+    out = cmdline.get_out([
+      ccomp, '-fall', '-interp', prog
+    ], timeout=timeout)
+    if "ERROR: Undefined behavior" in out:
+      return False, out
+    else:
+      return True, None
+  except TimeoutExpired as e:
+    return False, f"CompCert verification timed out: {e}"
 
 
 # -==========================================================
@@ -550,6 +576,8 @@ class Worker:
 
   def test(self, prog: Path, bina: Path, *, artifacts: List[Path], timeout: int, extra_cc_opts: str = ''):
     test_res = test_compiler(f"{self.wconf.cc} {extra_cc_opts}", cfile=prog, ofile=bina, timeout=timeout)
+    if is_creal_mutant(prog):
+      test_res.type = TestRes.Type.WRC
     if test_res.is_internal_compiler_error():
       self.log(f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
       self.store_bug(test_res, artifacts, self.ice_dir)
@@ -557,10 +585,19 @@ class Worker:
       self.log(f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue")
       self.store_bug(test_res, artifacts, self.hang_dir)
     elif test_res.is_wrong_code():
+      # There're cases that Creal-generated mutants are not UB-free
+      if self.wconf.creal_env and is_creal_mutant(prog):
+        ccomp = self.wconf.creal_env.ccomp_bin()
+        self.log(f"Verifying Creal mutants towards UBs: ccomp={ccomp}, prog={prog}")
+        noUBs, errmsg = verify_ubfree(str(ccomp), str(prog), timeout=timeout * 2)
+        if not noUBs:
+          self.log(f"UBs detected in the mutant (skipping it): {errmsg}", color="yellow")
+          self.remove_all(artifacts)
+          return
       self.log(f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
       self.store_bug(test_res, artifacts, self.wrc_dir)
     elif test_res.is_execution_timeout():
-      self.log(f"The generated program timed out: {test_res.errmsg}")
+      self.log(f"The generated program timed out (skipping it): {test_res.errmsg}")
       self.remove_all(artifacts)
     elif test_res.is_success():
       self.log("Compiler passed the test")
@@ -767,6 +804,12 @@ def main():
     help="Path to Csmith's home directory; this option is required when Creal is enabled (default: None, not used)",
   )
   parser.add_argument(
+    "--ccomp",
+    type=str,
+    default=None,
+    help="Path to CompCert's home directory; this option is required when Creal is enabled (default: None, not used)",
+  )
+  parser.add_argument(
     "--creal-limit",
     type=int,
     default=500,
@@ -846,9 +889,13 @@ def main():
     if not args.csmith:
       mlog(f"Error: Csmith's home directory is required when Creal is enabled.", color='red')
       sys.exit(1)
+    if not args.ccomp:
+      mlog(f"Error: CompCert's home directory is required when Creal is enabled.", color='red')
+      sys.exit(1)
     creal = Path(args.creal).resolve().absolute()
     csmith = Path(args.csmith).resolve().absolute()
-    creal_env = CrealEnv(creal, csmith)
+    ccomp = Path(args.ccomp).resolve().absolute()
+    creal_env = CrealEnv(creal, csmith, ccomp)
     if not creal.exists():
       mlog(f"Error: The given Creal's home directory does not exist: {creal}", color='red')
       sys.exit(1)
@@ -872,6 +919,15 @@ def main():
       sys.exit(1)
     if not creal_env.csmith_incl_dir().exists():
       mlog(f"Error: Csmith's home directory does not contain '{creal_env.csmith_incl_dir().name}'", color='red')
+      sys.exit(1)
+    if not ccomp.exists():
+      mlog(f"Error: The given CompCert's home directory does not exist: {ccomp}", color='red')
+      sys.exit(1)
+    if not ccomp.is_dir():
+      mlog(f"Error: The given CompCert's home directory is not a directory: {ccomp}", color='red')
+      sys.exit(1)
+    if not creal_env.ccomp_bin().exists():
+      mlog(f"Error: CompCert's home directory does not contain '{creal_env.ccomp_bin().name}'", color='red')
       sys.exit(1)
     mlog(f"Testing if Creal is valid ...")
     test_out = outdir / "realsmith"
