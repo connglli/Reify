@@ -417,15 +417,16 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
 # -==========================================================
 
 
-def verify_ubfree(ccomp: str, prog: str, timeout: int) -> Tuple[bool, Optional[str]]:
+def verify_ubfree(
+    ccomp: str, prog: str, *, timeout: int, extra: Optional[List[str]] = None
+) -> Tuple[bool, Optional[str]]:
   try:
-    out = cmdline.get_out([
-      ccomp, '-fall', '-interp', prog
-    ], timeout=timeout)
+    extra = extra if extra else []
+    out = cmdline.get_out([ccomp, '-fall'] + extra + ['-interp', prog], timeout=timeout)
     if "ERROR: Undefined behavior" in out:
       return False, out
     else:
-      return True, None
+      return True, out
   except TimeoutExpired as e:
     return False, f"CompCert verification timed out: {e}"
 
@@ -618,8 +619,10 @@ class Worker:
       with mut.open('a') as fou:
         fou.write(f"\n\n// Creal Options: {json.dumps(opts.to_dict())}")
       bina = (mut.parent / (mut.name + '.out'))
-      self.test(mut, bina, artifacts=[mut, bina], timeout=timeout,
-                extra_cc_opts=f"-I{self.wconf.creal_env.csmith_home}/include")
+      self.test(
+        mut, bina, artifacts=[mut, bina], timeout=timeout,
+        extra_cc_opts=f"-I{self.wconf.creal_env.csmith_incl_dir()}"
+      )
       if mut.exists():  # No bugs found
         mut.unlink(missing_ok=False)  # Remove the mutant file after testing
         bina.unlink(missing_ok=True)
@@ -653,9 +656,13 @@ class Worker:
       # There're cases that Creal-generated mutants are not UB-free
       if self.wconf.creal_env and is_creal_mutant(prog):
         ccomp = self.wconf.creal_env.ccomp_bin()
-        self.log(f"Verifying Creal mutants towards UBs: ccomp={ccomp}, prog={prog}")
-        noUBs, errmsg = verify_ubfree(str(ccomp), str(prog), timeout=timeout * 2)
-        if not noUBs:
+        if str(self.wconf.creal_env.csmith_incl_dir()) in extra_cc_opts:
+          extra_ccomp_opts = [f"-I{self.wconf.creal_env.csmith_incl_dir()}"]
+        else:
+          extra_ccomp_opts = []
+        self.log(f"Verifying Creal mutants towards UBs: ccomp={ccomp}, prog={prog}, extra={' '.join(extra_ccomp_opts)}")
+        ubfree, errmsg = verify_ubfree(str(ccomp), str(prog), extra=extra_ccomp_opts, timeout=timeout * 2)
+        if not ubfree:
           self.log(f"UBs detected in the mutant (skipping it): {errmsg}", color="yellow")
           self.remove_all(artifacts)
           return
