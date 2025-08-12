@@ -29,8 +29,8 @@ import uuid
 from argparse import ArgumentParser
 from pathlib import Path
 
-from configs import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file, parse_mapping, CHKSUM_FUNC, get_crealdb_file
-from fuzz import FuncGenOptions, generate_function
+from configs import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file, get_crealdb_file
+from fuzz import FuncGenOptions, generate_function, crealize
 from ubchk import check_ubs, check_ubs_once
 
 
@@ -46,60 +46,6 @@ def generate(opts: FuncGenOptions, *, timeout: int):
 
 def get_tmp_crealdb_file(gen_dir: Path):
   return gen_dir / "crealdb.tmp.jsonl"
-
-
-def crealize(cdb_file: Path, func_file: Path, map_file: Path):
-  func_name = func_file.stem
-  func_code = func_file.read_text()
-  func_maps = parse_mapping(map_file)
-  num_maps = len(func_maps)
-  num_params = len(func_maps[0][0])
-
-  # Change the checksum function into a checksum check function
-  # and add the new checksum check function to the code.
-  chkchk_name = func_name + "_checksum"
-  func_code = func_code.replace(CHKSUM_FUNC, chkchk_name)
-  func_code = f"""\
-int {chkchk_name}(int size, int args[]) {{
-  int outs[{num_maps}][{num_params}] = {{
-{",\n".join(["    {" + ",".join([str(x) for x in m[1]]) + "}" for m in func_maps])}
-  }};
-  int chks[{num_maps}] = {{
-    {",".join([str(m[2]) for m in func_maps])}
-  }};
-  for (int i = 0; i < {num_maps}; i ++) {{
-    int found = 1;
-    for (int j = 0; j < {num_params}; j ++) {{
-      if (args[j] != outs[i][j]) {{
-        found = 0;
-        break; // Checksum mismatch
-      }}
-    }}
-    if (found) {{
-      return chks[i]; // Return the checksum value
-    }}
-  }}
-  abort(); // No matching checksum found
-  return -2147483648; // Should never reach here
-}}\n
-""" + func_code
-
-  with cdb_file.open("a") as fout:
-    fout.write(json.dumps({
-      "function_name": func_name,
-      "parameter_types": ["int"] * num_params,
-      "return_type": "int",
-      "function": func_code,
-      "io_list": [[
-        [int(x) for x in m[0]], int(m[2])
-      ] for m in func_maps],
-      "misc": [],
-      "src_file": "",
-      "include_headers": ["stdlib.h"],
-      "include_sources": [],
-    }) + "\n")
-
-  return True
 
 
 def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int, crealdb: bool):

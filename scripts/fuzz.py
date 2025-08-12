@@ -45,7 +45,6 @@ from uuid import uuid4 as uuidgen
 
 import cmdline
 import configs
-import fgen
 
 
 # -==========================================================
@@ -345,6 +344,74 @@ def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], O
     return None, f"Unexpected error during Creal generation: {e}"
 
 
+CREALIZE_TPL = """
+int {chkchk_name}(int size, int args[]) {{
+  int outs[{num_maps}][{num_params}] = {{
+    {outputs}
+  }};
+  int chks[{num_maps}] = {{
+    {checksums}
+  }};
+  for (int i = 0; i < {num_maps}; i ++) {{
+    int found = 1;
+    for (int j = 0; j < {num_params}; j ++) {{
+      if (args[j] != outs[i][j]) {{
+        found = 0;
+        break; // Checksum mismatch
+      }}
+    }}
+    if (found) {{
+      return chks[i]; // Return the checksum value
+    }}
+  }}
+  abort(); // No matching checksum found
+  return -2147483648; // Should never reach here
+}}
+
+{func_code}
+"""
+
+
+def crealize(cdb_file: Path, func_file: Path, map_file: Path):
+  func_name = func_file.stem
+  func_code = func_file.read_text()
+  func_maps = configs.parse_mapping(map_file)
+  num_maps = len(func_maps)
+  if num_maps == 0:
+    return False
+  num_params = len(func_maps[0][0])
+
+  # Change the checksum function into a checksum check function
+  # and add the new checksum check function to the code.
+  chkchk_name = func_name + "_checksum"
+  func_code = func_code.replace(configs.CHKSUM_FUNC, chkchk_name)
+  func_code = CREALIZE_TPL.format(
+    chkchk_name=chkchk_name,
+    num_maps=num_maps,
+    num_params=num_params,
+    outputs=",\n".join(["    {" + ",".join([str(x) for x in m[1]]) + "}" for m in func_maps]),
+    checksums=",".join([str(m[2]) for m in func_maps]),
+    func_code=func_code,
+  )
+
+  with cdb_file.open("a") as fout:
+    fout.write(json.dumps({
+      "function_name": func_name,
+      "parameter_types": ["int"] * num_params,
+      "return_type": "int",
+      "function": func_code,
+      "io_list": [[
+        [int(x) for x in m[0]], int(m[2])
+      ] for m in func_maps],
+      "misc": [],
+      "src_file": "",
+      "include_headers": ["stdlib.h"],  # for abort()
+      "include_sources": [],
+    }) + "\n")
+
+  return True
+
+
 # -==========================================================
 # CompCert and its utility functions
 # -==========================================================
@@ -524,7 +591,7 @@ class Worker:
         continue  # Skip if the function or map file does not exist
       if not func.exists() or not map.exists():
         continue  # Skip if the function or map file does not exist
-      fgen.crealize(tmp_file, func, map)
+      crealize(tmp_file, func, map)
     with tmp_file.open() as fin:
       items = []
       for line in fin:
