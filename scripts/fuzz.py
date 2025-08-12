@@ -344,7 +344,9 @@ def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], O
     return None, f"Unexpected error during Creal generation: {e}"
 
 
-
+# TODO: There're chances that we missed some compiler bugs because
+#       we're unable to distinguish whether it is due to compiler's
+#       bugs or Creal's bugs when the checksum does not match.
 CREALIZE_TEMPLATE = """
 int {chkchk_name}(int size, int args[]) {{
   int outs[{num_maps}][{num_params}] = {{
