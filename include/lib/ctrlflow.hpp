@@ -143,12 +143,16 @@ public:
   // Get the number of basic blocks
   [[nodiscard]] int NumBbls() const { return static_cast<int>(basicblocks.size()); }
 
+  // Get the basic block with the given ID
   [[nodiscard]] const BblSketch &GetBbl(int id) const {
     Assert(
         id >= 0 && id < NumBbls(), "Invalid basic block id %d, must be in [0, %d)", id, NumBbls()
     );
     return basicblocks[id];
   }
+
+  // Set a graph set for sampling the underlying graphs
+  void SetGraphSet(std::string file) { graph.SetGraphSet(std::move(file)); }
 
   // Sample an execution and stop once we executed the exit block
   // or we have reached the limit of our execution steps

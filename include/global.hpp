@@ -72,6 +72,9 @@ struct GlobalOptions {
 
   // The number of basic blocks for each control flow graph
   int NumBblsPerFun = 10;
+  // Probability of sampling a base graph from an existing control-flow graph
+  // database (if available) during control-flow graph generation
+  double SampleBaseGraphProba = 0.5;
   // The number of allowed variables for each function
   int NumVarsPerFun = 8;
   // The allowed number of loops per function
@@ -142,6 +145,7 @@ struct GlobalOptions {
       ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>())
       ("U,Xenable-ub-inject", "Enable the injection of undefined behaviors to those unexecuted basic blocks", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xinject-ub-proba", "Probability of the selection of unexecuted blocks to inject undefined behaviors", cxxopts::value<double>())
+      ("Xsample-bg-proba", "Probability of sampling a base graph from the given graph database", cxxopts::value<double>())
       ;
     // clang-format on
   }
@@ -255,6 +259,24 @@ struct GlobalOptions {
       if (UBInjectionProba > 1) {
         std::cerr << "Error: The probability for selecting basic blocks to inject UBs "
                   << "(--Xinject-ub-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("Xsample-bg-proba")) {
+      SampleBaseGraphProba = args["Xsample-bg-proba"].as<double>();
+      if (SampleBaseGraphProba <= 0) {
+        std::cerr << "Error: The probability for sampling a base graph from a graph database "
+                     "(--Xsample-bg-proba) cannot be less than or equal to 0. It should be "
+                     "within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+      if (SampleBaseGraphProba > 1) {
+        std::cerr << "Error: The probability for sampling a base graph from a graph database "
+                  << "(--Xsample-bg-proba) cannot be be larger than 1. It should be within "
+                     "0 to 1."
                   << std::endl;
         exit(1);
       }

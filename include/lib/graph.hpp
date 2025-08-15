@@ -28,9 +28,34 @@
 
 #include <algorithm>
 #include <set>
+#include <string>
 #include <vector>
 
+#include "json.hpp"
 #include "lib/dbgutils.hpp"
+
+/// A SimpleGraphSet is a set of simple graphs stored in a JSON file.
+struct SimpleGraphSet {
+public:
+  using SimpleGraph = std::vector<std::vector<int>>;
+  static const SimpleGraph NO_AVAILABLE_GRAPHS;
+
+  explicit SimpleGraphSet(std::string file) : file(std::move(file)) {
+    Assert(!this->file.empty(), "The database file path cannot be empty");
+  }
+
+  /// Sample a graph of which the number of nodes is at least `atLeastNumNodes`.
+  /// If no such graph is found, return NO_AVAILABLE_GRAPHS.
+  const SimpleGraph &SampleGraph(int atLeastNumNodes);
+
+private:
+  static SimpleGraph parseGraph(const nlohmann::json &graph);
+
+private:
+  const std::string file;
+  std::vector<nlohmann::json> data{};
+  std::vector<SimpleGraph> graphs{};
+};
 
 /// A GraphPlus is random graph generator
 class GraphPlus {
@@ -42,10 +67,13 @@ public:
     Assert(maxOutdeg >= 2, "The maximum outdegree must be greater than 2, but got %d", maxOutdeg);
   }
 
+  // Get the number of nodes in the graph
   [[nodiscard]] int NumNodes() const { return static_cast<int>(adjTab.size()); }
 
+  // Get the set of successors of the node with the given ID
   [[nodiscard]] const std::set<int> &GetAdj(int i) const { return adjTab[i]; }
 
+  // Get the adjacency table of the graph
   [[nodiscard]] const std::vector<std::set<int>> &GetAdjTab() const { return adjTab; }
 
   // Check if u->v is reachable, i.e., there exists a path from node u to node v.
@@ -56,6 +84,11 @@ public:
 
   // Check if the graph has cycles.
   [[nodiscard]] bool HasCycles() const;
+
+  // Set the graph set for sampling base graphs
+  void SetGraphSet(std::string file) {
+    graphSet = std::make_unique<SimpleGraphSet>(std::move(file));
+  }
 
   // Walk the graph randomly from start and stop if we encounter end or reach max steps.
   // Return the path we've been through (including start and the end).
@@ -110,6 +143,7 @@ private:
 private:
   const size_t maxOutdeg;
   std::vector<std::set<int>> adjTab{};
+  std::unique_ptr<SimpleGraphSet> graphSet{};
 };
 
 #endif // GRAPHFUZZ_GRAPH_HPP

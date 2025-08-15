@@ -25,11 +25,102 @@
 
 #include "lib/graph.hpp"
 
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <queue>
 
+#include "global.hpp"
+#include "lib/logger.hpp"
 #include "lib/random.hpp"
+
+const SimpleGraphSet::SimpleGraph SimpleGraphSet::NO_AVAILABLE_GRAPHS{};
+
+const SimpleGraphSet::SimpleGraph &SimpleGraphSet::SampleGraph(int atLeastNumNodes) {
+  if (data.empty()) {
+    std::ifstream ifs(file);
+    std::string line;
+    while (std::getline(ifs, line)) {
+      if (line.empty()) {
+        continue;
+      }
+      try {
+        data.push_back(nlohmann::json::parse(line));
+      } catch (const nlohmann::json::exception &e) {
+        Panic(
+            "Failed to parse JSON line\n"
+            "Line: %s\n"
+            "File: %s\n"
+            "Error: %s",
+            line.c_str(), file.c_str(), e.what()
+        );
+      }
+      const auto &item = data.back();
+      Assert(
+          item.is_object(), "The item at line %lu is not an object: %s", data.size(), line.c_str()
+      );
+      Assert(
+          item.contains("num_bbls"), "The item at line %lu is missing the 'num_bbls' field: %s",
+          data.size(), line.c_str()
+      );
+      Assert(
+          item.contains("adj_tab"), "The item at line %lu is missing the 'adj_tab' field: %s",
+          data.size(), line.c_str()
+      );
+    }
+    ifs.close();
+  }
+  auto rand = Random::Get().Uniform(0, static_cast<int>(data.size()) - 1);
+  for (auto tries = 0; tries < 100; tries++) {
+    auto idx = rand();
+    if (idx >= static_cast<int>(graphs.size())) {
+      for (size_t i = graphs.size(); i <= static_cast<size_t>(idx); i++) {
+        graphs.push_back(std::move(parseGraph(data[i])));
+      }
+    }
+    auto &g = graphs[idx];
+    if (g.size() >= static_cast<size_t>(atLeastNumNodes)) {
+      return g;
+    }
+  }
+  // All attempts are failed, return an empty graph to notify an error
+  return NO_AVAILABLE_GRAPHS;
+}
+
+SimpleGraphSet::SimpleGraph SimpleGraphSet::parseGraph(const nlohmann::json &object) {
+  SimpleGraph g{};
+  const int numNodes = object["num_bbls"].get<int>();
+  for (int i = 0; i < numNodes; i++) {
+    g.emplace_back();
+  }
+  for (auto it = object["adj_tab"].begin(); it != object["adj_tab"].end(); ++it) {
+    Assert(
+        it->is_array(), "Adjacency list at index %ld is not an array",
+        (it - object["adj_tab"].begin())
+    );
+    Assert(
+        it->size() == 3, "Adjacency list at index %ld does not have 3 elements",
+        (it - object["adj_tab"].begin())
+    );
+    const int sId = (*it)[0].get<int>();
+    Assert(sId < numNodes, "Source node id %d is out of bounds [0, %d)", sId, numNodes);
+    if (const int t1Id = (*it)[1].get<int>(); t1Id != -1) {
+      Assert(
+          t1Id < numNodes, "Target node at index %d id %d is out of bounds [-1, %d)", t1Id, 0,
+          numNodes
+      );
+      g[sId].push_back(t1Id);
+    }
+    if (const int t2Id = (*it)[2].get<int>(); t2Id != -1) {
+      Assert(
+          t2Id < numNodes, "Target node at index %d id %d is out of bounds [-1, %d)", t2Id, 1,
+          numNodes
+      );
+      g[sId].push_back(t2Id);
+    }
+  }
+  return g;
+}
 
 bool GraphPlus::IsReachable(const int u, const int v) const {
   std::vector visited(NumNodes(), false);
@@ -139,27 +230,63 @@ std::vector<int> GraphPlus::SampleGraph(const bool consistent, const int maxStep
 }
 
 void GraphPlus::Generate(const bool acyclic) {
-  auto randTarget = Random::Get().Uniform(0, NumNodes() - 1);
-  auto randTarNum = Random::Get().Uniform(2, static_cast<int>(maxOutdeg));
+  bool hasBaseGraph = false;
 
-  for (int node = 0; node < NumNodes() - 1; node++) {
-    if (randTarget() % 2 == 0 || node == NumNodes() - 2) {
-      int target = randTarget();
-      while (target == 0 || target == node) {
-        target = randTarget();
+  if (graphSet != nullptr &&
+      Random::Get().UniformReal()() < GlobalOptions::Get().SampleBaseGraphProba) {
+    // Sample a base graph from the graph database if available
+    SimpleGraphSet::SimpleGraph base = graphSet->SampleGraph(NumNodes());
+    if (base != SimpleGraphSet::NO_AVAILABLE_GRAPHS) {
+      Log::Get().Out() << "Sampled a base graph from the graph database: #bbls=" << base.size()
+                       << std::endl;
+      Assert(
+          base.size() >= static_cast<size_t>(NumNodes()),
+          "The sampled base graph from the graph database has less than %d nodes, but got %lu",
+          NumNodes(), base.size()
+      );
+      adjTab.clear();
+      // FIXME: There're chances that the base graph is overly large. We need better strategies to
+      // shrink the graph while maintaining its "good" properties. Also, the shrinked graph (e.g., a
+      // subgraph) should be self-contained, not containing nodes out of it.
+      for (int node = 0; node < static_cast<int>(base.size()); node++) {
+        adjTab.emplace_back();
+        for (int target: base[node]) {
+          addEdge(node, target);
+        }
       }
-      addEdge(node, target);
-    } else {
-      std::set<int> targets;
-      const int numTargets = randTarNum();
+      // The exit node should not have any successor
+      Assert(
+          adjTab.back().empty(),
+          "The exit node has %lu successors after sampling a base graph from the graph database",
+          adjTab.back().size()
+      );
+      hasBaseGraph = true;
+    }
+  }
 
-      for (int i = 0; i < numTargets; i++) {
+  if (!hasBaseGraph) {
+    auto randTarget = Random::Get().Uniform(0, NumNodes() - 1);
+    auto randTarNum = Random::Get().Uniform(2, static_cast<int>(maxOutdeg));
+
+    for (int node = 0; node < NumNodes() - 1; node++) {
+      if (randTarget() % 2 == 0 || node == NumNodes() - 2) {
         int target = randTarget();
-        while (target == 0 || target == node || targets.contains(target)) {
+        while (target == 0 || target == node) {
           target = randTarget();
         }
         addEdge(node, target);
-        targets.insert(target);
+      } else {
+        std::set<int> targets;
+        const int numTargets = randTarNum();
+
+        for (int i = 0; i < numTargets; i++) {
+          int target = randTarget();
+          while (target == 0 || target == node || targets.contains(target)) {
+            target = randTarget();
+          }
+          addEdge(node, target);
+          targets.insert(target);
+        }
       }
     }
   }

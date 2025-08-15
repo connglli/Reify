@@ -112,6 +112,17 @@ Install [Creal](https://github.com/UniCodeSphere/Creal) and then add
 python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 --creal /path/to/Creal --csmith /path/to/Csmith  --ccomp /path/to/CompCert 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
 ```
 
+## Integraging Existing Graphs
+
+The function generation can start from control-flow graphs sampled from other programs. For example, one can gather a graph database from YARPGen-generated programs, then feed the database into fgen for function generation.
+
+```sh
+python scripts/ggen.py -g yarpgen --yarpgen /path/to/yarpgen /path/to/database.jsonl
+python scripts/fgen.py ... --extra '--unstable-graphdb /path/to/database.jsonl' ...
+```
+
+By so, fgen will sample a control-flow graph from the database and populate statements in the graph to generate new functions.
+
 ## Other Scripts
 
 There're some other useful scripts.

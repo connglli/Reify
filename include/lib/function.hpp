@@ -74,10 +74,14 @@ public:
     return NumBbls() - 1; // Following our CFG, the exit block is always the last basic block
   }
 
+  // Get the build function from the generator
   [[nodiscard]] symir::Funct *GetFun() const {
     Assert(fun != nullptr, "The function has not yet been generated");
     return fun.get();
   }
+
+  // Set a graph set for sampling control-flow graphs
+  void SetGraphSet(std::string file) { cfg.SetGraphSet(std::move(file)); }
 
   // Generate the function with random control-flow, statements, and symbols
   void Generate();

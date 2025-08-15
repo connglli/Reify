@@ -80,6 +80,7 @@ void signalHandler(int signum) {
 struct FunGenOpts {
   std::string uuid, sno;
   std::string output;
+  std::optional<std::string> graphdb;
   bool main;
   bool sexpression;
   bool javaclass;
@@ -93,6 +94,7 @@ struct FunGenOpts {
       ("n,sno", "A sample number as the second identifier", cxxopts::value<std::string>())
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("g,unstable-graphdb", "Path to the JSONL file of a graph database for guiding graph generation", cxxopts::value<std::string>())
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("S,sexpression", "Also generate the S Expression of the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -154,6 +156,21 @@ struct FunGenOpts {
       Random::Get().Seed(seed);
     }
 
+    std::optional<std::string> graphdb{};
+    if (args.count("unstable-graphdb")) {
+      const std::string file = args["unstable-graphdb"].as<std::string>();
+      if (file.empty()) {
+        std::cerr << "Error: The graph database file (--unstable-graphdb) is not a valid path."
+                  << std::endl;
+        exit(1);
+      }
+      if (!std::filesystem::exists(file)) {
+        std::cerr << "Error: The graph database file (--unstable-graphdb) does not exist: " << file
+                  << std::endl;
+        exit(1);
+      }
+      graphdb = file;
+    }
     const bool main = args["main"].as<bool>();
     const bool sexpression = args["sexpression"].as<bool>();
     const bool javaclass = args["unstable-javaclass"].as<bool>();
@@ -165,6 +182,7 @@ struct FunGenOpts {
         .uuid = uuid,
         .sno = sno,
         .output = output,
+        .graphdb = graphdb,
         .main = main,
         .sexpression = sexpression,
         .javaclass = javaclass,
@@ -178,6 +196,7 @@ int main(int argc, char **argv) {
 
   std::string uuid = cliOpts.uuid;
   std::string sno = cliOpts.sno;
+  std::optional<std::string> graphdb = cliOpts.graphdb;
   bool mainfun = cliOpts.main;
   bool sexpression = cliOpts.sexpression;
   bool javaclass = cliOpts.javaclass;
@@ -209,6 +228,10 @@ int main(int argc, char **argv) {
       GlobalOptions::Get().NumBblsPerFun, GlobalOptions::Get().MaxNumLoopsPerFun,
       GlobalOptions::Get().MaxNumBblsPerLoop
   );
+  if (graphdb.has_value()) {
+    std::cout << "WARNING: Using the graph database may cause timeout too frequently." << std::endl;
+    fun.SetGraphSet(graphdb.value());
+  }
   fun.Generate();
 
   // Populate symbols through the the execution path
