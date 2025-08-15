@@ -665,7 +665,9 @@ class Worker:
           extra_ccomp_opts = [f"-I{self.wconf.creal_env.csmith_incl_dir()}"]
         else:
           extra_ccomp_opts = []
-        self.log(f"Verifying Creal-generated mutant towards UBs: ccomp={ccomp}, prog={prog}, extra={' '.join(extra_ccomp_opts)}")
+        self.log(
+          f"Verifying Creal-generated mutant towards UBs: ccomp={ccomp}, prog={prog}, extra={' '.join(extra_ccomp_opts)}"
+        )
         ubfree, errmsg = verify_ubfree(str(ccomp), str(prog), extra=extra_ccomp_opts, timeout=timeout * 2)
         if not ubfree:
           self.log(f"UBs detected in the mutant (skipping it): {errmsg}", color="yellow")
@@ -917,7 +919,7 @@ def main():
     mlog(f"Warning: Number of workers ({workers}) exceeds available CPU cores ({os.cpu_count()}).", color='yellow')
 
   limit = args.limit
-  if limit < 0:
+  if limit <= 0:
     limit = MAX_I32
   elif limit > MAX_I32:
     mlog(f"Warning: Limit ({limit}) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.",
