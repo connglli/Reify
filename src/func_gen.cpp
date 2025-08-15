@@ -295,6 +295,9 @@ int main(int argc, char **argv) {
 
   // Generate a Java class if necessary
   if (javaclass) {
+    std::cout << "WARNING: The Java class generation is unstable and may not work as expected "
+                 "(common failures include bytecode verification failures."
+              << std::endl;
     std::filesystem::create_directories(GetJavaClassesDir(outputDirectory));
     Log::Get().OpenSection("Java Class Generation");
     // TODO: Copy the checksum classes to the output directory if they are not already there

@@ -287,6 +287,7 @@ def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
     elif cfg.num_bbls() <= 2 or cfg.num_succs() <= 5:
       mwarning(f"Small CFG: Skipping.")
       continue
+    # TODO: More strategies to cut large CFGs
     results.append(cfg)
     mlog(">> Added")
   return results
