@@ -347,6 +347,7 @@ def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], O
 # TODO: There're chances that we missed some compiler bugs because
 #       we're unable to distinguish whether it is due to compiler's
 #       bugs or Creal's bugs when the checksum does not match.
+CREALIZE_CHK_SIGN = "exit(101)"
 CREALIZE_TEMPLATE = """
 int {chkchk_name}(int size, int args[]) {{
   int outs[{num_maps}][{num_params}] = {{
@@ -367,7 +368,7 @@ int {chkchk_name}(int size, int args[]) {{
       return chks[i]; // Return the checksum value
     }}
   }}
-  abort(); // No checksum found, signal an error
+  {chkchk_signal}; // No checksum found, signal an error
   return -2147483648; // Should never reach here
 }}
 
@@ -394,6 +395,7 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
     num_params=num_params,
     outputs=",\n".join(["    {" + ",".join([str(x) for x in m[1]]) + "}" for m in func_maps]),
     checksums=",".join([str(m[2]) for m in func_maps]),
+    chkchk_signal=CREALIZE_CHK_SIGN,
     func_code=func_code,
   )
 
@@ -408,7 +410,7 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
       ] for m in func_maps],
       "misc": [],
       "src_file": "",
-      "include_headers": ["stdlib.h"],  # for abort()
+      "include_headers": ["stdlib.h"],  # for exit()
       "include_sources": [],
     }) + "\n")
 
@@ -669,14 +671,18 @@ class Worker:
           f"Verifying Creal-generated mutant towards UBs: ccomp={ccomp}, prog={prog}, extra={' '.join(extra_ccomp_opts)}"
         )
         ubfree, errmsg = verify_ubfree(str(ccomp), str(prog), extra=extra_ccomp_opts, timeout=timeout * 2)
-        if not ubfree:
-          self.log(f"UBs detected in the mutant (skipping it): {errmsg}", color="yellow")
+        # CompCert recognizes exit() as UB but llubi (dtcxzyw/llvm-ub-aware-interpreter) does not
+        if not ubfree:  # Creal generated mutant with UBs, we drop it
+          if CREALIZE_CHK_SIGN in errmsg:  # For this case, Creal's mutant is UB-free, but incorrect
+            self.log(f"Creal generated UB-free yet checksum mismatching mutant (skip): {errmsg}", color="yellow")
+          else:
+            self.log(f"Creal generated UB-seeded mutant (skip): {errmsg}", color="yellow")
           self.remove_all(artifacts)
           return
       self.log(f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
       self.store_bug(test_res, artifacts, self.wrc_dir)
     elif test_res.is_execution_timeout():
-      self.log(f"The generated program timed out (skipping it): {test_res.errmsg}")
+      self.log(f"The generated program timed out (skip): {test_res.errmsg}")
       self.remove_all(artifacts)
     elif test_res.is_success():
       self.log("Compiler passed the test")
