@@ -305,7 +305,7 @@ void ProgPlus::GenerateCode(const fs::path &file, bool debug, bool staticModifie
   const std::vector<int> *initialisation = &(mappings[0].first[index]);
   const std::vector<int> *finalization = &(mappings[0].second[index]);
   int checksum = StatelessChecksum::Compute(*finalization);
-  oss << "    printf(\"%d,\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
+  oss << "    printf(\"%d\\n\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
       << ", " << functions[0]->GetName() << "(";
   for (size_t i = 0; i < initialisation->size(); ++i) {
     oss << (*initialisation)[i];
