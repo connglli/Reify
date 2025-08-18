@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_UBINJECT_HPP
-#define GRAPHFUZZ_UBINJECT_HPP
+#ifndef REIFY_UBINJECT_HPP
+#define REIFY_UBINJECT_HPP
 
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
@@ -129,4 +129,4 @@ private:
   std::map<std::string, int> versions{}; // The SSA version table for each variable
 };
 
-#endif // GRAPHFUZZ_UBINJECT_HPP
+#endif // REIFY_UBINJECT_HPP

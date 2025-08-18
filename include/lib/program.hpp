@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_PROGRAM_HPP
-#define GRAPHFUZZ_PROGRAM_HPP
+#ifndef REIFY_PROGRAM_HPP
+#define REIFY_PROGRAM_HPP
 
 #include <memory>
 #include <string>
@@ -56,4 +56,4 @@ private:
   std::vector<FunPlus::InitFinaMap> mappings{};
 };
 
-#endif // GRAPHFUZZ_PROGRAM_HPP
+#endif // REIFY_PROGRAM_HPP

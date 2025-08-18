@@ -24,8 +24,8 @@
 // SOFTWARE.
 
 
-#ifndef GRAPHFUZZ_CHKSUM_HPP
-#define GRAPHFUZZ_CHKSUM_HPP
+#ifndef REIFY_CHKSUM_HPP
+#define REIFY_CHKSUM_HPP
 
 #include <string>
 #include <vector>
@@ -75,4 +75,4 @@ private:
 };
 
 
-#endif // GRAPHFUZZ_CHKSUM_HPP
+#endif // REIFY_CHKSUM_HPP

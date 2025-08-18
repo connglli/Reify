@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_STRUTILS_HPP
-#define GRAPHFUZZ_STRUTILS_HPP
+#ifndef REIFY_STRUTILS_HPP
+#define REIFY_STRUTILS_HPP
 
 #include <algorithm>
 #include <sstream>
@@ -84,4 +84,4 @@ static std::string &StripStr(std::string &s) {
   return s;
 }
 
-#endif // GRAPHFUZZ_STRUTILS_HPP
+#endif // REIFY_STRUTILS_HPP

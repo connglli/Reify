@@ -1,11 +1,11 @@
-# GraphFuzz
+# Reify
 
 ## Prerequisite
 
 1. z3: `apt install libz3-dev`.
 2. z: `apt install libz-dev`.
 
-## Build GraphFuzz
+## Build Reify
 
 ```sh
 # Build all targets
@@ -112,16 +112,18 @@ Install [Creal](https://github.com/UniCodeSphere/Creal) and then add
 python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 --creal /path/to/Creal --csmith /path/to/Csmith  --ccomp /path/to/CompCert 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
 ```
 
-## Integraging Existing Graphs
+## Integrating Existing Graphs
 
-The function generation can start from control-flow graphs sampled from other programs. For example, one can gather a graph database from YARPGen-generated programs, then feed the database into fgen for function generation.
+The function generation can start from control-flow graphs sampled from other programs. For example, one can gather a
+graph database from YARPGen-generated programs, then feed the database into fgen for function generation.
 
 ```sh
 python scripts/ggen.py -g yarpgen --yarpgen /path/to/yarpgen /path/to/database.jsonl
 python scripts/fgen.py ... --extra '--unstable-graphdb /path/to/database.jsonl' ...
 ```
 
-By so, fgen will sample a control-flow graph from the database and populate statements in the graph to generate new functions.
+By so, fgen will sample a control-flow graph from the database and populate statements in the graph to generate new
+functions.
 
 ## Other Scripts
 

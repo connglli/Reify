@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_LANG_HPP
-#define GRAPHFUZZ_LANG_HPP
+#ifndef REIFY_LANG_HPP
+#define REIFY_LANG_HPP
 
 #include <cstdint>
 #include <functional>
@@ -1479,4 +1479,4 @@ namespace symir {
   };
 } // namespace symir
 
-#endif // GRAPHFUZZ_LANG_HPP
+#endif // REIFY_LANG_HPP

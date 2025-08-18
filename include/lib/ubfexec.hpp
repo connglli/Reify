@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_UBFEXEC_HPP
-#define GRAPHFUZZ_UBFEXEC_HPP
+#ifndef REIFY_UBFEXEC_HPP
+#define REIFY_UBFEXEC_HPP
 
 #include "lib/function.hpp"
 #include "lib/ubfree.hpp"
@@ -122,4 +122,4 @@ private:
   std::vector<std::vector<int>> finalizations{};
 };
 
-#endif // GRAPHFUZZ_UBFEXEC_HPP
+#endif // REIFY_UBFEXEC_HPP

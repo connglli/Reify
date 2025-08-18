@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_GLOBAL_HPP
-#define GRAPHFUZZ_GLOBAL_HPP
+#ifndef REIFY_GLOBAL_HPP
+#define REIFY_GLOBAL_HPP
 
 #include <climits>
 #include <filesystem>
@@ -395,8 +395,8 @@ static std::filesystem::path GetMappingPath(
   return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
-) {
+static std::filesystem::path
+GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
 }
@@ -432,11 +432,11 @@ static std::filesystem::path GetGenLogPath(
   }
 }
 
-static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
-) {
+static std::filesystem::path
+GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetLoggingsDir(functionPath.parent_path().parent_path()) /
          GetLoggingNameForFunctionName(functionPath.stem());
 }
 
 
-#endif // GRAPHFUZZ_GLOBAL_HPP
+#endif // REIFY_GLOBAL_HPP

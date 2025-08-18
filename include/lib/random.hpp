@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_RANDOM_HPP
-#define GRAPHFUZZ_RANDOM_HPP
+#ifndef REIFY_RANDOM_HPP
+#define REIFY_RANDOM_HPP
 
 #include <functional>
 #include <random>
@@ -67,4 +67,4 @@ private:
 };
 
 
-#endif // GRAPHFUZZ_RANDOM_HPP
+#endif // REIFY_RANDOM_HPP

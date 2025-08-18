@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_NAMING_HPP
-#define GRAPHFUZZ_NAMING_HPP
+#ifndef REIFY_NAMING_HPP
+#define REIFY_NAMING_HPP
 
 #include <string>
 
@@ -55,4 +55,4 @@ static std::string NameCondConst(const int block, const int stmt) {
 }
 
 
-#endif // GRAPHFUZZ_NAMING_HPP
+#endif // REIFY_NAMING_HPP

@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_LOGGER_HPP
-#define GRAPHFUZZ_LOGGER_HPP
+#ifndef REIFY_LOGGER_HPP
+#define REIFY_LOGGER_HPP
 
 #include <ostream>
 #include <string>
@@ -54,4 +54,4 @@ private:
   int section = 0;
 };
 
-#endif // GRAPHFUZZ_LOGGER_HPP
+#endif // REIFY_LOGGER_HPP

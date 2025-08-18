@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_TYPEUTILS_HPP
-#define GRAPHFUZZ_TYPEUTILS_HPP
+#ifndef REIFY_TYPEUTILS_HPP
+#define REIFY_TYPEUTILS_HPP
 
 #include <cstdint>
 #include <cstring>
@@ -37,4 +37,4 @@ D safe_reinterpret_cast(S src) {
   return dst;
 }
 
-#endif // GRAPHFUZZ_TYPEUTILS_HPP
+#endif // REIFY_TYPEUTILS_HPP

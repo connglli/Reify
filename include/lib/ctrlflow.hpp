@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_GRAPHPLUS_HPP
-#define GRAPHFUZZ_GRAPHPLUS_HPP
+#ifndef REIFY_GRAPHPLUS_HPP
+#define REIFY_GRAPHPLUS_HPP
 
 #include <algorithm>
 #include <memory>
@@ -181,4 +181,4 @@ private:
   std::vector<BblSketch> basicblocks{};
 };
 
-#endif // GRAPHFUZZ_GRAPHPLUS_HPP
+#endif // REIFY_GRAPHPLUS_HPP

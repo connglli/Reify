@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef GRAPHFUZZ_GRAPH_HPP
-#define GRAPHFUZZ_GRAPH_HPP
+#ifndef REIFY_GRAPH_HPP
+#define REIFY_GRAPH_HPP
 
 #include <algorithm>
 #include <set>
@@ -34,7 +34,7 @@
 #include "json.hpp"
 #include "lib/dbgutils.hpp"
 
-/// A SimpleGraphSet is a set of simple graphs stored in a JSON file.
+/// A SimpleGraphSet is a set of simple graphs stored in a JSONL file.
 struct SimpleGraphSet {
 public:
   using SimpleGraph = std::vector<std::vector<int>>;
@@ -146,4 +146,4 @@ private:
   std::unique_ptr<SimpleGraphSet> graphSet{};
 };
 
-#endif // GRAPHFUZZ_GRAPH_HPP
+#endif // REIFY_GRAPH_HPP
