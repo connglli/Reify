@@ -30,6 +30,8 @@ import tempfile
 import time
 from abc import abstractmethod, ABC
 from argparse import ArgumentParser
+from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired
 from typing import Optional, Tuple, List
@@ -224,7 +226,7 @@ class CfgSkel:
   def num_bbls(self) -> int:
     return len(self.bbls)
 
-  def num_succs(self) -> int:
+  def num_jmps(self) -> int:
     return sum(len(s) for s in self.succs)
 
   def add_bbl(self, n: str) -> None:
@@ -280,11 +282,11 @@ def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
       # for a in edge.get_attributes():
       #   mlog(f"  {a} = {edge.get_attributes()[a]}")
       cfg.set_succ(source, destination, which=which)
-    mlog(f">> Parsed CFG with {cfg.num_bbls()} basic blocks and {cfg.num_succs()} successors.")
-    if cfg.num_bbls() == 0 and cfg.num_succs() == 0:
+    mlog(f">> Parsed CFG with {cfg.num_bbls()} basic blocks and {cfg.num_jmps()} block jumps.")
+    if cfg.num_bbls() == 0 and cfg.num_jmps() == 0:
       mwarning(f"Empty CFG: Skipping.")
       continue
-    elif cfg.num_bbls() <= 2 or cfg.num_succs() <= 5:
+    elif cfg.num_bbls() <= 2 or cfg.num_jmps() <= 5:
       mwarning(f"Small CFG: Skipping.")
       continue
     # TODO: More strategies to cut large CFGs
@@ -293,11 +295,43 @@ def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
   return results
 
 
+@dataclass
+class GenStats:
+  num_graphs: int = 0
+  num_bbls: int = 0
+  num_jmps: int = 0
+  time_spent: float = 0.0
+  bbl_dist: Counter = field(default_factory=Counter)
+  edges_dist: Counter = field(default_factory=Counter)
+
+  def contrib(self, g: CfgSkel, t: float):
+    self.num_graphs += 1
+    self.num_bbls += g.num_bbls()
+    self.num_jmps += g.num_jmps()
+    self.time_spent += t
+    self.bbl_dist[g.num_bbls()] += 1
+    self.edges_dist[g.num_jmps()] += 1
+
+  @property
+  def num_bbls_per(self) -> float:
+    return self.num_bbls / self.num_graphs if self.num_graphs > 0 else 0.0
+
+  @property
+  def num_jmps_per(self) -> float:
+    return self.num_jmps / self.num_graphs if self.num_graphs > 0 else 0.0
+
+  @property
+  def time_spent_per(self) -> float:
+    return self.time_spent / self.num_graphs if self.num_graphs > 0 else 0.0
+
+
 def run_gen_loop(gid: str, *, pgen: BitCodeProgGen, llvm: LLVM, limit: int, output: Path, timeout: int):
   outdir = Path(tempfile.mkdtemp(prefix=f"ggen-{gid}-", dir=tempfile.gettempdir()))
   mlog(f"Working on: {outdir}")
+  stats = GenStats()
   counter = 0
   while limit <= 0 or counter < limit:
+    time_per = time.time()
     fname = f"{gid}_{counter:08}"
     mlog(f"=> {counter}: Generating LLVM program with ID {fname} ... ", color='blue')
     bcprog, errmsg = pgen.next(name=fname, outdir=outdir, seed=rand_int(), timeout=timeout)
@@ -317,12 +351,25 @@ def run_gen_loop(gid: str, *, pgen: BitCodeProgGen, llvm: LLVM, limit: int, outp
       mwarning("Failed: No valid CFGs found in the DOT file.")
       continue
     mlog("Succeeded")
+    time_per = time.time() - time_per
     with output.open("a") as fou:
       for g in cfgs:
         fou.write(json.dumps(g.to_dict()) + "\n")
+        stats.contrib(g, time_per / len(cfgs))
     counter += len(cfgs)
   shutil.rmtree(outdir)
   mlog(f"The generated graphs are saved into: {output}", color='green')
+  mlog("Generation statistics:")
+  mlog(f"  Number of control-flow graphs : {stats.num_graphs}")
+  mlog(f"  Total number of basic blocks  : {stats.num_bbls} (average: {stats.num_bbls_per:.2f})")
+  mlog(f"  Total number of block jumps   : {stats.num_jmps} (average: {stats.num_jmps_per:.2f})")
+  mlog(f"  Total time spent (seconds)    : {stats.time_spent:.2f} (average: {stats.time_spent_per:.2f})")
+  mlog(f"  Basic blocks distribution     :")
+  for bbl, count in stats.bbl_dist.most_common(10):
+    mlog(f"    {bbl:5d} basic blocks : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
+  mlog(f"  Block jumps distribution      :")
+  for jmp, count in stats.edges_dist.most_common(10):
+    mlog(f"    {jmp:5d} block jumps  : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
 
 
 def main():
