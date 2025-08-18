@@ -90,7 +90,8 @@ class LLVM:
           "-o",
           str(bprog),
           str(prog)
-        ]
+        ],
+        timeout=timeout
       )
       return bprog, None
     except CalledProcessError as e:
@@ -100,9 +101,11 @@ class LLVM:
     except Exception as e:
       return None, f"Unexpected error during LLVM compilation: {str(e)}"
 
-  def emit_cfg_dot(self, bprog: Path, func: str, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
+  def emit_cfg_dots(
+      self, bprog: Path, *, fn_pat: str, funcs: List[str], timeout: int
+  ) -> Tuple[Optional[List[Path]], Optional[str]]:
     prefix = bprog.stem
-    cfg_file = bprog.parent / f"{prefix}.{func}.dot"
+    cfg_files = [bprog.parent / f"{prefix}.{fn}.dot" for fn in funcs]
     try:
       cmdline.check_out(
         [
@@ -110,13 +113,13 @@ class LLVM:
           "-disable-output",
           "-passes=dot-cfg",  # dot-cfg-only runs very slowly, so we use dot-cfg
           f"-cfg-dot-filename-prefix={prefix}",
-          f"-cfg-func-name={func}",
+          f"-cfg-func-name={fn_pat}",
           str(bprog.name),
         ],
         cwd=str(bprog.parent),
         timeout=timeout
       )
-      return cfg_file, None
+      return cfg_files, None
     except CalledProcessError as e:
       return None, f"CFG generation failed: {e.stdout}"
     except TimeoutExpired as e:
@@ -130,19 +133,41 @@ class LLVM:
 # -==========================================================
 
 
-class BitCodeProgGen(ABC):
+class LLVMProgGenRes:
+  file: Optional[Path] = None  # Path to the generated LLVM (bitcode) program
+  funcs: Optional[List[str]] = None  # The pattern of the test functions in the generated program
+  errmsg: Optional[str] = None  # Error message if the generation failed
+
+  @staticmethod
+  def success(file: Path, funcs: List[str]) -> 'LLVMProgGenRes':
+    result = LLVMProgGenRes()
+    result.file = file
+    result.funcs = funcs
+    result.errmsg = None
+    return result
+
+  @staticmethod
+  def failure(errmsg: str) -> 'LLVMProgGenRes':
+    result = LLVMProgGenRes()
+    result.file = None
+    result.funcs = None
+    result.errmsg = errmsg
+    return result
+
+
+class LLVMProgGen(ABC):
 
   @abstractmethod
-  def next(self, name: str, outdir: Path, seed: int, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
-    """Return the path to the next generated LLVM bitcode program. If failed, return None and an error message."""
+  def next(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
+    """Return the next generated LLVM program."""
     ...
 
-  def test_func(self) -> str:
-    """Return the name of the test function to be used in the generated program."""
+  def fn_pat(self) -> str:
+    """Return the common pattern of the generated functions in the generated program."""
     ...
 
 
-class YARPGen(BitCodeProgGen):
+class YARPGen(LLVMProgGen):
 
   def __init__(self, bin: Path, llvm: LLVM):
     super().__init__()
@@ -151,19 +176,22 @@ class YARPGen(BitCodeProgGen):
       merror(f"YARPGen binary not found at {self.bin}. Please build YARPGen first.")
     self.llvm = llvm
 
-  def test_func(self) -> str:
+  def fn_pat(self) -> str:
     return "test"
 
-  def next(self, name: str, outdir: Path, seed: int, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
+  def next(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
     mlog(f"Generating C program with ID {name} using YARPGen ... ")
-    cprog, errmsg = self.next_cprog(name=name, outdir=outdir, seed=seed, timeout=timeout)
-    if cprog is None:
-      return None, errmsg
-    mlog(f"Succeeded: {cprog}")
-    mlog(f"Compiling the C program into LLVM bitcode (text) ... ")
-    return self.llvm.emit_llvm(cprog, extra_opts=["-mcmodel=large"], timeout=10)  # seconds
+    cres = self.next_cprog(name=name, outdir=outdir, seed=seed, timeout=timeout)
+    if cres.file is None:
+      return cres
+    mlog(f"Succeeded: {cres.file}")
+    mlog(f"Compiling the C program into LLVM (bitcode) program (text) ... ")
+    bprog, errmsg = self.llvm.emit_llvm(cres.file, extra_opts=["-mcmodel=large"], timeout=10)  # seconds
+    if bprog is None:
+      return LLVMProgGenRes.failure(errmsg)
+    return LLVMProgGenRes.success(bprog, cres.funcs)
 
-  def next_cprog(self, name: str, outdir: Path, seed: int, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
+  def next_cprog(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
     tmpdir = tempfile.mkdtemp(prefix="yarpgen-", dir=tempfile.gettempdir())
     try:
       cmdline.check_out([
@@ -174,25 +202,25 @@ class YARPGen(BitCodeProgGen):
       ], timeout=timeout)
     except CalledProcessError as e:
       shutil.rmtree(tmpdir)
-      return None, f"Generation failure: {e.stdout}"
+      return LLVMProgGenRes.failure(f"Generation failure: {e.stdout}")
     except TimeoutExpired as e:
       shutil.rmtree(tmpdir)
-      return None, f"Generation timed out: {e.stdout}"
+      return LLVMProgGenRes.failure(f"Generation timed out: {e.stdout}")
     except Exception as e:
       shutil.rmtree(tmpdir)
-      return None, f"Unexpected error during generation: {str(e)}"
+      return LLVMProgGenRes.failure(f"Unexpected error during generation: {str(e)}")
 
     # Merge the generated files into a single C file
     tmp_path = Path(tmpdir)
     driv_file = tmp_path / "driver.c"
     if not driv_file.exists():
       shutil.rmtree(tmpdir)
-      return None, "driver.c not found in the generated output."
+      return LLVMProgGenRes.failure("driver.c not found in the generated output.")
     fun_file = tmp_path / "func.c"
     out_file = outdir / f"{name}.c"
     if not fun_file.exists():
       shutil.rmtree(tmpdir)
-      return None, "func.c not found in the generated output."
+      return LLVMProgGenRes.failure("func.c not found in the generated output.")
     with out_file.open("w") as fou:
       # Replace the init header as it only declares extern variables
       # that are defined in the driver file.
@@ -201,7 +229,7 @@ class YARPGen(BitCodeProgGen):
       fou.write(fun_file.read_text().replace("#include \"init.h\"", ""))
     shutil.rmtree(tmpdir)
 
-    return out_file, None
+    return LLVMProgGenRes.success(out_file, ['test'])
 
 
 # -==========================================================
@@ -325,7 +353,7 @@ class GenStats:
     return self.time_spent / self.num_graphs if self.num_graphs > 0 else 0.0
 
 
-def run_gen_loop(gid: str, *, pgen: BitCodeProgGen, llvm: LLVM, limit: int, output: Path, timeout: int):
+def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output: Path, timeout: int):
   outdir = Path(tempfile.mkdtemp(prefix=f"ggen-{gid}-", dir=tempfile.gettempdir()))
   mlog(f"Working on: {outdir}")
   stats = GenStats()
@@ -334,19 +362,21 @@ def run_gen_loop(gid: str, *, pgen: BitCodeProgGen, llvm: LLVM, limit: int, outp
     time_per = time.time()
     fname = f"{gid}_{counter:08}"
     mlog(f"=> {counter}: Generating LLVM program with ID {fname} ... ", color='blue')
-    bcprog, errmsg = pgen.next(name=fname, outdir=outdir, seed=rand_int(), timeout=timeout)
-    if bcprog is None:
-      mwarning(f"Failed: {errmsg}")
+    gen_res = pgen.next(name=fname, outdir=outdir, seed=rand_int(), timeout=timeout)
+    if gen_res.file is None:
+      mwarning(f"Failed: {gen_res.errmsg}")
       continue
-    mlog(f"Succeeded: {bcprog}")
+    mlog(f"Succeeded: {gen_res.file}")
     mlog(f"Extracting the control flow graph ... ")
-    cfg_dot, errmsg = llvm.emit_cfg_dot(bcprog, func=pgen.test_func(), timeout=15 + timeout)
-    if cfg_dot is None:
+    cfg_dots, errmsg = llvm.emit_cfg_dots(gen_res.file, fn_pat=pgen.fn_pat(), funcs=gen_res.funcs, timeout=15 + timeout)
+    if cfg_dots is None:
       mwarning(f"Failed: {errmsg}")
       continue
-    mlog(f"Succeeded: {cfg_dot}")
+    mlog(f"Succeeded: {[str(c) for c in cfg_dots]}")
     mlog("Parsing the DOT file into a CFG skeleton ... ")
-    cfgs = parse_dot_to_cfgs(cfg_dot)
+    cfgs = []
+    for cd in cfg_dots:
+      cfgs = cfgs + parse_dot_to_cfgs(cd)
     if not cfgs:
       mwarning("Failed: No valid CFGs found in the DOT file.")
       continue
@@ -366,10 +396,10 @@ def run_gen_loop(gid: str, *, pgen: BitCodeProgGen, llvm: LLVM, limit: int, outp
   mlog(f"  Total time spent (seconds)    : {stats.time_spent:.2f} (average: {stats.time_spent_per:.2f})")
   mlog(f"  Basic blocks distribution     :")
   for bbl, count in stats.bbl_dist.most_common(10):
-    mlog(f"    {bbl:5d} basic blocks : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
+    mlog(f"    {bbl:5d} basic blocks           : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
   mlog(f"  Block jumps distribution      :")
   for jmp, count in stats.edges_dist.most_common(10):
-    mlog(f"    {jmp:5d} block jumps  : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
+    mlog(f"    {jmp:5d} block jumps            : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
 
 
 def main():
