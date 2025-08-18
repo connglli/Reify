@@ -25,6 +25,7 @@
 
 import json
 import random
+import re
 import shutil
 import tempfile
 import time
@@ -79,6 +80,7 @@ class LLVM:
   def emit_llvm(self, prog: Path, extra_opts: List[str], timeout: int) -> Tuple[Optional[Path], Optional[str]]:
     bprog = prog.with_suffix('.ll')
     try:
+      # TODO: Disable function inlining
       cmdline.check_out(
         [
           str(self.clang),
@@ -119,7 +121,8 @@ class LLVM:
         cwd=str(bprog.parent),
         timeout=timeout
       )
-      return cfg_files, None
+      # There're chances that the functions are inlined and not found in the LLVM program
+      return [cf for cf in cfg_files if cf.exists()], None
     except CalledProcessError as e:
       return None, f"CFG generation failed: {e.stdout}"
     except TimeoutExpired as e:
@@ -165,6 +168,72 @@ class LLVMProgGen(ABC):
   def fn_pat(self) -> str:
     """Return the common pattern of the generated functions in the generated program."""
     ...
+
+
+class Csmith(LLVMProgGen):
+  _FUNC_PATTERN = re.compile(r"^static .*? (func_\d+)\(.*?\);$")
+
+  def __init__(self, bin: Path, llvm: LLVM):
+    super().__init__()
+    self.bin = bin
+    if not self.bin.exists():
+      merror(f"Csmith binary not found at {self.bin}. Please build Csmith first.")
+    self.home = self.bin.parent.parent
+    self.llvm = llvm
+
+  def next(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
+    mlog(f"Generating C program with ID {name} using Csmith ... ")
+    res = self.next_cprog(name=name, outdir=outdir, seed=seed, timeout=timeout)
+    if res.file is None:
+      return res
+    mlog(f"Succeeded: {res.file}")
+    mlog(f"Compiling the C program into LLVM (bitcode) program (text) ... ")
+    bprog, errmsg = self.llvm.emit_llvm(res.file, extra_opts=[f"-I{self.home / 'include'}"], timeout=10)  # seconds
+    if bprog is None:
+      return LLVMProgGenRes.failure(errmsg)
+    return LLVMProgGenRes.success(bprog, res.funcs)
+
+  def fn_pat(self) -> str:
+    return 'func_'
+
+  def next_cprog(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
+    out_file = outdir / f"{name}.c"
+    try:
+      cmdline.check_out([
+        str(self.bin),
+        f"--seed", str(seed),
+        f"--output", str(out_file),
+      ], timeout=timeout)
+    except CalledProcessError as e:
+      return LLVMProgGenRes.failure(f"Generation failure: {e.stdout}")
+    except TimeoutExpired as e:
+      return LLVMProgGenRes.failure(f"Generation timed out: {e.stdout}")
+    except Exception as e:
+      return LLVMProgGenRes.failure(f"Unexpected error during generation: {str(e)}")
+
+    # Parse to find all test functions
+    cont = out_file.read_text()
+    lines = cont.splitlines()
+    # All functions are forward declared between these two markers
+    try:
+      start_index = lines.index("/* --- FORWARD DECLARATIONS --- */")
+    except ValueError:
+      out_file.unlink()
+      return LLVMProgGenRes.failure(f"No '/* --- FORWARD DECLARATIONS --- */' found in the generated C program: {cont}")
+    try:
+      end_index = lines.index("/* --- FUNCTIONS --- */")
+    except ValueError:
+      out_file.unlink()
+      return LLVMProgGenRes.failure(f"No '/* --- FUNCTIONS --- */' found in the generated C program: {cont}")
+
+    test_funcs = []
+    for line in lines[start_index + 1:end_index]:
+      mat = self._FUNC_PATTERN.fullmatch(line)
+      if mat is None:
+        continue  # Skip non-function lines
+      test_funcs.append(mat.group(1))
+
+    return LLVMProgGenRes.success(out_file, test_funcs)
 
 
 class YARPGen(LLVMProgGen):
@@ -330,7 +399,7 @@ class GenStats:
   num_jmps: int = 0
   time_spent: float = 0.0
   bbl_dist: Counter = field(default_factory=Counter)
-  edges_dist: Counter = field(default_factory=Counter)
+  jmp_dist: Counter = field(default_factory=Counter)
 
   def contrib(self, g: CfgSkel, t: float):
     self.num_graphs += 1
@@ -338,7 +407,7 @@ class GenStats:
     self.num_jmps += g.num_jmps()
     self.time_spent += t
     self.bbl_dist[g.num_bbls()] += 1
-    self.edges_dist[g.num_jmps()] += 1
+    self.jmp_dist[g.num_jmps()] += 1
 
   @property
   def num_bbls_per(self) -> float:
@@ -351,6 +420,38 @@ class GenStats:
   @property
   def time_spent_per(self) -> float:
     return self.time_spent / self.num_graphs if self.num_graphs > 0 else 0.0
+
+  @property
+  def max_num_bbls(self) -> int:
+    largest = -1
+    for bbl, count in self.bbl_dist.items():
+      if bbl > largest:
+        largest = bbl
+    return largest
+
+  @property
+  def min_num_bbls(self) -> int:
+    smallest = MAX_I32
+    for bbl, count in self.bbl_dist.items():
+      if bbl < smallest:
+        smallest = bbl
+    return smallest
+
+  @property
+  def max_num_jmps(self) -> int:
+    largest = -1
+    for jmp, count in self.jmp_dist.items():
+      if jmp > largest:
+        largest = jmp
+    return largest
+
+  @property
+  def min_num_jmps(self) -> int:
+    smallest = MAX_I32
+    for jmp, count in self.jmp_dist.items():
+      if jmp < smallest:
+        smallest = jmp
+    return smallest
 
 
 def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output: Path, timeout: int):
@@ -368,15 +469,19 @@ def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output:
       continue
     mlog(f"Succeeded: {gen_res.file}")
     mlog(f"Extracting the control flow graph ... ")
-    cfg_dots, errmsg = llvm.emit_cfg_dots(gen_res.file, fn_pat=pgen.fn_pat(), funcs=gen_res.funcs, timeout=15 + timeout)
-    if cfg_dots is None:
+    cfg_files, errmsg = llvm.emit_cfg_dots(
+      gen_res.file,
+      fn_pat=pgen.fn_pat(), funcs=gen_res.funcs,
+      timeout=15 + timeout
+    )
+    if not cfg_files:
       mwarning(f"Failed: {errmsg}")
       continue
-    mlog(f"Succeeded: {[str(c) for c in cfg_dots]}")
+    mlog(f"Succeeded: {[str(c) for c in cfg_files]}")
     mlog("Parsing the DOT file into a CFG skeleton ... ")
     cfgs = []
-    for cd in cfg_dots:
-      cfgs = cfgs + parse_dot_to_cfgs(cd)
+    for cf in cfg_files:
+      cfgs = cfgs + parse_dot_to_cfgs(cf)
     if not cfgs:
       mwarning("Failed: No valid CFGs found in the DOT file.")
       continue
@@ -391,15 +496,17 @@ def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output:
   mlog(f"The generated graphs are saved into: {output}", color='green')
   mlog("Generation statistics:")
   mlog(f"  Number of control-flow graphs : {stats.num_graphs}")
-  mlog(f"  Total number of basic blocks  : {stats.num_bbls} (average: {stats.num_bbls_per:.2f})")
-  mlog(f"  Total number of block jumps   : {stats.num_jmps} (average: {stats.num_jmps_per:.2f})")
-  mlog(f"  Total time spent (seconds)    : {stats.time_spent:.2f} (average: {stats.time_spent_per:.2f})")
+  mlog(f"  Total number of basic blocks  : {stats.num_bbls} "
+       f"(ave: {stats.num_bbls_per:.2f}, max: {stats.max_num_bbls}, min: {stats.min_num_bbls})")
+  mlog(f"  Total number of block jumps   : {stats.num_jmps} "
+       f"(ave: {stats.num_jmps_per:.2f}, max: {stats.max_num_jmps}, min: {stats.min_num_jmps})")
+  mlog(f"  Total time spent (seconds)    : {stats.time_spent:.2f} (ave: {stats.time_spent_per:.2f})")
   mlog(f"  Basic blocks distribution     :")
   for bbl, count in stats.bbl_dist.most_common(10):
-    mlog(f"    {bbl:5d} basic blocks           : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
+    mlog(f"    {bbl:5d} basic blocks          : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
   mlog(f"  Block jumps distribution      :")
-  for jmp, count in stats.edges_dist.most_common(10):
-    mlog(f"    {jmp:5d} block jumps            : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
+  for jmp, count in stats.jmp_dist.most_common(10):
+    mlog(f"    {jmp:5d} block jumps           : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
 
 
 def main():
@@ -476,7 +583,7 @@ def main():
       merror(
         f"Option --csmith must be specified when using csmith as the program generator."
       )
-    merror("Csmith is not yet supported in this version of the generator.")
+    gen = Csmith(Path(args.csmith), llvm)
   elif gen == "yarpgen":
     if args.yarpgen is None:
       merror(f"Option --yarpgen must be specified when using YARPGen as the program generator.")
