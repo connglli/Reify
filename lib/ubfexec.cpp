@@ -303,6 +303,7 @@ void UBFreeExec::extractInitFromModel(z3::model &model) {
       z3::expr paramConst = model.get_const_interp(paramKey.decl());
       Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
       int paramVal;
+      // FIXME: There're chances (~1/200) that this statement failed. Investigating why.
       Assert(
           paramConst.is_numeral_i(paramVal),
           "Failed to obtain the value of parameter %s from the model", paramName
