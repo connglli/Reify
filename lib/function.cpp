@@ -38,6 +38,8 @@
 void FunPlus::Generate() {
   Log::Get().OpenSection("FunPlus: Generate Function " + name);
 
+  auto randProba = Random::Get().UniformReal();
+
   // Generate the sketch of our control flow graph
   cfg.Generate();
   for (int i = 0; i < Random::Get().Uniform(0, maxNumLoops)(); i++) {
@@ -48,7 +50,12 @@ void FunPlus::Generate() {
   // Create the function builder to build the function
   auto builder = std::make_unique<symir::FunctBuilder>(name, symir::SymIR::I32);
   for (int i = 0; i < numParams; i++) {
-    builder->SymParam(NameVar(i), symir::SymIR::Type::I32);
+    if (GlobalOptions::Get().EnableVolatileVars &&
+        randProba() < GlobalOptions::Get().VolatileVariableProba) {
+      builder->SymParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/true);
+    } else {
+      builder->SymParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/false);
+    }
   }
 
   // Map each basic block in the CFG to a basic block generator

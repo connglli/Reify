@@ -65,6 +65,11 @@ struct GlobalOptions {
   // otherwise we only allow addition for expression and multiplication for terms
   // When true, the generation process is much harder and thereby might be slower
   bool EnableAllOps = false;
+  // If true, we allow some variables to be declared as volatile so that
+  // the compilers/optimizers cannot have any assumptions about them.
+  bool EnableVolatileVars = false;
+  // The probability of a variable being declared as volatile.
+  double VolatileVariableProba = 0.4;
 
   ////////////////////////////////////////////////////////////
   ////// Function Generation Parameters
@@ -139,6 +144,8 @@ struct GlobalOptions {
       ("Xnum-vars-per-assign", "The number of variables in each assignment statement", cxxopts::value<int>())
       ("Xnum-vars-in-cond", "The number of variables in each conditional statement", cxxopts::value<int>())
       ("A,Xenable-all-ops", "Enable all operations for terms and expressions (This may make the generation longer and harder)", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xenable-volatile-vars", "Enable declaring some variables as volatile", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xvolatile-var-proba", "Probability of declaring a variable as a volatile variable", cxxopts::value<double>())
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xnum-vars-per-fun", "The number of allowed variables for each function", cxxopts::value<int>())
@@ -206,6 +213,26 @@ struct GlobalOptions {
     }
 
     EnableAllOps = args["Xenable-all-ops"].as<bool>();
+
+    EnableVolatileVars = args["Xenable-volatile-vars"].as<bool>();
+
+    if (args.count("Xvolatile-var-proba")) {
+      VolatileVariableProba = args["Xvolatile-var-proba"].as<double>();
+      if (VolatileVariableProba <= 0) {
+        std::cerr << "Error: The probability for declaring a variable as volatile "
+                     "(--Xvolatile-var-proba) cannot be less than or equal to 0. It should be "
+                     "within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+      if (VolatileVariableProba > 1) {
+        std::cerr
+            << "Error: The probability for declaring a variable as volatile "
+            << "(--Xvolatile-var-proba) cannot be be larger than 1. It should be within 0 to 1."
+            << std::endl;
+        exit(1);
+      }
+    }
 
     if (args.count("Xnum-bbls-per-fun")) {
       NumBblsPerFun = args["Xnum-bbls-per-fun"].as<int>();
