@@ -245,12 +245,18 @@ void SignedOverflow::Visit(const symir::Branch &b) {
 
 void SignedOverflow::Visit(const symir::Goto &g) { /* DO NOTHING */ }
 
-void SignedOverflow::Visit(const symir::Param &p) { Panic("Cannot reach here"); }
+void SignedOverflow::Visit(const symir::Param &p) {
+  auto varExpr = CreateVarExpr(&p, 0);
+  constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);
+  constraints.push_back(varExpr >= GlobalOptions::Get().LowerInitBound);
+}
 
 void SignedOverflow::Visit(const symir::Local &l) {
   l.GetCoef()->Accept(*this);
   auto coefExpr = popExpression();
   auto varExpr = CreateVarExpr(l.GetDefinition(), 0);
+  constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);
+  constraints.push_back(varExpr >= GlobalOptions::Get().LowerInitBound);
   constraints.push_back(varExpr == coefExpr);
 }
 
@@ -266,6 +272,9 @@ void SignedOverflow::Visit(const symir::Funct &f) {
       f.GetName().c_str()
   );
 
+  for (const auto &param: f.GetParams()) {
+    param->Accept(*this);
+  }
   for (const auto &local: f.GetLocals()) {
     local->Accept(*this);
   }
