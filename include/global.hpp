@@ -80,8 +80,11 @@ struct GlobalOptions {
   // Probability of sampling a base graph from an existing control-flow graph
   // database (if available) during control-flow graph generation
   double SampleBaseGraphProba = 0.5;
-  // The number of allowed variables for each function
+  // The number of allowed variables (parameters and locals) for each function
   int NumVarsPerFun = 8;
+  // The number of allowed local variables for each function
+  // This should be less than NumVarsPerFun
+  int NumLocalsPerFun = 0;
   // The allowed number of loops per function
   int MaxNumLoopsPerFun = 2;
   // The maximum number of basic blocks in a loop
@@ -148,7 +151,8 @@ struct GlobalOptions {
       ("Xvolatile-var-proba", "Probability of declaring a variable as a volatile variable", cxxopts::value<double>())
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
-      ("Xnum-vars-per-fun", "The number of allowed variables for each function", cxxopts::value<int>())
+      ("Xnum-vars-per-fun", "The number of allowed variables (parameters and local variables) for each function", cxxopts::value<int>())
+      ("Xnum-locals-per-fun", "The number of allowed local variables for each function", cxxopts::value<int>())
       ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>())
       ("U,Xenable-ub-inject", "Enable the injection of undefined behaviors to those unexecuted basic blocks", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xinject-ub-proba", "Probability of the selection of unexecuted blocks to inject undefined behaviors", cxxopts::value<double>())
@@ -256,6 +260,22 @@ struct GlobalOptions {
       if (NumAssignsPerBBL >= NumVarsPerFun) {
         std::cerr
             << "Error: The number of assignments per basic block (--Xnum-assigns-per-bbl) cannot "
+               "exceed the number of variables allowed in each function (--Xnum-vars-per-fun)"
+            << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("Xnum-locals-per-fun")) {
+      NumLocalsPerFun = args["Xnum-locals-per-fun"].as<int>();
+      if (NumLocalsPerFun > 16) {
+        std::cerr << "Warning: Too many locals per function would make the generation much slower"
+                  << std::endl;
+      }
+      ensurePositive(NumLocalsPerFun, "Xnum-locals-per-fun");
+      if (NumLocalsPerFun >= NumVarsPerFun) {
+        std::cerr
+            << "Error: The number of local variables per function (--Xnum-locals-per-fun) cannot "
                "exceed the number of variables allowed in each function (--Xnum-vars-per-fun)"
             << std::endl;
         exit(1);

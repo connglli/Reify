@@ -224,9 +224,10 @@ int main(int argc, char **argv) {
 
   // Generate the function code
   FunPlus fun(
-      GetFunctionName(uuid, sno), GlobalOptions::Get().NumVarsPerFun,
-      GlobalOptions::Get().NumBblsPerFun, GlobalOptions::Get().MaxNumLoopsPerFun,
-      GlobalOptions::Get().MaxNumBblsPerLoop
+      GetFunctionName(uuid, sno),
+      GlobalOptions::Get().NumVarsPerFun - GlobalOptions::Get().NumLocalsPerFun,
+      GlobalOptions::Get().NumLocalsPerFun, GlobalOptions::Get().NumBblsPerFun,
+      GlobalOptions::Get().MaxNumLoopsPerFun, GlobalOptions::Get().MaxNumBblsPerLoop
   );
   if (graphdb.has_value()) {
     std::cout << "WARNING: Using the graph database may cause timeout too frequently." << std::endl;

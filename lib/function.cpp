@@ -49,12 +49,28 @@ void FunPlus::Generate() {
 
   // Create the function builder to build the function
   auto builder = std::make_unique<symir::FunctBuilder>(name, symir::SymIR::I32);
+  // The first numParams variables are parameters
   for (int i = 0; i < numParams; i++) {
     if (GlobalOptions::Get().EnableVolatileVars &&
         randProba() < GlobalOptions::Get().VolatileVariableProba) {
       builder->SymParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/true);
     } else {
       builder->SymParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/false);
+    }
+  }
+  // The next numLocals variables are locals
+  for (int i = numParams; i < numParams + numLocals; i++) {
+    if (GlobalOptions::Get().EnableVolatileVars &&
+        randProba() < GlobalOptions::Get().VolatileVariableProba) {
+      builder->SymLocal(
+          NameVar(i), builder->SymCoef("init_var" + i, symir::SymIR::Type::I32),
+          symir::SymIR::Type::I32, /*IsVolatile=*/true
+      );
+    } else {
+      builder->SymLocal(
+          NameVar(i), builder->SymCoef("init_var" + i, symir::SymIR::Type::I32),
+          symir::SymIR::Type::I32, /*IsVolatile=*/false
+      );
     }
   }
 
@@ -88,7 +104,7 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
 
   // We define a variable as LHS for each assignment using other variables
   const auto numAssPerBbl = GlobalOptions::Get().NumAssignsPerBBL;
-  const auto assignments = SampleKDistinct(numParams, numAssPerBbl);
+  const auto assignments = SampleKDistinct(NumVars(), numAssPerBbl);
 
   for (int stmtIndex = 0; stmtIndex < numAssPerBbl; stmtIndex++) {
     int varIndex = assignments[stmtIndex];
@@ -98,7 +114,7 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
 
     // Sample the variables which will be used in the RHS of the assignment statement
     const auto numVarsPerAss = GlobalOptions::Get().NumVarsPerAssign;
-    const auto assDeps = SampleKDistinct(numParams, numVarsPerAss);
+    const auto assDeps = SampleKDistinct(NumVars(), numVarsPerAss);
     Log::Get().Out() << JoinInt(assDeps, ", ") << std::endl;
 
     // Create the terms for each assigment
@@ -128,7 +144,7 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
     // Our conditional is controlled by all variables defined in this basic block.
     // In case we need more variables beyond the number of variables we already defined,
     // let's refer to some variables defined in other basic blocks.
-    const auto randVar = Random::Get().Uniform(0, numParams - 1);
+    const auto randVar = Random::Get().Uniform(0, NumVars() - 1);
     auto condDeps = assignments;
     const auto numVarsInCond = GlobalOptions::Get().NumVarsInCond;
     for (int i = 0; i < numVarsInCond - numAssPerBbl; i++) {
@@ -373,7 +389,6 @@ std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
 }
 
 std::unique_ptr<symir::Funct> FunPlus::ParseFunSexpCode(const std::string &sexpPath) {
-  Log::Get().Out() << "Parsing S Expression code from: " << sexpPath << std::endl;
   std::ifstream sifs(sexpPath);
   std::ostringstream oss;
   std::string line;

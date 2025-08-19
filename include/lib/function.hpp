@@ -40,23 +40,30 @@
 class UBFreeExec;
 
 /// FunPlus is a generator which populates the generates a function with
-/// random contrl flow, variables, and statements
+/// random control flow, variables, and statements
 class FunPlus {
 public:
   using InitFinaMap = std::pair<std::vector<std::vector<int>>, std::vector<std::vector<int>>>;
 
 public:
   explicit FunPlus(
-      std::string name, int numParams, int numBBs, int maxNumLoops, int maxNumBblsPerLoop
+      std::string name, int numParams, int numLocals, int numBBs, int maxNumLoops,
+      int maxNumBblsPerLoop
   ) :
-      cfg(numBBs), name(std::move(name)), numParams(numParams), maxNumLoops(maxNumLoops),
-      maxNumBblsPerLoop(maxNumBblsPerLoop) {}
+      cfg(numBBs), name(std::move(name)), numParams(numParams), numLocals(numLocals),
+      maxNumLoops(maxNumLoops), maxNumBblsPerLoop(maxNumBblsPerLoop) {}
 
   // Get the name of the function
   [[nodiscard]] const std::string &GetName() const { return name; }
 
   // Get the number of parameters used by the function
   [[nodiscard]] int NumParams() const { return numParams; }
+
+  // Get the number of local variables used by the function
+  [[nodiscard]] int NumLocals() const { return numLocals; }
+
+  // Get the number of variables (parameters and locals) used by the function
+  [[nodiscard]] int NumVars() const { return numParams + numLocals; }
 
   // Get the number of basic blocks in the function
   [[nodiscard]] int NumBbls() const { return cfg.NumBbls(); }
@@ -121,6 +128,7 @@ private:
 
   std::string name;      // The name of the function
   int numParams;         // The number of parameters that the function has
+  int numLocals;         // The number of local variables that the function has
   int maxNumLoops;       // The maximum number of loops that the function can have
   int maxNumBblsPerLoop; // The maximum number of basic blocks in a loop
 

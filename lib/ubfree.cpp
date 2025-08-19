@@ -247,7 +247,12 @@ void SignedOverflow::Visit(const symir::Goto &g) { /* DO NOTHING */ }
 
 void SignedOverflow::Visit(const symir::Param &p) { Panic("Cannot reach here"); }
 
-void SignedOverflow::Visit(const symir::Local &l) { Panic("We currently does not support Locals"); }
+void SignedOverflow::Visit(const symir::Local &l) {
+  l.GetCoef()->Accept(*this);
+  auto coefExpr = popExpression();
+  auto varExpr = CreateVarExpr(l.GetDefinition(), 0);
+  constraints.push_back(varExpr == coefExpr);
+}
 
 void SignedOverflow::Visit(const symir::Block &b) {
   for (const auto &stmt: b.GetStmts()) {
@@ -261,6 +266,9 @@ void SignedOverflow::Visit(const symir::Funct &f) {
       f.GetName().c_str()
   );
 
+  for (const auto &local: f.GetLocals()) {
+    local->Accept(*this);
+  }
   for (size_t i = 0; i < execution.size() - 1; i++) {
     currBbl = execution[i];
     nextBbl = execution[i + 1];
