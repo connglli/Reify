@@ -22,10 +22,11 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-
+import glob
 import json
 import random
 import re
+import shlex
 import shutil
 import tempfile
 import time
@@ -44,6 +45,10 @@ import cmdline
 from fuzz import MAX_I32, mlog, rand_int
 
 SUPPORTED_PROGRAM_GENERATORS = ["csmith", "yarpgen", "preset"]
+GLOBAL_OPTION_MIN_CFG_BLOCKS = 5
+GLOBAL_OPTION_MAX_CFG_BLOCKS = 256
+GLOBAL_OPTION_MIN_CFG_JUMPS = 10
+GLOBAL_OPTION_MAX_CFG_JUMPS = GLOBAL_OPTION_MAX_CFG_BLOCKS * 2
 
 
 # -==========================================================
@@ -71,6 +76,7 @@ class LLVM:
   def __init__(self, home: Path):
     self.home = home
     self.clang = self.home / "bin" / "clang"
+    self.clangxx = self.home / "bin" / "clang++"
     if not self.clang.exists():
       merror(f"LLVM clang binary not found at {self.clang}. Please build LLVM first.")
     self.opt = self.home / "bin" / "opt"
@@ -106,21 +112,31 @@ class LLVM:
   def emit_cfg_dots(
       self, bprog: Path, *, fn_pat: str, funcs: List[str], timeout: int
   ) -> Tuple[Optional[List[Path]], Optional[str]]:
+    """
+    Emit the control flow graph (CFG) of functions (matching fn_pat) in the given LLVM program
+    in DOT format and return the paths to the generated DOT files for each function specified by funcs.
+    If fn_pat is not specified, it will generate the CFG for all functions.
+    If funcs is not specified, it will return paths to all the generated CFGs.
+    """
     prefix = bprog.stem
-    cfg_files = [bprog.parent / f"{prefix}.{fn}.dot" for fn in funcs]
     try:
+      fn_opt = [f"-cfg-func-name={fn_pat}"] if fn_pat else []
       cmdline.check_out(
         [
           str(self.opt),
           "-disable-output",
           "-passes=dot-cfg",  # dot-cfg-only runs very slowly, so we use dot-cfg
-          f"-cfg-dot-filename-prefix={prefix}",
-          f"-cfg-func-name={fn_pat}",
+          f"-cfg-dot-filename-prefix={prefix}"
+        ] + fn_opt + [
           str(bprog.name),
         ],
         cwd=str(bprog.parent),
         timeout=timeout
       )
+      if funcs:
+        cfg_files = [bprog.parent / f"{prefix}.{fn}.dot" for fn in funcs]
+      else:
+        cfg_files = [bprog.parent / s for s in glob.glob(f"{prefix}.*.dot", root_dir=str(bprog.parent))]
       # There're chances that the functions are inlined and not found in the LLVM program
       return [cf for cf in cfg_files if cf.exists()], None
     except CalledProcessError as e:
@@ -138,7 +154,9 @@ class LLVM:
 
 class LLVMProgGenRes:
   file: Optional[Path] = None  # Path to the generated LLVM (bitcode) program
-  funcs: Optional[List[str]] = None  # The pattern of the test functions in the generated program
+  funcs: Optional[
+    List[str]
+  ] = None  # The pattern of the test functions in the generated program, None or [] means all functions
   errmsg: Optional[str] = None  # Error message if the generation failed
 
   @staticmethod
@@ -162,7 +180,7 @@ class LLVMProgGen(ABC):
 
   @abstractmethod
   def next(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
-    """Return the next generated LLVM program."""
+    """Return the next generated LLVM program. Or raise StopIteration if no more programs can be generated."""
     ...
 
   def fn_pat(self) -> str:
@@ -301,6 +319,73 @@ class YARPGen(LLVMProgGen):
     return LLVMProgGenRes.success(out_file, ['test'])
 
 
+class Preset(LLVMProgGen):
+  _C_COMMAND_PATTERN = re.compile(r"^(/?(?:\w+/)*(?:clang|gcc|cc))\s+(.*?)\s+(-o\s+.*?)\s+(.*?)")
+  _CXX_COMMAND_PATTERN = re.compile(r"^(/?(?:\w+/)*(?:clang\+\+|g\+\+|c\+\+))\s+(.*?)\s+(-o\s+.*?)\s+(.*?)")
+
+  def __init__(self, preset: Path, llvm: LLVM):
+    super().__init__()
+    self.preset = preset
+    if not self.preset.exists():
+      merror(f"Preset file (should be a compile_commands.json) not found at {self.preset}.")
+    with self.preset.open() as fin:
+      self.commands = json.load(fin)
+    self._ptr = -1
+    self.llvm = llvm
+
+  def next(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
+    mlog(f"Generating the next program with ID {name} using Preset ... ")
+    bprog = outdir / f"{name}.ll"
+    cmd, workdir = self._parse_next_command(bprog)
+    try:
+      cmdline.check_out(
+        shlex.split(cmd),
+        timeout=timeout,
+        cwd=workdir
+      )
+      return LLVMProgGenRes.success(bprog, [])
+    except CalledProcessError as e:
+      return LLVMProgGenRes.failure(f"LLVM compilation failed: {e.stdout}")
+    except TimeoutExpired as e:
+      return LLVMProgGenRes.failure(f"LLVM compilation timed out: {e.stdout}")
+    except Exception as e:
+      return LLVMProgGenRes.failure(f"Unexpected error during LLVM compilation: {str(e)}")
+
+  def fn_pat(self) -> str:
+    return ''  # Indicating all found functions in the preset
+
+  def _parse_next_command(self, bprog: Path) -> Tuple[str, str]:
+    while self._ptr < len(self.commands) - 1:
+      self._ptr += 1
+      cmd_obj = self.commands[self._ptr]
+      mlog(f"Testing command at index {self._ptr}: " + (cmd_obj["file"] if "file" in cmd_obj else "<unknown-file>"))
+      if "directory" not in cmd_obj:
+        mwarning(f"Failure: 'directory' not found in the command object, skipping: {cmd_obj}")
+        continue
+      workdir = cmd_obj["directory"]
+      if "command" not in cmd_obj:
+        if "arguments" not in cmd_obj:
+          mwarning(f"Failure: Neither 'command' nor 'arguments' found in the command object, skipping: {cmd_obj}")
+          continue
+        cmd_obj["command"] = " ".join(cmd_obj["arguments"])
+      orig_cmd = cmd_obj["command"]
+      match = self._C_COMMAND_PATTERN.fullmatch(orig_cmd)
+      compiler = str(self.llvm.clang)
+      extra_incl = ""
+      if match is None:
+        match = self._CXX_COMMAND_PATTERN.fullmatch(orig_cmd)
+        compiler = str(self.llvm.clangxx)
+        extra_incl = "-I/usr/include/c++/v1 "  # For libc++ headers
+      if match is None:
+        mwarning(f"Failure: Invalid command (neither for C nor for C++), skipping: {orig_cmd}")
+        continue
+      cmd = f'{compiler} -Xclang -disable-llvm-passes -emit-llvm -S {extra_incl} {match[2]} -o {bprog} {match[4]}'
+      mlog(f"Success: Transform to command: {cmd}")
+      return cmd, workdir
+    mlog("All commands have been processed")
+    raise StopIteration()
+
+
 # -==========================================================
 # Graph generation loop
 # -==========================================================
@@ -333,28 +418,37 @@ class CfgSkel:
     self.succs.append([-1, -1])
 
   def set_succ(self, u: str, v: str, which: int) -> None:
-    if which > 1 or which < 0:
-      merror(f"Invalid successor index {which} which is neither 0 nor 1 for successor edge: {u} -> {v}")
+    if which not in [0, 1, -1]:
+      merror(f"Invalid successor index {which} which is neither 0, 1, nor -1 for successor edge: {u} -> {v}")
     if u not in self.bbls:
       merror(f"Basic block {u} is not in graph")
     if v not in self.bbls:
       merror(f"Basic block {v} is not in graph")
     ui = self.bbls.index(u)
+    vi = self.bbls.index(v)
+    if which == -1:  # Append to the first available successor slot
+      if self.succs[ui][0] == -1:
+        self.succs[ui][0] = vi
+      elif self.succs[ui][1] == -1:
+        self.succs[ui][1] = vi
+      else:
+        merror(
+          f"Basic block {u} (id={ui}) already has two successors: "
+          f"{self.bbls[self.succs[ui][0]]} (id={self.succs[ui][0]}), "
+          f"{self.bbls[self.succs[ui][1]]} (id={self.succs[ui][1]})"
+        )
+      return
     if self.succs[ui][which] != -1:
       merror(
         f"Basic block {u} (id={ui}) already has a successor at index {which}: " +
         f"{self.bbls[self.succs[ui][which]]} (id={self.succs[ui][which]})"
       )
-    vi = self.bbls.index(v)
     if vi == self.succs[ui][which]:
       merror(f"Successor {v} (id={vi}) of basic block {u} (id={ui}) already exists at index {which}: {u} -> {v}")
     self.succs[ui][which] = vi
 
-
-def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
-  results = []
-  for dot in pydot.graph_from_dot_file(str(dot_file)):
-    mlog(f">> CFG: {dot.get_name()}")
+  @staticmethod
+  def parse(dot: pydot.Dot) -> 'CfgSkel':
     cfg = CfgSkel()
     for node in dot.get_nodes():
       node_name = node.get_name()
@@ -374,17 +468,44 @@ def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
         source = source[:-3]
         which = 1
       else:
-        which = 0
+        if ":s" in source:
+          raise ValueError(f"Unexpected successor index for Node: {source}")
+        which = -1
       # mlog(f"Edge: {edge.get_source()}:{which} -> {edge.get_destination()}")
       # for a in edge.get_attributes():
       #   mlog(f"  {a} = {edge.get_attributes()[a]}")
       cfg.set_succ(source, destination, which=which)
+    return cfg
+
+
+def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
+  global GLOBAL_OPTION_MIN_CFG_BLOCKS, GLOBAL_OPTION_MAX_CFG_BLOCKS, \
+    GLOBAL_OPTION_MIN_CFG_JUMPS, GLOBAL_OPTION_MAX_CFG_JUMPS
+  try:
+    dot_list = pydot.graph_from_dot_file(str(dot_file))
+  except Exception as e:
+    mwarning(f"Unable to parse the dot file: {dot_file}: {e}")
+    return []
+  if not dot_list:
+    mwarning(f"No graphs found in the dot file: {dot_file}")
+    return []
+  results = []
+  for dot in dot_list:
+    mlog(f">> CFG: {dot.get_name()}")
+    try:
+      cfg = CfgSkel.parse(dot)
+    except Exception as e:
+      mwarning(f"Failed to parse CFG: {e}")
+      continue
     mlog(f">> Parsed CFG with {cfg.num_bbls()} basic blocks and {cfg.num_jmps()} block jumps.")
     if cfg.num_bbls() == 0 and cfg.num_jmps() == 0:
       mwarning(f"Empty CFG: Skipping.")
       continue
-    elif cfg.num_bbls() <= 2 or cfg.num_jmps() <= 5:
+    elif cfg.num_bbls() <= GLOBAL_OPTION_MIN_CFG_BLOCKS or cfg.num_jmps() <= GLOBAL_OPTION_MIN_CFG_JUMPS:
       mwarning(f"Small CFG: Skipping.")
+      continue
+    elif cfg.num_bbls() > GLOBAL_OPTION_MAX_CFG_BLOCKS or cfg.num_jmps() > GLOBAL_OPTION_MAX_CFG_JUMPS:
+      mwarning(f"Large CFG: Skipping.")
       continue
     # TODO: More strategies to cut large CFGs
     results.append(cfg)
@@ -458,12 +579,17 @@ def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output:
   outdir = Path(tempfile.mkdtemp(prefix=f"ggen-{gid}-", dir=tempfile.gettempdir()))
   mlog(f"Working on: {outdir}")
   stats = GenStats()
-  counter = 0
-  while limit <= 0 or counter < limit:
+  simple_hash_cache = set()
+  while limit <= 0 or stats.num_graphs < limit:
+    counter = stats.num_graphs
     time_per = time.time()
     fname = f"{gid}_{counter:08}"
     mlog(f"=> {counter}: Generating LLVM program with ID {fname} ... ", color='blue')
-    gen_res = pgen.next(name=fname, outdir=outdir, seed=rand_int(), timeout=timeout)
+    try:
+      gen_res = pgen.next(name=fname, outdir=outdir, seed=rand_int(), timeout=timeout)
+    except StopIteration:
+      mlog("No more programs can be generated due to StopIteration, stopping.")
+      break
     if gen_res.file is None:
       mwarning(f"Failed: {gen_res.errmsg}")
       continue
@@ -477,7 +603,7 @@ def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output:
     if not cfg_files:
       mwarning(f"Failed: {errmsg}")
       continue
-    mlog(f"Succeeded: {[str(c) for c in cfg_files]}")
+    mlog(f"Succeeded: {len(cfg_files)} returned ([{cfg_files[0].relative_to(outdir)}, ...])")
     mlog("Parsing the DOT file into a CFG skeleton ... ")
     cfgs = []
     for cf in cfg_files:
@@ -489,10 +615,18 @@ def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output:
     time_per = time.time() - time_per
     with output.open("a") as fou:
       for g in cfgs:
-        fou.write(json.dumps(g.to_dict()) + "\n")
+        # We enforce a simplest dedup strategy. However this is not
+        # sufficient to remove all isomorphic graphs.
+        g_str = json.dumps(g.to_dict())
+        g_hash = hash(g_str)
+        if g_hash in simple_hash_cache:
+          mwarning("Duplicate graph detected, skipping.")
+          continue
+        fou.write(g_str + "\n")
+        simple_hash_cache.add(g_hash)
         stats.contrib(g, time_per / len(cfgs))
-    counter += len(cfgs)
   shutil.rmtree(outdir)
+  # TODO: Leverage NetworkX to remove isomorphic graphs
   mlog(f"The generated graphs are saved into: {output}", color='green')
   mlog("Generation statistics:")
   mlog(f"  Number of control-flow graphs : {stats.num_graphs}")
@@ -510,6 +644,9 @@ def run_gen_loop(gid: str, *, pgen: LLVMProgGen, llvm: LLVM, limit: int, output:
 
 
 def main():
+  global GLOBAL_OPTION_MIN_CFG_BLOCKS, GLOBAL_OPTION_MAX_CFG_BLOCKS, \
+    GLOBAL_OPTION_MIN_CFG_JUMPS, GLOBAL_OPTION_MAX_CFG_JUMPS
+
   parser = ArgumentParser("gen", description="Generate a graph database from a set of functions")
   parser.add_argument(
     "-l", "--llvm",
@@ -554,8 +691,42 @@ def main():
     "--preset",
     default=None,
     type=str,
-    help="Path to the directory saving the preset of programs. This is required when "
-         "preset is chosen as the program generator (default: None, not used)"
+    help="Path to the compile_commands.json saving the compile commands of a preset of programs. "
+         "The compile_commands.json is a widely used format for storing compilation commands. It can be "
+         "generated it using CMake with the option -DCMAKE_EXPORT_COMPILE_COMMANDS=ON, or tools like Bear. "
+         "Note that, each command in the compile_commands.json should be a valid command to compile a "
+         "C/C++ program (with an explicit -o option) using either GCC or Clang. "
+         "We did not rely on the 'arguments' field of the compile_commands.json as it is not always available. "
+         "See: https://clang.llvm.org/docs/JSONCompilationDatabase.html."
+         "This is required when preset is chosen as the program generator (default: None, not used)"
+  )
+  parser.add_argument(
+    "--min-blocks",
+    default=GLOBAL_OPTION_MIN_CFG_BLOCKS,
+    type=int,
+    help="Minimum number of basic blocks (nodes) in the generated control flow graphs. This is used to "
+         f"filter out small graphs that are not useful for testing (default: {GLOBAL_OPTION_MIN_CFG_BLOCKS})"
+  )
+  parser.add_argument(
+    "--max-blocks",
+    default=GLOBAL_OPTION_MAX_CFG_BLOCKS,
+    type=int,
+    help="Maximum number of basic blocks (nodes) in the generated control flow graphs. This is used to "
+         f"filter out overly large graphs that are not harmful for testing (default: {GLOBAL_OPTION_MAX_CFG_BLOCKS})"
+  )
+  parser.add_argument(
+    "--min-jumps",
+    default=GLOBAL_OPTION_MIN_CFG_JUMPS,
+    type=int,
+    help="Minimum number of block jumps (edges) in the generated control flow graphs. This is used to "
+         f"filter out small graphs that are not useful for testing (default: {GLOBAL_OPTION_MIN_CFG_JUMPS})"
+  )
+  parser.add_argument(
+    "--max-jumps",
+    default=GLOBAL_OPTION_MAX_CFG_JUMPS,
+    type=int,
+    help="Maximum number of block jumps (edges) in the generated control flow graphs. This is used to "
+         f"filter out overly large graphs that are not harmful for testing (default: {GLOBAL_OPTION_MAX_CFG_JUMPS})"
   )
   parser.add_argument(
     "output",
@@ -591,7 +762,9 @@ def main():
   elif gen == "preset":
     if args.preset is None:
       merror(f"Option --preset must be specified when using Preset as the program generator.")
-    merror("Preset generator is not yet supported in this version of the generator.")
+    gen = Preset(Path(args.preset), llvm)
+  else:
+    merror(f"Unsupported program generator: {gen}")
 
   limit = args.limit
   if limit <= 0:
@@ -599,6 +772,34 @@ def main():
   if limit > MAX_I32:
     mwarning(f"Limit (--limit) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.")
     limit = MAX_I32
+
+  GLOBAL_OPTION_MIN_CFG_BLOCKS = args.min_blocks
+  if GLOBAL_OPTION_MIN_CFG_BLOCKS <= 0:
+    GLOBAL_OPTION_MIN_CFG_BLOCKS = 0
+  if GLOBAL_OPTION_MIN_CFG_BLOCKS > MAX_I32:
+    mwarning(f"Minimum blocks (--min-blocks) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.")
+    GLOBAL_OPTION_MIN_CFG_BLOCKS = MAX_I32
+
+  GLOBAL_OPTION_MAX_CFG_BLOCKS = args.max_blocks
+  if GLOBAL_OPTION_MAX_CFG_BLOCKS <= 0:
+    GLOBAL_OPTION_MAX_CFG_BLOCKS = 0
+  if GLOBAL_OPTION_MAX_CFG_BLOCKS > MAX_I32:
+    mwarning(f"Maximum blocks (--max-blocks) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.")
+    GLOBAL_OPTION_MAX_CFG_BLOCKS = MAX_I32
+
+  GLOBAL_OPTION_MIN_CFG_JUMPS = args.min_jumps
+  if GLOBAL_OPTION_MIN_CFG_JUMPS <= 0:
+    GLOBAL_OPTION_MIN_CFG_JUMPS = 0
+  if GLOBAL_OPTION_MIN_CFG_JUMPS > MAX_I32:
+    mwarning(f"Minimum jumps (--min-jumps) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.")
+    GLOBAL_OPTION_MIN_CFG_JUMPS = MAX_I32
+
+  GLOBAL_OPTION_MAX_CFG_JUMPS = args.max_jumps
+  if GLOBAL_OPTION_MAX_CFG_JUMPS <= 0:
+    GLOBAL_OPTION_MAX_CFG_JUMPS = 0
+  if GLOBAL_OPTION_MAX_CFG_JUMPS > MAX_I32:
+    mwarning(f"Minimum jumps (--min-jumps) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.")
+    GLOBAL_OPTION_MAX_CFG_JUMPS = MAX_I32
 
   seed = args.seed
   if seed >= 0:
