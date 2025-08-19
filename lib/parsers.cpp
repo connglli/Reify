@@ -269,13 +269,25 @@ namespace symir {
             pushOp(opToken.kind);
             break;
 
-
 #define XX(name, ...) case SymSexpLexer::Token::Kind::TK_OP_EXPR_##name:
             SYMIR_EXPROP_LIST(XX)
 #undef XX
             pushArg<int>(0); // We need to save the number of terms
             pushOp(opToken.kind);
             break;
+
+          case SymSexpLexer::Token::Kind::TK_KW_VOL: {
+            pushOp(opToken.kind);
+            const auto varToken = stream();
+            Assert(
+                varToken.kind == SymSexpLexer::Token::Kind::TK_KW_PAR ||
+                    varToken.kind == SymSexpLexer::Token::Kind::TK_KW_LOC,
+                "The 1st child (%s) of the volatile node is neither a parameter nor a local",
+                varToken.FullInfo().c_str()
+            );
+            pushOp(varToken.kind);
+            break;
+          }
 
           default:
             pushOp(opToken.kind);
@@ -316,11 +328,9 @@ namespace symir {
             buildLocal();
             break;
 
-
           case SymSexpLexer::Token::Kind::TK_KW_RET:
             buildReturn();
             break;
-
 
           case SymSexpLexer::Token::Kind::TK_KW_ASS:
             buildAssign();
@@ -330,16 +340,13 @@ namespace symir {
             buildBranch();
             break;
 
-
           case SymSexpLexer::Token::Kind::TK_KW_GOTO:
             buildGoto();
             break;
 
-
           case SymSexpLexer::Token::Kind::TK_KW_BBL:
             buildBlock();
             break;
-
 
           case SymSexpLexer::Token::Kind::TK_KW_FUN:
             buildFunc();
@@ -469,7 +476,14 @@ namespace symir {
         "type of the term",
         varToken->FullInfo().c_str()
     );
-    funBd->SymParam(varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()));
+    if (const auto opKind = popOp(); opKind == SymSexpLexer::Token::TK_KW_VOL) {
+      funBd->SymParam(
+          varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()), /*isVolatile=*/true
+      );
+    } else {
+      pushOp(opKind); // Push it back as this is a volatile parameter
+      funBd->SymParam(varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()));
+    }
     delete typeToken;
     delete varToken;
   }
@@ -497,7 +511,14 @@ namespace symir {
         varToken->FullInfo().c_str()
     );
     const auto localType = SymIR::GetTypeFromSName(typeToken->ToStr());
-    funBd->SymLocal(varToken->ToStr(), buildCoef(coefToken, localType), localType);
+    if (const auto opKind = popOp(); opKind == SymSexpLexer::Token::TK_KW_VOL) {
+      funBd->SymLocal(
+          varToken->ToStr(), buildCoef(coefToken, localType), localType, /*isVolatile=*/true
+      );
+    } else {
+      pushOp(opKind); // Push it back as this is a volatile parameter
+      funBd->SymLocal(varToken->ToStr(), buildCoef(coefToken, localType), localType);
+    }
     delete typeToken;
     delete coefToken;
     delete varToken;

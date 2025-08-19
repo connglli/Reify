@@ -99,12 +99,21 @@ namespace symir {
   }
 
   void SymSexpLower::Visit(const Param &p) {
-    out << "(" << KW_PAR << " " << p.GetName() << " " << SymIR::GetTypeSName(p.GetType()) << ")";
+    if (p.IsVolatile()) {
+      out << "(" << KW_VOL << " " << KW_PAR << " " << p.GetName() << " "
+          << SymIR::GetTypeSName(p.GetType()) << ")";
+    } else {
+      out << "(" << KW_PAR << " " << p.GetName() << " " << SymIR::GetTypeSName(p.GetType()) << ")";
+    }
   }
 
   void SymSexpLower::Visit(const Local &l) {
     indent();
-    out << "(" << KW_LOC << " " << l.GetName() << " ";
+    if (l.IsVolatile()) {
+      out << "(" << KW_VOL << " " << KW_LOC << " " << l.GetName() << " ";
+    } else {
+      out << "(" << KW_LOC << " " << l.GetName() << " ";
+    }
     l.GetCoef()->Accept(*this);
     out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
@@ -217,12 +226,20 @@ namespace symir {
   }
 
   void SymCxLower::Visit(const Param &p) {
-    out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    if (p.IsVolatile()) {
+      out << "volatile" << " " << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    } else {
+      out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    }
   }
 
   void SymCxLower::Visit(const Local &l) {
     indent();
-    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+    if (l.IsVolatile()) {
+      out << "volatile" << " " << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+    } else {
+      out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+    }
     l.GetCoef()->Accept(*this);
     out << ";" << std::endl;
   }

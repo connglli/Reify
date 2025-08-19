@@ -242,8 +242,13 @@ namespace symir {
 
     [[nodiscard]] const std::string &GetName() const { return name; }
 
+    [[nodiscard]] bool IsVolatile() const { return isVolatile; }
+
+    void SetVolatile(const bool set = true) { isVolatile = set; }
+
   protected:
     std::string name;
+    bool isVolatile = false;
   };
 
   /// SymDef is a definition of a symbolic value, either been solved or not yet.
@@ -1336,10 +1341,13 @@ namespace symir {
     Coef *SymCoef(const std::string &name, const std::string &value, SymIR::Type type = SymIR::I32);
 
     /// Define and commit a new Param
-    const Param *SymParam(const std::string &name, SymIR::Type type = SymIR::I32);
+    const Param *
+    SymParam(const std::string &name, SymIR::Type type = SymIR::I32, bool isVolatile = false);
 
     /// Define and commit a new Local
-    const Local *SymLocal(const std::string &name, Coef *coef, SymIR::Type type = SymIR::I32);
+    const Local *SymLocal(
+        const std::string &name, Coef *coef, SymIR::Type type = SymIR::I32, bool isVolatile = false
+    );
 
     /// Define and commit a new basic block with defined body
     const Block *SymBlock(const std::string &label, const BlockBuilder::BlockBody &body);

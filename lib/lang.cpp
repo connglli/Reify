@@ -125,7 +125,7 @@ namespace symir {
     return dynamic_cast<Coef *>(s);
   }
 
-  const Param *FunctBuilder::SymParam(const std::string &name, SymIR::Type type) {
+  const Param *FunctBuilder::SymParam(const std::string &name, SymIR::Type type, bool isVolatile) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
@@ -136,12 +136,16 @@ namespace symir {
         name.c_str()
     );
     params.push_back(std::make_unique<Param>(name, type));
-    auto v = params.back().get();
+    const auto v = params.back().get();
+    if (isVolatile) {
+      v->SetVolatile();
+    }
     paramMap[name] = v;
     return v;
   }
 
-  const Local *FunctBuilder::SymLocal(const std::string &name, Coef *coef, SymIR::Type type) {
+  const Local *
+  FunctBuilder::SymLocal(const std::string &name, Coef *coef, SymIR::Type type, bool isVolatile) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
@@ -152,7 +156,10 @@ namespace symir {
         name.c_str()
     );
     locals.push_back(std::make_unique<Local>(name, coef, type));
-    auto v = locals.back().get();
+    const auto v = locals.back().get();
+    if (isVolatile) {
+      v->SetVolatile();
+    }
     localMap[name] = v;
     return v;
   }
@@ -292,11 +299,13 @@ namespace symir {
 
   void FunctCopier::Visit(const Goto &g) { currentBlock->SymGoto(g.GetTarget()); }
 
-  void FunctCopier::Visit(const Param &p) { builder->SymParam(p.GetName(), p.GetType()); }
+  void FunctCopier::Visit(const Param &p) {
+    builder->SymParam(p.GetName(), p.GetType(), p.IsVolatile());
+  }
 
   void FunctCopier::Visit(const Local &l) {
     l.GetCoef()->Accept(*this);
-    builder->SymLocal(l.GetName(), popCoef(), l.GetType());
+    builder->SymLocal(l.GetName(), popCoef(), l.GetType(), l.IsVolatile());
   }
 
   void FunctCopier::Visit(const Block &b) {
