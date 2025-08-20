@@ -113,11 +113,16 @@ struct GlobalOptions {
   // The number of different initialisation sets we want the solver to find for a given function
   int NumInitsPerExec = 3;
   // When enabled, inject obvious undefined behaviour in the unexecuted blocks
-  // Otherwise, we inject some randome values to their coefficients
+  // Otherwise, we inject some random values to their coefficients
   bool EnableUBInUnexecutedBbls = false;
   // Probability of selecting unexecuted blocks to inject UBs. I'm not making this probability
   // large since this may lead to a much longer generation time.
   double UBInjectionProba = 0.3;
+  // When enabled, some values are forced to be equal to give compilers
+  // opportunity to perform value numbering optimisations like GVN and LVN.
+  bool EnableValueNumbering = false;
+  // The probability of forcing some values to be equal
+  double ValueNumberingProba = 0.2;
 
   ////////////////////////////////////////////////////////////
   ////// Program Generation Parameters
@@ -157,6 +162,8 @@ struct GlobalOptions {
       ("U,Xenable-ub-inject", "Enable the injection of undefined behaviors to those unexecuted basic blocks", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xinject-ub-proba", "Probability of the selection of unexecuted blocks to inject undefined behaviors", cxxopts::value<double>())
       ("Xsample-bg-proba", "Probability of sampling a base graph from the given graph database", cxxopts::value<double>())
+      ("Xenable-lvn-gvn", "Forcing some values to be the equivalent to give compilers opportunity to perform LVN/GVN", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xlvn-gvn-proba", "Probability of forcing some values to be the equivalent as some others", cxxopts::value<double>())
       ;
     // clang-format on
   }
@@ -306,6 +313,25 @@ struct GlobalOptions {
       if (UBInjectionProba > 1) {
         std::cerr << "Error: The probability for selecting basic blocks to inject UBs "
                   << "(--Xinject-ub-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    EnableValueNumbering = args["Xenable-lvn-gvn"].as<bool>();
+
+    if (args.count("Xlvn-gvn-proba")) {
+      ValueNumberingProba = args["Xlvn-gvn-proba"].as<double>();
+      if (ValueNumberingProba <= 0) {
+        std::cerr
+            << "Error: The probability for selecting some values to be equivalent "
+               "(--Xlvn-gvn-proba) cannot be less than or equal to 0. It should be within 0 to 1."
+            << std::endl;
+        exit(1);
+      }
+      if (ValueNumberingProba > 1) {
+        std::cerr << "Error: The probability for selecting some values to be equivalent "
+                  << "(--Xlvn-gvn-proba) cannot be be larger than 1. It should be within 0 to 1."
                   << std::endl;
         exit(1);
       }

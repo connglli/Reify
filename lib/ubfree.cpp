@@ -217,7 +217,45 @@ void SignedOverflow::Visit(const symir::AssStmt &a) {
   a.GetExpr()->Accept(*this);
   auto exprExpr = popExpression();
   auto varNewVerExpr = CreateVarExpr(a.GetVar()->GetDef(), ++versions[a.GetVar()->GetName()]);
+  verbbls[a.GetVar()->GetName()] = currBbl;
   constraints.push_back(varNewVerExpr == exprExpr);
+  // TODO: This is an ugly support for enabling value numbering. Try make this a separate visitor.
+  // TODO: Also considering numbering the value of a term or an expression, besides a variable.
+  if (GlobalOptions::Get().EnableValueNumbering && versions.size() > 1 &&
+      Random::Get().UniformReal()() < GlobalOptions::Get().ValueNumberingProba) {
+    // If value numbering is enabled, we also add a constraint that the new version
+    // of the variable should be equal to the newest version of one other variable.
+    // We only consider variables in the previous and the current block to let the compiler
+    // found them more easily.
+    // TODO: However, we are irreducible and hard to be analyzed. Better consider dup the statement.
+    std::vector<std::string> aliveVars{};
+    for (const auto &[v, b]: verbbls) {
+      if (b == currBbl || b == prevBbl) {
+        aliveVars.push_back(v);
+      }
+    }
+    if (aliveVars.empty()) {
+      return; // No available variables to enforce value numbering
+    }
+    const auto ourName = a.GetVar()->GetName();
+    const auto rand = Random::Get().Uniform(0, static_cast<int>(aliveVars.size()) - 1);
+    std::string otherName;
+    for (int tries = 0; tries < 10; tries++) {
+      otherName = aliveVars[rand()];
+      if (otherName != ourName) {
+        break;
+      }
+    }
+    if (otherName == ourName) {
+      return; // Give up
+    }
+    const auto otherVar = fun.FindVar(otherName);
+    auto otherVarExpr = CreateVarExpr(otherVar);
+    constraints.push_back(varNewVerExpr == otherVarExpr);
+    Log::Get().Out() << "Value numbering enforced: " << ourName << "(version=" << versions[ourName]
+                     << ") == " << otherName << "(version=" << versions[otherName] << ")"
+                     << std::endl;
+  }
 }
 
 void SignedOverflow::Visit(const symir::RetStmt &r) { /* DO NOTHING */ }
@@ -247,6 +285,8 @@ void SignedOverflow::Visit(const symir::Goto &g) { /* DO NOTHING */ }
 
 void SignedOverflow::Visit(const symir::Param &p) {
   auto varExpr = CreateVarExpr(&p, 0);
+  versions[p.GetName()] = 0;
+  verbbls[p.GetName()] = "___entry_bbl";
   constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);
   constraints.push_back(varExpr >= GlobalOptions::Get().LowerInitBound);
 }
@@ -255,6 +295,8 @@ void SignedOverflow::Visit(const symir::Local &l) {
   l.GetCoef()->Accept(*this);
   auto coefExpr = popExpression();
   auto varExpr = CreateVarExpr(l.GetDefinition(), 0);
+  versions[l.GetName()] = 0;
+  verbbls[l.GetName()] = "___entry_bbl";
   constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);
   constraints.push_back(varExpr >= GlobalOptions::Get().LowerInitBound);
   constraints.push_back(varExpr == coefExpr);
@@ -279,10 +321,12 @@ void SignedOverflow::Visit(const symir::Funct &f) {
     local->Accept(*this);
   }
   for (size_t i = 0; i < execution.size() - 1; i++) {
+    prevBbl = currBbl;
     currBbl = execution[i];
     nextBbl = execution[i + 1];
     f.GetBlock(currBbl)->Accept(*this);
   }
+  prevBbl = currBbl;
   currBbl = execution.back();
   nextBbl = "";
   f.GetBlock(currBbl)->Accept(*this);
