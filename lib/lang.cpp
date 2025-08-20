@@ -61,7 +61,7 @@ namespace symir {
     return cid;
   }
 
-  void BlockBuilder::SymAssign(const VarDef *var, ExprID eid) {
+  const AssStmt *BlockBuilder::SymAssign(const VarDef *var, ExprID eid) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
@@ -69,28 +69,33 @@ namespace symir {
         std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
     );
     createdExprs.erase(it);
+    return dynamic_cast<const AssStmt *>(stmts.back().get());
   }
 
-  void BlockBuilder::SymReturn() {
+  const RetStmt *BlockBuilder::SymReturn() {
     Assert(isActive(), "The BlockBuilder is no longer active");
     std::vector<std::unique_ptr<VarUse>> uses;
     for (const auto *p: GetParent()->GetParams()) {
       uses.push_back(std::make_unique<VarUse>(p));
     }
     stmts.push_back(std::make_unique<RetStmt>(std::move(uses)));
+    return dynamic_cast<const RetStmt *>(stmts.back().get());
   }
 
-  void BlockBuilder::SymBranch(const std::string &truLab, const std::string &falLab, CondID cid) {
+  const Branch *
+  BlockBuilder::SymBranch(const std::string &truLab, const std::string &falLab, CondID cid) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdConds.find(cid);
     Assert(it != createdConds.end(), "Cond with ID \"%lu\" does not exist", cid);
     target = std::make_unique<Branch>(std::move(it->second), truLab, falLab);
     createdConds.erase(it);
+    return dynamic_cast<const Branch *>(target.get());
   }
 
-  void BlockBuilder::SymGoto(const std::string &label) {
+  const Goto *BlockBuilder::SymGoto(const std::string &label) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     target = std::make_unique<Goto>(label);
+    return dynamic_cast<const Goto *>(target.get());
   }
 
   std::unique_ptr<Block> BlockBuilder::Build() {
@@ -99,7 +104,6 @@ namespace symir {
     return std::make_unique<Block>(label, std::move(stmts), std::move(target));
   }
 
-  /// Define and commit a new unsolved coefficient
   Coef *FunctBuilder::SymCoef(const std::string &name, SymIR::Type type) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
@@ -112,7 +116,6 @@ namespace symir {
     return dynamic_cast<Coef *>(s);
   }
 
-  /// Define and commit a new solved coefficient
   Coef *FunctBuilder::SymCoef(const std::string &name, const std::string &value, SymIR::Type type) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(

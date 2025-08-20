@@ -1178,20 +1178,20 @@ namespace symir {
 #undef XX
 
     /// Create and commit an AssStmt to the builder..
-    void SymAssign(const VarDef *var, ExprID eid);
+    const AssStmt *SymAssign(const VarDef *var, ExprID eid);
 
     /// Create and commit a RetStmt to the builder.
-    void SymReturn();
+    const RetStmt *SymReturn();
 
     /// Create and commit a Branch target to the builder.
     /// After calling this function, the ::Build() should be called to commit the block
     /// and the builder cannot be used any more to create more SIRs.
-    void SymBranch(const std::string &truLab, const std::string &falLab, CondID cid);
+    const Branch *SymBranch(const std::string &truLab, const std::string &falLab, CondID cid);
 
     /// Create and commit a Goto target to the builder.
     /// After calling this function, the ::Build() should be called to commit the block
     /// and the builder cannot be used any more to create more SIRs.
-    void SymGoto(const std::string &label);
+    const Goto *SymGoto(const std::string &label);
 
     /// Get the list of used variables in this block
     [[nodiscard]] std::vector<const VarUse *> GetUses(bool removeDefs = true) const {
@@ -1207,7 +1207,7 @@ namespace symir {
     std::unique_ptr<Block> Build() override;
 
   protected:
-    [[nodiscard]] bool isActive() const {
+    [[nodiscard]] bool isActive() const override {
       return target == nullptr && SymIRBuilderGeneric::isActive();
     }
 
