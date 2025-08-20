@@ -4,3 +4,7 @@ generated*/
 .idea
 .vscode
 venv
+
+# for clangd
+compile_commands.json
+.cache
