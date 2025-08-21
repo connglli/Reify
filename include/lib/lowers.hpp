@@ -28,6 +28,7 @@
 
 #include <fstream>
 #include "jnif/jnif.hpp"
+#include "lib/bpf/bpf.h"
 #include "lib/lang.hpp"
 
 #define SYMIR_LOWER_INDENTATION_SIZE 2
@@ -202,9 +203,92 @@ namespace symir {
         jnif::ConstPool::NULLENTRY;            // The method index in the constant pool
     const Funct *fun = nullptr;                // The function that we're currently lowering
     std::map<const std::string, int> locals{}; // Map from variable names to local variable indices
-    std::map<const std::string, jnif::LabelInst *> labels{
-    }; // Map from block labels to bytecode labels
+    std::map<const std::string, jnif::LabelInst *>
+        labels{}; // Map from block labels to bytecode labels
   };
+
+  /// Translates SymIR to eBPF bytecode with register allocation, arithmetic operations,
+  /// control flow handling, and oracle-based verification for bug detection.
+  class eBPFLower : public SymIRLower {
+  public:
+    explicit eBPFLower(std::vector<struct bpf_insn> &insns) : SymIRLower(devNull), insns(insns) {}
+
+  protected:
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &e) override;
+    void Visit(const RetStmt &r) override;
+    void Visit(const Branch &b) override;
+    void Visit(const Goto &g) override;
+    void Visit(const Param &p) override;
+    void Visit(const Local &l) override;
+    void Visit(const Block &b) override;
+    void Visit(const Funct &f) override;
+
+  private:
+    using u32 = std::uint32_t;
+    using u16 = std::uint16_t;
+    using u8 = std::uint8_t;
+
+    /* BPF has 11 regs, R0~R10:
+     *   R0: return reg
+     *   R1: ctx pointer
+     *   R2~R5: other function parameters
+     *   R6~R9: locals
+     *   R10: stack pointer
+     * In this translation, we use:
+     *   R2~R5: params
+     *   R6~R7: locals
+     *   R8: tmp reg (for the lower)
+     *   R9: tmp reg
+     * So 6 regs are available (MAX_REG), AX0 and AX1 are tmps.
+     */
+    static const u8 MAX_REG = 6;
+    static const u8 REG_AX0 = BPF_REG_8; // for imm result of term
+    static const u8 REG_AX1 = BPF_REG_9; // for expr
+
+    template<typename T>
+    u8 GetReg(const T *t, bool param = false) {
+      switch (t->GetType()) {
+        case SymIR::Type::I32: {
+          const auto name = t->GetName();
+          if (regs.find(name) == regs.end()) {
+            Assert(regs.size() < MAX_REG, "Too many variables");
+            u8 reg_n;
+            if (param) {
+              reg_n = preg_gen++;
+              Assert(reg_n <= BPF_REG_5, "Too many parameters");
+            } else {
+              reg_n = lreg_gen++;
+              Assert(reg_n <= BPF_REG_7, "Too many locals");
+            }
+            regs[name] = reg_n;
+          }
+          return regs[name];
+        }
+        default: {
+          Panic("Unsupported var type");
+        }
+      }
+    }
+
+    void AddJmp(struct bpf_insn insn, const std::string &target) {
+      jmp_fixups[static_cast<u32>(insns.size())] = target;
+      insns.push_back(insn);
+    }
+
+    std::vector<struct bpf_insn> &insns;
+    std::unordered_map<std::string, u8> regs;
+    u8 preg_gen = BPF_REG_2; // Next param reg, starting from R2
+    u8 lreg_gen = BPF_REG_6; // Next local reg, starting from R6
+    std::unordered_map<std::string, u32> labels;
+    std::unordered_map<u32, std::string> jmp_fixups;
+  };
+
+
 } // namespace symir
 
 

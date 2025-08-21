@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "jnif/jnif.hpp"
+#include "lib/bpf/bpf.h"
 #include "lib/ctrlflow.hpp"
 #include "lib/dbgutils.hpp"
 #include "lib/lang.hpp"
@@ -118,6 +119,9 @@ public:
 
   // Parse the map of initialisation-finalisation and return them
   [[nodiscard]] static InitFinaMap ParseMappingCode(const std::string &mapPath);
+
+  // Generate the eBPF code of the function for a given execution
+  [[nodiscard]] std::vector<struct bpf_insn> GenerateFuneBPFCode(const UBFreeExec &exec) const;
 
 private:
   // Generate a new basic block with random statements and symbols

@@ -84,6 +84,7 @@ struct FunGenOpts {
   bool main;
   bool sexpression;
   bool javaclass;
+  bool ebpf;
   bool verbose;
 
   static FunGenOpts Parse(int argc, char **argv) {
@@ -98,6 +99,7 @@ struct FunGenOpts {
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("S,sexpression", "Also generate the S Expression of the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("E,ebpf", "Also generate an eBPF program identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -174,6 +176,7 @@ struct FunGenOpts {
     const bool main = args["main"].as<bool>();
     const bool sexpression = args["sexpression"].as<bool>();
     const bool javaclass = args["unstable-javaclass"].as<bool>();
+    const bool ebpf = args["ebpf"].as<bool>();
     const bool verbose = args["verbose"].as<bool>();
 
     GlobalOptions::Get().HandleFuncArgs(args);
@@ -186,6 +189,7 @@ struct FunGenOpts {
         .main = main,
         .sexpression = sexpression,
         .javaclass = javaclass,
+        .ebpf = ebpf,
         .verbose = verbose
     };
   }
@@ -200,6 +204,7 @@ int main(int argc, char **argv) {
   bool mainfun = cliOpts.main;
   bool sexpression = cliOpts.sexpression;
   bool javaclass = cliOpts.javaclass;
+  bool ebpf = cliOpts.ebpf;
   bool verbose = cliOpts.verbose;
 
   std::filesystem::path outputDirectory = cliOpts.output;
@@ -307,6 +312,17 @@ int main(int argc, char **argv) {
     jnif::stream::OClassFileStream ofs(
         GetJavaClassPath(uuid, sno, outputDirectory).c_str(), javaClass.get()
     );
+  }
+
+  if (ebpf) {
+    std::filesystem::create_directories(GeteBPFDir(outputDirectory));
+    std::ofstream ebpfFile =
+        std::ofstream(GeteBPFPath(uuid, sno, outputDirectory), std::ios::binary);
+    auto ebpfCode = fun.GenerateFuneBPFCode(*exec);
+    ebpfFile.write(
+        reinterpret_cast<const char *>(ebpfCode.data()), ebpfCode.size() * sizeof(struct bpf_insn)
+    );
+    ebpfFile.close();
   }
 
   return 0;

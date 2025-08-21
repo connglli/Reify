@@ -427,6 +427,10 @@ static std::filesystem::path GetProgramsDir(const std::filesystem::path &output)
   return output / "programs";
 }
 
+static std::filesystem::path GeteBPFDir(const std::filesystem::path &output) {
+  return output / "ebpf_progs";
+}
+
 static std::string GetFunctionName(const std::string &uuid, const std::string &sno) {
   return std::string(FUNCTION_NAME_PREFIX) + "_" + uuid + "_" + sno;
 }
@@ -487,6 +491,15 @@ static std::filesystem::path GetProgramPath(
     const std::string &uuid, const std::string &sno, const std::filesystem::path &output
 ) {
   return GetProgramsDir(output) / GetProgramNameForFunctionName(GetFunctionName(uuid, sno));
+}
+
+static std::string GeteBPFProgramNameForFunctionName(const std::string &functionName) {
+  return functionName.substr(std::string(FUNCTION_NAME_PREFIX).size() + 1) + ".bpf";
+}
+
+static std::filesystem::path
+GeteBPFPath(const std::string &uuid, const std::string &sno, const std::filesystem::path &output) {
+  return GeteBPFDir(output) / GeteBPFProgramNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
 static std::filesystem::path

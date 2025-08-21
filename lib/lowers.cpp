@@ -24,6 +24,7 @@
 // SOFTWARE.
 
 #include "lib/lowers.hpp"
+#include "lib/bpf/bpf.h"
 #include "lib/chksum.hpp"
 #include "lib/logger.hpp"
 
@@ -497,4 +498,187 @@ namespace symir {
       b->Accept(*this);
     }
   }
+
+/* C++ has the following strange warning, which is basically fp in C.
+ * Suppress it in the eBPFLower code area.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnarrowing"
+
+  void eBPFLower::Visit(const VarUse &v) { Panic("Unreachable"); }
+
+  void eBPFLower::Visit(const Coef &c) {
+    Assert(c.GetType() == SymIR::Type::I32, "Unsupported coefficient type");
+    Assert(c.IsValueSet(), "Coefficient value is not set");
+  }
+
+  void eBPFLower::Visit(const Term &t) {
+    /* term := op coef var
+     * This: stores coef to AX0, and get the reg of var
+     * compute the result into AX0
+     */
+
+    t.GetCoef()->Accept(*this);
+    int coef = std::stoi(t.GetCoef()->GetValue());
+    insns.push_back(BPF_MOV32_IMM(REG_AX0, coef));
+
+    u8 op;
+    u16 off = 0;
+    switch (t.GetOp()) {
+      case Term::Op::OP_ADD:
+        op = BPF_ADD;
+        break;
+      case Term::Op::OP_SUB:
+        op = BPF_SUB;
+        break;
+      case Term::Op::OP_MUL:
+        op = BPF_MUL;
+        break;
+      case Term::Op::OP_DIV:
+        op = BPF_DIV;
+        off = 1; // BPF_SDIV
+        break;
+      case Term::Op::OP_REM:
+        op = BPF_MOD;
+        off = 1; // BPF_SMOD
+        break;
+      case Term::Op::OP_CST:
+        // Do nothing
+        return;
+      default:
+        Panic("Unsupported term type");
+    }
+    if (t.GetVar() != nullptr) {
+      auto insn = BPF_ALU32_REG(op, REG_AX0, GetReg(t.GetVar()));
+      insn.off = off;
+      insns.push_back(insn);
+    }
+  }
+
+  void eBPFLower::Visit(const Expr &e) {
+    /* expr := op term1 term2 ... termN
+     * This is computed by:
+     *   ax1 = term1
+     *   for i = 2 to N:
+     *     ax1 = op(ax1, termi)
+     */
+
+    e.GetTerm(0)->Accept(*this);
+    insns.push_back(BPF_MOV32_REG(REG_AX1, REG_AX0));
+
+    u8 op;
+    switch (e.GetOp()) {
+      case Expr::Op::OP_ADD:
+        op = BPF_ADD;
+        break;
+      case Expr::Op::OP_SUB:
+        op = BPF_SUB;
+        break;
+      default:
+        Panic("Unsupported expression type");
+    }
+
+    for (size_t i = 1; i < e.GetTerms().size(); ++i) {
+      e.GetTerm(i)->Accept(*this);
+      insns.push_back(BPF_ALU32_REG(op, REG_AX1, REG_AX0));
+    }
+  }
+
+  void eBPFLower::Visit(const Cond &c) { c.GetExpr()->Accept(*this); }
+
+  void eBPFLower::Visit(const AssStmt &a) {
+    u8 reg = GetReg(a.GetVar());
+    a.GetExpr()->Accept(*this);
+    insns.push_back(BPF_MOV32_REG(reg, REG_AX1));
+  }
+
+  void eBPFLower::Visit(const RetStmt &r) {
+    /* csum = v1 ^ v2 ^ ... ^ vN
+     * The below adds an oracle:
+     *  if (csum == csum_computed_during_gen_exe)
+     *      verifier_sink();
+     * The sink is expected to be detected; otherwise, a false negative.
+     */
+
+    insns.push_back(BPF_MOV32_IMM(BPF_REG_0, 0));
+    for (const auto &v: r.GetVars())
+      insns.push_back(BPF_ALU32_REG(BPF_XOR, BPF_REG_0, GetReg(v)));
+    insns.push_back(BPF_EXIT_INSN());
+  }
+
+  void eBPFLower::Visit(const Branch &b) {
+    /* Jmp in this ir has two targets, while bpf only has one.
+     * For `br cond l0 l1`, we translate it to:
+     *    jmp cond l0
+     *    jmp l1
+     */
+
+    b.GetCond()->Accept(*this);
+
+    u8 op;
+    switch (b.GetCond()->GetOp()) {
+      case Cond::Op::OP_GTZ:
+        op = BPF_JSGT;
+        break;
+      case Cond::Op::OP_LTZ:
+        op = BPF_JSLT;
+        break;
+      case Cond::Op::OP_EQZ:
+        op = BPF_JEQ;
+        break;
+      default:
+        Panic("Unsupported condition type");
+    }
+    AddJmp(BPF_JMP32_IMM(op, REG_AX1, 0, 0), b.GetTrueTarget());
+    AddJmp(BPF_JMP_A(0), b.GetFalseTarget());
+  }
+
+  void eBPFLower::Visit(const Goto &g) { AddJmp(BPF_JMP_A(0), g.GetTarget()); }
+
+  void eBPFLower::Visit(const Param &p) { GetReg(&p, true); }
+
+  void eBPFLower::Visit(const Local &l) {
+    l.GetCoef()->Accept(*this);
+    insns.push_back(BPF_MOV32_IMM(GetReg(&l), std::stoi(l.GetCoef()->GetValue())));
+  }
+
+  void eBPFLower::Visit(const Block &b) {
+    u32 insn_cnt_before = insns.size();
+
+    labels[b.GetLabel()] = insns.size();
+    for (const auto &s: b.GetStmts()) {
+      s->Accept(*this);
+    }
+    Assert(insn_cnt_before != insns.size(), "Empty block");
+  }
+
+  void eBPFLower::Visit(const Funct &f) {
+    for (const auto &p: f.GetParams()) {
+      p->Accept(*this);
+    }
+
+    for (const auto &l: f.GetLocals()) {
+      l->Accept(*this);
+    }
+
+    for (const auto &b: f.GetBlocks()) {
+      b->Accept(*this);
+    }
+
+    // Fix block jump offsets
+    for (const auto &[insn_off, target]: jmp_fixups) {
+      const auto br_off = labels.at(target);
+      Assert(br_off != insn_off, "Dead jmp");
+      int off = static_cast<int>(br_off) - static_cast<int>(insn_off);
+      // eBPF jump offset is relative to the next instruction
+      off -= 1;
+      Assert(off >= INT16_MIN && off <= INT16_MAX, "Jump offset too large");
+      insns[insn_off].off = off;
+    }
+    jmp_fixups.clear();
+  }
+
+#pragma GCC diagnostic pop
+
+
 } // namespace symir

@@ -444,3 +444,94 @@ FunPlus::InitFinaMap FunPlus::ParseMappingCode(const std::string &mapPath) {
 
   return InitFinaMap(std::move(initialisations), std::move(finalizations));
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnarrowing"
+std::vector<struct bpf_insn> FunPlus::GenerateFuneBPFCode(const UBFreeExec &exec) const {
+  using u8 = std::uint8_t;
+  using u32 = std::uint32_t;
+
+  Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
+  const auto *fun = exec.GetFun();
+  Assert(fun != nullptr, "Function is not generated yet!");
+
+  const auto &initializations = exec.GetInitializations();
+  const auto &finalizations = exec.GetFinalizations();
+  Assert(
+      initializations.size() == finalizations.size(),
+      "Initializations and finalizations must have the same size"
+  );
+  // The ctx pointer of R1 is preserved, so we don't generate it.
+  Assert(initializations.size() <= 4, "Four parameters are supported for eBPF");
+
+  /* eBPF Program Layout:
+   *
+   *  ╭─────────────────────────────────────────────────────────╮
+   *  │                    MAIN FUNCTION                        │
+   *  ├─────────────────────────────────────────────────────────┤
+   *  │  R9 = 0  (counter initialization)                       │
+   *  │                                                         │
+   *  │  ┌─ FOR EACH TEST CASE ─────────────────────────────┐   │
+   *  │  │  • Setup params (R2, R3, R4, R5)                 │   │
+   *  │  │  • CALL generated_func                           │   │
+   *  │  │  • Oracle: if (R0 != expected_csum) skip         │   │
+   *  │  │  • R9++  (increment counter)                     │   │
+   *  │  └──────────────────────────────────────────────────┘   │
+   *  │                                                         │
+   *  │  Final Oracle:                                          │
+   *  │  • if (R9 != num_tests) exit(normal)                    │
+   *  │  • R10 = 0  (bug detected signal)                       │
+   *  │  • exit                                                 │
+   *  ├─────────────────────────────────────────────────────────┤
+   *  │                GENERATED FUNCTION                       │
+   *  ├─────────────────────────────────────────────────────────┤
+   *  │  Register Layout:                                       │
+   *  │  • R2-R5: function parameters                           │
+   *  │  • R6-R7: local variables                               │
+   *  │  • R8 (AX0): temp for term results                      │
+   *  │  • R9 (AX1): temp for expression results                │
+   *  │                                                         │
+   *  │  Function Body (from SymIR lowering):                   │
+   *  │  • Param/Local initialization                           │
+   *  │  • Basic blocks with control flow                       │
+   *  │  • Arithmetic operations                                │
+   *  │  • Return: XOR checksum of finals in R0                 │
+   *  ╰─────────────────────────────────────────────────────────╯
+   */
+
+  std::vector<struct bpf_insn> prog;
+  prog.push_back(BPF_MOV32_IMM(BPF_REG_9, 0));
+
+  std::vector<int> call_fixups;
+  for (size_t i = 0; i < initializations.size(); i++) {
+    const auto &init = initializations[i];
+    const auto &fina = finalizations[i];
+    const auto numParams = static_cast<u8>(init.size());
+    for (auto j = 0; j < numParams; j++) {
+      prog.push_back(BPF_MOV32_IMM(BPF_REG_2 + j, init[j]));
+    }
+    call_fixups.push_back(prog.size());
+    prog.push_back(BPF_CALL_REL(0));
+
+    u32 csum = 0;
+    for (auto x: fina) {
+      csum ^= x;
+    }
+    // counter
+    prog.push_back(BPF_JMP32_IMM(BPF_JNE, BPF_REG_0, csum, 1));
+    prog.push_back(BPF_ALU32_IMM(BPF_ADD, BPF_REG_9, 1));
+  }
+  // oracle
+  prog.push_back(BPF_JMP32_IMM(BPF_JNE, BPF_REG_9, initializations.size(), 1));
+  prog.push_back(BPF_MOV32_IMM(BPF_REG_10, 0));
+  prog.push_back(BPF_EXIT_INSN());
+
+  for (size_t i = 0; i < call_fixups.size(); i++)
+    prog[call_fixups[i]].imm = prog.size() - call_fixups[i] - 1;
+
+  symir::eBPFLower lower(prog);
+  lower.Lower(*fun);  // append the real prog
+
+  return prog;
+}
+#pragma GCC diagnostic pop
