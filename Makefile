@@ -1,6 +1,6 @@
-CXX := $(shell command -v g++ || command -v clang++)
-CC  := $(shell command -v gcc || command -v clang)
-PY3 := $(shell command -v python3)
+CXX ?= $(shell command -v g++ || command -v clang++)
+CC  ?= $(shell command -v gcc || command -v clang)
+PY3 ?= $(shell command -v python3 || shell command -v python)
 
 # Complain if we don't have any available compilers
 ifeq ($(CXX),)
