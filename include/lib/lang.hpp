@@ -273,19 +273,19 @@ namespace symir {
     [[nodiscard]] T GetTypedValue() const {
       Assert(IsSolved(), "This coefficient is not yet solved");
       const auto type = GetType();
-      const auto *typeName = SymIR::GetTypeName(type).c_str();
+      const auto typeName = SymIR::GetTypeName(type);
       switch (type) {
         case SymIR::I32:
           Assert(
               typeid(T) == typeid(int),
               "The coefficient \"%s\" is an %s, cannot get its typed value as %s", name.c_str(),
-              typeName, typeid(T).name()
+              typeName.c_str(), typeid(T).name()
           );
           return GetI32Value();
         default:
           Panic(
               "Unsupported type for coefficient \"%s\": %s, cannot get its typed value",
-              name.c_str(), typeName
+              name.c_str(), typeName.c_str()
           );
           break;
       }
@@ -677,7 +677,7 @@ namespace symir {
 
     [[nodiscard]] size_t NumSuccessors() const override { return 2; };
 
-    [[nodiscard]] virtual bool HasTarget(const std::string &label) const {
+    [[nodiscard]] bool HasTarget(const std::string &label) const override {
       return label == truLab || label == falLab;
     }
 
@@ -685,7 +685,7 @@ namespace symir {
 
     [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
 
-    virtual void ReplaceTarget(const std::string &from, const std::string &to) {
+    void ReplaceTarget(const std::string &from, const std::string &to) override {
       if (from != truLab && from != falLab) {
         Assert(
             false, "The target label (%s) is not found in the branch targets (true=%s, false=%s)",
@@ -717,7 +717,7 @@ namespace symir {
 
     [[nodiscard]] size_t NumSuccessors() const override { return 1; };
 
-    [[nodiscard]] virtual bool HasTarget(const std::string &label) const {
+    [[nodiscard]] bool HasTarget(const std::string &label) const override {
       return label == this->label;
     }
 
@@ -725,7 +725,7 @@ namespace symir {
 
     [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
 
-    virtual void ReplaceTarget(const std::string &from, const std::string &to) {
+    void ReplaceTarget(const std::string &from, const std::string &to) override {
       if (from == label) {
         label = to;
       } else {

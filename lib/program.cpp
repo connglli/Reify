@@ -37,7 +37,7 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     fs::path sexpPath = GetSexpressionPathForFunctionPath(funPath);
     functions.push_back(FunPlus::ParseFunSexpCode(sexpPath));
     fs::path mapPath = GetMappingPathForFunctionPath(funPath);
-    mappings.push_back(std::move(FunPlus::ParseMappingCode(mapPath)));
+    mappings.push_back(FunPlus::ParseMappingCode(mapPath));
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
   }
 }

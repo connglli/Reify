@@ -75,7 +75,7 @@ const SimpleGraphSet::SimpleGraph &SimpleGraphSet::SampleGraph(int atLeastNumNod
     auto idx = rand();
     if (idx >= static_cast<int>(graphs.size())) {
       for (size_t i = graphs.size(); i <= static_cast<size_t>(idx); i++) {
-        graphs.push_back(std::move(parseGraph(data[i])));
+        graphs.push_back(parseGraph(data[i]));
       }
     }
     auto &g = graphs[idx];

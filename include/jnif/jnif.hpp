@@ -1386,6 +1386,8 @@ namespace jnif {
           Inst *next = nullptr
       ) : opcode(opcode), kind(kind), _offset(0), constPool(constPool), prev(prev), next(next) {}
 
+      virtual ~Inst() = default;
+
       template<typename TKind>
       TKind *cast(bool cond, const char *kindName) {
         checkCast(cond, kindName);

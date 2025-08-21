@@ -63,12 +63,12 @@ void FunPlus::Generate() {
     if (GlobalOptions::Get().EnableVolatileVars &&
         randProba() < GlobalOptions::Get().VolatileVariableProba) {
       builder->SymLocal(
-          NameVar(i), builder->SymCoef("init_var" + i, symir::SymIR::Type::I32),
+          NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),
           symir::SymIR::Type::I32, /*IsVolatile=*/true
       );
     } else {
       builder->SymLocal(
-          NameVar(i), builder->SymCoef("init_var" + i, symir::SymIR::Type::I32),
+          NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),
           symir::SymIR::Type::I32, /*IsVolatile=*/false
       );
     }
