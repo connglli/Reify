@@ -66,12 +66,13 @@ public:
 /// A BiLoop is a reducible loop with entry, latch, and exit
 class BiLoop final : public Bimpo {
 public:
-  explicit BiLoop(int numBbls, bool allowNestedLoops = true) : graph(numBbls - 1, 2) {
+  explicit BiLoop(int numBbls, bool allowNestedLoops = true, bool allowUnreachableBbls = true) :
+      graph(numBbls - 1, 2) {
     bool reachable = false;
     // We instantiate the loop's CFG directly. We'll try until we successfully
     // generate a loop that is reachable from the entry to the exit.
     for (int tries = 0; tries < 100; tries++) {
-      graph.Generate(/*acyclic=*/!allowNestedLoops);
+      graph.Generate(/*acyclic=*/!allowNestedLoops, /*unreachable=*/allowUnreachableBbls);
       if (!graph.IsEntryExitReachable()) {
         // If the graph is not reachable from the entry to the exit, we try again
         graph.Reset();
@@ -159,12 +160,12 @@ public:
   [[nodiscard]] std::vector<int> SampleExec(int stepLimit, bool consistent, int maxLoopIter = 5);
 
   // Generate the sketch of the control flow graph randomly.
-  void Generate();
+  void Generate(bool unreachBbls = true);
 
   // Generate a reducible loop and insert into the graph.
   // This method must be called after Generate().
   // This method will turn a random block into a
-  void GenerateReduLoop(int numBbls = 5);
+  void GenerateReduLoop(int numBbls = 5, bool unreachBbls = true);
 
   void Print() const;
 

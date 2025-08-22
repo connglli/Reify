@@ -109,8 +109,8 @@ public:
   // Add a new exit node to the graph, which is pointed by the old exit node
   void AddNewExit();
 
-  // Generate the backbone graph randomly.
-  void Generate(bool acyclic = false);
+  // Generate the backbone graph randomly with allowing acyclic graph and/or unreachable nodes.
+  void Generate(bool acyclic = false, bool unreachable = true);
 
   // Reset the graph
   void Reset();
@@ -121,6 +121,9 @@ private:
 
   // Ensure the graph has no cycles
   void ensureNoCycles();
+
+  // Ensure the graph has no unreachable nodes
+  void ensureNoUnreachNodesFromEntry();
 
   // Try to make every node is reachable from the entry node
   // However, this is not ensured

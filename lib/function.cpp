@@ -35,15 +35,15 @@
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
 
-void FunPlus::Generate() {
+void FunPlus::Generate(bool allowDeadCode) {
   Log::Get().OpenSection("FunPlus: Generate Function " + name);
 
   auto randProba = Random::Get().UniformReal();
 
   // Generate the sketch of our control flow graph
-  cfg.Generate();
+  cfg.Generate(allowDeadCode);
   for (int i = 0; i < Random::Get().Uniform(0, maxNumLoops)(); i++) {
-    cfg.GenerateReduLoop(maxNumBblsPerLoop);
+    cfg.GenerateReduLoop(maxNumBblsPerLoop, allowDeadCode);
   }
   cfg.Print();
 

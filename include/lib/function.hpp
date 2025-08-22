@@ -91,7 +91,7 @@ public:
   void SetGraphSet(std::string file) { cfg.SetGraphSet(std::move(file)); }
 
   // Generate the function with random control-flow, statements, and symbols
-  void Generate();
+  void Generate(bool allowDeadCode = true);
 
   // Sample an execution of the function.
   std::vector<int> SampleExec(int execStep, bool consistent);

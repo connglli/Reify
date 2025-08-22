@@ -287,7 +287,7 @@ namespace symir {
               "Unsupported type for coefficient \"%s\": %s, cannot get its typed value",
               name.c_str(), typeName.c_str()
           );
-          break;
+          return T(); // To avoid compiler warning
       }
     }
 

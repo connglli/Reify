@@ -27,6 +27,7 @@
 
 #include <queue>
 
+#include "global.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 #include "lib/strutils.hpp"
@@ -45,9 +46,9 @@ std::vector<int> BiLoop::SampleOneIter(int stepLimit, bool consistent, bool incl
   return {};
 }
 
-void CfgSketch::Generate() {
+void CfgSketch::Generate(bool unreachBbls) {
   graph.Reset();
-  graph.Generate();
+  graph.Generate(/*acyclic=*/false, /*unreachable=*/unreachBbls);
   // Sync all bimpos and their start index in basicblocks array
   // Also clear and update the flattened basicblocks array
   bimpos.clear();
@@ -67,7 +68,7 @@ void CfgSketch::Generate() {
   }
 }
 
-void CfgSketch::GenerateReduLoop(const int numBbls) {
+void CfgSketch::GenerateReduLoop(const int numBbls, bool unreachBbls) {
   Log::Get().OpenSection("CfgSketch::GenerateReduLoop");
 
   // Randomly select a block and transform it into a loop, except for the entry and exit
@@ -82,7 +83,9 @@ void CfgSketch::GenerateReduLoop(const int numBbls) {
 
   // TODO: Currently, we did not support nested loops as otherwise
   // we'll often get into cycles when sampling executions.
-  bimpos[biInd] = std::make_unique<BiLoop>(numBbls, /*allowNestedLoops=*/false);
+  bimpos[biInd] = std::make_unique<BiLoop>(
+      numBbls, /*allowNestedLoops=*/false, /*allowUnreachableBbls=*/unreachBbls
+  );
 
   // Update the flattened basicblocks array.
   // Previously, the basicblocks array is:

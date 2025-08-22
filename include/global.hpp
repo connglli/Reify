@@ -89,6 +89,8 @@ struct GlobalOptions {
   int MaxNumLoopsPerFun = 2;
   // The maximum number of basic blocks in a loop
   int MaxNumBblsPerLoop = 5;
+  // When enabled, we disallow the generation of dead code (i.e., definitely unreachable code)
+  bool DisallowDeadCode = false;
 
   // The max number of executions that we can try sampling for each function
   int MaxNumExecsPerFun = 3;
@@ -156,6 +158,7 @@ struct GlobalOptions {
       ("Xvolatile-var-proba", "Probability of declaring a variable as a volatile variable", cxxopts::value<double>())
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
+      ("Xdisable-dead-code", "Disable the generation of dead code", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xnum-vars-per-fun", "The number of allowed variables (parameters and local variables) for each function", cxxopts::value<int>())
       ("Xnum-locals-per-fun", "The number of allowed local variables for each function", cxxopts::value<int>())
       ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>())
@@ -255,6 +258,8 @@ struct GlobalOptions {
       }
       ensurePositive(NumBblsPerFun, "Xnum-bbls-per-fun");
     }
+
+    DisallowDeadCode = args["Xdisable-dead-code"].as<bool>();
 
     if (args.count("Xnum-vars-per-fun")) {
       NumVarsPerFun = args["Xnum-vars-per-fun"].as<int>();

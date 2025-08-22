@@ -233,7 +233,7 @@ int main(int argc, char **argv) {
     std::cout << "WARNING: Using the graph database may cause timeout too frequently." << std::endl;
     fun.SetGraphSet(graphdb.value());
   }
-  fun.Generate();
+  fun.Generate(!GlobalOptions::Get().DisallowDeadCode);
 
   // Populate symbols through the the execution path
   // We keep trying unless when we succeeded

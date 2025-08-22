@@ -229,7 +229,9 @@ std::vector<int> GraphPlus::SampleGraph(const bool consistent, const int maxStep
                     : SampleWalk(0, NumNodes() - 1, maxSteps);
 }
 
-void GraphPlus::Generate(const bool acyclic) {
+void GraphPlus::Generate(const bool acyclic, const bool unreachable) {
+  Log::Get().OpenSection("GraphPlus::Generate");
+
   bool hasBaseGraph = false;
 
   if (graphSet != nullptr &&
@@ -265,6 +267,7 @@ void GraphPlus::Generate(const bool acyclic) {
   }
 
   if (!hasBaseGraph) {
+    Log::Get().Out() << "Randomly generating a graph with " << NumNodes() << " nodes" << std::endl;
     auto randTarget = Random::Get().Uniform(0, NumNodes() - 1);
     auto randTarNum = Random::Get().Uniform(2, static_cast<int>(maxOutdeg));
 
@@ -299,10 +302,27 @@ void GraphPlus::Generate(const bool acyclic) {
   tryMakeReachFromEntry();
   tryMakeReachToExit();
 
+  if (!unreachable) {
+    ensureNoUnreachNodesFromEntry();
+    for (int node = 0; node < NumNodes(); node++) {
+      Assert(
+          IsReachable(0, node),
+          "Node %d is still not reachable from the entry node after removing unreachable nodes",
+          node
+      );
+    }
+    // Try to make the graph not that naive
+    while (NumNodes() < 3) {
+      AddNewEntry();
+    }
+  }
+
   if (!IsReachable(0, NumNodes() - 1)) {
-    std::cout << "Warning: The generated graph is not reachable from the entry to the exit"
+    std::cout << "WARNING: The generated graph is not reachable from the entry to the exit"
               << std::endl;
   }
+
+  Log::Get().CloseSection();
 }
 
 bool GraphPlus::HasCycles() const {
@@ -364,6 +384,49 @@ void GraphPlus::AddNewExit() {
   adjTab.emplace_back();
 }
 
+void GraphPlus::ensureNoUnreachNodesFromEntry() {
+  // Perform a BFS from the entry node to find all reachable nodes
+  Log::Get().Out() << "Removing unreachable nodes from the graph" << std::endl;
+  std::vector<bool> visited(NumNodes(), false);
+  std::queue<int> worklist;
+  worklist.push(0);
+  visited[0] = true;
+  while (!worklist.empty()) {
+    int curr = worklist.front();
+    worklist.pop();
+    for (int neighbor: adjTab[curr]) {
+      if (!visited[neighbor]) {
+        visited[neighbor] = true;
+        worklist.push(neighbor);
+      }
+    }
+  }
+  // Remove unreachable nodes and update adjTab accordingly
+  for (int nodeToDel = NumNodes() - 1; nodeToDel >= 0; nodeToDel--) {
+    // If the node is unreachable, remove it
+    if (!visited[nodeToDel]) {
+      // Remove the neighbor if it is the node from the adjTab
+      adjTab.erase(adjTab.begin() + nodeToDel);
+      // Update all the successors of all the old nodes
+      for (int currNode = 0; currNode < NumNodes(); ++currNode) {
+        // Update n's successors by decreasing each successor's value by 1 if it is
+        // greater than nodeToDel
+        auto &oldSuccessors = adjTab[currNode];
+        std::set<int> newSuccessors;
+        for (int v: oldSuccessors) {
+          if (v > nodeToDel) {
+            newSuccessors.insert(v - 1);
+          } else if (v < nodeToDel) {
+            newSuccessors.insert(v);
+          }
+        }
+        oldSuccessors = std::move(newSuccessors);
+      }
+      Log::Get().Out() << "Removed node " << nodeToDel << std::endl;
+    }
+  }
+}
+
 bool GraphPlus::addEdge(const int u, const int v) {
   // Ensure outdegree <= maxOutdeg
   if (u != v && adjTab[u].size() < maxOutdeg) {
@@ -374,6 +437,8 @@ bool GraphPlus::addEdge(const int u, const int v) {
 }
 
 void GraphPlus::ensureNoCycles() {
+  Log::Get().Out() << "Removing cycles from the generated graph" << std::endl;
+
   // This is a simple cycle detection algorithm using DFS
   std::vector<bool> visited(NumNodes(), false);
   std::vector<bool> recStack(NumNodes(), false);
@@ -393,6 +458,7 @@ void GraphPlus::ensureNoCycles() {
       if (!cycleEdges.empty()) {
         for (auto e: cycleEdges) {
           adjTab[n].erase(e); // Remove the back edge to break the cycle
+          Log::Get().Out() << "Removed edge " << n << " -> " << e << std::endl;
         }
       }
     }
