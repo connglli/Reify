@@ -447,7 +447,10 @@ FunPlus::InitFinaMap FunPlus::ParseMappingCode(const std::string &mapPath) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnarrowing"
-std::vector<struct bpf_insn> FunPlus::GenerateFuneBPFCode(const UBFreeExec &exec) const {
+
+std::vector<struct bpf_insn> FunPlus::GenerateFuneBPFCode(
+    const UBFreeExec &exec, std::vector<struct bpf_insn> *provided_insns_buf
+) const {
   using u8 = std::uint8_t;
   using u32 = std::uint32_t;
 
@@ -499,8 +502,10 @@ std::vector<struct bpf_insn> FunPlus::GenerateFuneBPFCode(const UBFreeExec &exec
    *  ╰─────────────────────────────────────────────────────────╯
    */
 
-  std::vector<struct bpf_insn> prog;
-  prog.push_back(BPF_MOV32_IMM(BPF_REG_9, 0));
+  std::vector<struct bpf_insn> local_insns_buf;
+  std::vector<struct bpf_insn> *prog = provided_insns_buf ? provided_insns_buf : &local_insns_buf;
+
+  prog->push_back(BPF_MOV32_IMM(BPF_REG_9, 0));
 
   std::vector<int> call_fixups;
   for (size_t i = 0; i < initializations.size(); i++) {
@@ -508,30 +513,31 @@ std::vector<struct bpf_insn> FunPlus::GenerateFuneBPFCode(const UBFreeExec &exec
     const auto &fina = finalizations[i];
     const auto numParams = static_cast<u8>(init.size());
     for (auto j = 0; j < numParams; j++) {
-      prog.push_back(BPF_MOV32_IMM(BPF_REG_2 + j, init[j]));
+      prog->push_back(BPF_MOV32_IMM(BPF_REG_2 + j, init[j]));
     }
-    call_fixups.push_back(prog.size());
-    prog.push_back(BPF_CALL_REL(0));
+    call_fixups.push_back(prog->size());
+    prog->push_back(BPF_CALL_REL(0));
 
     u32 csum = 0;
     for (auto x: fina) {
       csum ^= x;
     }
     // counter
-    prog.push_back(BPF_JMP32_IMM(BPF_JNE, BPF_REG_0, csum, 1));
-    prog.push_back(BPF_ALU32_IMM(BPF_ADD, BPF_REG_9, 1));
+    prog->push_back(BPF_JMP32_IMM(BPF_JNE, BPF_REG_0, csum, 1));
+    prog->push_back(BPF_ALU32_IMM(BPF_ADD, BPF_REG_9, 1));
   }
   // oracle
-  prog.push_back(BPF_JMP32_IMM(BPF_JNE, BPF_REG_9, initializations.size(), 1));
-  prog.push_back(BPF_MOV32_IMM(BPF_REG_10, 0));
-  prog.push_back(BPF_EXIT_INSN());
+  prog->push_back(BPF_JMP32_IMM(BPF_JNE, BPF_REG_9, initializations.size(), 1));
+  prog->push_back(BPF_MOV32_IMM(BPF_REG_10, 0));
+  prog->push_back(BPF_EXIT_INSN());
 
   for (size_t i = 0; i < call_fixups.size(); i++)
-    prog[call_fixups[i]].imm = prog.size() - call_fixups[i] - 1;
+    prog->at(call_fixups[i]).imm = prog->size() - call_fixups[i] - 1;
 
-  symir::eBPFLower lower(prog);
-  lower.Lower(*fun);  // append the real prog
+  symir::eBPFLower lower(*prog);
+  lower.Lower(*fun); // append the real prog
 
-  return prog;
+  return local_insns_buf; // empty if `provided_insns_buf` exists
 }
+
 #pragma GCC diagnostic pop

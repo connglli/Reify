@@ -121,7 +121,9 @@ public:
   [[nodiscard]] static InitFinaMap ParseMappingCode(const std::string &mapPath);
 
   // Generate the eBPF code of the function for a given execution
-  [[nodiscard]] std::vector<struct bpf_insn> GenerateFuneBPFCode(const UBFreeExec &exec) const;
+  // If `insns` is provided, the code is appended to it; otherwise return a new vector<insns>
+  std::vector<struct bpf_insn>
+  GenerateFuneBPFCode(const UBFreeExec &exec, std::vector<struct bpf_insn> *insns = nullptr) const;
 
 private:
   // Generate a new basic block with random statements and symbols

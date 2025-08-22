@@ -76,7 +76,7 @@ LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread -lz
 ## Building Targets
 ########################################################################
 
-.PHONY: clean all lib fgen pgen bins gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check
+.PHONY: clean all lib fgen pgen bins gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check bpf_test
 
 all: lib bins
 
@@ -107,11 +107,17 @@ $(BIN_DIR)/pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+$(BIN_DIR)/bpf_test: $(LIB_OBJ) $(OBJ_DIR)/bpf_test.o
+	@mkdir -p $(dir $@)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
 fgen: $(BIN_DIR)/fgen
 
 pgen: $(BIN_DIR)/pgen
 
-bins: fgen pgen
+bpf_test: $(BIN_DIR)/bpf_test
+
+bins: fgen pgen bpf_test
 
 
 ########################################################################
