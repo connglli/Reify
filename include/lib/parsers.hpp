@@ -48,6 +48,10 @@ namespace symir {
         TK_LPAREN = 0,
         TK_RPAREN,
 
+        // Brackets
+        TK_LBRACKET,
+        TK_RBRACKET,
+
         // Keywords
 #define XX(name, ...) TK_KW_## name,
         SYMIR_KEYWORD_LIST(XX)

@@ -83,6 +83,10 @@ namespace symir {
       [](const std::string_view &str) { return str == "("; },
       [](const std::string_view &str) { return str == ")"; },
 
+      // Brackets
+      [](const std::string_view &str) { return str == "["; },
+      [](const std::string_view &str) { return str == "]"; },
+
       // Keywords
   #define XX(name, sname) [](const std::string_view &str) { return str == #sname; },
       SYMIR_KEYWORD_LIST(XX)
@@ -167,8 +171,12 @@ namespace symir {
       char ch = lookahead(1)[0];
       if (ch == '(' || ch == ')') {
         eatChars(1);
+      } else if (ch == '[' || ch == ']') {
+        eatChars(1);
       } else {
-        eatNonwhitespace(/*excl=*/[](char c) { return c == ')'; });
+        eatNonwhitespace(/*excl=*/[](char c) {
+          return c == '(' || c == ')' || c == '[' || c == ']';
+        });
       }
 
       // We record the ending position and take the token
@@ -278,14 +286,14 @@ namespace symir {
 
           case SymSexpLexer::Token::Kind::TK_KW_VOL: {
             pushOp(opToken.kind);
-            const auto varToken = stream();
+            const auto nextOpToken = stream();
             Assert(
-                varToken.kind == SymSexpLexer::Token::Kind::TK_KW_PAR ||
-                    varToken.kind == SymSexpLexer::Token::Kind::TK_KW_LOC,
+                nextOpToken.kind == SymSexpLexer::Token::Kind::TK_KW_PAR ||
+                    nextOpToken.kind == SymSexpLexer::Token::Kind::TK_KW_LOC,
                 "The 1st child (%s) of the volatile node is neither a parameter nor a local",
-                varToken.FullInfo().c_str()
+                nextOpToken.FullInfo().c_str()
             );
-            pushOp(varToken.kind);
+            pushOp(nextOpToken.kind);
             break;
           }
 
@@ -355,6 +363,13 @@ namespace symir {
           default:
             Panic("Cannot reach here");
         }
+      } else if (kind == SymSexpLexer::Token::Kind::TK_LBRACKET) {
+        // Make the '[' op not closing ')'
+        const auto closingOp = popOp();
+        pushOp(kind);
+        pushOp(closingOp);
+      } else if (kind == SymSexpLexer::Token::Kind::TK_RBRACKET) {
+        // DROP IT
       } else {
         pushArg<SymSexpLexer::Token>(*token);
       }
@@ -399,6 +414,22 @@ namespace symir {
   }
 
   void SymSexpParser::buildTerm(Term::Op op) {
+    std::vector<Coef *> vecAcc{};
+    while (true) {
+      const auto opKind = popOp();
+      if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
+        pushOp(opKind); // Push it back as this is not a bracket
+        break;
+      }
+      const auto *accToken = popArg<SymSexpLexer::Token>();
+      Assert(
+          accToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+          "The 3rd child (%s) of the term node is not a coefficient, while it should be the "
+          "an access to a vector variable of the term",
+          accToken->FullInfo().c_str()
+      );
+      vecAcc.insert(vecAcc.begin(), buildCoef(accToken, SymIR::Type::I32));
+    }
     SymSexpLexer::Token *varToken =
         op != Term::Op::OP_CST ? popArg<SymSexpLexer::Token>() : nullptr;
     Assert(
@@ -418,7 +449,8 @@ namespace symir {
     (*numTerms)++;
     const auto varDef = varToken != nullptr ? funBd->FindVar(varToken->ToStr()) : nullptr;
     const auto termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
-    pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(op, buildCoef(coefToken, termType), varDef));
+    pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(op, buildCoef(coefToken, termType), varDef, vecAcc)
+    );
     pushArg<int>(*numTerms);
     if (varToken != nullptr) {
       delete varToken;
@@ -465,24 +497,48 @@ namespace symir {
     const auto *typeToken = popArg<SymSexpLexer::Token>();
     Assert(
         typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
-        "The 2nd child (%s) of the param node is not an identifier, while it should be the "
-        "type of the term",
+        "The 3rd child (%s) of the param node is not an identifier, while it should be the "
+        "type of the parameter",
         typeToken->FullInfo().c_str()
     );
+    std::vector<int> vecDims;
+    while (true) {
+      const auto opKind = popOp();
+      if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
+        pushOp(opKind); // Push it back as this is not a bracket
+        break;
+      }
+      const auto *dimToken = popArg<SymSexpLexer::Token>();
+      Assert(
+          dimToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+          "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
+          "length of a specific dimension of the vector parameter",
+          dimToken->FullInfo().c_str()
+      );
+      vecDims.insert(vecDims.begin(), std::stoi(dimToken->ToStr()));
+    }
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
         varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
         "The 1st child (%s) of the parameter is not an identifier, while it should be the "
-        "type of the term",
+        "type of the parameter",
         varToken->FullInfo().c_str()
     );
+    bool isVolatile = false;
     if (const auto opKind = popOp(); opKind == SymSexpLexer::Token::TK_KW_VOL) {
-      funBd->SymParam(
-          varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()), /*isVolatile=*/true
-      );
+      isVolatile = true;
     } else {
       pushOp(opKind); // Push it back as this is a volatile parameter
-      funBd->SymParam(varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()));
+    }
+    if (!vecDims.empty()) {
+      funBd->SymVecParam(
+          varToken->ToStr(), vecDims, SymIR::GetTypeFromSName(typeToken->ToStr()),
+          /*isVolatile=*/isVolatile
+      );
+    } else {
+      funBd->SymScaParam(
+          varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()), /*isVolatile=*/isVolatile
+      );
     }
     delete typeToken;
     delete varToken;
@@ -526,6 +582,22 @@ namespace symir {
 
   void SymSexpParser::buildAssign() {
     const auto *eid = popArg<SymIRBuilder::ExprID>();
+    std::vector<Coef *> vecAcc{};
+    while (true) {
+      const auto opKind = popOp();
+      if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
+        pushOp(opKind); // Push it back as this is not a bracket
+        break;
+      }
+      const auto *accToken = popArg<SymSexpLexer::Token>();
+      Assert(
+          accToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+          "The 2nd child (%s) of the assignment is not a coefficient, while it should be the "
+          "an access to a vector variable of the assignment",
+          accToken->FullInfo().c_str()
+      );
+      vecAcc.insert(vecAcc.begin(), buildCoef(accToken, SymIR::Type::I32));
+    }
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
         varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
@@ -533,7 +605,7 @@ namespace symir {
         "variable of the assignment",
         varToken->FullInfo().c_str()
     );
-    bblBd->SymAssign(funBd->FindVar(varToken->ToStr()), *eid);
+    bblBd->SymAssign(funBd->FindVar(varToken->ToStr()), *eid, vecAcc);
     delete eid;
     delete varToken;
   }
@@ -580,11 +652,18 @@ namespace symir {
   }
 
   Coef *SymSexpParser::buildCoef(const SymSexpLexer::Token *token, SymIR::Type type) {
+    const auto tokenStr = token->ToStr();
     if (token->str.starts_with(SymSexpLower::KW_COEF_VAL_SYM)) {
       std::string tempName = std::string("__c") + std::to_string(funBd->GetSymbols().size());
-      return funBd->SymCoef(tempName, token->ToStr().substr(1), type);
+      return funBd->SymCoef(tempName, tokenStr.substr(1), type);
+    } else if (auto coef = funBd->FindSymbol(tokenStr); coef != nullptr) {
+      Assert(
+          typeid(*coef) == typeid(Coef), "The symbol with name \"%s\" is not a Coef",
+          tokenStr.c_str()
+      );
+      return dynamic_cast<Coef *>(coef);
     } else {
-      return funBd->SymCoef(token->ToStr(), type);
+      return funBd->SymCoef(tokenStr, type);
     }
   }
 } // namespace symir

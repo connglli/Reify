@@ -54,7 +54,8 @@ namespace symir {
   class RetStmt;
   class Branch;
   class Goto;
-  class Param;
+  class ScaParam;
+  class VecParam;
   class Local;
   class Block;
   class Funct;
@@ -71,7 +72,8 @@ namespace symir {
     virtual void Visit(const RetStmt &r) = 0;
     virtual void Visit(const Branch &b) = 0;
     virtual void Visit(const Goto &g) = 0;
-    virtual void Visit(const Param &p) = 0;
+    virtual void Visit(const ScaParam &p) = 0;
+    virtual void Visit(const VecParam &p) = 0;
     virtual void Visit(const Local &l) = 0;
     virtual void Visit(const Block &b) = 0;
     virtual void Visit(const Funct &f) = 0;
@@ -109,11 +111,11 @@ namespace symir {
    * Cond    -> CondOp Expr
    * Expr    -> ExprOp Term Term+   // We intentionally avoid "Expr -> ExprOp Expr Expr"
    * Term    -> TermOp Coef Var
+   * Var     -> Name | Name ('[' Coef ']')+  // Variable (scalar or vector) access
    * ---
-   * Name    -> f1, f2, f3, ...
+   * Name    -> f1, f2, f3, v1, v2, ...
    * Label   -> BB1, BB2, BB3, ...
    * Type    -> int
-   * Var     -> v1, v2, v3, ...
    * Coef    -> c1, c2, 0, 1, 2, ...
    * CondOp  -> >, <, ==             // Remove other ops as they are identical
    * ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
@@ -139,7 +141,7 @@ namespace symir {
    *
    * TODOs:
    *
-   * 1. Add support for on-stack arrays and structs.
+   * 1. Add support for on-stack structs.
    * 2. Add support for heap and pointer arithemics.
    */
   class SymIR {
@@ -156,7 +158,8 @@ namespace symir {
       SIR_STMT_RET,
       SIR_TGT_BRA,
       SIR_TGT_GOTO,
-      SIR_PARAM,
+      SIR_PARAM_SCA,
+      SIR_PARAM_VEC,
       SIR_LOCAL,
       SIR_BLOCK,
       SIR_FUNCT,
@@ -235,12 +238,59 @@ namespace symir {
     SymIR::Type type;
   };
 
-  /// VarDef is an annotator for SymIR nodes which defines a variable
+  /// VarDef is an annotator for SymIR nodes which defines a scalar/vector variable
   class VarDef : public WithType {
   public:
     VarDef(std::string name, const SymIR::Type type) : WithType(type), name(std::move(name)) {}
 
+    VarDef(std::string name, std::vector<int> vecDims, const SymIR::Type type) :
+        WithType(type), name(std::move(name)), vecDims(std::move(vecDims)) {
+      Assert(
+          !this->vecDims.empty(), "The vector dimensions for variable %s should be non-negative",
+          name.c_str()
+      );
+      for (int dim = 0; dim < static_cast<int>(this->vecDims.size()); dim++) {
+        Assert(
+            // We disallow zero-length vectors
+            this->vecDims[dim] > 0,
+            "The vector length (%d) for variable %s at dimension %d should be non-negative, got %d",
+            this->vecDims[dim], name.c_str(), dim, this->vecDims[dim]
+        );
+      }
+    }
+
     [[nodiscard]] const std::string &GetName() const { return name; }
+
+    [[nodiscard]] bool IsScalar() const { return vecDims.empty(); }
+
+    [[nodiscard]] bool IsVector() const { return !vecDims.empty(); }
+
+    [[nodiscard]] std::vector<int> GetVecDims() const { return vecDims; }
+
+    /// Get the total number of elements in the vector if dim == -1.
+    /// Otherwise, return the number of elements of a subvector at the given dim.
+    [[nodiscard]] int GetVecNumEls(int dim = -1) const {
+      Assert(
+          dim >= -1 && dim < GetVecNumDims(), "The accessing dimension (%d) is out of bound (%d)",
+          dim, GetVecNumDims()
+      );
+      int num = 1;
+      for (int i = dim + 1; i < GetVecNumDims(); i++) {
+        num *= vecDims[i];
+      }
+      return num;
+    }
+
+    [[nodiscard]] int GetVecNumDims() const { return static_cast<int>(vecDims.size()); }
+
+    [[nodiscard]] int GetVecDimLen(int dim) const {
+      Assert(IsVector(), "The variable \"%s\" is not a vector", name.c_str());
+      Assert(
+          dim >= 0 && dim < GetVecNumDims(), "The accessing dimension (%d) is out of bound (%d)",
+          dim, GetVecNumDims()
+      );
+      return vecDims[dim];
+    }
 
     [[nodiscard]] bool IsVolatile() const { return isVolatile; }
 
@@ -248,6 +298,9 @@ namespace symir {
 
   protected:
     std::string name;
+    // Empty vector means scalar. Otherwise, each element in vecDims means the
+    // length of the vector at that dimension.
+    std::vector<int> vecDims{};
     bool isVolatile = false;
   };
 
@@ -326,17 +379,47 @@ namespace symir {
   public:
     explicit VarUse(const VarDef *var) : SymIR(SIR_VAR_USE), var(var) {
       Assert(var != nullptr, "No var to use: a nullptr is given");
+      Assert(!var->IsVector(), "The used variable %s is a vector", var->GetName().c_str());
       setType(var->GetType());
     }
+
+    explicit VarUse(const VarDef *var, std::vector<Coef *> access);
 
     [[nodiscard]] const VarDef *GetDef() const { return var; }
 
     [[nodiscard]] const std::string &GetName() const { return var->GetName(); }
 
+    [[nodiscard]] bool IsScalar() const { return var->IsScalar(); }
+
+    [[nodiscard]] bool IsVector() const { return var->IsVector(); }
+
+    [[nodiscard]] int GetVecNumDims() const { return var->GetVecNumDims(); }
+
+    [[nodiscard]] int GetVecDimLen(int dim) const { return var->GetVecDimLen(dim); }
+
+    [[nodiscard]] int GetVecNumEls(int dim = -1) const { return var->GetVecNumEls(dim); }
+
+    [[nodiscard]] Coef *GetDimAccess(int dim) const {
+      Assert(
+          dim < static_cast<int>(access.size()),
+          "The accessing dim (%d) is out of bound (%lu) for vector %s", dim, access.size(),
+          var->GetName().c_str()
+      );
+      return access[dim];
+    }
+
+    [[nodiscard]] std::vector<Coef *> GetAccess() const {
+      return std::vector(access.begin(), access.end());
+    }
+
+    [[nodiscard]] bool IsVolatile() const { return var->IsVolatile(); }
+
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   protected:
     const VarDef *var;
+    // Accessing coefficients for each dimension if the variable is a vector.
+    const std::vector<Coef *> access{};
   };
 
   /// A Coef represents an coefficient for updating a variable. Since we are a symbolic IR,
@@ -745,13 +828,33 @@ namespace symir {
   /// A Param is a declaration of a function's parameter.
   class Param : public SymIR, public VarDef {
   public:
-    explicit Param(std::string name, Type type = Type::I32) :
-        SymIR(SIR_PARAM), VarDef(std::move(name), type) {}
+    explicit Param(ID irId, std::string name, Type type = Type::I32) :
+        SymIR(irId), VarDef(std::move(name), type) {}
+
+    explicit Param(ID irId, std::string name, std::vector<int> dims, Type type = Type::I32) :
+        SymIR(irId), VarDef(std::move(name), dims, type) {}
+  };
+
+  /// An ScaParam is a declaration of a function's parameter which is a scalar.
+  class ScaParam : public Param {
+  public:
+    explicit ScaParam(std::string name, Type type = Type::I32) :
+        Param(SIR_PARAM_SCA, std::move(name), type) {}
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+  };
+
+  /// An VecParam is a declaration of a function's parameter which is a vector.
+  class VecParam : public Param {
+  public:
+    explicit VecParam(std::string name, std::vector<int> dims, Type type = Type::I32) :
+        Param(SIR_PARAM_VEC, std::move(name), std::move(dims), type) {}
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
   };
 
   /// A Local is a declaration of a local variable with an initial value within the function.
+  // TODO: Support VecLocal
   class Local : public Stmt, public VarDef {
   public:
     explicit Local(std::string name, Coef *init, Type type = Type::I32) :
@@ -1153,10 +1256,11 @@ namespace symir {
     [[nodiscard]] const std::string &GetLabel() const { return label; }
 
     /// Create a Term with a coef and return the ID to use it. The term can be used only once.
-    TermID SymTerm(Term::Op op, Coef *coef, const VarDef *var);
+    TermID
+    SymTerm(Term::Op op, Coef *coef, const VarDef *var, const std::vector<Coef *> &access = {});
 #define XX(val, capt, ...)                                                                         \
-  TermID Sym##capt##Term(Coef *coef, const VarDef *var) {                                          \
-    return SymTerm(Term::OP_##val, coef, var);                                                     \
+  TermID Sym##capt##Term(Coef *coef, const VarDef *var, const std::vector<Coef *> &access = {}) {  \
+    return SymTerm(Term::OP_##val, coef, var, access);                                             \
   }
     SYMIR_TERMOP_LIST(XX)
 #undef XX
@@ -1178,7 +1282,7 @@ namespace symir {
 #undef XX
 
     /// Create and commit an AssStmt to the builder..
-    const AssStmt *SymAssign(const VarDef *var, ExprID eid);
+    const AssStmt *SymAssign(const VarDef *var, ExprID eid, const std::vector<Coef *> &access = {});
 
     /// Create and commit a RetStmt to the builder.
     const RetStmt *SymReturn();
@@ -1203,10 +1307,15 @@ namespace symir {
       return Block::GetDefinitions(stmts);
     }
 
+    /// Gather all accesses of the vector variable
+    [[nodiscard]] std::vector<std::vector<int>> GatherVecAccesses(const VarDef *var) const;
+
     /// Build and commit the basic block.
     std::unique_ptr<Block> Build() override;
 
   protected:
+    std::vector<const VarUse *> symAllUses(VecParam *p);
+
     [[nodiscard]] bool isActive() const override {
       return target == nullptr && SymIRBuilderGeneric::isActive();
     }
@@ -1232,7 +1341,7 @@ namespace symir {
   ///
   /// -----------------------------------------------------------
   ///   auto b = std::make_unique<FunctBuilder>("f0", SymIR::Type::I32)
-  ///   auto v0 = b->SymParam("v0");
+  ///   auto v0 = b->SymScaParam("v0");
   ///   auto v1 = b->SymLocal("v1");
   ///   auto bb1 = b.SymBlock("BB1", [&](BlockBuilder *blk) {
   ///     blk->SymBranch(
@@ -1334,15 +1443,36 @@ namespace symir {
       }
     }
 
+    /// Define a solved coefficient with the given integer value
+    Coef *SymI32Const(int value) {
+      const auto valueStr = std::to_string(value);
+      const auto coefName = "__sir_predef_const_" + valueStr;
+      if (auto coef = FindSymbol(coefName); coef != nullptr) {
+        Assert(
+            typeid(*coef) == typeid(Coef), "The const symbol with name \"%s\" is not a Coef",
+            coefName.c_str()
+        );
+        return dynamic_cast<Coef *>(coef);
+      } else {
+        return SymCoef(coefName, valueStr, SymIR::I32);
+      }
+    }
+
     /// Define and commit a new unsolved coefficient
     Coef *SymCoef(const std::string &name, SymIR::Type type = SymIR::I32);
 
     /// Define and commit a new solved coefficient
     Coef *SymCoef(const std::string &name, const std::string &value, SymIR::Type type = SymIR::I32);
 
-    /// Define and commit a new Param
-    const Param *
-    SymParam(const std::string &name, SymIR::Type type = SymIR::I32, bool isVolatile = false);
+    /// Define and commit a new ScaParam
+    const ScaParam *
+    SymScaParam(const std::string &name, SymIR::Type type = SymIR::I32, bool isVolatile = false);
+
+    /// Define and commit a new VecParam
+    const VecParam *SymVecParam(
+        const std::string &name, const std::vector<int> &dims, SymIR::Type type = SymIR::I32,
+        bool isVolatile = false
+    );
 
     /// Define and commit a new Local
     const Local *SymLocal(
@@ -1429,7 +1559,8 @@ namespace symir {
     void Visit(const RetStmt &r) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
-    void Visit(const Param &p) override;
+    void Visit(const ScaParam &p) override;
+    void Visit(const VecParam &p) override;
     void Visit(const Local &l) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;

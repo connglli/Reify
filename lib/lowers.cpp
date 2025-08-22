@@ -30,7 +30,16 @@
 namespace symir {
   std::ostream SymIRLower::devNull(nullptr);
 
-  void SymSexpLower::Visit(const VarUse &v) { out << v.GetName(); }
+  void SymSexpLower::Visit(const VarUse &v) {
+    out << v.GetName();
+    if (v.IsVector()) {
+      for (const auto &c: v.GetAccess()) {
+        out << "[";
+        c->Accept(*this);
+        out << "]";
+      }
+    }
+  }
 
   void SymSexpLower::Visit(const Coef &c) {
     if (c.IsValueSet()) {
@@ -98,13 +107,25 @@ namespace symir {
     out << "(" << KW_GOTO << " " << g.GetTarget() << ")" << std::endl;
   }
 
-  void SymSexpLower::Visit(const Param &p) {
+  void SymSexpLower::Visit(const ScaParam &p) {
     if (p.IsVolatile()) {
       out << "(" << KW_VOL << " " << KW_PAR << " " << p.GetName() << " "
           << SymIR::GetTypeSName(p.GetType()) << ")";
     } else {
       out << "(" << KW_PAR << " " << p.GetName() << " " << SymIR::GetTypeSName(p.GetType()) << ")";
     }
+  }
+
+  void SymSexpLower::Visit(const VecParam &p) {
+    out << "(";
+    if (p.IsVolatile()) {
+      out << KW_VOL << " ";
+    }
+    out << KW_PAR << " " << p.GetName();
+    for (const auto &l: p.GetVecDims()) {
+      out << "[" << l << "]";
+    }
+    out << " " << SymIR::GetTypeSName(p.GetType()) << ")";
   }
 
   void SymSexpLower::Visit(const Local &l) {
@@ -154,7 +175,16 @@ namespace symir {
     out << ")" << std::endl;
   }
 
-  void SymCxLower::Visit(const VarUse &v) { out << v.GetName(); }
+  void SymCxLower::Visit(const VarUse &v) {
+    out << v.GetName();
+    if (v.IsVector()) {
+      for (const auto &c: v.GetAccess()) {
+        out << "[";
+        c->Accept(*this);
+        out << "]";
+      }
+    }
+  }
 
   void SymCxLower::Visit(const Coef &c) {
     if (c.IsValueSet()) {
@@ -225,11 +255,21 @@ namespace symir {
     out << "goto " << g.GetTarget() << ";" << std::endl;
   }
 
-  void SymCxLower::Visit(const Param &p) {
+  void SymCxLower::Visit(const ScaParam &p) {
     if (p.IsVolatile()) {
       out << "volatile" << " " << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
     } else {
       out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    }
+  }
+
+  void SymCxLower::Visit(const VecParam &p) {
+    if (p.IsVolatile()) {
+      out << "volatile" << " ";
+    }
+    out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    for (const auto &l: p.GetVecDims()) {
+      out << "[" << l << "]";
     }
   }
 
@@ -277,7 +317,17 @@ namespace symir {
   void SymJavaBytecodeLower::Visit(const VarUse &v) {
     switch (v.GetType()) {
       case SymIR::Type::I32:
-        method->instList().addVar(jnif::Opcode::iload, locals[v.GetName()]);
+        if (v.IsVector()) {
+          method->instList().addVar(jnif::Opcode::aload, locals[v.GetName()]);
+          for (int i = 0; i < v.GetVecNumDims() - 1; i++) {
+            v.GetDimAccess(i)->Accept(*this);
+            method->instList().addZero(jnif::Opcode::aaload);
+          }
+          v.GetDimAccess(v.GetVecNumDims() - 1)->Accept(*this);
+          method->instList().addZero(jnif::Opcode::iaload);
+        } else {
+          method->instList().addVar(jnif::Opcode::iload, locals[v.GetName()]);
+        }
         break;
       default:
         Panic("Unsupported variable type");
@@ -365,13 +415,23 @@ namespace symir {
   }
 
   void SymJavaBytecodeLower::Visit(const AssStmt &a) {
-    a.GetExpr()->Accept(*this);
-    if (a.GetVar()->GetType() != SymIR::Type::I32) {
-      Panic(
-          "Unsupported assignment for type %s", SymIR::GetTypeName(a.GetVar()->GetType()).c_str()
-      );
+    const auto v = a.GetVar();
+    if (v->GetType() != SymIR::Type::I32) {
+      Panic("Unsupported assignment for type %s", SymIR::GetTypeName(v->GetType()).c_str());
     }
-    method->instList().addVar(jnif::Opcode::istore, locals[a.GetVar()->GetName()]);
+    if (!v->IsVector()) {
+      a.GetExpr()->Accept(*this);
+      method->instList().addVar(jnif::Opcode::istore, locals[v->GetName()]);
+    } else {
+      method->instList().addVar(jnif::Opcode::aload, locals[v->GetName()]);
+      for (int i = 0; i < v->GetVecNumDims() - 1; i++) {
+        v->GetDimAccess(i)->Accept(*this);
+        method->instList().addZero(jnif::Opcode::aaload);
+      }
+      v->GetDimAccess(v->GetVecNumDims() - 1)->Accept(*this);
+      a.GetExpr()->Accept(*this);
+      method->instList().addZero(jnif::Opcode::iastore);
+    }
   }
 
   void SymJavaBytecodeLower::Visit(const RetStmt &r) {
@@ -392,9 +452,11 @@ namespace symir {
       if (a->GetType() != SymIR::Type::I32) {
         Panic("Unsupported return variable type %s", SymIR::GetTypeName(a->GetType()).c_str());
       }
-      method->instList().addZero(
-          jnif::Opcode::dup
-      ); // Duplicate the array to avoid frequent load-store and save a local
+      if (a->IsVector()) {
+        Panic("Returning vector variables is not supported");
+      }
+      // Duplicate the array to avoid frequent load-store and save a local
+      method->instList().addZero(jnif::Opcode::dup);
       switch (i) {
         case 0:
           method->instList().addZero(jnif::Opcode::iconst_0);
@@ -453,7 +515,9 @@ namespace symir {
     method->instList().addJump(jnif::Opcode::GOTO, labels[g.GetTarget()]);
   }
 
-  void SymJavaBytecodeLower::Visit(const Param &p) {}
+  void SymJavaBytecodeLower::Visit(const ScaParam &p) {}
+
+  void SymJavaBytecodeLower::Visit(const VecParam &p) {}
 
   void SymJavaBytecodeLower::Visit(const Local &l) {
     if (l.GetType() != SymIR::Type::I32) {

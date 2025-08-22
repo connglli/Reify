@@ -26,11 +26,41 @@
 #include "lib/lang.hpp"
 
 namespace symir {
-  SymIRBuilder::TermID BlockBuilder::SymTerm(Term::Op op, Coef *coef, const VarDef *var) {
+  VarUse::VarUse(const VarDef *var, std::vector<Coef *> access) :
+      SymIR(SIR_VAR_USE), var(var), access(std::move(access)) {
+    Assert(this->var != nullptr, "No var to use: a nullptr is given");
+    Assert(this->var->IsVector(), "The variable %s is not a vector", var->GetName().c_str());
+    Assert(
+        this->var->GetVecNumDims() == static_cast<int>(this->access.size()),
+        "The number of access indices (%lu) "
+        "should match the number of vector dimensions (%d) for the variable %s",
+        this->access.size(), this->var->GetVecNumDims(), var->GetName().c_str()
+    );
+    for (const auto *c: this->access) {
+      Assert(c != nullptr, "The access coefficient cannot be a nullptr");
+      Assert(
+          c->GetType() == Type::I32, "The access coefficient should be an %s, but got %s",
+          SymIR::GetTypeCName(Type::I32).c_str(), SymIR::GetTypeName(c->GetType()).c_str()
+      );
+    }
+    setType(var->GetType());
+  }
+
+  SymIRBuilder::TermID BlockBuilder::SymTerm(
+      Term::Op op, Coef *coef, const VarDef *var, const std::vector<Coef *> &access
+  ) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     TermID tid = numCreatedTerms++;
     if (op == Term::Op::OP_CST) {
       createdTerms[tid] = std::make_unique<Term>(op, coef, nullptr);
+    } else if (var->IsVector()) {
+      Assert(
+          var->GetVecNumDims() == static_cast<int>(access.size()),
+          "The number of access indices (%lu) does not "
+          "match the number of vector dimensions (%d) for the variable %s",
+          access.size(), var->GetVecNumDims(), var->GetName().c_str()
+      );
+      createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var, access));
     } else {
       createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var));
     }
@@ -61,22 +91,71 @@ namespace symir {
     return cid;
   }
 
-  const AssStmt *BlockBuilder::SymAssign(const VarDef *var, ExprID eid) {
+  const AssStmt *
+  BlockBuilder::SymAssign(const VarDef *var, ExprID eid, const std::vector<Coef *> &access) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
-    stmts.push_back(
-        std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
-    );
+    if (var->IsVector()) {
+      Assert(
+          var->GetVecNumDims() == static_cast<int>(access.size()),
+          "The number of access indices (%lu) does not "
+          "match the number of vector dimensions (%d) for the variable %s",
+          access.size(), var->GetVecNumDims(), var->GetName().c_str()
+      );
+      stmts.push_back(
+          std::make_unique<AssStmt>(std::make_unique<VarUse>(var, access), std::move(it->second))
+      );
+    } else {
+      stmts.push_back(
+          std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
+      );
+    }
     createdExprs.erase(it);
     return dynamic_cast<const AssStmt *>(stmts.back().get());
+  }
+
+  std::vector<std::vector<int>> BlockBuilder::GatherVecAccesses(const VarDef *var) const {
+    Assert(var->IsVector(), "The variable %s is not a vector", var->GetName().c_str());
+
+    std::vector<std::vector<int>> accesses(var->GetVecNumEls());
+    const std::function<void(int, int)> gather = [&](int dim, int offset) {
+      if (dim == var->GetVecNumDims()) {
+        return;
+      }
+      int dimLen = var->GetVecDimLen(dim);
+      int dimSize = var->GetVecNumEls(dim);
+      for (int i = 0; i < dimLen; i++) {
+        const auto startEl = offset + i * dimSize;
+        const auto endEl = offset + (i + 1) * dimSize;
+        for (auto loc = startEl; loc < endEl; loc += 1) {
+          accesses[loc].push_back(i);
+        }
+        gather(dim + 1, startEl);
+      }
+    };
+    gather(0, 0);
+
+    return accesses;
   }
 
   const RetStmt *BlockBuilder::SymReturn() {
     Assert(isActive(), "The BlockBuilder is no longer active");
     std::vector<std::unique_ptr<VarUse>> uses;
     for (const auto *p: GetParent()->GetParams()) {
-      uses.push_back(std::make_unique<VarUse>(p));
+      if (p->IsVector()) {
+        // Put every element of the vector parameter into the return statement
+        const auto accesses = GatherVecAccesses(p);
+        for (const auto &acc: accesses) {
+          std::vector<Coef *> coefs(acc.size());
+          for (const auto idx: acc) {
+            coefs.push_back(GetParent()->SymI32Const(idx));
+          }
+          uses.push_back(std::make_unique<VarUse>(p, coefs));
+        }
+      } else {
+        uses.push_back(std::make_unique<VarUse>(p));
+      }
     }
     stmts.push_back(std::make_unique<RetStmt>(std::move(uses)));
     return dynamic_cast<const RetStmt *>(stmts.back().get());
@@ -128,7 +207,8 @@ namespace symir {
     return dynamic_cast<Coef *>(s);
   }
 
-  const Param *FunctBuilder::SymParam(const std::string &name, SymIR::Type type, bool isVolatile) {
+  const ScaParam *
+  FunctBuilder::SymScaParam(const std::string &name, SymIR::Type type, bool isVolatile) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
@@ -138,13 +218,34 @@ namespace symir {
         !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
         name.c_str()
     );
-    params.push_back(std::make_unique<Param>(name, type));
+    params.push_back(std::make_unique<ScaParam>(name, type));
     const auto v = params.back().get();
     if (isVolatile) {
       v->SetVolatile();
     }
     paramMap[name] = v;
-    return v;
+    return dynamic_cast<ScaParam *>(v);
+  }
+
+  const VecParam *FunctBuilder::SymVecParam(
+      const std::string &name, const std::vector<int> &dims, SymIR::Type type, bool isVolatile
+  ) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    Assert(
+        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    params.push_back(std::make_unique<VecParam>(name, dims, type));
+    const auto v = params.back().get();
+    if (isVolatile) {
+      v->SetVolatile();
+    }
+    paramMap[name] = v;
+    return dynamic_cast<VecParam *>(v);
   }
 
   const Local *
@@ -217,9 +318,9 @@ namespace symir {
         atBlk->GetLabel().c_str()
     );
     blocks.insert(atPos, builder->Build());
-    blockMap[label] = (*(atPos - 1)).get();
+    blockMap[label] = ((atPos - 1))->get();
     createdBlocks.erase(it);
-    return (*(atPos - 1)).get();
+    return ((atPos - 1))->get();
   }
 
   std::unique_ptr<Funct> FunctBuilder::Build() {
@@ -245,11 +346,21 @@ namespace symir {
   }
 
   void FunctCopier::Visit(const VarUse &v) {
-    Panic("Cannot reach here, VarUse should be handled by its parent");
+    if (v.IsVector()) {
+      for (auto &c: v.GetAccess()) {
+        c->Accept(*this);
+      }
+    }
   }
 
   void FunctCopier::Visit(const Coef &c) {
-    if (c.IsSolved()) {
+    if (auto coef = builder->FindSymbol(c.GetName()); coef != nullptr) {
+      Assert(
+          typeid(*coef) == typeid(Coef),
+          "Symbol \"%s\" is already defined and is not a coefficient", c.GetName().c_str()
+      );
+      pushCoef(dynamic_cast<Coef *>(coef));
+    } else if (c.IsSolved()) {
       pushCoef(builder->SymCoef(c.GetName(), c.GetValue(), c.GetType()));
     } else {
       pushCoef(builder->SymCoef(c.GetName(), c.GetType()));
@@ -259,12 +370,17 @@ namespace symir {
   void FunctCopier::Visit(const Term &t) {
     t.GetCoef()->Accept(*this);
     const VarDef *var = nullptr;
+    std::vector<Coef *> access{};
     if (t.GetOp() != Term::Op::OP_CST) {
       const auto name = t.GetVar()->GetName();
       var = builder->FindVar(name);
       Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+      t.GetVar()->Accept(*this);
+      for (int i = 0; i < t.GetVar()->GetVecNumDims(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
     }
-    pushTerm(currentBlock->SymTerm(t.GetOp(), popCoef(), var));
+    pushTerm(currentBlock->SymTerm(t.GetOp(), popCoef(), var, access));
   }
 
   void FunctCopier::Visit(const Expr &e) {
@@ -284,12 +400,20 @@ namespace symir {
   }
 
   void FunctCopier::Visit(const AssStmt &a) {
-    const auto name = a.GetVar()->GetName();
+    const auto use = a.GetVar();
+    const auto name = use->GetName();
     const auto var = builder->FindVar(name);
+    std::vector<Coef *> access{};
+    if (var->IsVector()) {
+      use->Accept(*this);
+      for (int i = 0; i < use->GetVecNumDims(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
+    }
     Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
     a.GetExpr()->Accept(*this);
     auto exprId = popExpr();
-    currentBlock->SymAssign(var, exprId);
+    currentBlock->SymAssign(var, exprId, access);
   }
 
   void FunctCopier::Visit(const RetStmt &r) { currentBlock->SymReturn(); }
@@ -302,8 +426,12 @@ namespace symir {
 
   void FunctCopier::Visit(const Goto &g) { currentBlock->SymGoto(g.GetTarget()); }
 
-  void FunctCopier::Visit(const Param &p) {
-    builder->SymParam(p.GetName(), p.GetType(), p.IsVolatile());
+  void FunctCopier::Visit(const ScaParam &p) {
+    builder->SymScaParam(p.GetName(), p.GetType(), p.IsVolatile());
+  }
+
+  void FunctCopier::Visit(const VecParam &p) {
+    builder->SymVecParam(p.GetName(), p.GetVecDims(), p.GetType(), p.IsVolatile());
   }
 
   void FunctCopier::Visit(const Local &l) {
