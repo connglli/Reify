@@ -235,6 +235,10 @@ bool UBFreeExec::solve(
   // Solve the generated constraints and see if we succeeded
   z3::solver solver(ubSov->GetContext());
   solver.add(ubSov->GetConstraints());
+  if (solver.check() == z3::unknown) {
+    Log::Get().Out() << "UNKNOWN" << std::endl;
+    return false;
+  }
   if (solver.check() == z3::unsat) {
     Log::Get().Out() << "UNSAT" << std::endl;
     return false;
