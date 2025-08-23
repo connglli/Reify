@@ -34,9 +34,9 @@ extern "C" int computeStatelessChecksum(int num_args, int args[]);
 
 int StatelessChecksum::Compute(const std::vector<int> &values) {
   // This is a trick to call into a variadic function.
-  // Suppose we can only handle to the maximum of 128 values.
-  Assert(values.size() <= 128, "Too many (>128) values provided to compute checksum");
-  static int args[128];
+  // Suppose we can only handle to the maximum of 512 values.
+  Assert(values.size() <= 512, "Too many (>512) values provided to compute checksum");
+  static int args[512];
   for (size_t i = 0; i < values.size(); i++) {
     args[i] = values[i];
   }
