@@ -106,7 +106,7 @@ private:
   std::vector<std::string> executionByLabels;
 
   // Constraints collector for signed overflow
-  std::unique_ptr<SignedOverflow> ubSov; // TODO: Add more UB types in the future
+  std::unique_ptr<UBSan> ubSan; // TODO: Add more UB types in the future
 
   // The value of each input parameter at the entry of the function.
   std::vector<std::vector<ArgPlus<int>>> inits{};

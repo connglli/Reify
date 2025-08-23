@@ -128,7 +128,7 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
   std::ranges::transform(this->execution, this->executionByLabels.begin(), [](int idx) {
     return idx == PassCounterBblId ? PassCounterBblLabel : NameLabel(idx);
   });
-  this->ubSov = std::make_unique<SignedOverflow>(*(this->fun), this->executionByLabels);
+  this->ubSan = std::make_unique<UBSan>(*(this->fun), this->executionByLabels);
 }
 
 UBFreeExec::~UBFreeExec() {
@@ -183,58 +183,58 @@ bool UBFreeExec::solve(
   // Generate or re-generate the constraints for the function execution
   if (inits.size() <= 1) {
     Log::Get().Out() << "Generating or re-generating UB-free constraints" << std::endl;
-    ubSov->Reset();
+    ubSan->Reset();
 
     // Let each parameter (coefficient or constant) interesting initially
     if (withInterestInit) {
-      ubSov->MakeInitInteresting();
+      ubSan->MakeInitInteresting();
     }
     if (withRandomInit) {
-      ubSov->MakeInitWithRandomValue();
+      ubSan->MakeInitWithRandomValue();
     }
     if (withInterestCoefs) {
-      ubSov->EnableInterestCoefs(true);
+      ubSan->EnableInterestCoefs(true);
     }
 
     if (debug) {
       Log::Get().Out() << "Initial constraints: " << std::endl;
       Log::Get().Out() << "```" << std::endl;
-      ubSov->PrintConstraints();
+      ubSan->PrintConstraints();
       Log::Get().Out() << "```" << std::endl;
     }
 
-    ubSov->Collect();
+    ubSan->Collect();
   }
 
   // We are solving the input parameters; let's sample for a different solution
   if (!inits.empty()) {
     // Ensure that the initialisation is sufficiently different from the previous one
-    ubSov->MakeInitDifferentFrom(inits.back());
+    ubSan->MakeInitDifferentFrom(inits.back());
   }
 
   if (debug) {
     Log::Get().Out() << "Final constraints: " << std::endl;
     Log::Get().Out() << "```" << std::endl;
-    ubSov->PrintConstraints();
+    ubSan->PrintConstraints();
     Log::Get().Out() << "```" << std::endl;
   }
 
   // We are solving the symbols for the first time; let's try simplifying the constraints
   if (inits.empty()) {
-    ubSov->Optimize();
+    ubSan->Optimize();
 
     if (debug) {
       // Dump the optimized SMT queries for debugging
       Log::Get().Out() << "Optimized constraints: " << std::endl;
       Log::Get().Out() << "```" << std::endl;
-      ubSov->PrintConstraints();
+      ubSan->PrintConstraints();
       Log::Get().Out() << "```" << std::endl;
     }
   }
 
   // Solve the generated constraints and see if we succeeded
-  z3::solver solver(ubSov->GetContext());
-  solver.add(ubSov->GetConstraints());
+  z3::solver solver(ubSan->GetContext());
+  solver.add(ubSan->GetConstraints());
   if (solver.check() == z3::unknown) {
     Log::Get().Out() << "UNKNOWN" << std::endl;
     return false;
@@ -280,7 +280,7 @@ void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
     }
     const auto symName = symbol->GetName().c_str();
     // Currently, we only support coefficients
-    const auto symKey = ubSov->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol)).decl();
+    const auto symKey = ubSan->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol)).decl();
     if (model.has_interp(symKey)) {
       z3::expr symConst = model.get_const_interp(symKey);
       Assert(symConst.is_numeral(), "Symbol %s is not a numeral", symName);
@@ -308,11 +308,11 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
     if (param->IsVector()) {
       args.emplace_back(param->GetVecDims());
       for (int i = 0; i < param->GetVecNumEls(); i++) {
-        paramKeys.push_back(ubSov->CreateVecElExpr(param, i, version));
+        paramKeys.push_back(ubSan->CreateVecElExpr(param, i, version));
       }
     } else {
       args.emplace_back();
-      paramKeys.push_back(ubSov->CreateScaExpr(param, version));
+      paramKeys.push_back(ubSan->CreateScaExpr(param, version));
     }
     for (int i = 0; i < static_cast<int>(paramKeys.size()); i++) {
       z3::expr &paramKey = paramKeys[i];

@@ -35,11 +35,11 @@
 #include "lib/naming.hpp"
 #include "z3++.h"
 
-/// SignedOverflow is a visitor that collects constraints to ensure that the
-/// execution of a function is free of Signed Overflow undefined behavior.
-class SignedOverflow : protected symir::SymIRVisitor {
+/// UBSan is a visitor that collects constraints to ensure that the
+/// execution of a function is free of undefined behavior like overflow .
+class UBSan : protected symir::SymIRVisitor {
 public:
-  SignedOverflow(const symir::Funct &fun, std::vector<std::string> execution) :
+  UBSan(const symir::Funct &fun, std::vector<std::string> execution) :
       fun(fun), execution(std::move(execution)) {}
 
   // Get the collected constraints that ensures the execution to be UB-free over integer arithmetic
