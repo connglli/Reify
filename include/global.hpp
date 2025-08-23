@@ -164,6 +164,8 @@ struct GlobalOptions {
       ("A,Xenable-all-ops", "Enable all operations for terms and expressions (This may make the generation longer and harder)", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xenable-volatile-vars", "Enable declaring some variables as volatile", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xvolatile-var-proba", "Probability of declaring a variable as a volatile variable", cxxopts::value<double>())
+      ("Xdisable-array-vars", "Disable generating array variables", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xarray-var-proba", "Probability of declaring a variable as an array", cxxopts::value<double>())
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xdisable-dead-code", "Disable the generation of dead code", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -252,6 +254,25 @@ struct GlobalOptions {
             << "Error: The probability for declaring a variable as volatile "
             << "(--Xvolatile-var-proba) cannot be be larger than 1. It should be within 0 to 1."
             << std::endl;
+        exit(1);
+      }
+    }
+
+    EnableArrayVars = !args["Xdisable-array-vars"].as<bool>();
+
+    if (args.count("Xarray-var-proba")) {
+      ArrayVariableProba = args["Xarray-var-proba"].as<double>();
+      if (ArrayVariableProba <= 0) {
+        std::cerr << "Error: The probability for declaring a variable as an array "
+                     "(--Xarray-var-proba) cannot be less than or equal to 0. It should be "
+                     "within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+      if (ArrayVariableProba > 1) {
+        std::cerr << "Error: The probability for declaring a variable as an array "
+                  << "(--Xarray-var-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << std::endl;
         exit(1);
       }
     }
