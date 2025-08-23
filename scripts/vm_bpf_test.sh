@@ -364,14 +364,14 @@ fi
 
 # Execute bpf_test in VM
 log_info "Executing bpf_test in VM..."
-log_info "Command: $VM_BPF_TEST_PATH --output $VM_RESULTS_DIR --procs $PROCS ${BPF_TEST_ARGS[*]}"
+log_info "Command: $VM_BPF_TEST_PATH --Xenable-ub-inject --Xenable-all-ops --output $VM_RESULTS_DIR --procs $PROCS ${BPF_TEST_ARGS[*]}"
 
 # Run bpf_test in the background inside the VM and return immediately
 # Use a wrapper script to properly handle background execution
 _vmcmd "cat > $VM_WORK_DIR/run_bpf_test.sh << 'EOF'
 #!/bin/bash
 cd $VM_WORK_DIR
-exec $VM_BPF_TEST_PATH --output $VM_RESULTS_DIR --procs $PROCS ${BPF_TEST_ARGS[*]} > $VM_BPF_TEST_OUTPUT 2>&1
+exec $VM_BPF_TEST_PATH --Xenable-ub-inject --Xenable-all-ops --output $VM_RESULTS_DIR --procs $PROCS ${BPF_TEST_ARGS[*]} > $VM_BPF_TEST_OUTPUT 2>&1
 EOF"
 
 _vmcmd "chmod +x $VM_WORK_DIR/run_bpf_test.sh"

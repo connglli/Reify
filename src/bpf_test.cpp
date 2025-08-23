@@ -3,10 +3,17 @@
 #include <csignal>
 #include <cstdint>
 #include <cxxopts.hpp>
+#include <errno.h>
+#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 
 #include "global.hpp"
@@ -93,6 +100,147 @@ struct eBPFTestOpts {
 const size_t log_buf_size = 1024 * 1024;
 static char log_buf[log_buf_size];
 
+void gen_prog(const eBPFTestOpts &opts, vector<struct bpf_insn> &prog);
+
+// Fork-server for program generation with timeout
+class GenForkServer {
+private:
+  int pipe_fd[2]; // [0] for reading, [1] for writing
+  pid_t child_pid;
+  bool is_parent;
+
+public:
+  GenForkServer() : child_pid(-1), is_parent(false) {
+    if (pipe(pipe_fd) == -1) {
+      throw std::runtime_error("Failed to create pipe: " + std::string(strerror(errno)));
+    }
+  }
+
+  ~GenForkServer() {
+    close_read();
+    close_write();
+    kill_child();
+  }
+
+  void close_write() {
+    if (pipe_fd[1] <= 0)
+      return;
+    close(pipe_fd[1]);
+    pipe_fd[1] = -1;
+  }
+
+  void close_read() {
+    if (pipe_fd[0] <= 0)
+      return;
+    close(pipe_fd[0]);
+    pipe_fd[0] = -1;
+  }
+
+  void kill_child() {
+    if (child_pid <= 0 || !is_parent)
+      return;
+    kill(child_pid, SIGKILL);
+    waitpid(child_pid, nullptr, 0);
+    child_pid = -1;
+  }
+
+  bool generate_program_with_timeout(
+      const eBPFTestOpts &opts, vector<struct bpf_insn> &prog, u32 timeout_seconds
+  ) {
+    child_pid = fork();
+
+    if (child_pid == -1) {
+      throw std::runtime_error("Failed to fork: " + std::string(strerror(errno)));
+    }
+
+    if (child_pid == 0) {
+      // Child process - generate program
+      is_parent = false;
+      close_read();
+
+      try {
+        gen_prog(opts, prog);
+
+        // Write program size and data
+        u32 prog_size = prog.size();
+        write(pipe_fd[1], &prog_size, sizeof(prog_size));
+        write(pipe_fd[1], prog.data(), prog_size * sizeof(struct bpf_insn));
+
+        close(pipe_fd[1]);
+        exit(0);
+      } catch (const std::exception &e) {
+        // Write error indicator
+        u32 error_size = 0;
+        write(pipe_fd[1], &error_size, sizeof(error_size));
+        close(pipe_fd[1]);
+        exit(1);
+      }
+    } else {
+      // Parent process - wait with timeout
+      is_parent = true;
+      close_write();
+
+      // Set pipe to non-blocking
+      int flags = fcntl(pipe_fd[0], F_GETFL, 0);
+      fcntl(pipe_fd[0], F_SETFL, flags | O_NONBLOCK);
+
+      auto start_time = std::chrono::steady_clock::now();
+      bool success = false;
+      while (true) {
+        // Check timeout
+        auto elapsed = std::chrono::steady_clock::now() - start_time;
+        if (elapsed > std::chrono::seconds(timeout_seconds)) {
+          cout << "[!] Generation timeout after " << timeout_seconds << " seconds" << endl;
+          kill_child();
+          return false;
+        }
+
+        // Check if child is still running
+        int status;
+        pid_t result = waitpid(child_pid, &status, WNOHANG);
+        if (result == child_pid) {
+          if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            success = true;
+          }
+          break;
+        } else if (result == -1) {
+          cout << "[!] Error waiting for child process" << endl;
+          return false;
+        }
+
+        // Try to read from pipe
+        u32 prog_size;
+        ssize_t bytes_read = read(pipe_fd[0], &prog_size, sizeof(prog_size));
+        if (bytes_read == sizeof(prog_size)) {
+          if (prog_size > 0) {
+            prog.resize(prog_size);
+            bytes_read = read(pipe_fd[0], prog.data(), prog_size * sizeof(struct bpf_insn));
+            if (bytes_read == prog_size * sizeof(struct bpf_insn)) {
+              success = true;
+              break;
+            }
+          }
+          break;
+        }
+
+        // Sleep briefly before next check
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+
+      close_read();
+      return success;
+    }
+  }
+};
+
+// Wrapper function for generation with timeout
+bool gen_prog_with_timeout(
+    const eBPFTestOpts &opts, vector<struct bpf_insn> &prog, u32 timeout_seconds
+) {
+  GenForkServer server;
+  return server.generate_program_with_timeout(opts, prog, timeout_seconds);
+}
+
 int load_prog(vector<struct bpf_insn> &prog) {
   const char license[] = "GPL";
   union bpf_attr attr;
@@ -138,6 +286,9 @@ again:
   );
   fun.Generate(false);
 
+  // Set Z3 timeout to 3 seconds to prevent hanging
+  z3::set_param("timeout", 3000);
+
   std::unique_ptr<UBFreeExec> exec = nullptr;
   for (int tries = 0; tries < GlobalOptions::Get().MaxNumExecsPerFun; ++tries) {
     vector<int> execPath = fun.SampleExec(
@@ -160,8 +311,6 @@ again:
     std::cerr << "[-] Unable to obtain any UB-free solutions within "
               << GlobalOptions::Get().MaxNumExecsPerFun << " execution samples" << std::endl;
     // TODO Confirm if this is necessary
-    Z3_finalize_memory();
-    Z3_reset_memory();
     goto again;
   }
 
@@ -251,7 +400,12 @@ void extract_vlog(char *vlog, string &summary, string &reason) {
 void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
 
   prog_buf.clear();
-  gen_prog(opts, prog_buf);
+
+  // Use fork-server with timeout for generation
+  if (!gen_prog_with_timeout(opts, prog_buf, 15)) { // 15 second timeout
+    cout << "[!] Generation failed or timed out, skipping this iteration" << endl;
+    return; // Skip to next iteration
+  }
 
   cout << "[*] Loading prog..." << endl;
   int prog_fd = load_prog(prog_buf);
@@ -275,12 +429,12 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
   // only be rejected due to the oracle.
 
   if (reason.find("frame pointer is read only") != string::npos) {
-    cout << "[+] \tRejected due to the oracle" << endl;
+    cout << "[+] \tResult: Rejected due to the oracle" << endl;
   } else if (reason.find("unreachable insn") != string::npos) {
     cout << "[!] \tWARNING: " << reason << endl;
     return; // can't fix or execute further.
   } else {
-    cout << "[!!] \tVerifier false positive: " << reason << endl
+    cout << "[!!] \tResult: Verifier false positive: " << reason << endl
          << "\tSummary: " << summary << endl;
     save_prog(opts, prog_buf);
     return;
@@ -307,14 +461,16 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
   prog_buf[prog_buf.size() - 2] = BPF_MOV32_IMM(BPF_REG_0, magic);
   prog_fd = load_prog(prog_buf);
   if (prog_fd < 0) {
-    cerr << "[-] WARNING: Failed to load the de-oracleized program" << endl;
-    cout << "Vlog: " << log_buf << endl;
+    cerr << "[-] \tWARNING: Failed to load the de-oracleized program" << endl;
+    extract_vlog(log_buf, summary, reason);
+    cout << "[*] \tReason: " << reason << endl;
+    cout << "[*] \tSummary: " << summary << endl;
     return;
   }
 
   int ret = test_run_prog(prog_fd);
   if (ret != magic) {
-    cout << "[!] WARNING: De-oracleized prog failed to run: " << ret << endl;
+    cout << "[!] \tWARNING: De-oracleized prog failed to run: " << ret << endl;
     save_prog(opts, prog_buf);
   }
   cout << "[*] \tde-oracleized prog executed successfully" << endl;
