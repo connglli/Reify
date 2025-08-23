@@ -53,11 +53,51 @@ void SignedOverflow::Optimize() {
   }
 }
 
-z3::expr SignedOverflow::CreateVarExpr(const symir::VarDef *var, int version) {
+z3::expr SignedOverflow::CreateScaExpr(const symir::VarDef *var, int version) {
+  Assert(var != nullptr, "Cannot create a variable expression for a nullptr variable");
+  const auto &varName = var->GetName();
+  Assert(
+      var->IsScalar(),
+      "Cannot create a scalar expression for a vector (%s). Use the other overload instead.",
+      varName.c_str()
+  );
   if (version == -1) {
-    version = versions[var->GetName()];
+    version = versions[varName];
+  } else if (version == -2) {
+    version = ++versions[varName];
+    verbbls[varName] = currBbl;
   }
-  return ctx.int_const((var->GetName() + "_" + std::to_string(version)).c_str());
+  return ctx.int_const((varName + "_v" + std::to_string(version)).c_str());
+}
+
+std::string SignedOverflow::GetVecElName(const symir::VarDef *var, int loc) const {
+  const auto &varName = var->GetName();
+  Assert(
+      var->IsVector(), "The variable %s is not a vector, cannot get element name", varName.c_str()
+  );
+  const auto numEls = var->GetVecNumEls();
+  Assert(
+      loc < numEls, "The element index (%d) is out of bound (%d) for variable %s", loc, numEls,
+      varName.c_str()
+  );
+  return varName + "_el" + std::to_string(loc);
+}
+
+z3::expr SignedOverflow::CreateVecElExpr(const symir::VarDef *var, int loc, int version) {
+  Assert(var != nullptr, "Cannot create a variable expression for a nullptr array variable");
+  Assert(
+      var->IsVector(),
+      "Cannot create a variable expression for a scalar variable (%s). Use the "
+      "other overload instead.",
+      var->GetName().c_str()
+  );
+  const auto elName = GetVecElName(var, loc);
+  if (version == -1) {
+    version = versions[elName];
+  } else if (version == -2) {
+    version = ++versions[elName];
+  }
+  return ctx.int_const((elName + "_v" + std::to_string(version)).c_str());
 }
 
 z3::expr SignedOverflow::CreateCoefExpr(const symir::Coef &coef) {
@@ -74,9 +114,15 @@ z3::expr SignedOverflow::CreateCoefExpr(const symir::Coef &coef) {
 void SignedOverflow::MakeInitInteresting() {
   std::vector<z3::expr> params;
   for (auto param: fun.GetParams()) {
-    params.push_back(CreateVarExpr(param, 0));
+    if (param->IsScalar()) {
+      params.push_back(CreateScaExpr(param, 0));
+    } else {
+      for (int i = 0; i < param->GetVecNumEls(); i++) {
+        params.push_back(CreateVecElExpr(param, i, 0));
+      }
+    }
   }
-  constraints.push_back(AtMostKZeroes(ctx, params, fun.NumParams() / 2));
+  constraints.push_back(AtMostKZeroes(ctx, params, static_cast<int>(params.size()) / 2));
 }
 
 void SignedOverflow::MakeInitWithRandomValue() {
@@ -84,27 +130,63 @@ void SignedOverflow::MakeInitWithRandomValue() {
       GlobalOptions::Get().LowerInitBound, GlobalOptions::Get().UpperInitBound
   );
   for (auto param: fun.GetParams()) {
-    constraints.push_back(CreateVarExpr(param, 0) == rand());
+    if (param->IsScalar()) {
+      constraints.push_back(CreateScaExpr(param, 0) == rand());
+    } else {
+      for (int i = 0; i < param->GetVecNumEls(); i++) {
+        constraints.push_back(CreateVecElExpr(param, i, 0) == rand());
+      }
+    }
   }
 }
 
-void SignedOverflow::MakeInitDifferentFrom(const std::vector<int> &init) {
+void SignedOverflow::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
   // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
   std::vector<z3::expr> params;
   for (int i = 0; i < fun.NumParams(); i++) {
-    int oldValue = init[i];
-    z3::expr newValue = CreateVarExpr(fun.GetParams()[i], 0);
-    params.push_back(z3::ite(oldValue != newValue, ctx.int_val(1), ctx.int_val(0)));
+    const auto p = fun.GetParams()[i];
+    const auto &oldValue = init[i];
+    if (p->IsScalar()) {
+      z3::expr newValue = CreateScaExpr(p, 0);
+      params.push_back(z3::ite(newValue != oldValue.GetValue(), ctx.int_val(1), ctx.int_val(0)));
+    } else {
+      for (int j = 0; j < p->GetVecNumEls(); j++) {
+        z3::expr newValue = CreateVecElExpr(p, j, 0);
+        params.push_back(z3::ite(newValue != oldValue.GetValue(j), ctx.int_val(1), ctx.int_val(0)));
+      }
+    }
   }
-  constraints.push_back(AtMostKZeroes(ctx, params, std::min(3, fun.NumParams() / 2)));
+  constraints.push_back(AtMostKZeroes(ctx, params, std::min(3, static_cast<int>(params.size()) / 2))
+  );
 }
 
 void SignedOverflow::Visit(const symir::VarUse &v) {
   Assert(v.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
-  auto varExpr = CreateVarExpr(v.GetDef());
-  constraints.push_back(varExpr >= GlobalOptions::Get().LowerBound);
-  constraints.push_back(varExpr <= GlobalOptions::Get().UpperBound);
-  pushExpression(varExpr);
+  if (v.IsScalar()) {
+    auto varExpr = CreateScaExpr(v.GetDef());
+    constraints.push_back(varExpr >= GlobalOptions::Get().LowerBound);
+    constraints.push_back(varExpr <= GlobalOptions::Get().UpperBound);
+    pushExpression(varExpr);
+  } else {
+    const auto access = v.GetAccess();
+    z3::expr locExpr = ctx.int_val(0);
+    // v[x][y][z] => v[x*len(y)*len(z) + y*len(z) + z]
+    for (int d = 0; d < v.GetVecNumDims(); d++) {
+      access[d]->Accept(*this);
+      auto coefExpr = popExpression();
+      constraints.push_back(coefExpr >= 0);
+      constraints.push_back(coefExpr < v.GetVecDimLen(d));
+      locExpr = locExpr * v.GetVecDimLen(d) + coefExpr;
+    }
+    // Make locExpr access a random element in the array
+    auto elLoc = Random::Get().Uniform(0, v.GetVecNumEls() - 1)();
+    constraints.push_back(locExpr == elLoc);
+    auto elExpr = CreateVecElExpr(v.GetDef(), elLoc);
+    constraints.push_back(elExpr >= GlobalOptions::Get().LowerBound);
+    constraints.push_back(elExpr <= GlobalOptions::Get().UpperBound);
+    pushExpression(elExpr);
+    pushVecElLoc(elLoc);
+  }
 }
 
 void SignedOverflow::Visit(const symir::Coef &c) {
@@ -123,6 +205,9 @@ void SignedOverflow::Visit(const symir::Term &t) {
   if (t.GetOp() != symir::Term::Op::OP_CST) {
     t.GetVar()->Accept(*this);
     varExpr = new z3::expr(popExpression());
+    if (t.GetVar()->IsVector()) {
+      popVecElLoc(); // We don't need the location
+    }
   }
 
   z3::expr *termExpr = nullptr;
@@ -216,9 +301,15 @@ void SignedOverflow::Visit(const symir::Cond &c) {
 void SignedOverflow::Visit(const symir::AssStmt &a) {
   a.GetExpr()->Accept(*this);
   auto exprExpr = popExpression();
-  auto varNewVerExpr = CreateVarExpr(a.GetVar()->GetDef(), ++versions[a.GetVar()->GetName()]);
-  verbbls[a.GetVar()->GetName()] = currBbl;
-  constraints.push_back(varNewVerExpr == exprExpr);
+  a.GetVar()->Accept(*this);
+  auto newVerExpr = popExpression(); // It's indeed the old expr; we don't need it
+  if (a.GetVar()->IsScalar()) {
+    newVerExpr = CreateScaExpr(a.GetVar()->GetDef(), -2);
+  } else {
+    auto loc = popVecElLoc();
+    newVerExpr = CreateVecElExpr(a.GetVar()->GetDef(), loc, -2);
+  }
+  constraints.push_back(newVerExpr == exprExpr);
   // TODO: This is an ugly support for enabling value numbering. Try make this a separate visitor.
   // TODO: Also considering numbering the value of a term or an expression, besides a variable.
   if (GlobalOptions::Get().EnableValueNumbering && versions.size() > 1 &&
@@ -227,7 +318,8 @@ void SignedOverflow::Visit(const symir::AssStmt &a) {
     // of the variable should be equal to the newest version of one other variable.
     // We only consider variables in the previous and the current block to let the compiler
     // found them more easily.
-    // TODO: However, we are irreducible and hard to be analyzed. Better consider dup the statement.
+    // TODO: However, we are irreducible and hard to be analyzed. Better consider dup the
+    // statement.
     std::vector<std::string> aliveVars{};
     for (const auto &[v, b]: verbbls) {
       if (b == currBbl || b == prevBbl) {
@@ -250,8 +342,8 @@ void SignedOverflow::Visit(const symir::AssStmt &a) {
       return; // Give up
     }
     const auto otherVar = fun.FindVar(otherName);
-    auto otherVarExpr = CreateVarExpr(otherVar);
-    constraints.push_back(varNewVerExpr == otherVarExpr);
+    auto otherVarExpr = CreateScaExpr(otherVar);
+    constraints.push_back(newVerExpr == otherVarExpr);
     Log::Get().Out() << "Value numbering enforced: " << ourName << "(version=" << versions[ourName]
                      << ") == " << otherName << "(version=" << versions[otherName] << ")"
                      << std::endl;
@@ -283,18 +375,28 @@ void SignedOverflow::Visit(const symir::Branch &b) {
 
 void SignedOverflow::Visit(const symir::Goto &g) { /* DO NOTHING */ }
 
-void SignedOverflow::Visit(const symir::Param &p) {
-  auto varExpr = CreateVarExpr(&p, 0);
+void SignedOverflow::Visit(const symir::ScaParam &p) {
+  auto varExpr = CreateScaExpr(&p, 0);
   versions[p.GetName()] = 0;
   verbbls[p.GetName()] = "___entry_bbl";
   constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);
   constraints.push_back(varExpr >= GlobalOptions::Get().LowerInitBound);
 }
 
+void SignedOverflow::Visit(const symir::VecParam &p) {
+  for (int e = 0; e < p.GetVecNumEls(); e++) {
+    auto elExpr = CreateVecElExpr(&p, e, 0);
+    auto elName = GetVecElName(&p, e);
+    versions[elName] = 0;
+    constraints.push_back(elExpr <= GlobalOptions::Get().UpperInitBound);
+    constraints.push_back(elExpr >= GlobalOptions::Get().LowerInitBound);
+  }
+}
+
 void SignedOverflow::Visit(const symir::Local &l) {
   l.GetCoef()->Accept(*this);
   auto coefExpr = popExpression();
-  auto varExpr = CreateVarExpr(l.GetDefinition(), 0);
+  auto varExpr = CreateScaExpr(l.GetDefinition(), 0);
   versions[l.GetName()] = 0;
   verbbls[l.GetName()] = "___entry_bbl";
   constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);

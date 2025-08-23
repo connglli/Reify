@@ -350,7 +350,7 @@ def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], O
 CREALIZE_CHK_SIGN = "exit(101)"
 CREALIZE_TEMPLATE = """
 int {chkchk_name}(int size, int args[]) {{
-  int outs[{num_maps}][{num_params}] = {{
+  int outs[{num_maps}][{num_flat_params}] = {{
     {outputs}
   }};
   int chks[{num_maps}] = {{
@@ -358,7 +358,7 @@ int {chkchk_name}(int size, int args[]) {{
   }};
   for (int i = 0; i < {num_maps}; i ++) {{
     int found = 1;
-    for (int j = 0; j < {num_params}; j ++) {{
+    for (int j = 0; j < {num_flat_params}; j ++) {{
       if (args[j] != outs[i][j]) {{
         found = 0;
         break; // Checksum mismatch
@@ -383,7 +383,10 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
   num_maps = len(func_maps)
   if num_maps == 0:
     return False
-  num_params = len(func_maps[0][0])
+  param_types = [
+    a.get_c_type() for a in func_maps[0][0]
+  ]
+  num_flat_params = sum(a.num_els() for a in func_maps[0][0])
 
   # Change the checksum function into a checksum check function
   # and add the new checksum check function to the code.
@@ -392,8 +395,8 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
   func_code = CREALIZE_TEMPLATE.format(
     chkchk_name=chkchk_name,
     num_maps=num_maps,
-    num_params=num_params,
-    outputs=",\n".join(["    {" + ",".join([str(x) for x in m[1]]) + "}" for m in func_maps]),
+    num_flat_params=num_flat_params,
+    outputs=",\n".join(["    {" + ",".join([x.flat_c_str() for x in m[1]]) + "}" for m in func_maps]),
     checksums=",".join([str(m[2]) for m in func_maps]),
     chkchk_signal=CREALIZE_CHK_SIGN,
     func_code=func_code,
@@ -402,11 +405,11 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
   with cdb_file.open("a") as fout:
     fout.write(json.dumps({
       "function_name": func_name,
-      "parameter_types": ["int"] * num_params,
+      "parameter_types": param_types,
       "return_type": "int",
       "function": func_code,
       "io_list": [[
-        [int(x) for x in m[0]], int(m[2])
+        [x.get_shaped_value() for x in m[0]], int(m[2])
       ] for m in func_maps],
       "misc": [],
       "src_file": "",

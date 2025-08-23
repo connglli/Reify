@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "jnif/jnif.hpp"
+#include "lib/argument.hpp"
 #include "lib/ctrlflow.hpp"
 #include "lib/dbgutils.hpp"
 #include "lib/lang.hpp"
@@ -43,7 +44,8 @@ class UBFreeExec;
 /// random control flow, variables, and statements
 class FunPlus {
 public:
-  using InitFinaMap = std::pair<std::vector<std::vector<int>>, std::vector<std::vector<int>>>;
+  using IniFinMap =
+      std::pair<std::vector<std::vector<ArgPlus<int>>>, std::vector<std::vector<ArgPlus<int>>>>;
 
 public:
   explicit FunPlus(
@@ -117,7 +119,7 @@ public:
   [[nodiscard]] static std::unique_ptr<symir::Funct> ParseFunSexpCode(const std::string &funPath);
 
   // Parse the map of initialisation-finalisation and return them
-  [[nodiscard]] static InitFinaMap ParseMappingCode(const std::string &mapPath);
+  [[nodiscard]] static IniFinMap ParseMappingCode(const std::string &mapPath);
 
 private:
   // Generate a new basic block with random statements and symbols

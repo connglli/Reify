@@ -134,6 +134,10 @@ int main(int argc, char *argv[]) {
       allFunPaths.push_back(entry.path());
     }
   }
+  Assert(
+      !allFunPaths.empty(), "No function files found in the input directory: %s", funsDir.c_str()
+  );
+
   // Without a sorting, our results may not be deterministic as
   // the order of directory_iterator is not decidable.
   std::sort(allFunPaths.begin(), allFunPaths.end());

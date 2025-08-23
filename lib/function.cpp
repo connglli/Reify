@@ -53,9 +53,9 @@ void FunPlus::Generate(bool allowDeadCode) {
   for (int i = 0; i < numParams; i++) {
     if (GlobalOptions::Get().EnableVolatileVars &&
         randProba() < GlobalOptions::Get().VolatileVariableProba) {
-      builder->SymParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/true);
+      builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/true);
     } else {
-      builder->SymParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/false);
+      builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/false);
     }
   }
   // The next numLocals variables are locals
@@ -288,8 +288,8 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
 
   Log::Get().OpenSection("Main Method");
 
-  const auto &initializations = exec.GetInitializations();
-  const auto &finalizations = exec.GetFinalizations();
+  const auto &initializations = exec.GetInits();
+  const auto &finalizations = exec.GetFinas();
   Assert(
       initializations.size() == finalizations.size(),
       "Initializations and finalizations must have the same size"
@@ -309,8 +309,11 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
     // TODO: The checksum computation should be using Java as Java and C might be different
     const auto checksum = StatelessChecksum::Compute(fina);
     mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(checksum));
-    for (const int &a: init) {
-      mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(a));
+    for (const auto &a: init) {
+      if (a.IsVector()) {
+        Assert(false, "Vector arguments are not yet supported in Java");
+      }
+      mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(a.GetValue()));
     }
     mainMethod->instList().addInvoke(jnif::Opcode::invokestatic, methodRef);
     if (debug) {
@@ -340,8 +343,8 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   const auto *fun = exec.GetFun();
   Assert(fun != nullptr, "Function is not generated yet!");
 
-  const auto &initializations = exec.GetInitializations();
-  const auto &finalizations = exec.GetFinalizations();
+  const auto &initializations = exec.GetInits();
+  const auto &finalizations = exec.GetFinas();
   Assert(
       initializations.size() == finalizations.size(),
       "Initializations and finalizations must have the same size"
@@ -358,7 +361,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
     main << "    " << StatelessChecksum::GetCheckChksumName() << "("
          << StatelessChecksum::Compute(fina) << ", " << fun->GetName() << "(";
     for (auto j = 0; j < numParams; j++) {
-      main << init[j];
+      main << init[j].ToCxStr();
       if (j < numParams - 1) {
         main << ", ";
       }
@@ -372,18 +375,21 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
 
 std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
-
   std::ostringstream mapping;
-  for (size_t i = 0; i < exec.GetInitializations().size(); i++) {
-    for (auto x: exec.GetInitializations()[i]) {
-      mapping << x << ",";
+  for (size_t i = 0; i < exec.GetInits().size(); i++) {
+    nlohmann::json mapObj = nlohmann::json::object();
+    const auto &init = exec.GetInits()[i];
+    mapObj["ini"] = nlohmann::json::array();
+    for (const auto &arg: init) {
+      mapObj["ini"].push_back(arg.ToJson());
     }
-    mapping << " : ";
-    for (auto x: exec.GetFinalizations()[i]) {
-      mapping << x << ",";
+    const auto &fina = exec.GetFinas()[i];
+    mapObj["fin"] = nlohmann::json::array();
+    for (const auto &arg: fina) {
+      mapObj["fin"].push_back(arg.ToJson());
     }
-    mapping << " : " << StatelessChecksum::Compute(exec.GetFinalizations()[i]);
-    mapping << std::endl;
+    mapObj["chk"] = StatelessChecksum::Compute(fina);
+    mapping << mapObj.dump() << std::endl;
   }
   return mapping.str();
 }
@@ -401,46 +407,54 @@ std::unique_ptr<symir::Funct> FunPlus::ParseFunSexpCode(const std::string &sexpP
   return parser.TakeFunct();
 }
 
-FunPlus::InitFinaMap FunPlus::ParseMappingCode(const std::string &mapPath) {
+FunPlus::IniFinMap FunPlus::ParseMappingCode(const std::string &mapPath) {
   std::ostringstream moss;
   std::ifstream mifs(mapPath);
   Assert(mifs.is_open(), "Error: failed to open file: %s", mapPath.c_str());
 
-  std::vector<std::vector<int>> initialisations;
-  std::vector<std::vector<int>> finalizations;
+  std::vector<std::vector<ArgPlus<int>>> inits;
+  std::vector<std::vector<ArgPlus<int>>> finas;
 
   std::string line;
   while (std::getline(mifs, line)) {
-    std::vector<std::string> iniFinChk = SplitStr(line, " : ", true);
+    nlohmann::json mapObj = nlohmann::json::parse(line);
+
+    Assert(mapObj.contains("ini"), "Mapping object does not contain an field 'ini'");
     Assert(
-        iniFinChk.size() == 3,
-        "Invalid mapping line, each line should be in the format of "
-        "initialisation : finalization : checksum. The invalid line is: %s",
-        line.c_str()
+        mapObj["ini"].is_array(), "The field 'ini' is not an array but a %s",
+        mapObj["ini"].type_name()
+    );
+    Assert(mapObj.contains("fin"), "Mapping object does not contain an field 'fin'");
+    Assert(
+        mapObj["fin"].is_array(), "The field 'fin' is not an array but a %s",
+        mapObj["fin"].type_name()
+    );
+    Assert(mapObj.contains("chk"), "Mapping object does not contain an field 'chk'");
+    Assert(
+        mapObj["chk"].is_number_integer(), "The field 'chk' is not an integer but a %s",
+        mapObj["chk"].type_name()
     );
 
-    std::vector<std::string> ini = SplitStr(iniFinChk[0], ",", true);
-    std::vector<std::string> fin = SplitStr(iniFinChk[1], ",", true);
-    Assert(ini.size() == fin.size(), "The size of initialisation and finalization is different");
+    std::vector<ArgPlus<int>> ini;
+    for (const auto &argObj: mapObj["ini"]) {
+      ini.push_back(ArgPlus<int>::FromJson(argObj));
+    }
 
-    initialisations.emplace_back(ini.size());
-    std::ranges::transform(ini, initialisations.back().begin(), [](const auto &s) -> int {
-      return std::stoi(s);
-    });
-    finalizations.emplace_back(fin.size());
-    std::ranges::transform(fin, finalizations.back().begin(), [](const auto &s) -> int {
-      return std::stoi(s);
-    });
+    std::vector<ArgPlus<int>> fin;
+    for (const auto &argObj: mapObj["fin"]) {
+      fin.push_back(ArgPlus<int>::FromJson(argObj));
+    }
 
     // Ensure our checksum is correct
-    // int chksum = std::stoi(iniFinChk[2]);
-    // Assert(
-    //     chksum == StatelessChecksum::Compute(finalizations.back()),
-    //     "The checksum %d does not match the finalization [%s]", chksum, JoinStr(fin, ",").c_str()
-    // );
+    int chk1 = mapObj["chk"];
+    int chk2 = StatelessChecksum::Compute(fin);
+    Assert(chk1 == chk2, "The saved checksum %d does not match the finalization (%d)", chk1, chk2);
+
+    inits.push_back(std::move(ini));
+    finas.push_back(std::move(fin));
   }
 
   mifs.close();
 
-  return InitFinaMap(std::move(initialisations), std::move(finalizations));
+  return IniFinMap(std::move(inits), std::move(finas));
 }

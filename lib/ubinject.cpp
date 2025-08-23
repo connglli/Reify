@@ -29,17 +29,54 @@
 #include "global.hpp"
 #include "lib/z3utils.hpp"
 
-z3::expr IntUBInject::CreateVarExpr(const symir::VarDef *var, int version) {
+z3::expr IntUBInject::CreateScaExpr(const symir::VarDef *var, int version) {
+  Assert(var != nullptr, "Cannot create a variable expression for a nullptr variable");
+  const auto &varName = var->GetName();
+  Assert(
+      var->IsScalar(),
+      "Cannot create a scalar expression for a vector %s. Use the other overload instead.",
+      varName.c_str()
+  );
   Assert(
       var->GetType() == symir::SymIR::I32,
       "Variable %s is of type %s, however only 32-bit integer variables are supported for now!",
-      var->GetName().c_str(), symir::SymIR::GetTypeName(var->GetType()).c_str()
+      varName.c_str(), symir::SymIR::GetTypeName(var->GetType()).c_str()
   );
   if (version == -1) {
-    version = versions[var->GetName()];
+    version = versions[varName];
+  } else if (version == -2) {
+    version = ++versions[varName];
   }
   // We used 33-bit bitvectors since we're overflowing 32-bit integers
-  return ctx->bv_const((var->GetName() + "_" + std::to_string(version)).c_str(), 33);
+  return ctx->bv_const((varName + "_v" + std::to_string(version)).c_str(), 33);
+}
+
+std::string IntUBInject::GetVecElName(const symir::VarDef *var, int loc) const {
+  const auto &varName = var->GetName();
+  Assert(
+      var->IsVector(), "The variable %s is not a vector, cannot get element name", varName.c_str()
+  );
+  const auto numEls = var->GetVecNumEls();
+  Assert(
+      loc < numEls, "The element index (%d) is out of bound (%d) for variable %s", loc, numEls,
+      varName.c_str()
+  );
+  return varName + "_el" + std::to_string(loc);
+}
+
+z3::expr IntUBInject::CreateVecElExpr(const symir::VarDef *var, int loc, int version) {
+  Assert(var != nullptr, "Cannot create a variable expression for a nullptr array variable");
+  Assert(
+      var->IsVector(), "Cannot create a vector element expression for a scalar variable. "
+                       "Use the other overload instead."
+  );
+  const auto eleName = GetVecElName(var, loc);
+  if (version == -1) {
+    version = versions[eleName];
+  } else if (version == -2) {
+    version = ++versions[eleName];
+  }
+  return ctx->bv_const((eleName + "_v" + std::to_string(version)).c_str(), 33);
 }
 
 z3::expr IntUBInject::CreateCoefExpr(const symir::Coef &coef) {
@@ -113,8 +150,21 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
 
 void IntUBInject::Visit(const symir::VarUse &v) {
   Assert(v.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
-  // We're not going to restrict the value of any variable
-  pushExpression(CreateVarExpr(v.GetDef()));
+  if (v.IsScalar()) {
+    // We're not going to restrict the value of any variable
+    pushExpression(CreateScaExpr(v.GetDef()));
+  } else {
+    const auto access = v.GetAccess();
+    // We asked them to access the very last element
+    for (int d = 0; d < v.GetVecNumDims(); d++) {
+      access[d]->Accept(*this);
+      auto coefExpr = popExpression();
+      constraints->push_back(coefExpr == v.GetVecDimLen(d) - 1);
+    }
+    auto elExpr = CreateVecElExpr(v.GetDef(), v.GetVecNumEls() - 1);
+    // We're not going to restrict the value of any element
+    pushExpression(elExpr);
+  }
 }
 
 void IntUBInject::Visit(const symir::Coef &c) {
@@ -229,8 +279,14 @@ void IntUBInject::Visit(const symir::AssStmt &a) {
   ubConstraints.push_back(
       expr > GlobalOptions::Get().UpperBound || expr < GlobalOptions::Get().LowerBound
   ); // Inserts signed overflow
-  auto varNewExpr = CreateVarExpr(a.GetVar()->GetDef(), ++versions[a.GetVar()->GetName()]);
-  constraints->push_back(varNewExpr == expr);
+  if (a.GetVar()->IsScalar()) {
+    auto varNewExpr = CreateScaExpr(a.GetVar()->GetDef(), -2);
+    constraints->push_back(varNewExpr == expr);
+  } else {
+    // We only access the very last element. See Visit(const symir::VarUse &v).
+    auto elNewExpr = CreateVecElExpr(a.GetVar()->GetDef(), a.GetVar()->GetVecNumEls() - 1, -2);
+    constraints->push_back(elNewExpr == expr);
+  }
 }
 
 void IntUBInject::Visit(const symir::RetStmt &r) {
@@ -246,7 +302,11 @@ void IntUBInject::Visit(const symir::Goto &g) {
   // Do nothing
 }
 
-void IntUBInject::Visit(const symir::Param &p) {
+void IntUBInject::Visit(const symir::ScaParam &p) {
+  Panic("Cannot reach here: We only inject UBs into basic blocks, not parameters");
+}
+
+void IntUBInject::Visit(const symir::VecParam &p) {
   Panic("Cannot reach here: We only inject UBs into basic blocks, not parameters");
 }
 
@@ -280,7 +340,13 @@ z3::expr IntUBInject::mapBitVecExprToIntExpr(const z3::expr &bv) {
 
 void IntUBInject::ensureValidInitsForUses(const symir::Block *b) {
   for (const auto uv: b->GetUses()) {
-    z3::expr varExpr = CreateVarExpr(uv->GetDef(), 0);
+    z3::expr varExpr{*ctx};
+    if (uv->IsScalar()) {
+      varExpr = CreateScaExpr(uv->GetDef(), 0);
+    } else {
+      // We only access the very last element. See Visit(const symir::VarUse &v).
+      varExpr = CreateVecElExpr(uv->GetDef(), uv->GetVecNumEls() - 1, 0);
+    }
     constraints->push_back(varExpr <= GlobalOptions::Get().UpperBound);
     constraints->push_back(varExpr >= GlobalOptions::Get().LowerBound);
     // We create a bv2int map so that it's easy for us to extract the coefficient
@@ -295,39 +361,54 @@ void IntUBInject::extractAndInitializeUses(
 ) {
   for (const auto *uv: b->GetUses()) {
     const auto *nuvd = funBd->FindVar(uv->GetName());
-    const auto &varName = nuvd->GetName().c_str();
-    auto varInitExpr = mapBitVecExprToIntExpr(CreateVarExpr(nuvd, 0)).decl();
+    std::string varName;
+    z3::func_decl varInitExpr{*ctx};
+    if (uv->IsScalar()) {
+      varName = uv->GetName();
+      varInitExpr = mapBitVecExprToIntExpr(CreateScaExpr(nuvd, 0)).decl();
+    } else {
+      // We only access the very last element. See Visit(const symir::VarUse &v).
+      varName = GetVecElName(nuvd, uv->GetVecNumEls() - 1);
+      varInitExpr = mapBitVecExprToIntExpr(CreateVecElExpr(nuvd, uv->GetVecNumEls() - 1, 0)).decl();
+    }
     // Every use has to be solved
     Assert(
         model.has_interp(varInitExpr),
-        "We didn't find the initial value of the used variable %s to intruoduce int-related "
+        "We didn't find the initial value of the used variable %s to introduce int-related "
         "undefined behaviors",
-        varName
+        varName.c_str()
     );
     z3::expr varInitConst = model.get_const_interp(varInitExpr);
-    Assert(varInitConst.is_numeral(), "Value %s is not a numeral", varName);
+    Assert(varInitConst.is_numeral(), "Value %s is not a numeral", varName.c_str());
     int varInitVal;
     Assert(
         varInitConst.is_numeral_i(varInitVal),
-        "Failed to obtain the valInitVal of variable %s from the model", varName
+        "Failed to obtain the valInitVal of variable %s from the model", varName.c_str()
     );
     Log::Get().Out() << "Let variable: var=" << varName << ", value=" << varInitVal << std::endl;
-    // Insert an assignment to the variable with its initial value like: uv <- 0* uv + initial_value
-    blkBd->SymAssign(
-        nuvd,
-        blkBd->SymAddExpr(
-            {blkBd->SymMulTerm(
-                 funBd->SymCoef(nextCoefNameForBlock(b->GetLabel()), "0", symir::SymIR::I32), nuvd
-             ),
-             blkBd->SymCstTerm(
-                 funBd->SymCoef(
-                     nextCoefNameForBlock(b->GetLabel()), std::to_string(varInitVal),
-                     symir::SymIR::I32
-                 ),
-                 nullptr
-             )}
-        )
-    );
+    // Insert an assignment to the variable with its initial value like: uv <- 0* uv +
+    // initial_value
+    if (uv->IsScalar()) {
+      blkBd->SymAssign(
+          nuvd, blkBd->SymAddExpr(
+                    {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd),
+                     blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
+                )
+      );
+    } else {
+      std::vector<symir::Coef *> access;
+      for (int d = 0; d < uv->GetVecNumDims(); d++) {
+        access.push_back(funBd->SymI32Const(uv->GetVecDimLen(d - 1)));
+      }
+      blkBd->SymAssign(
+          nuvd,
+          blkBd->SymAddExpr(
+              {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd, access),
+               blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
+          ),
+          access
+      );
+    }
   }
 }
 

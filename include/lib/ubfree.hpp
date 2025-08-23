@@ -29,6 +29,7 @@
 #include <algorithm>
 
 #include "global.hpp"
+#include "lib/argument.hpp"
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
 #include "lib/naming.hpp"
@@ -66,9 +67,19 @@ public:
   // Optimize the set of collected constraints to obtain an optimized set
   void Optimize();
 
-  // Create a versioned variable expression for the given variable
+  // Create a versioned variable expression for the given scalar variable
   // When version==-1, the current version in the version table is used
-  z3::expr CreateVarExpr(const symir::VarDef *var, int version = -1);
+  // When version==-2, the version in the version table is incremented and the new version is
+  // used
+  z3::expr CreateScaExpr(const symir::VarDef *var, int version = -1);
+
+  /// Return the name of the loc-th element of the vector variable
+  std::string GetVecElName(const symir::VarDef *var, int loc) const;
+
+  // Create a versioned variable expression for the loc-th element of the vector variable
+  // When version==-1, the current version in the version table is used
+  // When version==-2, the version in the version table is incremented and the new version is used
+  z3::expr CreateVecElExpr(const symir::VarDef *var, int loc, int version = -1);
 
   // Create a coefficient expression for the given name
   z3::expr CreateCoefExpr(const symir::Coef &coef);
@@ -80,7 +91,7 @@ public:
   void MakeInitWithRandomValue();
 
   // Generate constraints to differentiate the initialization of the parameters from the given one
-  void MakeInitDifferentFrom(const std::vector<int> &init);
+  void MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init);
 
   // Print all constraints to the logger
   void PrintConstraints() const {
@@ -99,7 +110,8 @@ protected:
   void Visit(const symir::RetStmt &r) override;
   void Visit(const symir::Branch &b) override;
   void Visit(const symir::Goto &g) override;
-  void Visit(const symir::Param &p) override;
+  void Visit(const symir::ScaParam &p) override;
+  void Visit(const symir::VecParam &p) override;
   void Visit(const symir::Local &l) override;
   void Visit(const symir::Block &b) override;
   void Visit(const symir::Funct &f) override;
@@ -115,6 +127,16 @@ private:
     return e;
   }
 
+  // Push an element location to the element location stack
+  void pushVecElLoc(int loc) { vecElLocStack.push(loc); }
+
+  // Pop an element location to the element location stack
+  int popVecElLoc() {
+    auto loc = vecElLocStack.top();
+    vecElLocStack.pop();
+    return loc;
+  }
+
   // Generate constraints to make the coefficients interesting
   void makeCoefsInteresting(const symir::Expr &expr);
 
@@ -127,6 +149,7 @@ private:
 
   // Context used in collecting UB-free constraints
   std::stack<z3::expr> exprStack{}; // The expression stack for evaluating the SymIR program
+  std::stack<int> vecElLocStack{};  // The element location stack for evaluating the SymIR program
   std::string prevBbl = "", currBbl = "",
               nextBbl = ""; // The previous/current/next blocks been/being/to-be evaluated
   std::map<std::string, int> versions{};        // The SSA version table for each variable

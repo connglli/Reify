@@ -71,7 +71,16 @@ public:
 
   // Create a versioned variable expression for the given variable
   // When version==-1, the current version in the version table is used
-  z3::expr CreateVarExpr(const symir::VarDef *var, int version = -1);
+  // When version==-2, the version table is updated and the new version is used
+  z3::expr CreateScaExpr(const symir::VarDef *var, int version = -1);
+
+  // Get the name of the loc-th element of the vector variable
+  std::string GetVecElName(const symir::VarDef *var, int loc) const;
+
+  // Create a versioned variable expression for the loc-th element of the vector variable
+  // When version==-1, the current version in the version table is used
+  // When version==-2, the version in the version table is incremented and the new version is used
+  z3::expr CreateVecElExpr(const symir::VarDef *var, int loc, int version = -1);
 
   // Create a coefficient expression for the given name
   z3::expr CreateCoefExpr(const symir::Coef &coef);
@@ -97,7 +106,8 @@ protected:
   void Visit(const symir::RetStmt &r) override;
   void Visit(const symir::Branch &b) override;
   void Visit(const symir::Goto &g) override;
-  void Visit(const symir::Param &p) override;
+  void Visit(const symir::ScaParam &p) override;
+  void Visit(const symir::VecParam &p) override;
   void Visit(const symir::Local &l) override;
   void Visit(const symir::Block &b) override;
   void Visit(const symir::Funct &f) override;
@@ -112,9 +122,9 @@ private:
   void
   extractSymbolsFromModel(const z3::model &model, const symir::Funct *f, const symir::Block *b);
 
-  std::string nextCoefNameForBlock(const std::string &label) {
+  static std::string nextCoefNameForBlock(const std::string &label) {
     static int counter = 0;
-    return "intubinj_blk" + label + "_coefval" + std::to_string(counter++);
+    return "__intubinj_blk" + label + "_coefval" + std::to_string(counter++);
   }
 
 private:

@@ -60,25 +60,36 @@ public:
   [[nodiscard]] int GetNumCoefs() const { return static_cast<int>(symbols.size()); }
 
   bool ReplaceFirstCoef(
-      const symir::Funct *guest, const std::vector<int> *inits, const std::vector<int> *finas
+      const symir::Funct *guest, const std::vector<ArgPlus<int>> *init,
+      const std::vector<ArgPlus<int>> *fina
   ) {
     this->succeeded = false;
     this->guest = guest;
-    this->initialisation = inits;
-    this->finalization = finas;
+    this->init = init;
+    this->fina = fina;
     this->host->Accept(*this);
     this->guest = nullptr;
-    this->initialisation = nullptr;
-    this->finalization = nullptr;
+    this->init = nullptr;
+    this->fina = nullptr;
     return this->succeeded;
   }
 
 protected:
-  void Visit(const symir::VarUse &v) {
-    Panic("Cannot reach here: VarUse should not be replaced, it is a variable");
+  void Visit(const symir::VarUse &v) override {
+    if (succeeded) {
+      return;
+    }
+    if (v.IsVector()) {
+      for (const auto *c: v.GetAccess()) {
+        c->Accept(*this);
+        if (succeeded) {
+          return;
+        }
+      }
+    }
   }
 
-  void Visit(const symir::Coef &c) {
+  void Visit(const symir::Coef &c) override {
     if (succeeded) {
       return;
     }
@@ -93,34 +104,40 @@ protected:
         "Unsupported type %s for the coefficient with name \"%s\"",
         symir::SymIR::GetTypeName(p->GetType()).c_str(), p->GetName().c_str()
     );
-    int coeff_val = p->GetI32Value();
-    int chk_val = StatelessChecksum::Compute(*finalization);
-    std::ostringstream chk_oss;
-    chk_oss << StatelessChecksum::GetCheckChksumName() << "(" << chk_val << ", " << guest->GetName()
-            << "(";
-    for (int i = 0; i < static_cast<int>(initialisation->size()) - 1; ++i) {
-      chk_oss << (*initialisation)[i] << ", ";
+    int coefVal = p->GetI32Value();
+    int chkVal = StatelessChecksum::Compute(*fina);
+    std::ostringstream chkOss;
+    chkOss << StatelessChecksum::GetCheckChksumName() << "(" << chkVal << ", " << guest->GetName()
+           << "(";
+    for (int i = 0; i < static_cast<int>(init->size()) - 1; ++i) {
+      chkOss << (*init)[i].ToCxStr() << ", ";
     }
-    chk_oss << (*initialisation)[initialisation->size() - 1] << "))";
+    chkOss << (*init)[init->size() - 1].ToCxStr() << "))";
     // To avoid UBs, we'd use an upper type to save the result: long long here
-    long long diff = static_cast<long long>(coeff_val) - static_cast<long long>(chk_val);
+    long long diff = static_cast<long long>(coefVal) - static_cast<long long>(chkVal);
     if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
-      p->SetValue("(" + chk_oss.str() + " + " + std::to_string(diff) + ")");
+      p->SetValue("(" + chkOss.str() + " + " + std::to_string(diff) + ")");
     } else {
-      p->SetValue("(int) ((long long)" + chk_oss.str() + " + " + std::to_string(diff) + "L)");
+      p->SetValue("(int) ((long long)" + chkOss.str() + " + " + std::to_string(diff) + "L)");
     }
     markMutated(p);
     succeeded = true;
   }
 
-  void Visit(const symir::Term &t) {
+  void Visit(const symir::Term &t) override {
     if (succeeded) {
       return;
     }
     t.GetCoef()->Accept(*this);
+    if (succeeded) {
+      return;
+    }
+    if (t.GetVar() != nullptr) {
+      t.GetVar()->Accept(*this);
+    }
   }
 
-  void Visit(const symir::Expr &e) {
+  void Visit(const symir::Expr &e) override {
     if (succeeded) {
       return;
     }
@@ -132,44 +149,52 @@ protected:
     }
   }
 
-  void Visit(const symir::Cond &c) {
+  void Visit(const symir::Cond &c) override {
     if (succeeded) {
       return;
     }
     c.GetExpr()->Accept(*this);
   }
 
-  void Visit(const symir::AssStmt &a) {
+  void Visit(const symir::AssStmt &a) override {
     if (succeeded) {
       return;
     }
     a.GetExpr()->Accept(*this);
+    if (succeeded) {
+      return;
+    }
+    a.GetVar()->Accept(*this);
   }
 
-  void Visit(const symir::RetStmt &r) { /* Do Nothing */ }
+  void Visit(const symir::RetStmt &r) override { /* Do Nothing */ }
 
-  void Visit(const symir::Branch &b) {
+  void Visit(const symir::Branch &b) override {
     if (succeeded) {
       return;
     }
     b.GetCond()->Accept(*this);
   }
 
-  void Visit(const symir::Goto &g) { /* Do Nothing */ }
+  void Visit(const symir::Goto &g) override { /* Do Nothing */ }
 
-  void Visit(const symir::Param &p) {
-    Panic("Cannot reach here: Param variables should not be replaced");
+  void Visit(const symir::ScaParam &p) override {
+    Panic("Cannot reach here: ScaParam variables should not be replaced");
   }
 
-  void Visit(const symir::Local &l) {
+  void Visit(const symir::VecParam &p) override {
+    Panic("Cannot reach here: ArrParam variables should not be replaced");
+  }
+
+  void Visit(const symir::Local &l) override {
     Panic("Cannot reach here: Local variables should not be replaced");
   }
 
-  void Visit(const symir::Block &b) {
+  void Visit(const symir::Block &b) override {
     Panic("Cannot reach here: We directly manipulate statements when visiting a function");
   }
 
-  void Visit(const symir::Funct &f) {
+  void Visit(const symir::Funct &f) override {
     const auto statements = f.GetStmts();
     const auto rand = Random::Get().Uniform(0, static_cast<int>(statements.size()) - 1);
     const auto probability = Random::Get().UniformReal()();
@@ -230,8 +255,8 @@ private:
   // The result of the replacement for the guest function
   bool succeeded = false;
   const symir::Funct *guest = nullptr;
-  const std::vector<int> *initialisation = nullptr;
-  const std::vector<int> *finalization = nullptr;
+  const std::vector<ArgPlus<int>> *init = nullptr;
+  const std::vector<ArgPlus<int>> *fina = nullptr;
 };
 
 void ProgPlus::Generate() const {
@@ -265,9 +290,9 @@ void ProgPlus::Generate() const {
       Assert(guest != nullptr, "The guest function is nullptr for index %d", j);
       auto guestMap = mappings[j];
       int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
-      std::vector<int> *initialisation = &guestMap.first[index];
-      std::vector<int> *finalization = &guestMap.second[index];
-      if (repl.ReplaceFirstCoef(guest, initialisation, finalization)) {
+      std::vector<ArgPlus<int>> *init = &guestMap.first[index];
+      std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
+      if (repl.ReplaceFirstCoef(guest, init, fina)) {
         Log::Get().Out() << "[" << sno << "]   var#" << k << " -> func#" << j << ": "
                          << guest->GetName() << std::endl;
       }
@@ -302,14 +327,14 @@ void ProgPlus::GenerateCode(const fs::path &file, bool debug, bool staticModifie
   }
   oss << "int main() {" << std::endl;
   int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
-  const std::vector<int> *initialisation = &(mappings[0].first[index]);
-  const std::vector<int> *finalization = &(mappings[0].second[index]);
-  int checksum = StatelessChecksum::Compute(*finalization);
+  const std::vector<ArgPlus<int>> *init = &(mappings[0].first[index]);
+  const std::vector<ArgPlus<int>> *fina = &(mappings[0].second[index]);
+  int checksum = StatelessChecksum::Compute(*fina);
   oss << "    printf(\"%d\\n\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
       << ", " << functions[0]->GetName() << "(";
-  for (size_t i = 0; i < initialisation->size(); ++i) {
-    oss << (*initialisation)[i];
-    if (i != initialisation->size() - 1) {
+  for (size_t i = 0; i < init->size(); ++i) {
+    oss << (*init)[i].ToCxStr();
+    if (i != init->size() - 1) {
       oss << ", ";
     }
   }

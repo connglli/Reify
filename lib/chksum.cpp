@@ -43,6 +43,20 @@ int StatelessChecksum::Compute(const std::vector<int> &values) {
   return computeStatelessChecksum(static_cast<int>(values.size()), args);
 }
 
+int StatelessChecksum::Compute(const std::vector<ArgPlus<int>> &args) {
+  std::vector<int> values;
+  for (const auto &a: args) {
+    if (a.IsVector()) {
+      for (int i = 0; i < a.GetVecNumEls(); i++) {
+        values.push_back(a.GetValue(i));
+      }
+    } else {
+      values.push_back(a.GetValue());
+    }
+  }
+  return Compute(values);
+}
+
 std::string StatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }
 
 std::string StatelessChecksum::GetRawCode() {

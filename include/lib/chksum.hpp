@@ -30,11 +30,16 @@
 #include <string>
 #include <vector>
 
+#include "lib/argument.hpp"
+
 class StatelessChecksum {
 
 public:
   // Compute the checksum of the given values
   static int Compute(const std::vector<int> &values);
+
+  // Compute the checksum of the given arguments
+  static int Compute(const std::vector<ArgPlus<int>> &args);
 
   // Get the function name for the checksum computing function
   static std::string GetComputeName();

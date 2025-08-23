@@ -181,7 +181,7 @@ bool UBFreeExec::solve(
   // clang-format on
 
   // Generate or re-generate the constraints for the function execution
-  if (initializations.size() <= 1) {
+  if (inits.size() <= 1) {
     Log::Get().Out() << "Generating or re-generating UB-free constraints" << std::endl;
     ubSov->Reset();
 
@@ -207,9 +207,9 @@ bool UBFreeExec::solve(
   }
 
   // We are solving the input parameters; let's sample for a different solution
-  if (!initializations.empty()) {
+  if (!inits.empty()) {
     // Ensure that the initialisation is sufficiently different from the previous one
-    ubSov->MakeInitDifferentFrom(initializations.back());
+    ubSov->MakeInitDifferentFrom(inits.back());
   }
 
   if (debug) {
@@ -220,7 +220,7 @@ bool UBFreeExec::solve(
   }
 
   // We are solving the symbols for the first time; let's try simplifying the constraints
-  if (initializations.empty()) {
+  if (inits.empty()) {
     ubSov->Optimize();
 
     if (debug) {
@@ -256,7 +256,7 @@ bool UBFreeExec::solve(
   extractSymbolsFromModel(model);
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
-  if (initializations.empty()) {
+  if (inits.empty()) {
     if (GlobalOptions::Get().EnableUBInUnexecutedBbls) {
       insertUBsIntoUnexecutedBbls();
     }
@@ -267,8 +267,8 @@ bool UBFreeExec::solve(
     }
   }
   // Extract the initialisation and finalisation values from the model
-  extractInitFromModel(model);
-  extractFinalFromModel(model);
+  inits.push_back(extractParamsFromModel(model, 0));
+  finas.push_back(extractParamsFromModel(model, -1));
 
   return true;
 }
@@ -298,60 +298,54 @@ void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
   }
 }
 
-void UBFreeExec::extractInitFromModel(z3::model &model) {
-  std::vector<int> init;
+std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, int version) {
+  Assert(version == 0 || version == -1, "Version must be 0 (init) or 1 (fina)");
+  const auto verTag = version == 0 ? "initialization" : "finalization";
+  std::vector<ArgPlus<int>> args;
   for (auto param: fun->GetParams()) {
     const auto paramName = param->GetName().c_str();
-    z3::expr paramKey = ubSov->CreateVarExpr(param, 0);
-    if (model.has_interp(paramKey.decl())) {
-      z3::expr paramConst = model.get_const_interp(paramKey.decl());
-      Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
-      int paramVal;
-      Assert(
-          paramConst.is_numeral_i(paramVal),
-          "Failed to obtain the value of parameter %s from the model", paramName
-      );
-      init.push_back(paramVal);
-      Log::Get().Out() << "Extract initialization: param=" << paramName << ", value=" << paramVal
-                       << std::endl;
+    std::vector<z3::expr> paramKeys;
+    if (param->IsVector()) {
+      args.emplace_back(param->GetVecDims());
+      for (int i = 0; i < param->GetVecNumEls(); i++) {
+        paramKeys.push_back(ubSov->CreateVecElExpr(param, i, version));
+      }
     } else {
-      // The parameter is never used by any executed block. We assign it a default value.
-      // Note, the assigned value should be the same as its value in finalization (as it
-      // is never used means it is never evaluated/changed).
-      init.push_back(GlobalOptions::Get().LowerBound);
-      Log::Get().Out() << "Extract initialization: param=" << paramName << ", value=<unused>"
-                       << std::endl;
+      args.emplace_back();
+      paramKeys.push_back(ubSov->CreateScaExpr(param, version));
+    }
+    for (int i = 0; i < static_cast<int>(paramKeys.size()); i++) {
+      z3::expr &paramKey = paramKeys[i];
+      if (model.has_interp(paramKey.decl())) {
+        z3::expr paramConst = model.get_const_interp(paramKey.decl());
+        Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
+        int paramVal;
+        Assert(
+            paramConst.is_numeral_i(paramVal),
+            "Failed to obtain the value of parameter %s from the model", paramName
+        );
+        if (args.back().IsScalar()) {
+          args.back().SetValue(paramVal);
+        } else {
+          args.back().SetValue(i, paramVal);
+        }
+        Log::Get().Out() << "Extract " << verTag << ": param=" << paramName
+                         << ", value=" << paramVal << std::endl;
+      } else {
+        // The parameter is never used by any executed block. We assign it a default value.
+        // Note, the assigned value should be the same as its value in finalization (as it
+        // is never used means it is never evaluated/changed).
+        if (args.back().IsVector()) {
+          args.back().SetValue(i, GlobalOptions::Get().LowerBound);
+        } else {
+          args.back().SetValue(GlobalOptions::Get().LowerBound);
+        }
+        Log::Get().Out() << "Extract " << verTag << ": param=" << paramName << ", value=<unused>"
+                         << std::endl;
+      }
     }
   }
-  initializations.push_back(init);
-}
-
-void UBFreeExec::extractFinalFromModel(z3::model &model) {
-  std::vector<int> fina;
-  for (auto param: fun->GetParams()) {
-    const auto paramName = param->GetName().c_str();
-    z3::expr paramKey = ubSov->CreateVarExpr(param);
-    if (model.has_interp(paramKey.decl())) {
-      z3::expr paramConst = model.get_const_interp(paramKey.decl());
-      Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
-      int paramVal;
-      Assert(
-          paramConst.is_numeral_i(paramVal),
-          "Failed to obtain the value of parameter %s from the model", paramName
-      );
-      fina.push_back(paramVal);
-      Log::Get().Out() << "Extract finalization: param=" << paramName << ", value=" << paramVal
-                       << std::endl;
-    } else {
-      // The parameter is never used by any executed block. We assign it a default value.
-      // Note, the assigned value should be the same as its value in initialization (as it
-      // is never used means it is never evaluated/changed).
-      fina.push_back(GlobalOptions::Get().LowerBound);
-      Log::Get().Out() << "Extract finalization: param=" << paramName << ", value=<unused>"
-                       << std::endl;
-    }
-  }
-  finalizations.push_back(fina);
+  return args;
 }
 
 void UBFreeExec::insertUBsIntoUnexecutedBbls() {

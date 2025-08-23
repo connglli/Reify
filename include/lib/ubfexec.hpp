@@ -52,14 +52,10 @@ public:
   [[nodiscard]] const std::vector<int> &GetExecution() const { return execution; }
 
   // Get all solved initializations
-  [[nodiscard]] const std::vector<std::vector<int>> &GetInitializations() const {
-    return initializations;
-  }
+  [[nodiscard]] const std::vector<std::vector<ArgPlus<int>>> &GetInits() const { return inits; }
 
   // Get all solved finalizations
-  [[nodiscard]] const std::vector<std::vector<int>> &GetFinalizations() const {
-    return finalizations;
-  }
+  [[nodiscard]] const std::vector<std::vector<ArgPlus<int>>> &GetFinas() const { return finas; }
 
   // Solve all symbols in the function to obtain an UB-free function with a number
   // of initialization-fianlization mapping. Return the number of obtained mapping.
@@ -92,11 +88,8 @@ private:
   // all the symbols that the solver successfully found an interpretation for
   void extractSymbolsFromModel(z3::model &model);
 
-  // Extract the initialization values from the model and save it
-  void extractInitFromModel(z3::model &model);
-
-  // Extract the finalization values from the model and save it
-  void extractFinalFromModel(z3::model &model);
+  /// Extract the solved value of the parameters from the model for the given version
+  std::vector<ArgPlus<int>> extractParamsFromModel(z3::model &model, int version);
 
   // Insert undefined behaviors into unexecuted basic blocks
   void insertUBsIntoUnexecutedBbls();
@@ -116,10 +109,10 @@ private:
   std::unique_ptr<SignedOverflow> ubSov; // TODO: Add more UB types in the future
 
   // The value of each input parameter at the entry of the function.
-  std::vector<std::vector<int>> initializations{};
+  std::vector<std::vector<ArgPlus<int>>> inits{};
 
   // The value of each input parameter at the exit of the function.
-  std::vector<std::vector<int>> finalizations{};
+  std::vector<std::vector<ArgPlus<int>>> finas{};
 };
 
 #endif // REIFY_UBFEXEC_HPP

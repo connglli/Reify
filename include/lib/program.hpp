@@ -53,7 +53,7 @@ private:
 private:
   std::string uuid, sno;
   std::vector<std::unique_ptr<symir::Funct>> functions{};
-  std::vector<FunPlus::InitFinaMap> mappings{};
+  std::vector<FunPlus::IniFinMap> mappings{};
 };
 
 #endif // REIFY_PROGRAM_HPP

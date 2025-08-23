@@ -23,6 +23,7 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+import json
 from pathlib import Path
 
 PROG_TPL = """
@@ -74,7 +75,7 @@ def get_func_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
 
 def get_map_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
   fuuid_ = fuuid.replace("-", "_")
-  return get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.map"
+  return get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.jsonl"
 
 
 def get_prog_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
@@ -105,9 +106,9 @@ def get_crealdb_file(gen_dir=DEFAULT_OUTPUT_DIR):
 
 def get_map_file_for_func_file(func_path, mappings_dir=None):
   if mappings_dir:
-    return Path(mappings_dir) / f"{Path(func_path).stem}.map"
+    return Path(mappings_dir) / f"{Path(func_path).stem}.jsonl"
   else:
-    return get_maps_dir(func_path.parent.parent) / f"{Path(func_path).stem}.map"
+    return get_maps_dir(func_path.parent.parent) / f"{Path(func_path).stem}.jsonl"
 
 
 def get_artifacts(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
@@ -125,15 +126,85 @@ def get_simple_program(func_name, func_code, func_args):
     chksum_code=CHKSUM_CODE,
     func_code=func_code,
     func_name=func_name,
-    func_args=", ".join(str(x) for x in func_args),
+    func_args=", ".join(x.unflat_c_str() for x in func_args),
   )
 
 
+class ArgVal:
+  def __init__(self, dims, elems):
+    self.dims = dims
+    self.elems = elems
+
+  def is_scalar(self):
+    return len(self.dims) == 0
+
+  def is_vector(self):
+    return len(self.dims) != 0
+
+  def get_c_type(self):
+    return f"int{''.join('[' + str(d) + ']' for d in self.dims) if self.dims else ''}"
+
+  def get_shaped_value(self):
+    if self.is_scalar():
+      return self.elems[0]
+
+    def reshape(flat, shape):
+      if not shape:
+        return flat[0]
+      if len(shape) == 1:
+        return flat[:shape[0]]
+      stride = 1
+      for d in shape[1:]:
+        stride *= d
+      out = []
+      for i in range(shape[0]):
+        start = i * stride
+        end = start + stride
+        out.append(reshape(flat[start:end], shape[1:]))
+      return out
+
+    return reshape(self.elems, self.dims)
+
+  def num_els(self):
+    return len(self.elems)
+
+  def flat_c_str(self):
+    # Flatten all array elements
+    return ",".join(str(e) for e in self.elems)
+
+  def unflat_c_str(self):
+    # Keep the original shape
+    if not self.dims:
+      return str(self.elems[0])
+    else:
+      oss = []
+      oss.append(f"(int(*){''.join('[' + str(d) + ']' for d in self.dims[1:])})")
+      oss.append(f"(int[{len(self.elems)}]")
+      oss.append('{' + ", ".join(str(e) for e in self.elems) + "})")
+      return "".join(oss)
+
+  @staticmethod
+  def from_json(obj):
+    dims = obj["dims"]
+    elems = obj["elems"]
+    # Validate size
+    expected = 1
+    for d in dims:
+      expected *= d
+    if expected != len(elems):
+      raise ValueError(
+        f"The elements length {len(elems)} doesn't match dims (expecting {expected} elements)"
+      )
+    return ArgVal(dims, elems)
+
+
 def parse_mapping(map_path):
-  return [
-    (pair[0].rstrip(",").split(","), pair[1].rstrip(",").split(","), pair[2])
-    for pair in [
-      tuple(line.split(" : ", maxsplit=2))
-      for line in Path(map_path).read_text().splitlines()
-    ]
-  ]
+  maps = []
+  for line in Path(map_path).read_text().splitlines():
+    obj = json.loads(line)
+    maps.append((
+      [ArgVal.from_json(a) for a in obj["ini"]],
+      [ArgVal.from_json(a) for a in obj["fin"]],
+      obj["chk"],
+    ))
+  return maps
