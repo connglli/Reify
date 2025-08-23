@@ -147,7 +147,7 @@ namespace symir {
         // Put every element of the vector parameter into the return statement
         const auto accesses = GatherVecAccesses(p);
         for (const auto &acc: accesses) {
-          std::vector<Coef *> coefs(acc.size());
+          std::vector<Coef *> coefs;
           for (const auto idx: acc) {
             coefs.push_back(GetParent()->SymI32Const(idx));
           }

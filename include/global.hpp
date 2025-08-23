@@ -57,6 +57,14 @@ struct GlobalOptions {
   int NumVarsPerAssign = 2;
   // The number of variables in each conditional statement
   int NumVarsInCond = 4;
+  // When enabled, some variables can be arrays
+  bool EnableArrayVars = true;
+  // The probability of generating an array variable
+  double ArrayVariableProba = 0.2;
+  // The maximum number of dimensions for an array variable
+  int MaxNumArrayDims = 3;
+  // The maximum number of elements for each dimension of an array variable
+  int MaxNumElsPerArrayDim = 3;
   // These are our anti-UB (mostly just checking for overflow and underflow) checks
   bool EnableSafetyChecks = true;
   // I don't want all coefficients to be 0, so this constraint takes care of that

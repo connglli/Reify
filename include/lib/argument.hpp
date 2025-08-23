@@ -45,7 +45,7 @@ public:
     }
     int numEls = 1;
     for (int i = 0; i < GetVecNumDims(); i++) {
-      numEls *= dims[i];
+      numEls *= this->dims[i];
     }
     elems.resize(numEls);
   }
@@ -96,17 +96,17 @@ public:
   }
 
   [[nodiscard]] int GetVecNumDims() const {
-    Assert(!IsVector(), "Cannot set a scalar value for a vector");
+    Assert(IsVector(), "Cannot get number of dimensions for a scalar");
     return static_cast<int>(dims.size());
   }
 
   [[nodiscard]] int GetVecNumEls() const {
-    Assert(!IsVector(), "Cannot set a scalar value for a vector");
+    Assert(IsVector(), "Cannot get number of elements for a scalar");
     return static_cast<int>(elems.size());
   }
 
   void SetValue(IntType val) {
-    Assert(!IsVector(), "Cannot set a scalar value for a vector");
+    Assert(IsScalar(), "Cannot set a scalar value for a vector");
     elems = {val};
   }
 
@@ -121,25 +121,19 @@ public:
     if (IsScalar()) {
       oss << GetValue();
     } else {
+      const auto numEls = GetVecNumEls();
       oss << "(int(*)";
       for (int d = 1; d < GetVecNumDims(); d++) {
         oss << "[" << GetVecDimLen(d) << "]";
       }
-      oss << ")";
-      const auto numEls = GetVecNumEls();
+      oss << ")((int[" << numEls << "]){";
       for (int k = 0; k < numEls; k++) {
-        oss << "((int[" << numEls << "]){";
-        for (int l = 0; l < numEls; l++) {
-          oss << GetValue(l);
-          if (l < numEls - 1) {
-            oss << ", ";
-          }
-        }
-        oss << "})";
-        if (k < GetVecNumEls() - 1) {
+        oss << GetValue(k);
+        if (k < numEls - 1) {
           oss << ", ";
         }
       }
+      oss << "})";
     }
     return oss.str();
   }

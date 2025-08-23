@@ -54,5 +54,10 @@ static std::string NameCondConst(const int block, const int stmt) {
   return "b_" + std::to_string(block) + "_" + std::to_string(stmt);
 }
 
+static std::string NameAccess(const int block, const int stmt, const int which, const int dim) {
+  return "i_" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which) +
+         "_" + std::to_string(dim);
+}
+
 
 #endif // REIFY_NAMING_HPP

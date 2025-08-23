@@ -39,6 +39,8 @@ void FunPlus::Generate(bool allowDeadCode) {
   Log::Get().OpenSection("FunPlus: Generate Function " + name);
 
   auto randProba = Random::Get().UniformReal();
+  auto randArrayDim = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumArrayDims);
+  auto randArrayLen = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumElsPerArrayDim);
 
   // Generate the sketch of our control flow graph
   cfg.Generate(allowDeadCode);
@@ -51,11 +53,24 @@ void FunPlus::Generate(bool allowDeadCode) {
   auto builder = std::make_unique<symir::FunctBuilder>(name, symir::SymIR::I32);
   // The first numParams variables are parameters
   for (int i = 0; i < numParams; i++) {
+    bool isVolatile = false;
+    bool isArray = false;
     if (GlobalOptions::Get().EnableVolatileVars &&
         randProba() < GlobalOptions::Get().VolatileVariableProba) {
-      builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/true);
+      isVolatile = true;
+    }
+    if (GlobalOptions::Get().EnableArrayVars &&
+        randProba() < GlobalOptions::Get().ArrayVariableProba) {
+      isArray = true;
+    }
+    if (isArray) {
+      std::vector<int> dims;
+      for (int i = 0; i < randArrayDim(); i++) {
+        dims.push_back(randArrayLen());
+      }
+      builder->SymVecParam(NameVar(i), dims, symir::SymIR::Type::I32, isVolatile);
     } else {
-      builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, /*IsVolatile=*/false);
+      builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, isVolatile);
     }
   }
   // The next numLocals variables are locals
@@ -127,8 +142,13 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
       // Statement index is the index of the assignment statement in a
       // basic block, and i is the index of the variable in the RHS of
       // the assignment statement. We create a term with random operations
-      const auto depCoef = funBd->SymCoef(NameCoef(bblId, stmtIndex, i), symir::SymIR::Type::I32);
-      terms.push_back(bblBd->SymTerm(static_cast<symir::Term::Op>(randTermOp()), depCoef, depVar));
+      int whichId = i + 1;
+      const auto depCoef =
+          funBd->SymCoef(NameCoef(bblId, stmtIndex, whichId), symir::SymIR::Type::I32);
+      auto depVarAcc = generateVarAccess(funBd, depVar, bblId, stmtIndex, whichId);
+      terms.push_back(
+          bblBd->SymTerm(static_cast<symir::Term::Op>(randTermOp()), depCoef, depVar, depVarAcc)
+      );
     }
     // Assign a constant to the current variable being defined
     terms.push_back(bblBd->SymCstTerm(
@@ -136,7 +156,10 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
     ));
 
     // Create the assignment statement with a random expression
-    bblBd->SymAssign(var, bblBd->SymExpr(static_cast<symir::Expr::Op>(randExprOp()), terms));
+    std::vector<symir::Coef *> assAcc = generateVarAccess(funBd, var, bblId, stmtIndex, 0);
+    bblBd->SymAssign(
+        var, bblBd->SymExpr(static_cast<symir::Expr::Op>(randExprOp()), terms), assAcc
+    );
   }
 
   // Define a specific target that our conditional/unconditional controls
@@ -167,14 +190,18 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
       // let's just not touch this), and i is the index of the
       // variable in the actual conditional.
       // (... perhaps because it is the first conditional statement)
-      const auto depCoef = funBd->SymCoef(NameCondCoef(bblId, 0, i), symir::SymIR::Type::I32);
+      int whichId = i + 1;
+      const auto depCoef =
+          funBd->SymCoef(NameCondCoef(bblId, numAssPerBbl, whichId), symir::SymIR::Type::I32);
+      std::vector<symir::Coef *> depVarAcc =
+          generateVarAccess(funBd, depVar, bblId, numAssPerBbl, whichId);
       condTerms.push_back(
-          bblBd->SymTerm(static_cast<symir::Term::Op>(randTermOp()), depCoef, depVar)
+          bblBd->SymTerm(static_cast<symir::Term::Op>(randTermOp()), depCoef, depVar, depVarAcc)
       );
     }
-    condTerms.push_back(
-        bblBd->SymCstTerm(funBd->SymCoef(NameCondConst(bblId, 0), symir::SymIR::Type::I32), nullptr)
-    );
+    condTerms.push_back(bblBd->SymCstTerm(
+        funBd->SymCoef(NameCondConst(bblId, numAssPerBbl), symir::SymIR::Type::I32), nullptr
+    ));
 
     // Target block is a parameter here if we ever wanted to support more that
     // 2 potential targets for the same basic block. We will always branch to
@@ -202,6 +229,19 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
   funBd->CloseBlock(bblBd);
 
   Log::Get().CloseSection();
+}
+
+std::vector<symir::Coef *> FunPlus::generateVarAccess(
+    symir::FunctBuilder *funBd, const symir::VarDef *var, int bbl, int stmt, int which
+) const {
+  if (var->IsScalar()) {
+    return {};
+  }
+  std::vector<symir::Coef *> coef;
+  for (int dim = 0; dim < var->GetVecNumDims(); dim++) {
+    coef.push_back(funBd->SymCoef(NameAccess(bbl, stmt, which, dim), symir::SymIR::Type::I32));
+  }
+  return coef;
 }
 
 /// A SymIR to Cxx lower with printing reducible loops, etc.

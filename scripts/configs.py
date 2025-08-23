@@ -179,7 +179,7 @@ class ArgVal:
     else:
       oss = []
       oss.append(f"(int(*){''.join('[' + str(d) + ']' for d in self.dims[1:])})")
-      oss.append(f"(int[{len(self.elems)}]")
+      oss.append(f"((int[{len(self.elems)}])")
       oss.append('{' + ", ".join(str(e) for e in self.elems) + "})")
       return "".join(oss)
 

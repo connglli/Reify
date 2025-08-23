@@ -398,7 +398,7 @@ void IntUBInject::extractAndInitializeUses(
     } else {
       std::vector<symir::Coef *> access;
       for (int d = 0; d < uv->GetVecNumDims(); d++) {
-        access.push_back(funBd->SymI32Const(uv->GetVecDimLen(d - 1)));
+        access.push_back(funBd->SymI32Const(uv->GetVecDimLen(d) - 1));
       }
       blkBd->SymAssign(
           nuvd,

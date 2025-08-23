@@ -125,6 +125,11 @@ private:
   // Generate a new basic block with random statements and symbols
   void generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const BblSketch &bblSkt);
 
+  // Generate an access for an array variable or return an empty vector if it is not an array
+  std::vector<symir::Coef *> generateVarAccess(
+      symir::FunctBuilder *funBd, const symir::VarDef *var, int bbl, int stmt, int which
+  ) const;
+
 private:
   CfgSketch cfg; // The sketch of our CFG, where each bbl maps to a blockgen in bbs
 
