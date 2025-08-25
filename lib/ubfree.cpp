@@ -178,6 +178,10 @@ void UBSan::Visit(const symir::VarUse &v) {
       constraints.push_back(coefExpr < v.GetVecDimLen(d));
       locExpr = locExpr * v.GetVecDimLen(d) + coefExpr;
     }
+    // FIXME: Enabling interesting access often makes the program UNSAT
+    // if (enableInterestCoefs) {
+    //   makeCoefsInteresting(access);
+    // }
     // Make locExpr access a random element in the array
     auto elLoc = Random::Get().Uniform(0, v.GetVecNumEls() - 1)();
     constraints.push_back(locExpr == elLoc);
@@ -273,7 +277,7 @@ void UBSan::Visit(const symir::Expr &e) {
     constraints.push_back(result <= GlobalOptions::Get().UpperBound);
   }
   if (enableInterestCoefs) {
-    makeCoefsInteresting(e);
+    makeCoefsInteresting(coefs);
   }
   pushExpression(result);
 }
@@ -417,6 +421,9 @@ void UBSan::Visit(const symir::VecLocal &l) {
     constraints.push_back(elExpr >= GlobalOptions::Get().LowerInitBound);
     constraints.push_back(elExpr == coefExpr);
   }
+  if (enableInterestCoefs) {
+    makeCoefsInteresting(inits);
+  }
 }
 
 void UBSan::Visit(const symir::Block &b) {
@@ -454,10 +461,10 @@ void UBSan::Visit(const symir::Funct &f) {
   );
 }
 
-void UBSan::makeCoefsInteresting(const symir::Expr &expr) {
-  std::vector<z3::expr> coefs;
-  for (const auto term: expr.GetTerms()) {
-    coefs.push_back(CreateCoefExpr(*term->GetCoef()));
+void UBSan::makeCoefsInteresting(const std::vector<symir::Coef *> &coefs) {
+  std::vector<z3::expr> exprs;
+  for (auto c: coefs) {
+    exprs.push_back(CreateCoefExpr(*c));
   }
-  constraints.push_back(AtMostKZeroes(ctx, coefs, static_cast<int>(coefs.size()) / 2));
+  constraints.push_back(AtMostKZeroes(ctx, exprs, static_cast<int>(coefs.size()) / 2));
 }

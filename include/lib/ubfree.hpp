@@ -139,7 +139,7 @@ private:
   }
 
   // Generate constraints to make the coefficients interesting
-  void makeCoefsInteresting(const symir::Expr &expr);
+  void makeCoefsInteresting(const std::vector<symir::Coef *> &coefs);
 
 private:
   const symir::Funct &fun;            // The function that we're analyzing
