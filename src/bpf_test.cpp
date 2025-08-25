@@ -40,6 +40,7 @@ struct eBPFTestOpts {
   bool verbose;
   u32 num_procs;
   u32 proc_id; // 0 for parent, 1-N for workers
+  bool no_save_prog;
 
   static eBPFTestOpts Parse(int argc, char **argv) {
     cxxopts::Options options("bpf_test");
@@ -48,6 +49,7 @@ struct eBPFTestOpts {
       ("s,seed",      "Seed for random sampling (negative for true random)", cxxopts::value<int>()->default_value("-1"))
       ("max_report",  "Maximum number of reports to generate", cxxopts::value<u32>()->default_value("1024"))
       ("procs",       "Number of processes to spawn", cxxopts::value<u32>()->default_value("1"))
+      ("no_save_prog",   "Do not save the generated prog before loading", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose",   "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help",      "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
@@ -91,6 +93,7 @@ struct eBPFTestOpts {
         .verbose = args["verbose"].as<bool>(),
         .num_procs = num_procs,
         .proc_id = 0,
+        .no_save_prog = args["no_save_prog"].as<bool>(),
     };
   }
 };
@@ -318,26 +321,38 @@ again:
   cout << "[+] Prog size: " << prog.size() << endl;
 }
 
-void save_prog(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
+void save_prog(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf, const string &name) {
+  string path = opts.output + "/" + name;
+  std::ofstream ebpfFile(path, std::ios::binary);
+  ebpfFile.write(
+      reinterpret_cast<const char *>(prog_buf.data()), prog_buf.size() * sizeof(struct bpf_insn)
+  );
+  ebpfFile.close();
+}
+
+void save_report_prog(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf, const string &prefix) {
+
   if (opts.report_num > opts.max_report) {
     cerr << "[+] Report suppressed" << endl;
     return;
   }
 
-  string prog_name = opts.output + "/fn" + std::to_string(opts.report_num) + ".bpf";
-  std::ofstream ebpfFile(prog_name, std::ios::binary);
-  ebpfFile.write(
-      reinterpret_cast<const char *>(prog_buf.data()), prog_buf.size() * sizeof(struct bpf_insn)
-  );
-  ebpfFile.close();
+  string prog_name = prefix + std::to_string(opts.report_num) + ".bpf";
+  save_prog(opts, prog_buf, prog_name);
 
-  string vlog_name = opts.output + "/fn_vlog" + std::to_string(opts.report_num) + ".txt";
+  string vlog_name =
+      opts.output + "/" + prefix + "_vlog" + std::to_string(opts.report_num) + ".txt";
   std::ofstream vlogFile(vlog_name);
   vlogFile.write(log_buf, strlen(log_buf));
   vlogFile.close();
 
   cout << "[+] Report saved: " << prog_name << " " << vlog_name << endl;
   opts.report_num++;
+}
+
+void save_gen_prog(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
+  string prog_name = "gen.bpf";
+  save_prog(opts, prog_buf, prog_name);
 }
 
 // Analyze the rejection reason.
@@ -397,6 +412,17 @@ void extract_vlog(char *vlog, string &summary, string &reason) {
   return;
 }
 
+bool fp_interesting(const string &reason) {
+  // The error reason "sequence of 8193 jumps is too complex" indicates the prog
+  // contains too many jumps, which is not interesting
+  static const std::vector<std::string> filters = {
+      "The sequence of 8193 jumps is too complex", "BPF program is too large"
+  };
+  return std::none_of(filters.begin(), filters.end(), [&](const std::string &f) {
+    return reason.find(f) != std::string::npos;
+  });
+}
+
 void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
 
   prog_buf.clear();
@@ -407,6 +433,11 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
     return; // Skip to next iteration
   }
 
+  // In case the kernel crashes, during loading the prog
+  if (!opts.no_save_prog) {
+    save_gen_prog(opts, prog_buf);
+  }
+
   cout << "[*] Loading prog..." << endl;
   int prog_fd = load_prog(prog_buf);
 
@@ -415,28 +446,28 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
     // Accept effectively indicates a verifier bug.
     cout << "[!!] INTERESTING FINDING: Verifier BUG: oracle prog accepted" << endl;
     cout << "[!!] Prog size: " << prog_buf.size() << endl;
-    save_prog(opts, prog_buf);
+    save_report_prog(opts, prog_buf, "fn_oracle");
     close(prog_fd);
     return;
   }
 
-  string summary, reason;
-  extract_vlog(log_buf, summary, reason);
 
   // if the reason is "frame pointer is read only", it's due to the oracle;
   // if the reason is "unreachable insn", it's due to the generator;
   // otherwise, it's a verifier false positive: we the prog is expected to
   // only be rejected due to the oracle.
+  string summary, reason;
+  extract_vlog(log_buf, summary, reason);
 
   if (reason.find("frame pointer is read only") != string::npos) {
     cout << "[+] \tResult: Rejected due to the oracle" << endl;
   } else if (reason.find("unreachable insn") != string::npos) {
     cout << "[!] \tWARNING: " << reason << endl;
     return; // can't fix or execute further.
-  } else {
+  } else if (fp_interesting(reason)) {
     cout << "[!!] \tResult: Verifier false positive: " << reason << endl
          << "\tSummary: " << summary << endl;
-    save_prog(opts, prog_buf);
+    save_report_prog(opts, prog_buf, "fp_oracle");
     return;
   }
 
@@ -461,20 +492,21 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
   prog_buf[prog_buf.size() - 2] = BPF_MOV32_IMM(BPF_REG_0, magic);
   prog_fd = load_prog(prog_buf);
   if (prog_fd < 0) {
-    cerr << "[-] \tWARNING: Failed to load the de-oracleized program" << endl;
     extract_vlog(log_buf, summary, reason);
-    cout << "[*] \tReason: " << reason << endl;
-    cout << "[*] \tSummary: " << summary << endl;
+    if (fp_interesting(reason)) {
+      cout << "[!!] \tResult: Verifier false positive: " << reason << endl;
+      save_report_prog(opts, prog_buf, "fp_de-oracle");
+    }
     return;
   }
 
   int ret = test_run_prog(prog_fd);
   if (ret != magic) {
     cout << "[!] \tWARNING: De-oracleized prog failed to run: " << ret << endl;
-    save_prog(opts, prog_buf);
+    save_report_prog(opts, prog_buf, "fp_de-oracle");
   }
-  cout << "[*] \tde-oracleized prog executed successfully" << endl;
 
+  cout << "[*] \tde-oracleized prog executed successfully" << endl;
   close(prog_fd);
 }
 

@@ -363,6 +363,12 @@ if ! _vmcmd "mkdir -p $VM_RESULTS_DIR"; then
 fi
 
 # Execute bpf_test in VM
+# If func_db.jsonl is in $SHARED_DIR, use the graph mode
+if [[ -f "$SHARED_DIR/func_db.jsonl" ]]; then
+    log_info "Using func graph db: $SHARED_DIR/func_db.jsonl"
+    BPF_TEST_ARGS+=("--unstable-graphdb $VM_WORK_DIR/func_db.jsonl") # VM_WORK_DIR is mounted in VM
+fi
+
 log_info "Executing bpf_test in VM..."
 log_info "Command: $VM_BPF_TEST_PATH --Xenable-ub-inject --Xenable-all-ops --output $VM_RESULTS_DIR --procs $PROCS ${BPF_TEST_ARGS[*]}"
 
