@@ -75,16 +75,32 @@ void FunPlus::Generate(bool allowDeadCode) {
   }
   // The next numLocals variables are locals
   for (int i = numParams; i < numParams + numLocals; i++) {
+    bool isVolatile = false;
+    bool isArray = false;
     if (GlobalOptions::Get().EnableVolatileVars &&
         randProba() < GlobalOptions::Get().VolatileVariableProba) {
-      builder->SymScaLocal(
-          NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),
-          symir::SymIR::Type::I32, /*IsVolatile=*/true
-      );
+      isVolatile = true;
+    }
+    if (GlobalOptions::Get().EnableArrayVars &&
+        randProba() < GlobalOptions::Get().ArrayVariableProba) {
+      isArray = true;
+    }
+    if (isArray) {
+      std::vector<int> shape;
+      for (int j = 0; j < randArrayDim(); j++) {
+        shape.push_back(randArrayLen());
+      }
+      std::vector<symir::Coef *> inits;
+      for (int j = 0; j < symir::VarDef::GetVecNumEls(shape); j++) {
+        inits.push_back(builder->SymCoef(
+            "init_var" + std::to_string(i) + "_el" + std::to_string(j), symir::SymIR::Type::I32
+        ));
+      }
+      builder->SymVecLocal(NameVar(i), shape, inits, symir::SymIR::Type::I32, isVolatile);
     } else {
       builder->SymScaLocal(
           NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),
-          symir::SymIR::Type::I32, /*IsVolatile=*/false
+          symir::SymIR::Type::I32, isVolatile
       );
     }
   }
