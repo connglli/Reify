@@ -1,4 +1,3 @@
-1. check if creal and our fuzz script is good or not with array
 1. support more conditions
 1. gvn/lvn still not working very well
 1. intrinsic idioms slp
