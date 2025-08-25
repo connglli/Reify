@@ -122,7 +122,7 @@ namespace symir {
       out << KW_VOL << " ";
     }
     out << KW_PAR << " " << p.GetName();
-    for (const auto &l: p.GetVecDims()) {
+    for (const auto &l: p.GetVecShape()) {
       out << "[" << l << "]";
     }
     out << " " << SymIR::GetTypeSName(p.GetType()) << ")";
@@ -268,7 +268,7 @@ namespace symir {
       out << "volatile" << " ";
     }
     out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
-    for (const auto &l: p.GetVecDims()) {
+    for (const auto &l: p.GetVecShape()) {
       out << "[" << l << "]";
     }
   }

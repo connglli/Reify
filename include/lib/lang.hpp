@@ -243,29 +243,29 @@ namespace symir {
   public:
     VarDef(std::string name, const SymIR::Type type) : WithType(type), name(std::move(name)) {}
 
-    VarDef(std::string name, std::vector<int> vecDims, const SymIR::Type type) :
-        WithType(type), name(std::move(name)), vecDims(std::move(vecDims)) {
+    VarDef(std::string name, std::vector<int> vecShape, const SymIR::Type type) :
+        WithType(type), name(std::move(name)), vecShape(std::move(vecShape)) {
       Assert(
-          !this->vecDims.empty(), "The vector dimensions for variable %s should be non-negative",
+          !this->vecShape.empty(), "The vector dimensions for variable %s should be non-negative",
           name.c_str()
       );
-      for (int dim = 0; dim < static_cast<int>(this->vecDims.size()); dim++) {
+      for (int dim = 0; dim < static_cast<int>(this->vecShape.size()); dim++) {
         Assert(
             // We disallow zero-length vectors
-            this->vecDims[dim] > 0,
+            this->vecShape[dim] > 0,
             "The vector length (%d) for variable %s at dimension %d should be non-negative, got %d",
-            this->vecDims[dim], name.c_str(), dim, this->vecDims[dim]
+            this->vecShape[dim], name.c_str(), dim, this->vecShape[dim]
         );
       }
     }
 
     [[nodiscard]] const std::string &GetName() const { return name; }
 
-    [[nodiscard]] bool IsScalar() const { return vecDims.empty(); }
+    [[nodiscard]] bool IsScalar() const { return vecShape.empty(); }
 
-    [[nodiscard]] bool IsVector() const { return !vecDims.empty(); }
+    [[nodiscard]] bool IsVector() const { return !vecShape.empty(); }
 
-    [[nodiscard]] std::vector<int> GetVecDims() const { return vecDims; }
+    [[nodiscard]] std::vector<int> GetVecShape() const { return vecShape; }
 
     /// Get the total number of elements in the vector if dim == -1.
     /// Otherwise, return the number of elements of a subvector at the given dim.
@@ -276,12 +276,12 @@ namespace symir {
       );
       int num = 1;
       for (int i = dim + 1; i < GetVecNumDims(); i++) {
-        num *= vecDims[i];
+        num *= vecShape[i];
       }
       return num;
     }
 
-    [[nodiscard]] int GetVecNumDims() const { return static_cast<int>(vecDims.size()); }
+    [[nodiscard]] int GetVecNumDims() const { return static_cast<int>(vecShape.size()); }
 
     [[nodiscard]] int GetVecDimLen(int dim) const {
       Assert(IsVector(), "The variable \"%s\" is not a vector", name.c_str());
@@ -289,7 +289,7 @@ namespace symir {
           dim >= 0 && dim < GetVecNumDims(), "The accessing dimension (%d) is out of bound (%d)",
           dim, GetVecNumDims()
       );
-      return vecDims[dim];
+      return vecShape[dim];
     }
 
     [[nodiscard]] bool IsVolatile() const { return isVolatile; }
@@ -298,9 +298,9 @@ namespace symir {
 
   protected:
     std::string name;
-    // Empty vector means scalar. Otherwise, each element in vecDims means the
-    // length of the vector at that dimension.
-    std::vector<int> vecDims{};
+    // Empty vector means scalar. Otherwise, vecShape is the shape of the vector, where
+    // each element in vecShape is the length of the vector at that dimension.
+    std::vector<int> vecShape{};
     bool isVolatile = false;
   };
 
@@ -392,6 +392,10 @@ namespace symir {
     [[nodiscard]] bool IsScalar() const { return var->IsScalar(); }
 
     [[nodiscard]] bool IsVector() const { return var->IsVector(); }
+
+    [[nodiscard]] std::vector<int> GetVecShape(std::vector<int> &shape) const {
+      return var->GetVecShape();
+    }
 
     [[nodiscard]] int GetVecNumDims() const { return var->GetVecNumDims(); }
 
@@ -831,8 +835,8 @@ namespace symir {
     explicit Param(ID irId, std::string name, Type type = Type::I32) :
         SymIR(irId), VarDef(std::move(name), type) {}
 
-    explicit Param(ID irId, std::string name, std::vector<int> dims, Type type = Type::I32) :
-        SymIR(irId), VarDef(std::move(name), dims, type) {}
+    explicit Param(ID irId, std::string name, std::vector<int> shape, Type type = Type::I32) :
+        SymIR(irId), VarDef(std::move(name), shape, type) {}
   };
 
   /// An ScaParam is a declaration of a function's parameter which is a scalar.
@@ -847,8 +851,8 @@ namespace symir {
   /// An VecParam is a declaration of a function's parameter which is a vector.
   class VecParam : public Param {
   public:
-    explicit VecParam(std::string name, std::vector<int> dims, Type type = Type::I32) :
-        Param(SIR_PARAM_VEC, std::move(name), std::move(dims), type) {}
+    explicit VecParam(std::string name, std::vector<int> shape, Type type = Type::I32) :
+        Param(SIR_PARAM_VEC, std::move(name), std::move(shape), type) {}
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
   };
@@ -1470,7 +1474,7 @@ namespace symir {
 
     /// Define and commit a new VecParam
     const VecParam *SymVecParam(
-        const std::string &name, const std::vector<int> &dims, SymIR::Type type = SymIR::I32,
+        const std::string &name, const std::vector<int> &shape, SymIR::Type type = SymIR::I32,
         bool isVolatile = false
     );
 

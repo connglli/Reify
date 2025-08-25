@@ -501,21 +501,21 @@ namespace symir {
         "type of the parameter",
         typeToken->FullInfo().c_str()
     );
-    std::vector<int> vecDims;
+    std::vector<int> vecShape;
     while (true) {
       const auto opKind = popOp();
       if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
         pushOp(opKind); // Push it back as this is not a bracket
         break;
       }
-      const auto *dimToken = popArg<SymSexpLexer::Token>();
+      const auto *dimLenTok = popArg<SymSexpLexer::Token>();
       Assert(
-          dimToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+          dimLenTok->kind == SymSexpLexer::Token::Kind::TK_IDENT,
           "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
           "length of a specific dimension of the vector parameter",
-          dimToken->FullInfo().c_str()
+          dimLenTok->FullInfo().c_str()
       );
-      vecDims.insert(vecDims.begin(), std::stoi(dimToken->ToStr()));
+      vecShape.insert(vecShape.begin(), std::stoi(dimLenTok->ToStr()));
     }
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
@@ -530,9 +530,9 @@ namespace symir {
     } else {
       pushOp(opKind); // Push it back as this is a volatile parameter
     }
-    if (!vecDims.empty()) {
+    if (!vecShape.empty()) {
       funBd->SymVecParam(
-          varToken->ToStr(), vecDims, SymIR::GetTypeFromSName(typeToken->ToStr()),
+          varToken->ToStr(), vecShape, SymIR::GetTypeFromSName(typeToken->ToStr()),
           /*isVolatile=*/isVolatile
       );
     } else {

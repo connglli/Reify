@@ -131,18 +131,18 @@ def get_simple_program(func_name, func_code, func_args):
 
 
 class ArgVal:
-  def __init__(self, dims, elems):
-    self.dims = dims
+  def __init__(self, shape, elems):
+    self.shape = shape
     self.elems = elems
 
   def is_scalar(self):
-    return len(self.dims) == 0
+    return len(self.shape) == 0
 
   def is_vector(self):
-    return len(self.dims) != 0
+    return len(self.shape) != 0
 
   def get_c_type(self):
-    return f"int{''.join('[' + str(d) + ']' for d in self.dims) if self.dims else ''}"
+    return f"int{''.join('[' + str(d) + ']' for d in self.shape) if self.shape else ''}"
 
   def get_shaped_value(self):
     if self.is_scalar():
@@ -163,7 +163,7 @@ class ArgVal:
         out.append(reshape(flat[start:end], shape[1:]))
       return out
 
-    return reshape(self.elems, self.dims)
+    return reshape(self.elems, self.shape)
 
   def num_els(self):
     return len(self.elems)
@@ -174,28 +174,28 @@ class ArgVal:
 
   def unflat_c_str(self):
     # Keep the original shape
-    if not self.dims:
+    if not self.shape:
       return str(self.elems[0])
     else:
       oss = []
-      oss.append(f"(int(*){''.join('[' + str(d) + ']' for d in self.dims[1:])})")
+      oss.append(f"(int(*){''.join('[' + str(d) + ']' for d in self.shape[1:])})")
       oss.append(f"((int[{len(self.elems)}])")
       oss.append('{' + ", ".join(str(e) for e in self.elems) + "})")
       return "".join(oss)
 
   @staticmethod
   def from_json(obj):
-    dims = obj["dims"]
+    shape = obj["shape"]
     elems = obj["elems"]
     # Validate size
     expected = 1
-    for d in dims:
+    for d in shape:
       expected *= d
     if expected != len(elems):
       raise ValueError(
-        f"The elements length {len(elems)} doesn't match dims (expecting {expected} elements)"
+        f"The elements length {len(elems)} doesn't match shape (expecting {expected} elements)"
       )
-    return ArgVal(dims, elems)
+    return ArgVal(shape, elems)
 
 
 def parse_mapping(map_path):

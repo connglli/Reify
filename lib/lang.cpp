@@ -228,7 +228,7 @@ namespace symir {
   }
 
   const VecParam *FunctBuilder::SymVecParam(
-      const std::string &name, const std::vector<int> &dims, SymIR::Type type, bool isVolatile
+      const std::string &name, const std::vector<int> &shape, SymIR::Type type, bool isVolatile
   ) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
@@ -239,7 +239,7 @@ namespace symir {
         !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
         name.c_str()
     );
-    params.push_back(std::make_unique<VecParam>(name, dims, type));
+    params.push_back(std::make_unique<VecParam>(name, shape, type));
     const auto v = params.back().get();
     if (isVolatile) {
       v->SetVolatile();
@@ -431,7 +431,7 @@ namespace symir {
   }
 
   void FunctCopier::Visit(const VecParam &p) {
-    builder->SymVecParam(p.GetName(), p.GetVecDims(), p.GetType(), p.IsVolatile());
+    builder->SymVecParam(p.GetName(), p.GetVecShape(), p.GetType(), p.IsVolatile());
   }
 
   void FunctCopier::Visit(const Local &l) {

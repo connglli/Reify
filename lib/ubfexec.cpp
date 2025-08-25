@@ -306,7 +306,7 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
     const auto paramName = param->GetName().c_str();
     std::vector<z3::expr> paramKeys;
     if (param->IsVector()) {
-      args.emplace_back(param->GetVecDims());
+      args.emplace_back(param->GetVecShape());
       for (int i = 0; i < param->GetVecNumEls(); i++) {
         paramKeys.push_back(ubSan->CreateVecElExpr(param, i, version));
       }

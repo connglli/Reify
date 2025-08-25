@@ -64,11 +64,11 @@ void FunPlus::Generate(bool allowDeadCode) {
       isArray = true;
     }
     if (isArray) {
-      std::vector<int> dims;
-      for (int i = 0; i < randArrayDim(); i++) {
-        dims.push_back(randArrayLen());
+      std::vector<int> shape;
+      for (int j = 0; j < randArrayDim(); j++) {
+        shape.push_back(randArrayLen());
       }
-      builder->SymVecParam(NameVar(i), dims, symir::SymIR::Type::I32, isVolatile);
+      builder->SymVecParam(NameVar(i), shape, symir::SymIR::Type::I32, isVolatile);
     } else {
       builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, isVolatile);
     }

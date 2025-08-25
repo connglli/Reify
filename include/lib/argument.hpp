@@ -35,24 +35,24 @@
 template<typename IntType>
 class ArgPlus {
 public:
-  explicit ArgPlus() : dims({}) { elems.resize(1); }
+  explicit ArgPlus() : shape({}) { elems.resize(1); }
 
-  explicit ArgPlus(std::vector<int> dims) : dims(std::move(dims)) {
-    for (const int &len: this->dims) {
+  explicit ArgPlus(std::vector<int> shape) : shape(std::move(shape)) {
+    for (const int &len: this->shape) {
       Assert(
           len > 0, "Each vector dimension must have at least one element, however %d is given", len
       );
     }
     int numEls = 1;
     for (int i = 0; i < GetVecNumDims(); i++) {
-      numEls *= this->dims[i];
+      numEls *= this->shape[i];
     }
     elems.resize(numEls);
   }
 
-  [[nodiscard]] bool IsScalar() const { return dims.size() == 0; }
+  [[nodiscard]] bool IsScalar() const { return shape.size() == 0; }
 
-  [[nodiscard]] bool IsVector() const { return dims.size() != 0; }
+  [[nodiscard]] bool IsVector() const { return shape.size() != 0; }
 
   [[nodiscard]] IntType GetValue() const {
     Assert(IsScalar(), "Cannot get a scalar value for a vector");
@@ -69,35 +69,35 @@ public:
   [[nodiscard]] IntType GetValue(const std::vector<int> &indices) const {
     Assert(IsVector(), "Cannot get a value for a scalar variable");
     Assert(
-        indices.size() == dims.size(),
+        indices.size() == shape.size(),
         "The indices (size=%lu) does not align with the dimensions (%lu)", indices.size(),
-        dims.size()
+        shape.size()
     );
     int at = 0;
     for (int i = 0; i < GetVecNumDims(); i++) {
       Assert(
-          indices[i] < dims[i], "The index (%d) is out of bound (%d) at dim %d", indices[i],
-          dims[i], i
+          indices[i] < shape[i], "The index (%d) is out of bound (%d) at dim %d", indices[i],
+          shape[i], i
       );
       Assert(indices[i] >= 0, "The index (%d) must be non-negative at dim %d", indices[i], i);
-      at = at * dims[i] + indices[i];
+      at = at * shape[i] + indices[i];
     }
     return elems[at];
   }
 
   [[nodiscard]] const std::vector<IntType> &GetEls() const { return elems; }
 
-  [[nodiscard]] std::vector<int> GetVecDims() const { return dims; }
+  [[nodiscard]] std::vector<int> GetVecShape() const { return shape; }
 
   [[nodiscard]] int GetVecDimLen(int d) const {
-    Assert(IsVector(), "Cannot get vector dimension lengths for a scalar");
+    Assert(IsVector(), "Cannot get the length of a vector dimension lengths for a scalar");
     Assert(d < GetVecNumDims(), "The dimension (%d) is out of bound (%d)", d, GetVecNumDims());
-    return dims[d];
+    return shape[d];
   }
 
   [[nodiscard]] int GetVecNumDims() const {
     Assert(IsVector(), "Cannot get number of dimensions for a scalar");
-    return static_cast<int>(dims.size());
+    return static_cast<int>(shape.size());
   }
 
   [[nodiscard]] int GetVecNumEls() const {
@@ -116,7 +116,7 @@ public:
     elems[at] = {val};
   }
 
-  std::string ToCxStr() const {
+  [[nodiscard]] std::string ToCxStr() const {
     std::ostringstream oss;
     if (IsScalar()) {
       oss << GetValue();
@@ -138,28 +138,28 @@ public:
     return oss.str();
   }
 
-  nlohmann::json ToJson() const {
+  [[nodiscard]] nlohmann::json ToJson() const {
     auto obj = nlohmann::json::object();
-    obj["dims"] = dims;
+    obj["shape"] = shape;
     obj["elems"] = elems;
     return obj;
   }
 
   static ArgPlus<IntType> FromJson(nlohmann::json obj) {
     Assert(obj.is_object(), "The argument JSON is not an object");
-    Assert(obj.contains("dims"), "The argument JSON does not contain the field 'dims'");
+    Assert(obj.contains("shape"), "The argument JSON does not contain the field 'shape'");
     Assert(obj.contains("elems"), "The argument JSON does not contain the field 'elems'");
-    Assert(obj["dims"].is_array(), "The 'dims' field is not an array");
+    Assert(obj["shape"].is_array(), "The 'shape' field is not an array");
     Assert(obj["elems"].is_array(), "The 'elems' field is not an array");
 
-    std::vector<int> dims = obj["dims"].get<std::vector<int>>();
+    std::vector<int> shape = obj["shape"].get<std::vector<int>>();
     std::vector<IntType> elems = obj["elems"].get<std::vector<IntType>>();
-    if (dims.empty()) {
+    if (shape.empty()) {
       auto arg = ArgPlus<IntType>();
       arg.SetValue(elems[0]);
       return arg;
     } else {
-      auto arg = ArgPlus<IntType>(dims);
+      auto arg = ArgPlus<IntType>(shape);
       Assert(
           static_cast<int>(elems.size()) == arg.GetVecNumEls(),
           "The number of elements (%lu) does not match the expected size (%d)", elems.size(),
@@ -173,7 +173,7 @@ public:
   }
 
 private:
-  std::vector<int> dims;
+  std::vector<int> shape;
   std::vector<IntType> elems{};
 };
 
