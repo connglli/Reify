@@ -118,6 +118,8 @@ struct FunGenOpts {
       exit(0);
     }
 
+    GlobalOptions::Get().HandleFuncArgs(args);
+
     std::string uuid;
     if (!args.count("uuid")) {
       std::cerr << "Error: The UUID identifier (UUID) is not given." << std::endl;
@@ -173,10 +175,15 @@ struct FunGenOpts {
     }
     const bool main = args["main"].as<bool>();
     const bool sexpression = args["sexpression"].as<bool>();
-    const bool javaclass = args["unstable-javaclass"].as<bool>();
-    const bool verbose = args["verbose"].as<bool>();
 
-    GlobalOptions::Get().HandleFuncArgs(args);
+    const bool javaclass = args["unstable-javaclass"].as<bool>();
+    if (javaclass && !GlobalOptions::Get().DisallowDeadCode) {
+      std::cout << "WARNING: Generating dead code is disabled as --unstable-javaclass is passed."
+                << std::endl;
+      GlobalOptions::Get().DisallowDeadCode = true;
+    }
+
+    const bool verbose = args["verbose"].as<bool>();
 
     return {
         .uuid = uuid,

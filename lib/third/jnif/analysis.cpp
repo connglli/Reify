@@ -2,6 +2,8 @@
 // Created by Luigi on 22.10.17.
 //
 
+#include <iostream>
+
 #include "jnif/jnif.hpp"
 #include "lib/dbgutils.hpp"
 #include "lib/logger.hpp"
@@ -1150,6 +1152,9 @@ namespace jnif {
   //     return os;
   // }
 
+  // Compute the correct frames for each basic block and save them in the class file.
+  // This procedure follows JVM Spec: Section 4.10.2.2. See for example Java 8:
+  // https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.10.2.2
   class ComputeFrames {
   public:
     bool isAssignable(const Type &subt, const Type &supt) {
@@ -1502,10 +1507,10 @@ namespace jnif {
       std::vector<Type> argsType;
       TypeFactory::fromMethodDesc(methodDesc, &argsType);
 
-      for (Type t: argsType) {
+      for (const Type &t: argsType) {
         initFrame.setVar(&lvindex, t, nullptr);
       }
-      Log::Get().Out() << "Frame INIT: " << initFrame.lva.size() << std::endl;
+      Log::Get().Out() << "Frame INIT: " << initFrame << std::endl;
 
       ControlFlowGraph *cfgp = new ControlFlowGraph(code->instList);
       code->cfg = cfgp;
@@ -1612,7 +1617,12 @@ namespace jnif {
             // The current from is not valid. It might be dead code
             // that we missed to analyze.
             if (!current.valid) {
-              Log::Get().Out() << "Invalid frame detected, replacing with Frame INIT." << std::endl;
+              std::cout
+                  << "WARNING: Invalid frame detected. This is perhaps due to the bytecode "
+                     "containing dead basic blocks. Replace the invalid frame with Frame INIT. "
+                     "However, this is dangerous as the Java bytecode verify does not define "
+                     "how to verify dead code. It is undefined behavior."
+                  << std::endl;
               current = initFrame;
             }
 
