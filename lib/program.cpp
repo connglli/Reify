@@ -186,7 +186,11 @@ protected:
     Panic("Cannot reach here: ArrParam variables should not be replaced");
   }
 
-  void Visit(const symir::Local &l) override {
+  void Visit(const symir::ScaLocal &l) override {
+    Panic("Cannot reach here: Local variables should not be replaced");
+  }
+
+  void Visit(const symir::VecLocal &l) override {
     Panic("Cannot reach here: Local variables should not be replaced");
   }
 

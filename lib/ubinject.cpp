@@ -310,7 +310,11 @@ void IntUBInject::Visit(const symir::VecParam &p) {
   Panic("Cannot reach here: We only inject UBs into basic blocks, not parameters");
 }
 
-void IntUBInject::Visit(const symir::Local &l) {
+void IntUBInject::Visit(const symir::ScaLocal &l) {
+  Panic("Cannot reach here: We only inject UBs into basic blocks, not locals");
+}
+
+void IntUBInject::Visit(const symir::VecLocal &l) {
   Panic("Cannot reach here: We only inject UBs into basic blocks, not locals");
 }
 

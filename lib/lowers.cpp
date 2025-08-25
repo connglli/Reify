@@ -128,7 +128,7 @@ namespace symir {
     out << " " << SymIR::GetTypeSName(p.GetType()) << ")";
   }
 
-  void SymSexpLower::Visit(const Local &l) {
+  void SymSexpLower::Visit(const ScaLocal &l) {
     indent();
     if (l.IsVolatile()) {
       out << "(" << KW_VOL << " " << KW_LOC << " " << l.GetName() << " ";
@@ -137,6 +137,24 @@ namespace symir {
     }
     l.GetCoef()->Accept(*this);
     out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
+  }
+
+  void SymSexpLower::Visit(const VecLocal &l) {
+    indent();
+    out << "(";
+    if (l.IsVolatile()) {
+      out << KW_VOL << " ";
+    }
+    out << KW_LOC << " " << l.GetName();
+    for (auto len: l.GetVecShape()) {
+      out << "[" << len << "]";
+    }
+    out << " ";
+    for (auto c: l.GetCoefs()) {
+      c->Accept(*this);
+      out << " ";
+    }
+    out << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const Block &b) {
@@ -273,7 +291,7 @@ namespace symir {
     }
   }
 
-  void SymCxLower::Visit(const Local &l) {
+  void SymCxLower::Visit(const ScaLocal &l) {
     indent();
     if (l.IsVolatile()) {
       out << "volatile" << " " << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
@@ -282,6 +300,28 @@ namespace symir {
     }
     l.GetCoef()->Accept(*this);
     out << ";" << std::endl;
+  }
+
+  void SymCxLower::Visit(const VecLocal &l) {
+    indent();
+    if (l.IsVolatile()) {
+      out << "volatile" << " ";
+    };
+    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
+    for (auto len: l.GetVecShape()) {
+      out << "[" << len << "]";
+    }
+    out << " = {";
+    const auto &cs = l.GetCoefs();
+    const auto ncs = l.GetVecNumEls();
+    for (int i = 0; i < ncs; ++i) {
+      auto c = cs[i];
+      c->Accept(*this);
+      if (i != ncs - 1) {
+        out << ", ";
+      }
+    }
+    out << "};" << std::endl;
   }
 
   void SymCxLower::Visit(const Block &b) {
@@ -519,12 +559,16 @@ namespace symir {
 
   void SymJavaBytecodeLower::Visit(const VecParam &p) {}
 
-  void SymJavaBytecodeLower::Visit(const Local &l) {
+  void SymJavaBytecodeLower::Visit(const ScaLocal &l) {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
     l.GetCoef()->Accept(*this);
     method->instList().addVar(jnif::Opcode::istore, locals[l.GetName()]);
+  }
+
+  void SymJavaBytecodeLower::Visit(const VecLocal &l) {
+    Panic("Vector local variables are not supported yet");
   }
 
   void SymJavaBytecodeLower::Visit(const Block &b) {

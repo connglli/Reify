@@ -77,12 +77,12 @@ void FunPlus::Generate(bool allowDeadCode) {
   for (int i = numParams; i < numParams + numLocals; i++) {
     if (GlobalOptions::Get().EnableVolatileVars &&
         randProba() < GlobalOptions::Get().VolatileVariableProba) {
-      builder->SymLocal(
+      builder->SymScaLocal(
           NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),
           symir::SymIR::Type::I32, /*IsVolatile=*/true
       );
     } else {
-      builder->SymLocal(
+      builder->SymScaLocal(
           NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),
           symir::SymIR::Type::I32, /*IsVolatile=*/false
       );

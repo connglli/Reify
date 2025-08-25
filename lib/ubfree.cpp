@@ -393,7 +393,7 @@ void UBSan::Visit(const symir::VecParam &p) {
   }
 }
 
-void UBSan::Visit(const symir::Local &l) {
+void UBSan::Visit(const symir::ScaLocal &l) {
   l.GetCoef()->Accept(*this);
   auto coefExpr = popExpression();
   auto varExpr = CreateScaExpr(l.GetDefinition(), 0);
@@ -402,6 +402,21 @@ void UBSan::Visit(const symir::Local &l) {
   constraints.push_back(varExpr <= GlobalOptions::Get().UpperInitBound);
   constraints.push_back(varExpr >= GlobalOptions::Get().LowerInitBound);
   constraints.push_back(varExpr == coefExpr);
+}
+
+void UBSan::Visit(const symir::VecLocal &l) {
+  int numEls = l.GetVecNumEls();
+  const auto &inits = l.GetCoefs();
+  for (int i = 0; i < numEls; i++) {
+    inits[i]->Accept(*this);
+    auto coefExpr = popExpression();
+    auto elName = GetVecElName(l.GetDefinition(), i);
+    auto elExpr = CreateVecElExpr(l.GetDefinition(), i, 0);
+    versions[elName] = 0;
+    constraints.push_back(elExpr <= GlobalOptions::Get().UpperInitBound);
+    constraints.push_back(elExpr >= GlobalOptions::Get().LowerInitBound);
+    constraints.push_back(elExpr == coefExpr);
+  }
 }
 
 void UBSan::Visit(const symir::Block &b) {

@@ -56,7 +56,8 @@ namespace symir {
   class Goto;
   class ScaParam;
   class VecParam;
-  class Local;
+  class ScaLocal;
+  class VecLocal;
   class Block;
   class Funct;
 
@@ -74,7 +75,8 @@ namespace symir {
     virtual void Visit(const Goto &g) = 0;
     virtual void Visit(const ScaParam &p) = 0;
     virtual void Visit(const VecParam &p) = 0;
-    virtual void Visit(const Local &l) = 0;
+    virtual void Visit(const ScaLocal &l) = 0;
+    virtual void Visit(const VecLocal &l) = 0;
     virtual void Visit(const Block &b) = 0;
     virtual void Visit(const Funct &f) = 0;
   };
@@ -160,7 +162,8 @@ namespace symir {
       SIR_TGT_GOTO,
       SIR_PARAM_SCA,
       SIR_PARAM_VEC,
-      SIR_LOCAL,
+      SIR_LOCAL_SCA,
+      SIR_LOCAL_VEC,
       SIR_BLOCK,
       SIR_FUNCT,
     };
@@ -269,17 +272,20 @@ namespace symir {
 
     /// Get the total number of elements in the vector if dim == -1.
     /// Otherwise, return the number of elements of a subvector at the given dim.
-    [[nodiscard]] int GetVecNumEls(int dim = -1) const {
+    [[nodiscard]] static int GetVecNumEls(const std::vector<int> &shape, int dim = -1) {
+      const int numDims = static_cast<int>(shape.size());
       Assert(
-          dim >= -1 && dim < GetVecNumDims(), "The accessing dimension (%d) is out of bound (%d)",
-          dim, GetVecNumDims()
+          dim >= -1 && dim < numDims, "The accessing dimension (%d) is out of bound (%d)", dim,
+          numDims
       );
       int num = 1;
-      for (int i = dim + 1; i < GetVecNumDims(); i++) {
-        num *= vecShape[i];
+      for (int i = dim + 1; i < numDims; i++) {
+        num *= shape[i];
       }
       return num;
     }
+
+    [[nodiscard]] int GetVecNumEls(int dim = -1) const { return GetVecNumEls(vecShape, dim); }
 
     [[nodiscard]] int GetVecNumDims() const { return static_cast<int>(vecShape.size()); }
 
@@ -857,12 +863,21 @@ namespace symir {
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
   };
 
-  /// A Local is a declaration of a local variable with an initial value within the function.
-  // TODO: Support VecLocal
+  /// A Local is a declaration of a local variable within the function.
   class Local : public Stmt, public VarDef {
   public:
-    explicit Local(std::string name, Coef *init, Type type = Type::I32) :
-        Stmt(SIR_LOCAL), VarDef(std::move(name), type), coef(std::move(init)) {
+    explicit Local(ID irId, std::string name, Type type = Type::I32) :
+        Stmt(irId), VarDef(std::move(name), type) {}
+
+    explicit Local(ID irId, std::string name, const std::vector<int> shape, Type type = Type::I32) :
+        Stmt(irId), VarDef(std::move(name), shape, type) {}
+  };
+
+  /// A ScaLocal is a declaration of a local variable with an initial value within the function.
+  class ScaLocal : public Local {
+  public:
+    explicit ScaLocal(std::string name, Coef *init, Type type = Type::I32) :
+        Local(SIR_LOCAL_SCA, std::move(name), type), coef(std::move(init)) {
       Assert(this->coef != nullptr, "The coef is given a nullptr");
       Assert(
           type == this->coef->GetType(), "The coef (%s) and the var (%s) are of different types",
@@ -880,6 +895,41 @@ namespace symir {
 
   private:
     Coef *coef;
+  };
+
+  /// A VecLocal is a declaration of a vector local variable with a list of initial values (each is
+  /// an initial value for one of its element) within the function.
+  class VecLocal : public Local {
+  public:
+    explicit VecLocal(
+        std::string name, const std::vector<int> &shape, std::vector<Coef *> inits,
+        Type type = Type::I32
+    ) : Local(SIR_LOCAL_VEC, std::move(name), shape, type), coefs(std::move(inits)) {
+      const int expectedNumEls = GetVecNumEls(this->vecShape);
+      Assert(
+          expectedNumEls == static_cast<int>(this->coefs.size()),
+          "The number of initial values (%lu) does not match the number of elements (%d) of "
+          "the vector variable %s",
+          this->coefs.size(), expectedNumEls, this->GetName().c_str()
+      );
+      for (const auto &c: this->coefs) {
+        Assert(
+            type == c->GetType(), "The coef (%s) and the var (%s) are of different types",
+            GetTypeSName(c->GetType()).c_str(), GetTypeSName(type).c_str()
+        );
+      }
+    }
+
+    [[nodiscard]] const std::vector<Coef *> &GetCoefs() const { return coefs; }
+
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return this; }
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+
+  private:
+    std::vector<Coef *> coefs;
   };
 
   /// A Block represents a basic block of a series of statements and a target
@@ -1346,7 +1396,7 @@ namespace symir {
   /// -----------------------------------------------------------
   ///   auto b = std::make_unique<FunctBuilder>("f0", SymIR::Type::I32)
   ///   auto v0 = b->SymScaParam("v0");
-  ///   auto v1 = b->SymLocal("v1");
+  ///   auto v1 = b->SymScaLocal("v1");
   ///   auto bb1 = b.SymBlock("BB1", [&](BlockBuilder *blk) {
   ///     blk->SymBranch(
   ///       "BB1", "BB2",
@@ -1478,9 +1528,15 @@ namespace symir {
         bool isVolatile = false
     );
 
-    /// Define and commit a new Local
-    const Local *SymLocal(
+    /// Define and commit a new ScaLocal
+    const ScaLocal *SymScaLocal(
         const std::string &name, Coef *coef, SymIR::Type type = SymIR::I32, bool isVolatile = false
+    );
+
+    /// Define and commit a new VecLocal
+    const VecLocal *SymVecLocal(
+        const std::string &name, const std::vector<int> &shape, const std::vector<Coef *> coefs,
+        SymIR::Type type = SymIR::I32, bool isVolatile = false
     );
 
     /// Define and commit a new basic block with defined body
@@ -1565,7 +1621,8 @@ namespace symir {
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
-    void Visit(const Local &l) override;
+    void Visit(const ScaLocal &l) override;
+    void Visit(const VecLocal &l) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
 

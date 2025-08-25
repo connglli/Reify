@@ -366,7 +366,22 @@ namespace symir {
       } else if (kind == SymSexpLexer::Token::Kind::TK_LBRACKET) {
         // Make the '[' op not closing ')'
         const auto closingOp = popOp();
-        pushOp(kind);
+        if (closingOp == SymSexpLexer::Token::Kind::TK_KW_PAR ||
+            closingOp == SymSexpLexer::Token::Kind::TK_KW_LOC) {
+          // The next token is the length of this dimension
+          const auto dimLenToken = stream();
+          Assert(
+              dimLenToken.kind == SymSexpLexer::Token::Kind::TK_IDENT,
+              "The child (%s) of a left-bracket is not an identifier, while it should be the "
+              "length of a specific dimension of the vector parameter",
+              dimLenToken.FullInfo().c_str()
+          );
+          // Make it part of the operator
+          pushOp(static_cast<SymSexpLexer::Token::Kind>(std::stoi(dimLenToken.ToStr())));
+          pushOp(kind);
+        } else {
+          pushOp(kind);
+        }
         pushOp(closingOp);
       } else if (kind == SymSexpLexer::Token::Kind::TK_RBRACKET) {
         // DROP IT
@@ -508,14 +523,13 @@ namespace symir {
         pushOp(opKind); // Push it back as this is not a bracket
         break;
       }
-      const auto *dimLenTok = popArg<SymSexpLexer::Token>();
+      const auto dimLen = static_cast<int>(popOp());
       Assert(
-          dimLenTok->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-          "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
-          "length of a specific dimension of the vector parameter",
-          dimLenTok->FullInfo().c_str()
+          dimLen > 0,
+          "The dimension length (%d) after an left-bracket operator should be a positive integer",
+          dimLen
       );
-      vecShape.insert(vecShape.begin(), std::stoi(dimLenTok->ToStr()));
+      vecShape.insert(vecShape.begin(), dimLen);
     }
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
@@ -552,6 +566,23 @@ namespace symir {
         "type of the term",
         typeToken->FullInfo().c_str()
     );
+    std::vector<int> vecShape;
+    while (true) {
+      const auto opKind = popOp();
+      if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
+        pushOp(opKind); // Push it back as this is not a bracket
+        break;
+      }
+      const auto dimLen = static_cast<int>(popOp());
+      Assert(
+          dimLen > 0,
+          "The dimension length (%d) after an left-bracket operator should be a positive integer",
+          dimLen
+      );
+      vecShape.insert(vecShape.begin(), dimLen);
+    }
+    const auto localType = SymIR::GetTypeFromSName(typeToken->ToStr());
+    std::vector<Coef *> vecInits;
     const auto *coefToken = popArg<SymSexpLexer::Token>();
     Assert(
         coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
@@ -559,6 +590,21 @@ namespace symir {
         "coefficient of the term",
         coefToken->FullInfo().c_str()
     );
+    vecInits.push_back(buildCoef(coefToken, localType));
+    if (!vecShape.empty()) {
+      // It is a vector local variable, there're more following elements
+      int numCoefs = VarDef::GetVecNumEls(vecShape);
+      for (int i = 0; i < numCoefs - 1; i++) {
+        coefToken = popArg<SymSexpLexer::Token>();
+        Assert(
+            coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+            "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
+            "coefficient of the term (one of an init of a vector element)",
+            coefToken->FullInfo().c_str()
+        );
+        vecInits.insert(vecInits.begin(), buildCoef(coefToken, localType));
+      }
+    }
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
         varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
@@ -566,14 +612,16 @@ namespace symir {
         "type of the term",
         varToken->FullInfo().c_str()
     );
-    const auto localType = SymIR::GetTypeFromSName(typeToken->ToStr());
+    bool isVolatile = false;
     if (const auto opKind = popOp(); opKind == SymSexpLexer::Token::TK_KW_VOL) {
-      funBd->SymLocal(
-          varToken->ToStr(), buildCoef(coefToken, localType), localType, /*isVolatile=*/true
-      );
+      isVolatile = true;
     } else {
       pushOp(opKind); // Push it back as this is a volatile parameter
-      funBd->SymLocal(varToken->ToStr(), buildCoef(coefToken, localType), localType);
+    }
+    if (vecShape.empty()) {
+      funBd->SymScaLocal(varToken->ToStr(), vecInits.front(), localType, isVolatile);
+    } else {
+      funBd->SymVecLocal(varToken->ToStr(), vecShape, vecInits, localType, isVolatile);
     }
     delete typeToken;
     delete coefToken;

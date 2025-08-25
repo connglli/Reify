@@ -70,7 +70,7 @@ UBFreeExec::UBFreeExec(const FunPlus &fun, const std::vector<int> &execution) {
 
     // Insert a basic block to count and check the pass counter right before the stop block
     auto passCounterBlockBd = funBd->OpenBlock(PassCounterBblLabel);
-    auto passCounter = funBd->SymLocal("passCounterLocal", funBd->SymCoef("zero", "0"));
+    auto passCounter = funBd->SymScaLocal("passCounterLocal", funBd->SymCoef("zero", "0"));
     passCounterBlockBd->SymAssign(
         passCounter, passCounterBlockBd->SymAddExpr(
                          {passCounterBlockBd->SymMulTerm(funBd->SymCoef("one1", "1"), passCounter),

@@ -248,8 +248,9 @@ namespace symir {
     return dynamic_cast<VecParam *>(v);
   }
 
-  const Local *
-  FunctBuilder::SymLocal(const std::string &name, Coef *coef, SymIR::Type type, bool isVolatile) {
+  const ScaLocal *FunctBuilder::SymScaLocal(
+      const std::string &name, Coef *coef, SymIR::Type type, bool isVolatile
+  ) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
         !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
@@ -259,13 +260,35 @@ namespace symir {
         !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
         name.c_str()
     );
-    locals.push_back(std::make_unique<Local>(name, coef, type));
+    locals.push_back(std::make_unique<ScaLocal>(name, coef, type));
     const auto v = locals.back().get();
     if (isVolatile) {
       v->SetVolatile();
     }
     localMap[name] = v;
-    return v;
+    return dynamic_cast<const ScaLocal *>(v);
+  }
+
+  const VecLocal *FunctBuilder::SymVecLocal(
+      const std::string &name, const std::vector<int> &shape, const std::vector<Coef *> coefs,
+      SymIR::Type type, bool isVolatile
+  ) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    Assert(
+        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    locals.push_back(std::make_unique<VecLocal>(name, shape, coefs, type));
+    const auto v = locals.back().get();
+    if (isVolatile) {
+      v->SetVolatile();
+    }
+    localMap[name] = v;
+    return dynamic_cast<const VecLocal *>(v);
   }
 
   const Block *
@@ -434,9 +457,18 @@ namespace symir {
     builder->SymVecParam(p.GetName(), p.GetVecShape(), p.GetType(), p.IsVolatile());
   }
 
-  void FunctCopier::Visit(const Local &l) {
+  void FunctCopier::Visit(const ScaLocal &l) {
     l.GetCoef()->Accept(*this);
-    builder->SymLocal(l.GetName(), popCoef(), l.GetType(), l.IsVolatile());
+    builder->SymScaLocal(l.GetName(), popCoef(), l.GetType(), l.IsVolatile());
+  }
+
+  void FunctCopier::Visit(const VecLocal &l) {
+    std::vector<Coef *> coefs{};
+    for (auto &c: l.GetCoefs()) {
+      c->Accept(*this);
+      coefs.push_back(popCoef());
+    }
+    builder->SymVecLocal(l.GetName(), l.GetVecShape(), coefs, l.GetType(), l.IsVolatile());
   }
 
   void FunctCopier::Visit(const Block &b) {
