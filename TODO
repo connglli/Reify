@@ -1,3 +1,10 @@
+1. check if creal and our fuzz script is good or not with array
+2. support veclocal
+1. support more conditions
+1. gvn/lvn still not working very well
+1. intrinsic idioms slp
+2. alive2/smt
+3. yingwei/csmith
 1. Add clang format to pre-commit
 2. Better optimization passes support
 3. More UBs. Create a UB manager which traces multiple UBs (specifically their constraints) along generation. For example for each statement L we generated: `ubManager.trace(L); -> `
@@ -10,3 +17,4 @@
 		}
 	}
 	```
+4. 
