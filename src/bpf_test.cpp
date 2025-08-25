@@ -41,6 +41,9 @@ struct eBPFTestOpts {
   u32 num_procs;
   u32 proc_id; // 0 for parent, 1-N for workers
   bool no_save_prog;
+  bool verify_crash;
+  string load_prog;
+  bool de_oracle;
 
   static eBPFTestOpts Parse(int argc, char **argv) {
     cxxopts::Options options("bpf_test");
@@ -50,6 +53,9 @@ struct eBPFTestOpts {
       ("max_report",  "Maximum number of reports to generate", cxxopts::value<u32>()->default_value("1024"))
       ("procs",       "Number of processes to spawn", cxxopts::value<u32>()->default_value("1"))
       ("no_save_prog",   "Do not save the generated prog before loading", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("verify_crash",  "Verify the crash discovered", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("load_prog",     "Load the prog from the file", cxxopts::value<std::string>()->default_value(""))
+      ("de_oracle",   "De-oracleize the prog before loading", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose",   "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help",      "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
@@ -94,6 +100,9 @@ struct eBPFTestOpts {
         .num_procs = num_procs,
         .proc_id = 0,
         .no_save_prog = args["no_save_prog"].as<bool>(),
+        .verify_crash = args["verify_crash"].as<bool>(),
+        .load_prog = args["load_prog"].as<std::string>(),
+        .de_oracle = args["de_oracle"].as<bool>(),
     };
   }
 };
@@ -244,7 +253,9 @@ bool gen_prog_with_timeout(
   return server.generate_program_with_timeout(opts, prog, timeout_seconds);
 }
 
-int load_prog(vector<struct bpf_insn> &prog) {
+int load_prog(
+    vector<struct bpf_insn> &prog, u32 log_level = 1, u32 prog_flags = BPF_F_TEST_REG_INVARIANTS
+) {
   const char license[] = "GPL";
   union bpf_attr attr;
 
@@ -253,9 +264,10 @@ int load_prog(vector<struct bpf_insn> &prog) {
   attr.insns = reinterpret_cast<__u64>(prog.data());
   attr.insn_cnt = prog.size();
   attr.license = reinterpret_cast<__u64>(license);
-  attr.log_level = 1;
+  attr.log_level = log_level;
   attr.log_buf = reinterpret_cast<__u64>(log_buf);
   attr.log_size = log_buf_size;
+  attr.prog_flags = prog_flags;
 
   return syscall(SYS_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
 }
@@ -350,9 +362,10 @@ void save_report_prog(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf, con
   opts.report_num++;
 }
 
+string get_gen_prog_name() { return "gen.bpf"; }
+
 void save_gen_prog(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
-  string prog_name = "gen.bpf";
-  save_prog(opts, prog_buf, prog_name);
+  save_prog(opts, prog_buf, get_gen_prog_name());
 }
 
 // Analyze the rejection reason.
@@ -416,11 +429,31 @@ bool fp_interesting(const string &reason) {
   // The error reason "sequence of 8193 jumps is too complex" indicates the prog
   // contains too many jumps, which is not interesting
   static const std::vector<std::string> filters = {
-      "The sequence of 8193 jumps is too complex", "BPF program is too large"
+      "The sequence of 8193 jumps is too complex", "BPF program is too large",
+      "old state:", /* This is actually "infinite loop detected at insn ..", but it appears early
+                     * (not just the last two entries), and the extract_vlog() does not handle it
+                     * well currently.
+                     */
   };
   return std::none_of(filters.begin(), filters.end(), [&](const std::string &f) {
     return reason.find(f) != std::string::npos;
   });
+}
+
+const u32 EXEC_MAGIC = 0xdeadbeef;
+const struct bpf_insn RETURN_MAGIC_INSN = BPF_MOV32_IMM(BPF_REG_0, EXEC_MAGIC);
+const struct bpf_insn VERIFIER_SINK_INSN = BPF_MOV32_IMM(BPF_REG_10, 0);
+
+bool replace_oracle(vector<struct bpf_insn> &prog_buf, struct bpf_insn new_insn) {
+  bool found = false;
+  for (auto &insn: prog_buf) {
+    if (memcmp(&insn, &VERIFIER_SINK_INSN, sizeof(struct bpf_insn)) == 0) {
+      insn = new_insn;
+      found = true;
+      break;
+    }
+  }
+  return found;
 }
 
 void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
@@ -451,7 +484,6 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
     return;
   }
 
-
   // if the reason is "frame pointer is read only", it's due to the oracle;
   // if the reason is "unreachable insn", it's due to the generator;
   // otherwise, it's a verifier false positive: we the prog is expected to
@@ -462,34 +494,28 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
   if (reason.find("frame pointer is read only") != string::npos) {
     cout << "[+] \tResult: Rejected due to the oracle" << endl;
   } else if (reason.find("unreachable insn") != string::npos) {
+    // unreachable blocks generated, fix the generator.
     cout << "[!] \tWARNING: " << reason << endl;
-    return; // can't fix or execute further.
-  } else if (fp_interesting(reason)) {
-    cout << "[!!] \tResult: Verifier false positive: " << reason << endl
-         << "\tSummary: " << summary << endl;
-    save_report_prog(opts, prog_buf, "fp_oracle");
+    return;
+  } else {
+    if (fp_interesting(reason)) {
+      cout << "[!!] \tResult: Verifier false positive: " << reason << endl;
+      save_report_prog(opts, prog_buf, "fp_oracle");
+    }
+    /* We cannot continue further: if we remove the oracle, then the prog
+     * would still be rejected due to the same error.
+     */
     return;
   }
 
   cout << "[*] \tSummary: " << summary << endl;
 
-  // Remove the oracle, load and run the prog
-  bool found = false;
-  struct bpf_insn guilty = BPF_MOV32_IMM(BPF_REG_10, 0);
-  for (auto &insn: prog_buf) {
-    if (memcmp(&insn, &guilty, sizeof(struct bpf_insn)) == 0) {
-      insn = BPF_MOV32_IMM(BPF_REG_0, 0);
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
+  // Replace the oracle with a return instruction, load and run the prog
+  if (!replace_oracle(prog_buf, RETURN_MAGIC_INSN)) {
     cerr << "[!] WARNING: Oracle not found" << endl;
     return;
   }
 
-  const int magic = 0xdeadbeef;
-  prog_buf[prog_buf.size() - 2] = BPF_MOV32_IMM(BPF_REG_0, magic);
   prog_fd = load_prog(prog_buf);
   if (prog_fd < 0) {
     extract_vlog(log_buf, summary, reason);
@@ -501,7 +527,7 @@ void test_one(eBPFTestOpts &opts, vector<struct bpf_insn> &prog_buf) {
   }
 
   int ret = test_run_prog(prog_fd);
-  if (ret != magic) {
+  if (ret != EXEC_MAGIC) {
     cout << "[!] \tWARNING: De-oracleized prog failed to run: " << ret << endl;
     save_report_prog(opts, prog_buf, "fp_de-oracle");
   }
@@ -602,8 +628,109 @@ void run_watcher(const eBPFTestOpts &opts) {
   cout << "[+] All workers finished." << endl;
 }
 
+void load_prog_from_file(
+    const eBPFTestOpts &opts, const string &path, vector<struct bpf_insn> &prog_buf
+) {
+  std::ifstream prog_file(path, std::ios::binary);
+  auto prog_size = std::filesystem::file_size(path); // in bytes
+  prog_buf.resize(prog_size / sizeof(struct bpf_insn));
+  prog_file.read(reinterpret_cast<char *>(prog_buf.data()), prog_size);
+  prog_file.close();
+}
+
+void do_verify(const eBPFTestOpts &opts, const string &dir) {
+  cout << "[+] Verifying " << dir << endl;
+
+  if (!std::filesystem::exists(dir)) {
+    cerr << "[-] Directory does not exist: " << dir << endl;
+    return;
+  }
+
+  // Check if the `gen.bpf` file exists
+  string gen_prog_name = dir + "/" + get_gen_prog_name();
+  if (!std::filesystem::exists(gen_prog_name)) {
+    cerr << "[-] " << gen_prog_name << " does not exist" << endl;
+    return;
+  }
+
+  // Load the prog
+  vector<struct bpf_insn> prog_buf;
+  load_prog_from_file(opts, gen_prog_name, prog_buf);
+
+  cout << "[+] Loading the prog: " << gen_prog_name << " (" << prog_buf.size() << " insns)" << endl;
+
+  int prog_fd = load_prog(prog_buf, 2);
+  string summary, reason;
+  extract_vlog(log_buf, summary, reason);
+  cout << "[+] \tSummary: " << summary << endl;
+  cout << "[+] \tReason: " << reason << endl;
+  if (prog_fd >= 0) {
+    int ret = test_run_prog(prog_fd);
+    cout << "[*] \tReturn value: " << ret << endl;
+    close(prog_fd);
+  }
+  return;
+}
+
+void verify_crash(const eBPFTestOpts &opts) {
+  // Check which generated prog caused the kernel crash
+  // If proc is one, then only checks the `output` directory
+  // Otherwise, checks the `output/proc_<id>` directory
+  if (opts.num_procs == 1) {
+    do_verify(opts, opts.output);
+  } else {
+    for (u32 i = 1; i <= opts.num_procs; ++i) {
+      do_verify(opts, opts.output + "/proc_" + std::to_string(i));
+    }
+  }
+}
+
+void load_prog_only(const eBPFTestOpts &opts) {
+  cout << "[+] Loading the prog: " << opts.load_prog << "..." << endl;
+  vector<struct bpf_insn> prog_buf;
+  load_prog_from_file(opts, opts.load_prog, prog_buf);
+
+  if (opts.de_oracle) {
+    if (!replace_oracle(prog_buf, RETURN_MAGIC_INSN)) {
+      cout << "[!] \tWARNING: Oracle not found, skipping de-oracleization" << endl;
+    } else {
+      cout << "[+] \tDe-oracleized the prog" << endl;
+    }
+  }
+
+  // Load the prog
+  int prog_fd = load_prog(prog_buf, 2, BPF_F_TEST_REG_INVARIANTS);
+  cout << "--------------------------------" << endl;
+  cout << log_buf;
+  cout << "--------------------------------" << endl;
+
+  if (prog_fd < 0)
+    return;
+
+  int ret = test_run_prog(prog_fd);
+  cout << "[*] \tProg executed, return value: 0x" << std::hex << ret << std::dec << endl;
+  if (opts.de_oracle && ret != EXEC_MAGIC) {
+    cout << "[!] \tWARNING: De-oracleized prog failed to run, expected magic: " << EXEC_MAGIC
+         << endl;
+  }
+
+  close(prog_fd);
+  return;
+}
+
 int main(int argc, char **argv) {
   auto cliOpts = eBPFTestOpts::Parse(argc, argv);
+
+  if (cliOpts.verify_crash) {
+    cout << "[+] Verifying the errors discovered..." << endl;
+    verify_crash(cliOpts);
+    return 0;
+  }
+
+  if (!cliOpts.load_prog.empty()) {
+    load_prog_only(cliOpts);
+    return 0;
+  }
 
   if (cliOpts.num_procs == 1) {
     run_worker(cliOpts);
