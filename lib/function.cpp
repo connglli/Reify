@@ -27,6 +27,7 @@
 
 #include "global.hpp"
 #include "lib/chksum.hpp"
+#include "lib/jnifutils.hpp"
 #include "lib/logger.hpp"
 #include "lib/lowers.hpp"
 #include "lib/naming.hpp"
@@ -318,6 +319,44 @@ std::string FunPlus::GenerateFunSexpCode(const UBFreeExec &exec) const {
   return oss.str();
 }
 
+// TODO: This implementation is exactly the same as SymJavaBytecodeLower::CreateArray,
+//       we should refactor it to avoid code duplication.
+void createArray(jnif::ClassFile &cls, jnif::Method &met, const ArgPlus<int> &var) {
+  Assert(var.IsVector(), "The variable for creating array is a scalar");
+  const std::function<void(int, int)> createArray = [&](const int dim, const int offset) {
+    const auto numDims = var.GetVecNumDims();
+    const auto dimLen = var.GetVecDimLen(dim);
+    const auto dimNumEls = var.GetVecNumEls(dim);
+    if (dim == numDims - 1) {
+      Assert(dimNumEls == 1, "The last dimension should have exactly one element");
+      // The very last dimension is an [I
+      jnif::PushInteger(cls, met, dimLen);
+      met.instList().addNewArray(jnif::model::NewArrayInst::NewArrayType::NEWARRAYTYPE_INT);
+      // Fill each element with its initialization value
+      for (int i = 0; i < dimLen; i++) {
+        met.instList().addZero(jnif::Opcode::dup);
+        jnif::PushInteger(cls, met, i);
+        jnif::PushInteger(cls, met, var.GetValue(offset + i));
+        met.instList().addZero(jnif::Opcode::iastore);
+      }
+      return;
+    }
+    // The other dimensions are [[...[[I.
+    jnif::PushInteger(cls, met, dimLen);
+    met.instList().addType(
+        jnif::Opcode::anewarray, cls.putClass((std::string(numDims - dim - 1, '[') + "I").c_str())
+    );
+    // Fill each element with a sub-array
+    for (int i = 0; i < dimLen; i++) {
+      met.instList().addZero(jnif::Opcode::dup);
+      jnif::PushInteger(cls, met, i);
+      createArray(dim + 1, offset + i * dimNumEls);
+      met.instList().addZero(jnif::Opcode::aastore);
+    }
+  };
+  createArray(0, 0);
+}
+
 std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
     const UBFreeExec &exec, const std::string &className, bool main, bool debug
 ) const {
@@ -362,14 +401,16 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
   for (size_t i = 0; i < initializations.size(); i++) {
     const auto &init = initializations[i];
     const auto &fina = finalizations[i];
-    // TODO: The checksum computation should be using Java as Java and C might be different
+    // Java's CRC32 is exactly the same as C/C++'s one, so we can directly
+    // compute the checksum in C/C++ and pass it to Java.
     const auto checksum = StatelessChecksum::Compute(fina);
-    mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(checksum));
+    jnif::PushInteger(*clazz, *mainMethod, checksum);
     for (const auto &a: init) {
       if (a.IsVector()) {
-        Assert(false, "Vector arguments are not yet supported in Java");
+        createArray(*clazz, *mainMethod, a);
+      } else {
+        jnif::PushInteger(*clazz, *mainMethod, a.GetValue());
       }
-      mainMethod->instList().addLdc(jnif::Opcode::ldc, clazz->addInteger(a.GetValue()));
     }
     mainMethod->instList().addInvoke(jnif::Opcode::invokestatic, methodRef);
     if (debug) {

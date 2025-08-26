@@ -100,9 +100,20 @@ public:
     return static_cast<int>(shape.size());
   }
 
-  [[nodiscard]] int GetVecNumEls() const {
+  [[nodiscard]] int GetVecNumEls(int dim = -1) const {
     Assert(IsVector(), "Cannot get number of elements for a scalar");
-    return static_cast<int>(elems.size());
+    if (dim == -1) {
+      return static_cast<int>(elems.size());
+    }
+    const int numDims = static_cast<int>(shape.size());
+    Assert(
+        dim >= 0 && dim < numDims, "The accessing dimension (%d) is out of bound (%d)", dim, numDims
+    );
+    int num = 1;
+    for (int i = dim + 1; i < numDims; i++) {
+      num *= shape[i];
+    }
+    return num;
   }
 
   void SetValue(IntType val) {

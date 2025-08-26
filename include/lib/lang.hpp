@@ -271,7 +271,13 @@ namespace symir {
     [[nodiscard]] std::vector<int> GetVecShape() const { return vecShape; }
 
     /// Get the total number of elements in the vector if dim == -1.
-    /// Otherwise, return the number of elements of a subvector at the given dim.
+    /// Otherwise, return the number of elements contained by each element (a vector) at the given
+    /// dim. Take a[3][4][5] as an example:
+    /// - GetVecNumEls(-1) = 3*4*5 = 60, is the number of elements contained by a
+    /// - GetVecNumEls(0) = 4*5 = 20, is the number of elements contained by each element a[i]
+    /// - GetVecNumEls(1) = 5, is the number of elements contained by each element a[i][j]
+    /// - GetVecNumEls(2) = 1, is the number of elements contained by each element a[i][j][k]
+    /// - GetVecNumEls(3) is invalid
     [[nodiscard]] static int GetVecNumEls(const std::vector<int> &shape, int dim = -1) {
       const int numDims = static_cast<int>(shape.size());
       Assert(

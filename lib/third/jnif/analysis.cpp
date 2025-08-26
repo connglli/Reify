@@ -1510,7 +1510,7 @@ namespace jnif {
       for (const Type &t: argsType) {
         initFrame.setVar(&lvindex, t, nullptr);
       }
-      Log::Get().Out() << "Frame INIT: " << initFrame << std::endl;
+      Log::Get().Out() << "INIT Frame: " << initFrame << std::endl;
 
       ControlFlowGraph *cfgp = new ControlFlowGraph(code->instList);
       code->cfg = cfgp;
