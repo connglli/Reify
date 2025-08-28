@@ -166,7 +166,7 @@ RY_RES_DIR=$RY_HOME/res
 #-=========================================
 
 # Exit code used by GNU timeout when a command times out
-TIMEOUT_RC=124
+TIMEOUT_RC=137
 TIMEOUT_SG=KILL
 
 # Run the fuzzing loop per process
