@@ -167,6 +167,7 @@ RY_RES_DIR=$RY_HOME/res
 
 # Exit code used by GNU timeout when a command times out
 TIMEOUT_RC=124
+TIMEOUT_SG=KILL
 
 # Run the fuzzing loop per process
 fuzz_worker() {
@@ -210,7 +211,7 @@ fuzz_worker() {
     # Generate a Java class/program
     fg_cmd=("$RY_FG" -J -m -S -A -U -v --Xenable-lvn-gvn -o "$work_dir" -s "$RANDOM" -n "$sno" "$uid")
     mylog "[$worker_id] [$sno] Run: ${fg_cmd[*]} (timeout=3s)"
-    if ! timeout 3s "${fg_cmd[@]}" >/dev/null 2>&1; then
+    if ! timeout --signal "$TIMEOUT_SG" 3s "${fg_cmd[@]}" >/dev/null 2>&1; then
       mylogw "[$worker_id] [$sno] Generation failed or timed out; skip"
       continue # Generation fails or times out, skip to next iteration
     fi
@@ -228,17 +229,17 @@ fuzz_worker() {
     int_cmd=("${JAVA}" -Xint -cp "$work_dir/javaclasses:$RY_RES_DIR" "$clazz")
 
     mylog "[$worker_id] [$sno] Run -Xmixed (default) -> $jvm_log_mix (timeout=60s)"
-    timeout 60s "${mix_cmd[@]}" >"$jvm_log_mix" 2>&1 || rc_mix=$?
+    timeout --signal "$TIMEOUT_SG" 60s "${mix_cmd[@]}" >"$jvm_log_mix" 2>&1 || rc_mix=$?
     [[ $rc_mix -eq $TIMEOUT_RC ]] && logw "[$sno] -Xmixed (default) timed out after 60s"
 
     mylog "[$worker_id] [$sno] Run -Xcomp (JIT)      -> $jvm_log_jit (timeout=60s)"
     # Run with JIT compilers enabled (force compilation where possible)
-    timeout 60s "${jit_cmd[@]}" >"$jvm_log_jit" 2>&1 || rc_jit=$?
+    timeout --signal "$TIMEOUT_SG" 60s "${jit_cmd[@]}" >"$jvm_log_jit" 2>&1 || rc_jit=$?
     [[ $rc_jit -eq $TIMEOUT_RC ]] && logw "[$sno] -Xcomp (JIT) timed out after 60s"
 
     mylog "[$worker_id] [$sno] Run -Xint (interp)    -> $jvm_log_int (timeout=60s)"
     # Run with JIT compilers disabled (interpreter only)
-    timeout 60s "${int_cmd[@]}" >"$jvm_log_int" 2>&1 || rc_int=$?
+    timeout --signal "$TIMEOUT_SG" 60s "${int_cmd[@]}" >"$jvm_log_int" 2>&1 || rc_int=$?
     [[ $rc_int -eq $TIMEOUT_RC ]] && logw "[$sno] -Xint (interp) timed out after 60s"
 
     mylog "[$worker_id] [$sno] Exit codes: mix=$rc_mix, jit=$rc_jit, int=$rc_int"
