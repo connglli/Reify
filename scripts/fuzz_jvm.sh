@@ -27,217 +27,322 @@
 # SOFTWARE.
 #
 
-RY_HOME=$(dirname "$0")/..
+RY_HOME=$(cd "$(dirname "$0")"/.. && pwd || exit)
 
-FUZZ_PROC=$1 # Number of parallel fuzzing processes
-FUZZ_ITER=$2 # Number of fuzzing iterations
-FUZZ_DIR=$3  # Output directory for fuzzing results
-JAVA_HOME=$4 # Path to the JDK installation directory
+#-=========================================
+# Logging functions
+#-=========================================
 
-# Simple logging helpers
 _ts() { date '+%Y-%m-%d::%H:%M:%S'; }
-log() { printf '[%s][INFO] %s\n' "$(_ts)" "$*"; }
-logw() { printf '\033[93m[%s][WARN] %s\033[0m\n' "$(_ts)" "$*"; }
-loge() { printf '\033[91m[%s][ERRO] %s\033[0m\n' "$(_ts)" "$*"; }
 
-# Validate inputs early
-if [[ -z "$FUZZ_PROC" || -z "$FUZZ_ITER" || -z "$FUZZ_DIR" || -z "$JAVA_HOME" ]]; then
-  loge "Usage: $0 <num_proc> <fuzz_iter> <fuzz_dir> <JAVA_HOME>"
+mylog() {
+  local color=""
+  case $1 in
+  green) color="32"; shift ;;
+  red) color="31"; shift ;;
+  yellow) color="33"; shift ;;
+  *) color="" ;;
+  esac
+  if [[ -n "$color" ]]; then
+    printf '\033[%sm[%s][INFO] %s\033[0m\n' "$color" "$(_ts)" "$*"
+  else
+    printf '[%s][INFO] %s\n' "$(_ts)" "$*"
+  fi
+}
+
+mylogw() { mylog "yellow" "$*"; }
+
+myloge() { mylog "red" "$*"; }
+
+#-=========================================
+# Logging functions
+#-=========================================
+
+OPT_FUZZ_PROC=$(nproc)   # Number of parallel fuzzing processes
+OPT_FUZZ_ITER="inf"      # Number of fuzzing iterations
+OPT_FUZZ_DIR="fuzzout"   # Output directory for fuzzing results
+JAVA_HOME=""             # Path to the JDK installation directory
+
+#-=========================================
+# Options parsing
+#-=========================================
+
+check_deps() {
+  if ! command -v uuidgen >/dev/null 2>&1; then
+    myloge "Error: uuidgen not found on PATH; please install uuid-runtime"
+    exit 1
+  fi
+}
+
+show_usage() {
+  echo "Usage: $0 --nproc <num_proc> --niter <fuzz_iter> --output <work_dir> --java-home <JAVA_HOME>"
+  echo ""
+  echo "Options:"
+  echo "  --nproc       Number of parallel fuzzing processes (default: ${OPT_FUZZ_PROC})"
+  echo "  --niter       Number of fuzzing iterations per process (default: ${OPT_FUZZ_ITER})"
+  echo "  --output      Output directory for fuzzing results (default: ${OPT_FUZZ_DIR})"
+  echo "  --java-home   Path to the JDK installation directory (required)"
+  echo "  --help        Show this help message"
+}
+
+check_deps
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  --help)
+    show_usage
+    exit 0
+    ;;
+  --nproc)
+    OPT_FUZZ_PROC=$2
+    shift 2
+    ;;
+  --niter)
+    OPT_FUZZ_ITER=$2
+    shift 2
+    ;;
+  --output)
+    OPT_FUZZ_DIR=$2
+    shift 2
+    ;;
+  --java-home)
+    JAVA_HOME=$2
+    shift 2
+    ;;
+  *)
+    myloge "Unknown argument: $1"
+    exit 1
+    ;;
+  esac
+done
+
+if [[ -z "$OPT_FUZZ_PROC" ]]; then
+  myloge "Error: Number of parallel fuzzing processes (--nproc) is not specified."
   exit 1
 fi
-if ! command -v uuidgen >/dev/null 2>&1; then
-  loge "uuidgen not found on PATH; please install uuid-runtime"
+
+if [[ -z "$OPT_FUZZ_ITER" ]]; then
+  myloge "Error: Number of fuzzing iterations (--niter) is not specified."
   exit 1
 fi
 
-# Check if FUZZ_DIR exists. If it exists, ask the user to confirm overwriting.
-if [[ -d "$FUZZ_DIR" ]]; then
-  logw "Output directory $FUZZ_DIR already exists. Overwrite? (Y/n): "
+if [[ -z "$OPT_FUZZ_DIR" ]]; then
+  myloge "Error: Output directory for fuzzing results (--output) is not specified."
+  exit 1
+fi
+
+if [[ -z "$JAVA_HOME" ]]; then
+  myloge "Error: Path to the JVM installation directory (--java-home) is not specified."
+  exit 1
+fi
+
+# Check if OPT_FUZZ_DIR exists. If it exists, ask the user to confirm overwriting.
+if [[ -d "$OPT_FUZZ_DIR" ]]; then
+  mylogw "Output directory $OPT_FUZZ_DIR already exists. Overwrite? (Y/n): "
   read -rp "" ans
   if [[ "$ans" != "Y" ]]; then
-    log "Aborting. Please specify a different output directory."
+    mylog "Aborting. Please specify a different output directory."
     exit 0
   fi
-  logw "Overwriting existing directory $FUZZ_DIR"
-  rm -rf "$FUZZ_DIR"
+  mylogw "Overwriting existing directory $OPT_FUZZ_DIR"
+  rm -rf "$OPT_FUZZ_DIR"
 fi
 
 JAVA=${JAVA_HOME}/bin/java
 if [[ -z "$JAVA" || ! -x "$JAVA" ]]; then
-  loge "Java binary not found or not executable! Ensure a valid JAVA_HOME."
+  myloge "Error: The 'java' binary not found or not executable! Ensure a valid JAVA_HOME (--java-home)."
   exit 1
 fi
 
 RY_FG=$RY_HOME/build/bin/fgen
-if [[ ! -f "$RY_FG" ]]; then
-  loge "fgen binary not found! Please build the project first."
+if [[ ! -f "$RY_FG" || ! -x "$RY_FG" ]]; then
+  myloge "Error: The 'fgen' binary not found! Please build the project first."
   exit 1
 fi
 RY_RES_DIR=$RY_HOME/res
+
+#-=========================================
+# Fuzz workers
+#-=========================================
 
 # Exit code used by GNU timeout when a command times out
 TIMEOUT_RC=124
 
 # Run the fuzzing loop per process
 fuzz_worker() {
-  worker_id=$1
-  fuzz_dir=$2
+  local worker_id=$1
+  local work_dir=$2
 
-  stop_evt=0
+  local stop_evt=0
+  # shellcheck disable=SC2317
   on_signal() {
     local sig="$1"
-    logw "[@$worker_id] Received SIGNAL $sig; stopping fuzzing after current step."
+    mylogw "[$worker_id] Received SIGNAL $sig; stopping fuzzing after current step."
     stop_evt=1
   }
   trap 'on_signal SIGINT' INT
   trap 'on_signal SIGTERM' TERM
 
-  log "[@$worker_id] Fuzzing options: maxiter=$FUZZ_ITER, outdir=$fuzz_dir, java=$JAVA, fgen=$RY_FG"
+  mylog "[$worker_id] Fuzzing options: maxiter=$OPT_FUZZ_ITER, outdir=$work_dir, java=$JAVA, fgen=$RY_FG"
 
-  mkdir -p "$fuzz_dir"/sexpressions \
-    "$fuzz_dir"/functions \
-    "$fuzz_dir"/mappings \
-    "$fuzz_dir"/programs \
-    "$fuzz_dir"/loggings \
-    "$fuzz_dir"/javaclasses
+  mkdir -p "$work_dir"/sexpressions \
+    "$work_dir"/functions \
+    "$work_dir"/mappings \
+    "$work_dir"/programs \
+    "$work_dir"/loggings \
+    "$work_dir"/javaclasses
   # Bug classification buckets
-  mkdir -p "$fuzz_dir"/reify_bugs "$fuzz_dir"/wrong_codes "$fuzz_dir"/intern_errors "$fuzz_dir"/prog_hangs
-  log "[@$worker_id] Prepared output directories under $fuzz_dir"
+  mkdir -p "$work_dir"/reify_bugs "$work_dir"/wrong_codes "$work_dir"/intern_errors "$work_dir"/prog_hangs
+  mylog "[$worker_id] Prepared output directories under $work_dir"
 
-  sno=0
-  while [[ "$sno" -lt "$FUZZ_ITER" && $stop_evt -eq 0 ]]; do
+  local sno=0
+  while [[ ("$OPT_FUZZ_ITER" = "inf" || "$sno" -lt "$OPT_FUZZ_ITER") && $stop_evt -eq 0 ]]; do
     # Allow early exit if stop was requested before iteration starts
     [[ $stop_evt -ne 0 ]] && break
 
     uuid=$(uuidgen)
     uid=${uuid//-/_}
-    base_id="${uid}_${sno}"
-    clazz="Class_${base_id}"
+    fid="${uid}_${sno}"
+    clazz="Class_${fid}"
 
-    log "[@$worker_id] [$sno] Generating Java program: base_id=$base_id"
+    mylog "[$worker_id] [$sno] Generating Java program with fid $fid ..."
 
     # Generate a Java class/program
-    fg_cmd=("$RY_FG" -J -m -S -A -U -v --Xenable-lvn-gvn -o "$fuzz_dir" -s "$RANDOM" -n "$sno" "$uid")
-    log "[@$worker_id] [$sno] Run: ${fg_cmd[*]} (timeout=3s)"
+    fg_cmd=("$RY_FG" -J -m -S -A -U -v --Xenable-lvn-gvn -o "$work_dir" -s "$RANDOM" -n "$sno" "$uid")
+    mylog "[$worker_id] [$sno] Run: ${fg_cmd[*]} (timeout=3s)"
     if ! timeout 3s "${fg_cmd[@]}" >/dev/null 2>&1; then
-      logw "[@$worker_id] [$sno] Generation failed or timed out; skip"
+      mylogw "[$worker_id] [$sno] Generation failed or timed out; skip"
       continue # Generation fails or times out, skip to next iteration
     fi
 
-    jvm_log_def="$fuzz_dir/loggings/function_${base_id}.def.log"
-    jvm_log_jit="$fuzz_dir/loggings/function_${base_id}.jit.log"
-    jvm_log_int="$fuzz_dir/loggings/function_${base_id}.int.log"
+    jvm_log_mix="$work_dir/loggings/function_${fid}.mix.log"
+    jvm_log_jit="$work_dir/loggings/function_${fid}.jit.log"
+    jvm_log_int="$work_dir/loggings/function_${fid}.int.log"
 
-    rc_def=0
+    rc_mix=0
     rc_jit=0
     rc_int=0
 
-    def_cmd=("${JAVA}" -cp "$fuzz_dir/javaclasses:$RY_RES_DIR" "$clazz")
-    jit_cmd=("${JAVA}" -Xcomp -cp "$fuzz_dir/javaclasses:$RY_RES_DIR" "$clazz")
-    int_cmd=("${JAVA}" -Xint -cp "$fuzz_dir/javaclasses:$RY_RES_DIR" "$clazz")
+    mix_cmd=("${JAVA}" -cp "$work_dir/javaclasses:$RY_RES_DIR" "$clazz")
+    jit_cmd=("${JAVA}" -Xcomp -cp "$work_dir/javaclasses:$RY_RES_DIR" "$clazz")
+    int_cmd=("${JAVA}" -Xint -cp "$work_dir/javaclasses:$RY_RES_DIR" "$clazz")
 
-    log "[@$worker_id] [$sno] Run default VM     -> $jvm_log_def (timeout=60s)"
-    timeout 60s "${def_cmd[@]}" >"$jvm_log_def" 2>&1 || rc_def=$?
-    [[ $rc_def -eq $TIMEOUT_RC ]] && logw "[$sno] Default VM timed out after 60s"
+    mylog "[$worker_id] [$sno] Run -Xmixed (default) -> $jvm_log_mix (timeout=60s)"
+    timeout 60s "${mix_cmd[@]}" >"$jvm_log_mix" 2>&1 || rc_mix=$?
+    [[ $rc_mix -eq $TIMEOUT_RC ]] && logw "[$sno] -Xmixed (default) timed out after 60s"
 
-    log "[@$worker_id] [$sno] Run -Xcomp (JIT)   -> $jvm_log_jit (timeout=60s)"
+    mylog "[$worker_id] [$sno] Run -Xcomp (JIT)      -> $jvm_log_jit (timeout=60s)"
     # Run with JIT compilers enabled (force compilation where possible)
     timeout 60s "${jit_cmd[@]}" >"$jvm_log_jit" 2>&1 || rc_jit=$?
     [[ $rc_jit -eq $TIMEOUT_RC ]] && logw "[$sno] -Xcomp (JIT) timed out after 60s"
 
-    log "[@$worker_id] [$sno] Run -Xint (interp) -> $jvm_log_int (timeout=60s)"
+    mylog "[$worker_id] [$sno] Run -Xint (interp)    -> $jvm_log_int (timeout=60s)"
     # Run with JIT compilers disabled (interpreter only)
     timeout 60s "${int_cmd[@]}" >"$jvm_log_int" 2>&1 || rc_int=$?
     [[ $rc_int -eq $TIMEOUT_RC ]] && logw "[$sno] -Xint (interp) timed out after 60s"
 
-    log "[@$worker_id] [$sno] Exit codes: def=$rc_def, jit=$rc_jit, int=$rc_int"
+    mylog "[$worker_id] [$sno] Exit codes: mix=$rc_mix, jit=$rc_jit, int=$rc_int"
 
     # Success: all modes executed without timeout or error
-    if [[ ${rc_def} -eq 0 && $rc_jit -eq 0 && $rc_int -eq 0 ]]; then
-      log "[@$worker_id] [$sno] All VM modes succeeded; cleaning generated artifacts"
+    if [[ ${rc_mix} -eq 0 && $rc_jit -eq 0 && $rc_int -eq 0 ]]; then
+      mylog "[$worker_id] [$sno] All VM modes succeeded; cleaning generated artifacts"
       # Both modes succeeded: clean up all generated artifacts for this seed
-      rm -f "$fuzz_dir"/sexpressions/function_${base_id}.sexp 2>/dev/null
-      rm -f "$fuzz_dir"/functions/function_${base_id}.c 2>/dev/null
-      rm -f "$fuzz_dir"/mappings/function_${base_id}.jsonl 2>/dev/null
-      rm -f "$fuzz_dir"/programs/${base_id}.c 2>/dev/null
-      rm -f "$fuzz_dir"/loggings/function_${base_id}.log 2>/dev/null
-      rm -f "$fuzz_dir"/loggings/function_${base_id}.*.log 2>/dev/null
-      rm -f "$fuzz_dir"/javaclasses/"${clazz}".class 2>/dev/null
+      rm -f "$work_dir"/sexpressions/function_"${fid}".sexp 2>/dev/null
+      rm -f "$work_dir"/functions/function_"${fid}".c 2>/dev/null
+      rm -f "$work_dir"/mappings/function_"${fid}".jsonl 2>/dev/null
+      rm -f "$work_dir"/programs/"${fid}".c 2>/dev/null
+      rm -f "$work_dir"/loggings/function_"${fid}".log 2>/dev/null
+      rm -f "$work_dir"/loggings/function_"${fid}".*.log 2>/dev/null
+      rm -f "$work_dir"/javaclasses/"${clazz}".class 2>/dev/null
     else
       # At least one mode failed: classify and archive artifacts
-      fail_log="$jvm_log_def"
-      [[ $rc_int -ne 0 ]] && fail_log="$jvm_log_int"
-      [[ $rc_jit -ne 0 ]] && fail_log="$jvm_log_jit"
+      mylog "[$worker_id] [$sno] Detected VM failure; classifying ..."
+      err_log="$jvm_log_mix"
+      [[ $rc_int -ne 0 ]] && err_log="$jvm_log_int"
+      [[ $rc_jit -ne 0 ]] && err_log="$jvm_log_jit"
 
-      dest_bucket=""
-      if [[ $rc_def -eq $TIMEOUT_RC || $rc_jit -eq $TIMEOUT_RC || $rc_int -eq $TIMEOUT_RC ]]; then
-        dest_bucket="prog_hangs"
-      elif grep -qiE 'VerifyError|verification error' "$fail_log"; then
-        dest_bucket="reify_bugs"
-      elif grep -q 'ChecksumNotEqualsException' "$fail_log"; then
-        dest_bucket="wrong_codes"
+      err_type=""
+      if [[ $rc_mix -eq $TIMEOUT_RC || $rc_jit -eq $TIMEOUT_RC || $rc_int -eq $TIMEOUT_RC ]]; then
+        err_type="prog_hangs" # The JVM fails to terminate within the timeout
+      elif grep -qiE 'VerifyError|verification error' "$err_log"; then
+        err_type="reify_bugs" # It should be a bug of our tool
+      elif grep -q 'ChecksumNotEqualsException' "$err_log"; then
+        err_type="wrong_codes" # The JVM computes a wrong checksum value
       else
-        dest_bucket="intern_errors"
+        err_type="intern_errors" # Other exceptions or JVM crashes
       fi
 
-      dest_root="$fuzz_dir/$dest_bucket/${base_id}"
-      logw "[@$worker_id] [$sno] FAILURE detected; bucket=$dest_bucket -> $dest_root (see $fail_log)"
-      mkdir -p "$dest_root"/sexpressions \
-        "$dest_root"/functions \
-        "$dest_root"/mappings \
-        "$dest_root"/programs \
-        "$dest_root"/loggings \
-        "$dest_root"/javaclasses
+      err_dir="$work_dir/$err_type/${fid}"
+      mylog "green" "[$worker_id] [$sno] FAILURE detected: type=$err_type -> $err_dir (see $err_log)"
+      mkdir -p "$err_dir"/sexpressions \
+        "$err_dir"/functions \
+        "$err_dir"/mappings \
+        "$err_dir"/programs \
+        "$err_dir"/loggings \
+        "$err_dir"/javaclasses
 
       # Move or copy all related artifacts
-      mv -f "$fuzz_dir"/sexpressions/function_${base_id}.sexp "$dest_root"/sexpressions/ 2>/dev/null
-      mv -f "$fuzz_dir"/functions/function_${base_id}.c "$dest_root"/functions/ 2>/dev/null
-      mv -f "$fuzz_dir"/mappings/function_${base_id}.jsonl "$dest_root"/mappings/ 2>/dev/null
-      mv -f "$fuzz_dir"/programs/${base_id}.c "$dest_root"/programs/ 2>/dev/null
-      mv -f "$fuzz_dir"/loggings/function_${base_id}.log "$dest_root"/loggings/ 2>/dev/null
-      mv -f "$fuzz_dir"/loggings/function_${base_id}.*.log "$dest_root"/loggings/ 2>/dev/null
-      mv -f "$fuzz_dir"/javaclasses/"${clazz}".class "$dest_root"/javaclasses/ 2>/dev/null
+      mv -f "$work_dir"/sexpressions/function_"${fid}".sexp "$err_dir"/sexpressions/ 2>/dev/null
+      mv -f "$work_dir"/functions/function_"${fid}".c "$err_dir"/functions/ 2>/dev/null
+      mv -f "$work_dir"/mappings/function_"${fid}".jsonl "$err_dir"/mappings/ 2>/dev/null
+      mv -f "$work_dir"/programs/"${fid}".c "$err_dir"/programs/ 2>/dev/null
+      mv -f "$work_dir"/loggings/function_"${fid}".log "$err_dir"/loggings/ 2>/dev/null
+      mv -f "$work_dir"/loggings/function_"${fid}".*.log "$err_dir"/loggings/ 2>/dev/null
+      mv -f "$work_dir"/javaclasses/"${clazz}".class "$err_dir"/javaclasses/ 2>/dev/null
 
       # Save reproduction info
       {
         echo "${fg_cmd[@]}"
-        echo "${def_cmd[@]}"
+        echo "${mix_cmd[@]}"
         echo "${int_cmd[@]}"
         echo "${jit_cmd[@]}"
-      } >"$dest_root/command.txt"
-      log "[@$worker_id] [$sno] Reproducer saved to $dest_root/command.txt"
+      } >"$err_dir/commands.txt"
+      mylog "[$worker_id] [$sno] Reproducer saved to $err_dir/commands.txt"
     fi
 
-    # After finishing this iteration, check for stop request before next
     sno=$((sno + 1))
   done
 
   if [[ $stop_evt -ne 0 ]]; then
-    logw "[@$worker_id] Fuzzing stopped by signal at iteration $sno"
+    mylogw "[$worker_id] Fuzzing stopped by signal at iteration $sno"
   else
-    log "[@$worker_id] Finished JVM fuzzing: iter=$sno/$FUZZ_ITER, outdir=$fuzz_dir"
+    mylog "green" "[$worker_id] Finished JVM fuzzing: iter=$sno/$OPT_FUZZ_ITER, outdir=$work_dir"
   fi
 }
 
+#-=========================================
+# Worker management
+#-=========================================
+
+worker_pids=() # Array to store worker PIDs
+
 on_signal() {
   local sig="$1"
-  logw "Received SIGNAL $sig; stopping fuzzing"
+  mylogw "[@MAIN] Received SIGNAL $sig; stopping fuzzing"
+  for pid in "${worker_pids[@]}"; do
+    mylogw "[@MAIN] Sending $sig to worker with PID $pid"
+    kill -"$sig" "$pid" 2>/dev/null
+  done
+  mylog "[@MAIN] Waiting for all workers to terminate..."
+  wait
 }
+
 trap 'on_signal SIGINT' INT
 trap 'on_signal SIGTERM' TERM
 
-source "$RY_HOME/scripts/job_pool.sh"
-
-job_pool_init "$FUZZ_PROC" 0
-
-for ((i = 0; i < FUZZ_PROC; i++)); do
-  log "Starting fuzzing worker $i ..."
-  worker_id="Worker$i"
-  fuzz_dir="$FUZZ_DIR/fuzz_proc_$(printf '%05d' "$i")"
-  mkdir -p "$fuzz_dir"
-  job_pool_run fuzz_worker "$worker_id" "$fuzz_dir"
+for ((i = 0; i < OPT_FUZZ_PROC; i++)); do
+  mylog "[@MAIN] Starting fuzzing worker with ID $i ..."
+  worker_id="@WORKER$i"
+  work_dir="$OPT_FUZZ_DIR/fuzz_proc_$(printf '%05d' "$i")"
+  mkdir -p "$work_dir"
+  fuzz_worker "$worker_id" "$work_dir" &
+  worker_pid="$!"
+  mylog "green" "[@MAIN] Worker with ID $i started: PID is $worker_pid"
+  worker_pids+=("$worker_pid") # Save the PID of the background process
 done
 
-job_pool_shutdown
+# Wait for all workers to finish
+mylog "[@MAIN] All workers started. Waiting for them to finish ..."
+wait
 
-log "All fuzzing processes completed. Results are in $FUZZ_DIR"
+mylog "[@MAIN] All fuzzing processes completed. Results are in $OPT_FUZZ_DIR."
