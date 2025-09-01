@@ -129,13 +129,13 @@ bug_type="unknown"
 # Format the Java command with the given optimization index and verbosity option
 # Arguments: optimization_index, [verbose_flag]
 # Echos: formatted command string
-fmt_cmd() {
+fmt_bisect_cmd() {
   local opt_ind=$1
   local ver_opts=""
   if [ -n "$2" ]; then
     ver_opts=",verbose,log=class.log"
   fi
-  printf "%s -Xjit:count=0,optLevel=%s,lastOptIndex=%s,traceLastOpt,limit={%s.*}%s -cp %s %s" \
+  printf "%s -Xjit:count=0,dontInline={*},optLevel=%s,lastOptIndex=%s,traceLastOpt,limit={%s.*}%s -cp %s %s" \
     "$JAVA" \
     "$OPT_LEVEL" \
     "$opt_ind" \
@@ -150,7 +150,7 @@ fmt_cmd() {
 # Returns: exit code of the Java program
 run_j9() {
   local j9_cmd
-  j9_cmd=$(fmt_cmd "$1")
+  j9_cmd=$(fmt_bisect_cmd "$1")
   echo "> running ($tmo_sec): $j9_cmd"
   timeout --signal KILL "$tmo_sec" bash -c "$j9_cmd"
   return $?
@@ -162,14 +162,13 @@ run_j9() {
 report_bug() {
   echo "------------------------------------------------------------"
   bugg_ind="$1"
-  verbose_command="$(fmt_cmd "$bugg_ind" 1)"
+  verbose_command="$(fmt_bisect_cmd "$bugg_ind" 1)"
   timeout --signal KILL "$tmo_sec" bash -c "$verbose_command" >/dev/null 2>&1
   echo "Exit code: $?"
   echo "Bug type: $bug_type"
   echo "Buggy index: $bugg_ind"
-  buggy_line=$(grep "Ending " class.log.* | tail -n 1)
-  buggy_pass=${buggy_line:7}
-  echo "Buggy pass: ${buggy_pass:-Unknown}"
+  buggy_lines=$(grep "Ending " class.log.*)
+  echo "Buggy pass(es): ${buggy_lines:-Unknown}"
   echo "Command: $verbose_command"
   echo "------------------------------------------------------------"
   rm -rf class.log.*
