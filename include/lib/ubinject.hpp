@@ -57,10 +57,10 @@ public:
   virtual void Reset() {
     solver = nullptr;      // Delete the old solver
     constraints = nullptr; // Delete the old constraints
+    ubConstraints.clear();
     ctx = std::make_unique<z3::context>();
     solver = std::make_unique<z3::solver>(*ctx);
     constraints = std::make_unique<z3::expr_vector>(*ctx);
-    ubConstraints.clear();
     Assert(
         exprStack.empty(),
         "The expression stack is not empty when resetting the UB injector: %zu elements left",
