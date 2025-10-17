@@ -52,11 +52,11 @@ struct GlobalOptions {
   int UpperInitBound = INT_MAX;
 
   // The number of assignment statements in a basic block
-  int NumAssignsPerBBL = 1;
+  int NumAssignsPerBBL = 2;
   // The number of variables in each assignment statement
   int NumVarsPerAssign = 2;
   // The number of variables in each conditional statement
-  int NumVarsInCond = 4;
+  int NumVarsInCond = 3;
   // When enabled, some variables can be arrays
   bool EnableArrayVars = true;
   // The probability of generating an array variable
@@ -141,7 +141,7 @@ struct GlobalOptions {
   // Probability of replacing a coefficient with a call to another function
   double ReplaceProba = 0.5;
   // Number of functions we want to knit together
-  int FunctionDepth = 3;
+  int FunctionDepth = 10;
 
   ////////////////////////////////////////////////////////////
   ////// Helper Functions
