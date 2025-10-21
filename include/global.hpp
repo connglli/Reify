@@ -84,7 +84,7 @@ struct GlobalOptions {
   ////////////////////////////////////////////////////////////
 
   // The number of basic blocks for each control flow graph
-  int NumBblsPerFun = 10;
+  int NumBblsPerFun = 15;
   // Probability of sampling a base graph from an existing control-flow graph
   // database (if available) during control-flow graph generation
   double SampleBaseGraphProba = 0.5;
