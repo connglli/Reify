@@ -1,18 +1,9 @@
-1. support more conditions
-1. gvn/lvn still not working very well
-1. intrinsic idioms slp
-2. alive2/smt
-3. yingwei/csmith
-1. Add clang format to pre-commit
-2. Better optimization passes support
-3. More UBs. Create a UB manager which traces multiple UBs (specifically their constraints) along generation. For example for each statement L we generated: `ubManager.trace(L); -> `
-	```
-	void UBManager::TraceAndGenerateUBConstraints(IR l) {
-		for (UBConstraintGen g : this->generators) {
-			// One of g may be our IntegerUBConstraintGen which collects under-/over-flow constrates for integers.
-			// The other one may be ArrayUBConstraintGen which collects UB constraints for arrays for example out-of-bounds access.
-			g.GenerateConstraint(L);
-		}
-	}
-	```
-4. type system
+1. use alive2/smt
+2. support more conditions and bitwise ops
+3. fuzzing with diverse configs
+4. use yingwei/ubi and yingwei/csmith
+5. structs and points and memory
+6. add clang format to pre-commit
+7. better optimization passes support, gvn/lvn still not working very well, consider intrinsics, idioms, and more slp patterns
+8. better type system
+9. sample multiple exec per function
