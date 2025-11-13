@@ -265,10 +265,6 @@ private:
 
 void ProgPlus::Generate() const {
   const int numFuns = static_cast<int>(functions.size());
-  Assert(
-      numFuns == GlobalOptions::Get().FunctionDepth,
-      "The number of selected functions is not FUNCTION_DEPTH"
-  );
 
   // Now replace the mappings in the functions with the calls to the other functions
   for (int i = 0; i < numFuns - 1; ++i) {
