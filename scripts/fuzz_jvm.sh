@@ -236,7 +236,7 @@ fuzz_worker() {
       --Xnum-vars-in-cond "$conf_terc"
     )
     fg_cmd=(
-      "$RY_FG" -J -m -S -A -U -v
+      "$RY_FG" -J -m -S -A -U
       --Xenable-lvn-gvn
       "${config_opts[@]}"
       -o "$work_dir"
