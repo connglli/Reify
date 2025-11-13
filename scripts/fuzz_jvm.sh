@@ -162,6 +162,23 @@ fi
 RY_RES_DIR=$RY_HOME/res
 
 #-=========================================
+# Suggested Configurations
+#-=========================================
+
+SUGGESTED_CONFIGS=(
+  "15 8 2 2 3"
+  "15 8 2 2 4"
+  "15 8 3 2 4"
+  "10 8 2 2 4"
+  "8 10 2 2 3"
+  "11 8 2 2 4"
+  "10 12 2 2 4"
+  "15 10 2 2 2"
+  "10 8 3 2 4"
+  "15 8 4 2 3"
+)
+
+#-=========================================
 # Fuzz workers
 #-=========================================
 
@@ -209,7 +226,24 @@ fuzz_worker() {
     mylog "[$worker_id] [$sno] Generating Java program with fid $fid ..."
 
     # Generate a Java class/program
-    fg_cmd=("$RY_FG" -J -m -S -A -U -v --Xenable-lvn-gvn -o "$work_dir" -s "$RANDOM" -n "$sno" "$uid")
+    config_idx=$((RANDOM % ${#SUGGESTED_CONFIGS[@]}))
+    read -r conf_bbls conf_vars conf_assn conf_tera conf_terc <<<"${SUGGESTED_CONFIGS[$config_idx]}"
+    config_opts=(
+      --Xnum-bbls-per-fun "$conf_bbls"
+      --Xnum-vars-per-fun "$conf_vars"
+      --Xnum-assigns-per-bbl "$conf_assn"
+      --Xnum-vars-per-assign "$conf_tera"
+      --Xnum-vars-in-cond "$conf_terc"
+    )
+    fg_cmd=(
+      "$RY_FG" -J -m -S -A -U -v
+      --Xenable-lvn-gvn
+      "${config_opts[@]}"
+      -o "$work_dir"
+      -s "$RANDOM"
+      -n "$sno"
+      "$uid"
+    )
     mylog "[$worker_id] [$sno] Run: ${fg_cmd[*]} (timeout=3s)"
     if ! timeout --signal "$TIMEOUT_SG" 3s "${fg_cmd[@]}" >/dev/null 2>&1; then
       mylogw "[$worker_id] [$sno] Generation failed or timed out; skip"
