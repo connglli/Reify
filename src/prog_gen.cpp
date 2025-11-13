@@ -149,11 +149,13 @@ int main(int argc, char *argv[]) {
     std::set<int> selFunInds;
     std::vector<std::string> selFunPaths;
 
-    int numAll = static_cast<int>(allFunPaths.size()), numSel = GlobalOptions::Get().FunctionDepth;
+    int numAll = static_cast<int>(allFunPaths.size());
+    int numSel = std::min(GlobalOptions::Get().FunctionDepth, numAll);
     auto rand = Random::Get().Uniform(0, static_cast<int>(numAll - 1));
 
     while (selFunInds.size() < static_cast<size_t>(numSel)) {
       int index = rand();
+      // TODO: Perhaps allow using functions more than once
       if (selFunInds.contains(index)) {
         continue;
       }
