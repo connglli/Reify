@@ -33,6 +33,7 @@ import signal
 import sys
 import time
 from argparse import ArgumentParser
+from collections import namedtuple
 from dataclasses import dataclass
 from multiprocessing import Manager, Pool, Queue
 from multiprocessing.synchronize import Event
@@ -46,10 +47,35 @@ from uuid import uuid4 as uuidgen
 import cmdline
 import configs
 
-
 # -==========================================================
 # Function and program generation
 # -==========================================================
+
+# Configuration tuple for function generation
+FuncGenConfig = namedtuple(
+  'FuncGenConfig',
+  [
+    'bbls',  # Number of basic blocks per function
+    'vars',  # Number of variables per basic block
+    'assn',  # Number of assignments per basic block
+    'tera',  # Number of terms per assignment per function
+    'terc',  # Number of terms per condition per function
+  ]
+)
+
+# List of suggested function generation configurations
+FGEN_SUGGESTED_CONFIGS: List[FuncGenConfig] = [
+  FuncGenConfig(15, 8, 2, 2, 3),
+  FuncGenConfig(15, 8, 2, 2, 4),
+  FuncGenConfig(15, 8, 3, 2, 4),
+  FuncGenConfig(10, 8, 2, 2, 4),
+  FuncGenConfig(8, 10, 2, 2, 3),
+  FuncGenConfig(11, 8, 2, 2, 4),
+  FuncGenConfig(10, 12, 2, 2, 4),
+  FuncGenConfig(15, 10, 2, 2, 2),
+  FuncGenConfig(10, 8, 3, 2, 4),
+  FuncGenConfig(15, 8, 4, 2, 3),
+]
 
 
 @dataclass
@@ -58,6 +84,7 @@ class FuncGenOptions:
   uuid: str  # Primary ID for the newly generated function
   sno: int  # Secondary ID for the newly generated function
   outdir: Path  # Directory to store the generated function files
+  config: FuncGenConfig  # Configuration for the function generation
   verbose: bool = True  # Whether to print verbose output
   main: bool = True  # Whether to include a main function in the generated program
   sexp: bool = True  # Whether to include S-expression output
@@ -72,6 +99,7 @@ class FuncGenOptions:
       'uuid': self.uuid,
       'sno': self.sno,
       'outdir': str(self.outdir),
+      'config': tuple(self.config),
       'verbose': self.verbose,
       'main': self.main,
       'sexp': self.sexp,
@@ -84,7 +112,14 @@ class FuncGenOptions:
 
 def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
   try:
-    cmd = [opts.bin]
+    cmd = [
+      opts.bin,
+      '--Xnum-bbls-per-fun', str(opts.config.bbls),
+      '--Xnum-vars-per-fun', str(opts.config.vars),
+      '--Xnum-assigns-per-bbl', str(opts.config.assn),
+      '--Xnum-vars-per-assign', str(opts.config.tera),
+      '--Xnum-vars-in-cond', str(opts.config.terc),
+    ]
     if opts.main:
       cmd += ["-m"]
     if opts.sexp:
@@ -116,12 +151,27 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
   return result
 
 
+# Configuration tuple for function generation
+ProgGenConfig = namedtuple(
+  'ProgGenConfig',
+  [
+    'funs',  # Number of functions per program
+  ]
+)
+
+# List of suggested program generation configurations
+PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [
+  ProgGenConfig(n) for n in range(5, 15)
+]
+
+
 @dataclass
 class ProgGenOptions:
   bin: str  # Path to the pgen executable
   uuid: str  # Primary ID for the newly generated program
   indir: Path  # Directory to read the input function files
   limit: int  # The maximum number of programs to generate (0 means unlimited)
+  config: ProgGenConfig  # Configuration for the program generation
   seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
   debug = False  # Whether to print debug information
   extra: Optional[str] = None  # Extra options to control the program generation process
@@ -132,6 +182,7 @@ class ProgGenOptions:
       'uuid': self.uuid,
       'indir': str(self.indir),
       'limit': self.limit,
+      'config': tuple(self.config),
       'seed': self.seed,
       'debug': self.debug,
       'extra': self.extra
@@ -140,7 +191,12 @@ class ProgGenOptions:
 
 def generate_programs(opts: ProgGenOptions) -> Optional[str]:
   try:
-    cmd = [opts.bin, "-i", str(opts.indir), "-l", str(opts.limit)]
+    cmd = [
+      opts.bin,
+      "-i", str(opts.indir),
+      "-l", str(opts.limit),
+      '--Xfunction-depth', str(opts.config.funs)
+    ]
     if opts.seed:
       cmd += ["-s", str(opts.seed)]
     if opts.debug:
@@ -500,6 +556,7 @@ class Worker:
       uuid=next_uuid(),
       sno=0,
       outdir=self.wconf.wdir,
+      config=FGEN_SUGGESTED_CONFIGS[0],
       extra='--Xinject-ub-proba 0.1'
     )
     popts = ProgGenOptions(
@@ -507,6 +564,7 @@ class Worker:
       uuid='<placeholder>',
       indir=self.wconf.wdir,
       limit=self.wconf.prog_limit,
+      config=PGEN_SUGGESTED_CONFIGS[0],
       extra='--Xreplace-proba 0.4'
     )
     copts = CrealOptions(
@@ -525,6 +583,7 @@ class Worker:
     self.iter = 0
     while self.iter < ropts.limit and not ropts.stop.is_set():
       fopts.seed = rand_int()
+      fopts.config = random.choice(FGEN_SUGGESTED_CONFIGS)
       prog = self.run_func(fopts, ropts.gen_tmo, ropts.test_tmo)
       if prog is not None:
         fopts.sno += 1
@@ -538,6 +597,7 @@ class Worker:
         self.log(f"Switched to program generation", color="yellow")
         popts.uuid = next_uuid()
         popts.seed = rand_int()
+        popts.config = random.choice(PGEN_SUGGESTED_CONFIGS)
         self.run_prog(popts, ropts.test_tmo)
         if self.wconf.creal_env:
           copts.bin = str(self.wconf.creal_env.creal_bin())
