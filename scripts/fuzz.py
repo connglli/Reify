@@ -85,7 +85,7 @@ class FuncGenOptions:
   sno: int  # Secondary ID for the newly generated function
   outdir: Path  # Directory to store the generated function files
   config: FuncGenConfig  # Configuration for the function generation
-  verbose: bool = True  # Whether to print verbose output
+  verbose: bool = False  # Whether to print verbose output
   main: bool = True  # Whether to include a main function in the generated program
   sexp: bool = True  # Whether to include S-expression output
   allops: bool = True  # Whether to consider all possible operations in the generated program
