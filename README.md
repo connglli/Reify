@@ -1,147 +1,161 @@
 # Reify
 
-## Prerequisite
+Reify is a random program generator based on *semantic reification*.
+It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
+Using Reify, 59 bugs have been discovered and reported in GCC and LLVM.
 
-1. z3: `apt install libz3-dev`.
-2. z: `apt install libz-dev`.
+Currently, Reify supports only i32 and i32 arrays.
+We are extending it to support additional primitive and aggregate types.
+We are also experimenting with generating Java bytecode and eBPF bytecode.
+Even in their early stages, these experimental attempts have already revealed one JIT compiler bug in OpenJ9 and two bugs in Linux's eBPF runtime.
 
-## Build Reify
+## 🚀 Quick Start
 
-```sh
-# Build all targets
-[DEBUG=true] make -j8 all
+Install dependencies and start fuzzing C compilers with a single command similar to:
 
-# Build the function generation target
-[DEBUG=true] make -j8 fgen
-
-# Build the program generation target
-[DEBUG=true] make -j8 pgen
+```bash
+apt install libz3-dev libz-dev && \
+make -j8 all && \
+python scripts/fuzz.py -j 8 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
 ```
 
-## Generate Programs
+## 🎇 Random Programs
 
-We can generate functions and programs using the following `make` commands.
+Reify is capable of generating *leaf functions* that does not call other functions and *whole programs* composed of multiple functions.
 
-```sh
-# Get FGEN_LIMIT (0 mean unlimited) functions into FGEN_OUT_DIR, controlled by GEN_SEED.
-# When FGEN_GEN_MAIN is set to any value (even false), a program will also be generated following each function
-# When FGEN_GEN_SEXP is set to any value (even false), its S expression will also be generated following each function. This is required when we are going to generate new programs using them as seeds.
-# When FGEN_ALL_OPS is set to any value (even false), the generation will use all kinds of operators for terms and expression
-# When FGEN_INJ_UBS is set to any value (even false), the generation will inject undefined behaviors into the unexecuted basic blocks
-# When FGEN_CREALDB is set to any value (even false), the generation will generate a function database file (JSON) for Creal
-# When tailing with -check-ub, each function (and program) will be checked against undefined behavior
-# Note, the double quotes inside the single quotes cannot be ignored
-[GEN_SEED=0]                                \
-[FGEN_OUT_DIR=/path/to/output]              \
-[FGEN_LIMIT=10000]                          \
-[FGEN_GEN_MAIN=true]                        \
-[FGEN_GEN_SEXP=true]                        \
-[FGEN_ALL_OPS=true]                         \
-[FGEN_INJ_UBS=true]                         \
-[FGEN_CREALDB=true]                         \
-[FGEN_EX_OPS='...']                         \
-make gen-func-set[-check-ub]
+### Leaf Function Generation
 
-# Get PGEN_LIMIT (0 means unlimited) programs into PGEN_IN_DIR, controlled by GEN_SEED.
-# When tailing with -check, each program will be checked against undefined behavior
-# Note, different from generating functions, the single quotes cannot have double quotes
-[GEN_SEED=0]                                \
-[PGEN_IN_DIR=/path/to/functions]            \
-[PGEN_LIMIT=10000]                          \
-[PGEN_EX_OPS='...']                         \
-make gen-prog-set-check
+**Use the following script to generate 512 leaf functions**:
+
+```bash
+python scripts/fgen.py --allops --injubs --sexp --main --output generated --limit 512
 ```
 
-For example, generating 100 functions into the `generated` directory with each function having `10` variables defined
-and each function being checked UB-free, using the seed of `1`:
+The output directory (given by the `--output` option) includes the following sub-directories:
 
-```sh
-GEN_SEED=1                                  \
-FGEN_OUT_DIR=generated                      \
-FGEN_LIMIT=100                              \
-FGEN_GEN_SEXP=true                          \
-FGEN_GEN_MAIN=true                          \
-FGEN_EX_OPS='--Xnum-vars-per-fun 10'        \
-make gen-func-set-check-ub
+- `functions`: Generated functions in C (not compilable).
+- `mappings`: Input-output mappings of the generated functions, ensuring UB-free execution and terminating
+- `sexpressions`:S expressions of the generated functions, which can be used as seeds for generating whole programs. Require `--sexp`.
+- `programs`: Generated programs corresponding to the functions (compilable). Require `--main`.
+- Others.
+
+**Or use the following command to generate an individual leaf function**:
+
+```bash
+timeout 3s ./build/bin/fgen -A -U -m -S --output generated --sno 0 $(uuidgen)
 ```
 
-The output directory (i.e., directories pointed by `FGEN_OUT_DIR` for function generation or `PGEN_IN_DIR` for program
-generation) include the following sub-directories:
+Note that generating leaf functions may
+(1) take a long time due to complicated constraints or
+(2) fail due to unsatisfiable constraints.
+This is why the above command is prefixed with `timeout 3s`.
 
-- `functions`: A set of functions that can be correctly compiled into `.o` (but not executable)
-- `mappings`: The input-output mappings for each generated function, ensuring their executions are UB-free
-- `loggings`: The detailed generation log for each function
-- `sexpressions`: A set of S expressions corresponding to the generated functions, which can be used as seeds for
-  generating new programs
-- `programs`: A set of programs that can be solely compiled (into executables), corresponding to those functions in
-  the `functions` directory
-- `crealdb.json`: A JSON file describing the generated functions in [Creal](https://github.com/UniCodeSphere/Creal)
-  format, which can serve as a customized function database to Creal. This file exists when `FGEN_CREALDB` is enabled.
+**Experimental: Leaf functions can be generated from existing control flow graphs (CFGs). This feature is experimental.**
 
-Afterward, we can further generate 100 new programs with the above generated functions as seeds:
+First install Clang:
 
-```sh
-GEN_SEED=0                                  \
-PGEN_IN_DIR=generated                       \
-PGEN_LIMIT=100                              \
-make gen-prog-set-check
+```bash
+apt install clang
 ```
 
-The new programs will be added to the `programs` subdirectory and each program will be checked against undefined
-behavior.
+Then extract 512 CFGs from other programs such as those generated by [Csmith](https://github.com/csmith-project/csmith) or [YARPGen](https://github.com/intel/yarpgen/):
 
-## Fuzz Compilers
-
-The fuzzing process can be started by for example running the following command:
-
-```sh
-python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
+```bash
+python scripts/ggen.py -l /path/to/clang -L 512 -g csmith --csmith /path/to/csmith /path/to/csmith_db.jsonl
 ```
 
-This means that the fuzzing process will start 10 jobs in parallel, each compiling the generated programs with the given
-command (i.e., `gcc -O3 -fno-tree-slsr -fno-tree-ch`) and seeding the random number generator with the `0`. All the
-generated programs will be put into the `fuzzdir` directory. Note, useless programs will be removed during the fuzzing
-process to save some space.
+Finally integrate the generated CFG database into leaf function generation:
 
-## Fuzzing with Creal
-
-Install [Creal](https://github.com/UniCodeSphere/Creal) and then add
-`--creal /path/to/Creal --csmith /path/to/Csmith --ccomp /path/to/CompCert` to `fuzz.py` for example:
-
-```sh
-python3 scripts/fuzz.py -o fuzzdir -s 0 -j 10 --creal /path/to/Creal --csmith /path/to/Csmith  --ccomp /path/to/CompCert 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
+```bash
+python scripts/fgen.py ... --extra '--unstable-graphdb /path/to/csmith_db.jsonl' ...
 ```
 
-## Integrating Existing Graphs
+### Whole Program Generation
 
-The function generation can start from control-flow graphs sampled from other programs. For example, one can gather a
-graph database from YARPGen-generated programs, then feed the database into fgen for function generation.
+Use the following command to generate 512 whole programs based on a set of leaf functions previously generated (given by the `--input` option), in particular, their S expressions:
 
-```sh
-python scripts/ggen.py -g yarpgen --yarpgen /path/to/yarpgen /path/to/database.jsonl
-python scripts/fgen.py ... --extra '--unstable-graphdb /path/to/database.jsonl' ...
+```bash
+./build/bin/pgen --input generated --limit 512 $(uuidgen)
 ```
 
-By so, fgen will sample a control-flow graph from the database and populate statements in the graph to generate new
-functions.
+The generated programs are placed in the `programs` subdirectory of `--input`.
 
-## Other Scripts
+## 🔎 Fuzzing Compilers
 
-There're some other useful scripts.
+GCC and Clang/LLVM can be tested with one command with `scripts/fuzz.py`.
+Start fuzzing with:
 
-```sh
-# Generate a set of functions (which is called by the above `make gen-func-set[-check-ub]` command)
-python3 scripts/fgen.py -h
+```bash
+python scripts/fuzz.py -o fuzzdir -j 10 -s 0 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
+```
 
-# Generate a single function (which is called by the above command)
-./build/bin/fgen -h
+- **`-o fuzzdir`**: Output directory
+- **`-j 10`**: Run 10 jobs in parallel
+- **`-s 0`**: Seed for random number generator
 
-# Generate a set of programs (which is called by the above `make gen-prog-set[-check]` command)
-./build/bin/pgen -h
+### Fuzzing Compilers with Creal
 
-# Check UB-freeness of the generated functions and their mappings
-python3 scripts/ubchk.py <func_dir> <map_dir>
+Creal can be integrated into testing process.
+Install [Csmith](https://github.com/csmith-project/csmith),
+[CompCert](https://compcert.org/man/manual002.html#install),
+[Creal](https://github.com/connglli/Creal), and optionally
+[YARPGen](https://github.com/intel/yarpgen/).
+Then use:
 
-# Check UB-freeness of the generated programs and their mappings
-python3 scripts/ubchk.py <prog_dir>
+```bash
+python scripts/fuzz.py -o fuzzdir -s 0 -j 10 \
+  --creal /path/to/Creal \
+  --csmith /path/to/Csmith \
+  --ccomp /path/to/CompCert \
+  'gcc -O3 -fno-tree-slsr -fno-tree-ch'
+```
+
+### Experimental: Fuzzing JVM
+
+Use the following command to fuzz a Java virtual machine:
+
+```bash
+./scripts/fuzz_jvm.sh --nproc 8 --java-home /path/to/java/home
+```
+
+This process adapted leaf function generation to generate Java bytecode.
+An individual Java class can also be generated via `--unstable-javaclass` with `build/bin/fgen` can be used to generate :
+
+```bash
+timeout 3s ./build/bin/fgen ... --unstable-javaclass ...
+```
+
+The generated Java class is placed inside the `javaclasses` subdirectory.
+
+## 🐞 Bug Showcases
+
+Navigate to [bugs](./hunting).
+
+## 🧾 License
+
+```
+MIT License
+
+Copyright (c) 2025
+
+Kavya Chopra (chopra.kavya04@gmail.com)
+Cong Li (cong.li@inf.ethz.ch)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
