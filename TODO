@@ -4,6 +4,6 @@
 4. use yingwei/ubi and yingwei/csmith
 5. structs and points and memory
 6. add clang format to pre-commit
-7. better optimization passes support, gvn/lvn still not working very well, consider intrinsics, idioms, and more slp patterns
+7. better optimization passes support, gvn/lvn still not working very well, consider intrinsics, idioms, and more slp patterns, separate functions from main so that hiding input parameters
 8. better type system
 9. sample multiple exec per function
