@@ -47,7 +47,7 @@
 | 121852 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=121852 | NEW | P3 normal | Wrong Code (SIGFPE) | RTL Optimization | Backend |
 | 122079 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=122079 | FIXE | P3 normal | Internal Compiler Error | Partial Redundancy Elimination | Middle-end |
 
-# LLVM
+## LLVM
 
 | ID | Link | Status | Priority | Type | Pass | X-End |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -70,7 +70,7 @@
 | 155162 | https://github.com/llvm/llvm-project/issues/155162 | Fixed | - | Wrong Code | Loop Vectorization | Middle-end |
 | 155184 | https://github.com/llvm/llvm-project/issues/155184 | Fixed | - | Internal Compiler Error (assertion) | Loop Invariant Code Motion | Middle-end |
 
-# OpenJ9
+## OpenJ9
 
 | ID | Link | Status | Priority | Type | Pass | Where |
 | --- | --- | --- | --- | --- | --- | --- |
