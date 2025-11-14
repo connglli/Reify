@@ -30,7 +30,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from configs import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file, get_crealdb_file
-from fuzz import FuncGenOptions, generate_function, crealize
+from fuzz import FuncGenOptions, generate_function, crealize, FGEN_SUGGESTED_CONFIGS
 from ubchk import check_ubs, check_ubs_once
 
 
@@ -168,6 +168,7 @@ if __name__ == "__main__":
       uuid=str(uuid.uuid4()),
       sno=0,
       outdir=outdir,
+      config=FGEN_SUGGESTED_CONFIGS[0],
       verbose=args.check,
       main=args.main,
       sexp=args.sexp,
