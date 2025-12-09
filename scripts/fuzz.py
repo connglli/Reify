@@ -75,6 +75,7 @@ FGEN_SUGGESTED_CONFIGS: List[FuncGenConfig] = [
   FuncGenConfig(15, 10, 2, 2, 2),
   FuncGenConfig(10, 8, 3, 2, 4),
   FuncGenConfig(15, 8, 4, 2, 3),
+  FuncGenConfig(10, 8, 1, 2, 4),
 ]
 
 
@@ -161,7 +162,7 @@ ProgGenConfig = namedtuple(
 
 # List of suggested program generation configurations
 PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [
-  ProgGenConfig(n) for n in range(5, 15)
+  ProgGenConfig(n) for n in range(3, 15)
 ]
 
 
