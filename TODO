@@ -1,9 +1,15 @@
-1. use alive2/smt
-2. support more conditions and bitwise ops
-3. fuzzing with diverse configs
-4. use yingwei/ubi and yingwei/csmith
-5. structs and points and memory
-6. add clang format to pre-commit
-7. better optimization passes support, gvn/lvn still not working very well, consider intrinsics, idioms, and more slp patterns, separate functions from main so that hiding input parameters
-8. better type system
-9. sample multiple exec per function
+C/C++:
+1. separate into different compilation units
+2. add a pool of common -f flags and pick them randomly
+3. use alive2/smt
+4. support more conditions and bitwise ops
+5. use yingwei/ubi and yingwei/csmith
+6. structs and points and memory
+7. add clang format to pre-commit
+8. better optimization passes support, gvn/lvn still not working very well, consider intrinsics, idioms, and more slp patterns, separate functions from main so that hiding input parameters
+9. better type system
+10. sample multiple exec per function
+
+Java:
+1. pgen for java
+2. separation compilation units
