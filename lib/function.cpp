@@ -450,12 +450,13 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
   main << "int main(int argc, char* argv[])" << std::endl;
   main << "{" << std::endl;
+  main << "  " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
   for (size_t i = 0; i < initializations.size(); i++) {
     const auto &init = initializations[i];
     const auto &fina = finalizations[i];
     const auto numParams = static_cast<int>(init.size());
     std::ostringstream chk_oss;
-    main << "    " << StatelessChecksum::GetCheckChksumName() << "("
+    main << "  " << StatelessChecksum::GetCheckChksumName() << "("
          << StatelessChecksum::Compute(fina) << ", " << fun->GetName() << "(";
     for (auto j = 0; j < numParams; j++) {
       main << init[j].ToCxStr();

@@ -30,6 +30,7 @@
 
 #include "lib/dbgutils.hpp"
 
+extern "C" void generate_crc32_table();
 extern "C" int computeStatelessChecksum(int num_args, int args[]);
 
 int StatelessChecksum::Compute(const std::vector<int> &values) {
@@ -40,6 +41,7 @@ int StatelessChecksum::Compute(const std::vector<int> &values) {
   for (size_t i = 0; i < values.size(); i++) {
     args[i] = values[i];
   }
+  generate_crc32_table();
   return computeStatelessChecksum(static_cast<int>(values.size()), args);
 }
 
@@ -56,6 +58,8 @@ int StatelessChecksum::Compute(const std::vector<ArgPlus<int>> &args) {
   }
   return Compute(values);
 }
+
+std::string StatelessChecksum::GetCrc32InitName() { return "generate_crc32_table"; }
 
 std::string StatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }
 
