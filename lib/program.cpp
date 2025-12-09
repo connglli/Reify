@@ -326,6 +326,7 @@ void ProgPlus::GenerateCode(const fs::path &file, bool debug, bool staticModifie
     oss << std::endl;
   }
   oss << "int main() {" << std::endl;
+  oss << "    " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
   int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
   const std::vector<ArgPlus<int>> *init = &(mappings[0].first[index]);
   const std::vector<ArgPlus<int>> *fina = &(mappings[0].second[index]);

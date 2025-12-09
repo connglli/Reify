@@ -34,6 +34,7 @@ PROG_TPL = """
 {func_code}
 
 int main(int argc, char* argv[]) {{
+    generate_crc32_table();
     printf("%d", {func_name}({func_args}));
     return 0;
 }}
