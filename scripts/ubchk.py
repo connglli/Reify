@@ -29,7 +29,12 @@ from enum import Enum, unique
 from pathlib import Path
 
 from cmdline import run_proc
-from configs import parse_mapping, get_simple_program, get_map_file_for_func_file
+from configs import (
+  FunArts,
+  ProgArts,
+  get_simple_program,
+  parse_mapping,
+)
 
 
 @unique
@@ -46,7 +51,10 @@ def _ub_exists_in(txt):
   return "runtime error: " in txt
 
 
-def _check_ubs(c_file, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
+def _do_check_ubs(test_dir, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
+  c_files = [f for f in test_dir.iterdir() if f.suffix == ".c"]
+  h_files = [f for f in test_dir.iterdir() if f.suffix == ".h"]
+  c_files = [str(f) for f in c_files + h_files]
   try:
     run_proc(
       [
@@ -56,8 +64,8 @@ def _check_ubs(c_file, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
         "-fsanitize=undefined",
         "-o",
         str(o_file),
-        str(c_file),
-      ],
+      ]
+      + c_files,
       stdout=subprocess.PIPE,
       stderr=subprocess.STDOUT,
       check=True,
@@ -92,18 +100,15 @@ def _check_ubs(c_file, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
     return UBChkRes.EXE_HANG, 0, f"execution timeout (>{exe_tmo}s)"
 
 
-def check_ubs_once(c_file):
-  ub_res, retc, out = _check_ubs(c_file)
+def _check_ubs_with_main(test_dir):
+  ub_res, retc, out = _do_check_ubs(test_dir)
   if ub_res == UBChkRes.UB_FOUND:
-    print(f"****************************")
-    print(f"********* FOUND UB *********")
-    print(f"****************************")
-    print(f"Func : {c_file.absolute()}")
+    print("****************************")
+    print("********* FOUND UB *********")
+    print("****************************")
+    print(f"Func : {test_dir.absolute()}")
     print(f"Retc : {retc}")
     print(f"Mesg : {out}")
-    print("`````````````````````````````")
-    print(c_file.read_text())
-    print("`````````````````````````````")
     exit(1)
   elif ub_res == UBChkRes.CMP_ERROR:
     print(f"CMP ERROR ({retc}): {out}")
@@ -112,10 +117,7 @@ def check_ubs_once(c_file):
   elif ub_res == UBChkRes.EXE_ERROR:
     print(f"EXE ERROR ({retc}): {out}")
     if "Checksum not equal" in out:
-      print(f"Func : {c_file.absolute()}")
-      print("`````````````````````````````")
-      print(c_file.read_text())
-      print("`````````````````````````````")
+      print(f"Func : {test_dir.absolute()}")
       exit(1)
   elif ub_res == UBChkRes.EXE_HANG:
     print(f"EXE HANG (.): {out}")
@@ -123,23 +125,28 @@ def check_ubs_once(c_file):
     pass
 
 
-def check_ubs(func_path, map_path):
-  func_code, func_name = func_path.read_text(), func_path.stem
-  tmp_c_path, tmp_o_path = Path("/tmp/a.c"), Path("/tmp/a.o")
+def _check_ubs_without_main(arts):
+  func_name = arts.get_func_name()
+  func_path = arts.get_func_file()
+  map_path = arts.get_map_file()
+
+  func_code = func_path.read_text()
+  tmp_test_dir = Path("/tmp") / "ubchk_tmp"
+  tmp_test_dir.mkdir(parents=True, exist_ok=True)
+
+  tmp_c_path, tmp_o_path = tmp_test_dir / "a.c", tmp_test_dir / "a.out"
+
   for map_ind, (func_args, _, _) in enumerate(parse_mapping(map_path)):
     tmp_c_path.write_text(get_simple_program(func_name, func_code, func_args))
-    ub_res, retc, out = _check_ubs(tmp_c_path, o_file=str(tmp_o_path))
+    ub_res, retc, out = _do_check_ubs(tmp_test_dir, o_file=str(tmp_o_path))
     if ub_res == UBChkRes.UB_FOUND:
-      print(f"****************************")
-      print(f"********* FOUND UB *********")
-      print(f"****************************")
+      print("****************************")
+      print("********* FOUND UB *********")
+      print("****************************")
       print(f"Func : {func_path.absolute()}")
       print(f"Maps : {map_path.absolute()}")
       print(f"Retc : {retc}")
       print(f"Mesg : {out}")
-      print("`````````````````````````````")
-      print(tmp_c_path.read_text())
-      print("`````````````````````````````")
       exit(1)
     elif ub_res == UBChkRes.CMP_ERROR:
       print(f"{map_ind}: CMP ERROR ({retc}): {out}")
@@ -153,19 +160,34 @@ def check_ubs(func_path, map_path):
       pass
 
 
+def check_func_ubs(arts):
+  main_file = arts.get_main_file()
+  if main_file.exists():
+    _check_ubs_with_main(arts.get_test_dir())
+  else:
+    _check_ubs_without_main(arts)
+
+
+def check_prog_ubs(arts):
+  _check_ubs_with_main(arts.get_test_dir())
+
+
 if __name__ == "__main__":
-  if len(sys.argv) != 2 and len(sys.argv) != 3:
-    print("Usage 1: ubchk <functions_dir> <mappings_dir>")
-    print("Usage 2: ubchk <programs_dir>")
+  if len(sys.argv) != 2:
+    print("Usage: ubchk <gen_dir>")
     exit(1)
-  func_dir = Path(sys.argv[1])
-  map_dir = Path(sys.argv[2]) if len(sys.argv) == 3 else None
-  for func_file in func_dir.iterdir():
-    if not func_file.is_file():
+
+  gen_dir = Path(sys.argv[1])
+
+  for test_dir in gen_dir.iterdir():
+    if not test_dir.is_dir():
       continue
-    print(f"Check {func_file.stem} ...")
-    if map_dir:
-      map_file = get_map_file_for_func_file(func_file, mappings_dir=map_dir)
-      check_ubs(func_file, map_file)
+
+    print(f"Check {test_dir.name} ...")
+
+    if FunArts.is_test_dir(test_dir):
+      check_func_ubs(FunArts.from_test_dir(test_dir))
+    elif ProgArts.is_test_dir(test_dir):
+      check_prog_ubs(ProgArts.from_test_dir(test_dir))
     else:
-      check_ubs_once(func_file)
+      print("Skipping (no main.c or function.c+mapping)")

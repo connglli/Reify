@@ -23,36 +23,56 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+import shutil
 import sys
 from pathlib import Path
 
-from configs import get_map_file_for_func_file, get_funcs_dir
+from configs import (
+  FILENAME_FUNCTION_C,
+  FILENAME_MAIN_C,
+  FILENAME_MAPPING_JSONL,
+  FUNCTION_PREFIX,
+  PROGRAM_PREFIX,
+)
 
 if __name__ == "__main__":
   if len(sys.argv) != 2:
     print("Usage: retouch <gen_dir>")
     exit(1)
-  # Iterate over all .c files in the procedures directory
-  for func_path in get_funcs_dir(Path(sys.argv[1])).iterdir():
-    if func_path.is_dir() or func_path.suffix != ".c":
+  gen_dir = Path(sys.argv[1])
+
+  # Iterate over all test directories
+  for test_dir in gen_dir.iterdir():
+    if test_dir.is_file():
       continue
-    print(f"INSPECT {func_path.stem}")
-    map_path = get_map_file_for_func_file(func_path)
-    # Check if we'd delete the generated function
-    del_cond = (
-      # The .c is empty
-      func_path.stat().st_size == 0
-      or
-      # The .map does not exist
-      not map_path.exists()
-      or
-      # The .map is empty
-      map_path.stat().st_size == 0
-    )
-    if not del_cond:
-      continue
-    # Delete the corresponding mapping file if it exists
-    if map_path.exists():
-      map_path.unlink()
-    func_path.unlink()
-    print(f"DELETE {func_path.stem}")
+
+    print(f"INSPECT {test_dir.name}")
+
+    if test_dir.name.startswith(FUNCTION_PREFIX + "_"):
+      func_path = test_dir / FILENAME_FUNCTION_C
+      map_path = test_dir / FILENAME_MAPPING_JSONL
+
+      # Check if we'd delete the generated function (and the whole test dir)
+      del_cond = (
+        not func_path.exists()
+        or func_path.stat().st_size == 0
+        or not map_path.exists()
+        or map_path.stat().st_size == 0
+      )
+      if not del_cond:
+        continue
+
+      # Delete the whole test directory
+      shutil.rmtree(test_dir)
+      print(f"DELETE {test_dir.name}")
+    elif test_dir.name.startswith(PROGRAM_PREFIX + "_"):
+      main_path = test_dir / FILENAME_MAIN_C
+
+      # Check if we'd delete the generated program (and the whole test dir)
+      del_cond = not main_path.exists() or main_path.stat().st_size == 0
+      if not del_cond:
+        continue
+
+      # Delete the whole test directory
+      shutil.rmtree(test_dir)
+      print(f"DELETE {test_dir.name}")
