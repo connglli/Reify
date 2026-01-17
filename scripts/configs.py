@@ -48,78 +48,128 @@ CHKSUM_FUNC = "computeStatelessChecksum"
 CHKSUM_FILE = ROOT_DIR / "res" / "cchksum.txt"
 CHKSUM_CODE = CHKSUM_FILE.read_text()
 
-
-def get_funcs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-  return Path(gen_dir) / "functions"
-
-
-def get_maps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-  return Path(gen_dir) / "mappings"
-
-
-def get_progs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-  return Path(gen_dir) / "programs"
-
-
-def get_logs_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-  return Path(gen_dir) / "loggings"
+# Must match C++ constants in include/global.hpp
+FUNCTION_PREFIX = "func"
+PROGRAM_PREFIX = "prog"
+FILENAME_FUNCTION_C = "func.c"
+FILENAME_MAIN_C = "main.c"
+FILENAME_MAPPING_JSONL = "inout.jsonl"
+FILENAME_SEXPRESSION = "func.sexp"
+FILENAME_LOGGING = "func.log"
+FILENAME_CHECKSUM_C = "chksum.c"
+FILENAME_PROTOTYPES_H = "proto.h"
 
 
-def get_sexps_dir(gen_dir=DEFAULT_OUTPUT_DIR):
-  return Path(gen_dir) / "sexpressions"
+class FunArts:
+  def __init__(self, fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+    self.fuuid = str(fuuid).replace("-", "_")
+    self.fsano = fsano
+    self.gen_dir = Path(gen_dir)
+
+  @staticmethod
+  def is_test_dir(test_dir):
+    test_dir = Path(test_dir)
+    return (
+      test_dir.exists()
+      and test_dir.is_dir()
+      and test_dir.name.startswith(FUNCTION_PREFIX)
+      and (test_dir / FILENAME_FUNCTION_C).exists()
+      and (test_dir / FILENAME_MAPPING_JSONL).exists()
+    )
+
+  @staticmethod
+  def from_test_dir(test_dir, gen_dir=DEFAULT_OUTPUT_DIR):
+    assert FunArts.is_test_dir(test_dir), f"Not a valid function test dir: {test_dir}"
+    test_dir = Path(test_dir)
+    parts = test_dir.name.split("_")
+    if len(parts) < 3:
+      raise ValueError(f"Invalid test dir name: {test_dir.name}")
+    fuuid = "_".join(parts[1:-1]).replace("_", "-")
+    fsano = parts[-1]
+    return FunArts(fuuid, fsano, gen_dir)
+
+  def get_test_dir(self):
+    return self.gen_dir / f"{FUNCTION_PREFIX}_{self.fuuid}_{self.fsano}"
+
+  def get_func_name(self):
+    return f"func_{self.fuuid}_{self.fsano}"
+
+  def get_func_file(self):
+    return self.get_test_dir() / FILENAME_FUNCTION_C
+
+  def get_map_file(self):
+    return self.get_test_dir() / FILENAME_MAPPING_JSONL
+
+  def get_main_file(self):
+    return self.get_test_dir() / FILENAME_MAIN_C
+
+  def get_log_file(self):
+    return self.get_test_dir() / FILENAME_LOGGING
+
+  def get_sexp_file(self):
+    return self.get_test_dir() / FILENAME_SEXPRESSION
+
+  def as_dict(self):
+    return {
+      "func": self.get_func_file(),
+      "map": self.get_map_file(),
+      "log": self.get_log_file(),
+      "sexp": self.get_sexp_file(),
+      "main": self.get_main_file(),
+    }
 
 
-def get_func_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  fuuid_ = fuuid.replace("-", "_")
-  return get_funcs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.c"
+class ProgArts:
+  def __init__(self, fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
+    self.fuuid = str(fuuid).replace("-", "_")
+    self.fsano = fsano
+    self.gen_dir = Path(gen_dir)
 
+  @staticmethod
+  def is_test_dir(test_dir):
+    test_dir = Path(test_dir)
+    return (
+      test_dir.exists()
+      and test_dir.is_dir()
+      and test_dir.name.startswith(PROGRAM_PREFIX)
+      and (test_dir / FILENAME_MAIN_C).exists()
+      and (test_dir / FILENAME_CHECKSUM_C).exists()
+      and (test_dir / FILENAME_PROTOTYPES_H).exists()
+    )
 
-def get_map_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  fuuid_ = fuuid.replace("-", "_")
-  return get_maps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.jsonl"
+  @staticmethod
+  def from_test_dir(test_dir, gen_dir=DEFAULT_OUTPUT_DIR):
+    assert ProgArts.is_test_dir(test_dir), f"Not a valid program test dir: {test_dir}"
+    test_dir = Path(test_dir)
+    parts = test_dir.name.split("_")
+    if len(parts) < 3:
+      raise ValueError(f"Invalid test dir name: {test_dir.name}")
+    fuuid = "_".join(parts[1:-1]).replace("_", "-")
+    fsano = parts[-1]
+    return ProgArts(fuuid, fsano, gen_dir)
 
+  def get_test_dir(self):
+    return self.gen_dir / f"{PROGRAM_PREFIX}_{self.fuuid}_{self.fsano}"
 
-def get_prog_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  fuuid_ = fuuid.replace("-", "_")
-  return get_progs_dir(gen_dir) / f"{fuuid_}_{fsano}.c"
+  def get_main_file(self):
+    return self.get_test_dir() / FILENAME_MAIN_C
 
+  def get_chksum_file(self):
+    return self.get_test_dir() / FILENAME_CHECKSUM_C
 
-def get_log_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  fuuid_ = fuuid.replace("-", "_")
-  return get_logs_dir(gen_dir) / f"function_{fuuid_}_{fsano}.log"
+  def get_proto_file(self):
+    return self.get_test_dir() / FILENAME_PROTOTYPES_H
 
-
-def get_sexp_file(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  fuuid_ = fuuid.replace("-", "_")
-  return get_sexps_dir(gen_dir) / f"function_{fuuid_}_{fsano}.sexp"
-
-
-def get_func_map_files(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  return (
-    get_func_file(fuuid, fsano, gen_dir=gen_dir),
-    get_map_file(fuuid, fsano, gen_dir=gen_dir),
-  )
+  def get_func_file(self, fname):
+    return self.get_test_dir() / (fname + ".c")
 
 
 def get_crealdb_file(gen_dir=DEFAULT_OUTPUT_DIR):
   return gen_dir / "crealdb.json"
 
 
-def get_map_file_for_func_file(func_path, mappings_dir=None):
-  if mappings_dir:
-    return Path(mappings_dir) / f"{Path(func_path).stem}.jsonl"
-  else:
-    return get_maps_dir(func_path.parent.parent) / f"{Path(func_path).stem}.jsonl"
-
-
 def get_artifacts(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  return {
-    "func": get_func_file(fuuid, fsano, gen_dir),
-    "map": get_map_file(fuuid, fsano, gen_dir),
-    "prog": get_prog_file(fuuid, fsano, gen_dir),
-    "log": get_log_file(fuuid, fsano, gen_dir),
-    "sexp": get_sexp_file(fuuid, fsano, gen_dir),
-  }
+  return FunArts(fuuid, fsano, gen_dir).as_dict()
 
 
 def get_simple_program(func_name, func_code, func_args):

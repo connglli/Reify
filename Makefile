@@ -123,9 +123,6 @@ GEN_SEED ?= -1
 ## Function Generation
 
 FGEN_OUT_DIR  ?= generated
-FGEN_FUNS_DIR := $(FGEN_OUT_DIR)/functions
-FGEN_MAPS_DIR := $(FGEN_OUT_DIR)/mappings
-FGEN_LOGS_DIR := $(FGEN_OUT_DIR)/loggings
 FGEN_LIMIT    ?= 1000000
 FGEN_SEXP_OPT := $(if $(FGEN_GEN_SEXP),--sexp,)
 FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
@@ -135,30 +132,27 @@ FGEN_CRDB_OPT := $(if $(FGEN_CREALDB),--crealdb,)
 FGEN_EX_OPTS  := $(if $(FGEN_EX_OPTS),--extra "$(FGEN_EX_OPTS)",)
 
 gen-func-set: fgen
-	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR)
+	@mkdir -p $(FGEN_OUT_DIR)
 	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_CRDB_OPT) $(FGEN_EX_OPTS)
 
 gen-func-set-check-ubs: fgen
-	@mkdir -p $(FGEN_FUNS_DIR) $(FGEN_MAPS_DIR) $(FGEN_LOGS_DIR)
+	@mkdir -p $(FGEN_OUT_DIR)
 	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_CRDB_OPT) $(FGEN_EX_OPTS) --check
 
 ## Program Generation
 
 PGEN_IN_DIR    ?= $(FGEN_OUT_DIR)
-PGEN_PROGS_DIR := $(PGEN_IN_DIR)/programs
 PGEN_LIMIT     ?= 100000
 PGEN_EX_OPTS   ?=
 
 gen-prog-set: pgen
-	@mkdir -p $(PGEN_PROGS_DIR)
 	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) $(shell uuidgen)
 
 gen-prog-set-check: pgen
-	@mkdir -p $(PGEN_PROGS_DIR)
 	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) --debug $(shell uuidgen)
-	$(PY3) scripts/ubchk.py $(PGEN_PROGS_DIR)
+	$(PY3) scripts/ubchk.py $(PGEN_IN_DIR)
 
 
 ########################################################################
@@ -166,4 +160,4 @@ gen-prog-set-check: pgen
 ########################################################################
 
 clean:
-	rm -rf $(BUILD_DIR) $(FGEN_OUT_DIR) $(PGEN_IN_DIR)
+	rm -rf $(BUILD_DIR)

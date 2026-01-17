@@ -31,12 +31,11 @@ from pathlib import Path
 
 from configs import (
   DEFAULT_OUTPUT_DIR,
-  get_func_map_files,
-  get_prog_file,
+  FunArts,
   get_crealdb_file,
 )
-from fuzz import FuncGenOptions, generate_function, crealize, FGEN_SUGGESTED_CONFIGS
-from ubchk import check_ubs, check_ubs_once
+from fuzz import FGEN_SUGGESTED_CONFIGS, FuncGenOptions, crealize, generate_function
+from ubchk import check_func_ubs
 
 
 def generate(opts: FuncGenOptions, *, timeout: int):
@@ -67,7 +66,7 @@ def run_gen_loop(
     f"seed={fopts.seed if fopts.seed >= 0 else '<RND>'}, "
     f"sexp={fopts.sexp}, main={fopts.main}, allops={fopts.allops}, injubs={fopts.injubs}, "
     f"check={check}, crealdb={crealdb}, timeout={timeout}s, "
-    f"extra={'\'' + fopts.extra + '\'' if fopts.extra else '<NONE>'}"
+    f"extra={"'" + fopts.extra + "'" if fopts.extra else '<NONE>'}"
   )
   fopts.sno = 0
   while limit == 0 or fopts.sno < limit:
@@ -78,15 +77,14 @@ def run_gen_loop(
       print(f"SUCC (time={elapsed}s)")
     if check and succ:
       print(f"[{fopts.sno}]: CheckUBs ...", end=" ", flush=True)
-      check_ubs(*get_func_map_files(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
-      if fopts.main:
-        check_ubs_once(get_prog_file(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
+      check_func_ubs(FunArts(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
       print("NO UBs")
     if crealdb and succ:
       print(f"[{fopts.sno}]: GenCreal ...", end=" ", flush=True)
       if crealize(
         get_tmp_crealdb_file(fopts.outdir),
-        *get_func_map_files(fopts.uuid, fopts.sno, gen_dir=fopts.outdir),
+        FunArts(fopts.uuid, fopts.sno, gen_dir=fopts.outdir).get_func_file(),
+        FunArts(fopts.uuid, fopts.sno, gen_dir=fopts.outdir).get_map_file(),
       ):
         print("SUCC")
       else:
@@ -190,7 +188,7 @@ if __name__ == "__main__":
   )
 
   if args.crealdb:
-    print(f"Converting CrealDB to JSON format ...")
+    print("Converting CrealDB to JSON format ...")
     cdb_tmp_file = get_tmp_crealdb_file(outdir)
     with cdb_tmp_file.open() as fin:
       items = []

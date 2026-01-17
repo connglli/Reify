@@ -41,8 +41,14 @@ public:
   // Compute the checksum of the given arguments
   static int Compute(const std::vector<ArgPlus<int>> &args);
 
+  // Get the function prototype for the CRC32 table initialization function
+  static std::string GetCrc32InitPrototype();
+
   // Get the function name for the CRC32 table initialization function
   static std::string GetCrc32InitName();
+
+  // Get the function prototype for the checksum computing function
+  static std::string GetComputePrototype();
 
   // Get the function name for the checksum computing function
   static std::string GetComputeName();

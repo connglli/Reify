@@ -105,6 +105,9 @@ namespace symir {
   public:
     explicit SymCxLower(std::ostream &out) : SymIRLower(out) {}
 
+  public:
+    static std::string GetFunPrototype(const Funct &f);
+
   protected:
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;

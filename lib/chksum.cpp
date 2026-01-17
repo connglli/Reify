@@ -59,7 +59,13 @@ int StatelessChecksum::Compute(const std::vector<ArgPlus<int>> &args) {
   return Compute(values);
 }
 
+std::string StatelessChecksum::GetCrc32InitPrototype() { return "void generate_crc32_table()"; }
+
 std::string StatelessChecksum::GetCrc32InitName() { return "generate_crc32_table"; }
+
+std::string StatelessChecksum::GetComputePrototype() {
+  return "int computeStatelessChecksum(int num_args, int args[])";
+}
 
 std::string StatelessChecksum::GetComputeName() { return "computeStatelessChecksum"; }
 
