@@ -58,9 +58,9 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
     f"UUID={fopts.uuid}, output={fopts.outdir}, "
     f"limit={limit if limit != 0 else '<INF>'}, "
     f"seed={fopts.seed if fopts.seed >= 0 else '<RND>'}, "
-    f"sexp={fopts.sexp}, main={fopts.main}, allops={fopts.allops}, injubs={fopts.injubs}, "
+    f"sexp={fopts.sexp}, main={fopts.main}, wasm={fopts.wasm}, allops={fopts.allops}, injubs={fopts.injubs}, "
     f"check={check}, crealdb={crealdb}, timeout={timeout}s, "
-    f"extra={'\'' + fopts.extra + '\'' if fopts.extra else '<NONE>'}"
+    f"extra={repr(fopts.extra) if fopts.extra else '<NONE>'}"
   )
   fopts.sno = 0
   while limit == 0 or fopts.sno < limit:
@@ -123,6 +123,12 @@ if __name__ == "__main__":
     help="enable the generation of a main function",
   )
   parser.add_argument(
+    "--wasm",
+    action="store_true",
+    default=False,
+    help="enable the generation of a Wasm program",
+  )
+  parser.add_argument(
     "--allops",
     action="store_true",
     default=False,
@@ -172,6 +178,7 @@ if __name__ == "__main__":
       verbose=args.check,
       main=args.main,
       sexp=args.sexp,
+      wasm=args.wasm,
       allops=args.allops,
       injubs=args.injubs,
       seed=args.seed,  # We save it as the initial seed

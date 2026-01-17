@@ -26,7 +26,9 @@
 #ifndef REIFY_LOWERS_HPP
 #define REIFY_LOWERS_HPP
 
+#include <algorithm>
 #include <fstream>
+#include <random>
 #include "jnif/jnif.hpp"
 #include "lib/lang.hpp"
 
@@ -121,6 +123,48 @@ namespace symir {
     void Visit(const VecLocal &l) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
+  };
+
+  /// An "SymIR -> Wasm" lower
+  class SymWasmLower : public SymIRLower {
+  public:
+    explicit SymWasmLower(std::ostream &out) : SymIRLower(out) {}
+
+  protected:
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &e) override;
+    void Visit(const RetStmt &r) override;
+    void Visit(const Branch &b) override;
+    void Visit(const Goto &g) override;
+    void Visit(const ScaParam &p) override;
+    void Visit(const VecParam &p) override;
+    void Visit(const ScaLocal &l) override;
+    void Visit(const VecLocal &l) override;
+    void Visit(const Block &b) override;
+    void Visit(const Funct &f) override;
+
+  protected:
+    std::string getWasmType(SymIR::Type type) {
+      switch (type) {
+        case SymIR::Type::I32:  return "i32";
+        default: return "unknown";
+      }
+    }
+
+  protected:
+    bool force_sexp = false; // Whether current emission must be sexp style
+    std::vector<const Block *> blocks; // Blocks in order of appearance
+    std::map<int, int> block_inds{}; // Map from block label nums to dispatch indices
+    std::map<const std::string, int> locals{}; // Map from variable names to local indices
+    std::set<std::string> is_anonymous; // If variable in this set, must use index to refer to
+
+  protected:
+    inline static const std::string WASM_DISPATCHER = "dispatcher";
+    inline static const std::string WASM_NEXT_BLOCK = "next_block";
   };
 
   /// An "SymIR -> Java Bytecode" lower

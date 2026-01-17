@@ -83,6 +83,7 @@ struct FunGenOpts {
   std::optional<std::string> graphdb;
   bool main;
   bool sexpression;
+  bool wasm;
   bool javaclass;
   bool verbose;
 
@@ -97,6 +98,7 @@ struct FunGenOpts {
       ("g,unstable-graphdb", "Path to the JSONL file of a graph database for guiding graph generation", cxxopts::value<std::string>())
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("S,sexpression", "Also generate the S Expression of the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("W,wasm", "Also generate a Wasm program identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
@@ -175,6 +177,9 @@ struct FunGenOpts {
     }
     const bool main = args["main"].as<bool>();
     const bool sexpression = args["sexpression"].as<bool>();
+    
+    const bool wasm = args["wasm"].as<bool>();
+    // TODO: any warnings, messages, or UB options needed for wasm?
 
     const bool javaclass = args["unstable-javaclass"].as<bool>();
     if (javaclass && !GlobalOptions::Get().DisallowDeadCode) {
@@ -192,6 +197,7 @@ struct FunGenOpts {
         .graphdb = graphdb,
         .main = main,
         .sexpression = sexpression,
+        .wasm = wasm,
         .javaclass = javaclass,
         .verbose = verbose
     };
@@ -206,6 +212,7 @@ int main(int argc, char **argv) {
   std::optional<std::string> graphdb = cliOpts.graphdb;
   bool mainfun = cliOpts.main;
   bool sexpression = cliOpts.sexpression;
+  bool wasm = cliOpts.wasm;
   bool javaclass = cliOpts.javaclass;
   bool verbose = cliOpts.verbose;
 
@@ -299,6 +306,15 @@ int main(int argc, char **argv) {
     programFile << funCode << std::endl;
     programFile << fun.GenerateMainCode(*exec, /*debug=*/verbose) << std::endl;
     programFile.close();
+  }
+
+  // Generate a Wasm program if necessary
+  if (wasm) {
+    std::string wasmCode = fun.GenerateWasmCode(*exec);
+    std::filesystem::create_directories(GetWasmDir(outputDirectory));
+    std::ofstream wasmFile = std::ofstream(GetWasmPath(uuid, sno, outputDirectory));
+    wasmFile << wasmCode << std::endl;
+    wasmFile.close();
   }
 
   // Generate a Java class if necessary

@@ -89,6 +89,7 @@ class FuncGenOptions:
   verbose: bool = False  # Whether to print verbose output
   main: bool = True  # Whether to include a main function in the generated program
   sexp: bool = True  # Whether to include S-expression output
+  wasm: bool = True  # Whether to include Wasm output -- TODO: should this be False?
   allops: bool = True  # Whether to consider all possible operations in the generated program
   injubs: bool = True  # Whether to inject undefined behaviors for those unexecuted blocks
   seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
@@ -104,6 +105,7 @@ class FuncGenOptions:
       'verbose': self.verbose,
       'main': self.main,
       'sexp': self.sexp,
+      'wasm': self.wasm,
       'allops': self.allops,
       'injubs': self.injubs,
       'seed': self.seed,
@@ -125,6 +127,8 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
       cmd += ["-m"]
     if opts.sexp:
       cmd += ["-S"]
+    if opts.wasm:
+      cmd += ["-W", "--Xdisable-array-vars"]
     if opts.allops:
       cmd += ["-A"]
     if opts.injubs:
@@ -618,7 +622,7 @@ class Worker:
       self.iter += 1
 
   def run_func(self, opts: FuncGenOptions, gen_tmo: int, test_tmo: int) -> Optional[Path]:
-    self.log(f"Generating function: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}")
+    self.log(f"Generating function: {', '.join([str(x[0]) + '=' + str(x[1]) for x in opts.to_dict().items()])}")
     prog, errmsg = generate_function(opts, timeout=gen_tmo)
     if not prog:
       # TODO: Save it as it might be our bugs
@@ -634,7 +638,7 @@ class Worker:
     return prog
 
   def run_prog(self, opts: ProgGenOptions, test_tmo: int):
-    self.log(f"Generating programs: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}")
+    self.log(f"Generating programs: {', '.join([str(x[0]) + '=' + str(x[1]) for x in opts.to_dict().items()])}")
     errmsg = generate_programs(opts)
     if errmsg:
       self.log(f"Failure: {errmsg}", color="yellow")
@@ -678,7 +682,7 @@ class Worker:
 
   def run_creal(self, opts: CrealOptions, timeout: int):
     self.log(
-      f"Generating Creal mutants: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}"
+      f"Generating Creal mutants: {', '.join([str(x[0]) + '=' + str(x[1]) for x in opts.to_dict().items()])}"
     )
     mutants, errmsg = run_creal(opts, timeout=timeout)
     if errmsg:

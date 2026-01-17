@@ -107,6 +107,9 @@ public:
   // Generate the S Expression code of the function for a given execution
   [[nodiscard]] std::string GenerateFunSexpCode(const UBFreeExec &exec) const;
 
+  // Generate the Wasm code of the function for a given execution
+  [[nodiscard]] std::string GenerateWasmCode(const UBFreeExec &exec) const;
+
   // Generate the Java code of the function for a given execution with or without main()
   [[nodiscard]] std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
       const UBFreeExec &exec, const std::string &className, bool main = false, bool debug = false

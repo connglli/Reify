@@ -355,6 +355,551 @@ namespace symir {
     out << "}" << std::endl;
   }
 
+  void SymWasmLower::Visit(const VarUse &v) {
+    // option 1: get by name
+    std::string var_name = v.GetName();
+    bool use_index = is_anonymous.count(var_name) || (rand() % 2 == 0);
+    // option 2: get by index (0-based, first params, then locals)
+    std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+
+    if (use_sexp) out << "(";
+    out << "local.get " << var_id;
+    if (use_sexp) out << ")";
+  }
+
+  void SymWasmLower::Visit(const Coef &c) {
+    // must be solved to emit value
+    Assert(c.IsSolved(), "The coefficient has not been solved, cannot lower to Wasm");
+    
+    std::string type;
+    switch (c.GetType()) {
+      case SymIR::Type::I32: type = "i32"; break;
+      default: Panic("Unsupported variable type");
+    }
+
+    // TODO: will currently only work for i32
+    int32_t value = c.GetI32Value();
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+
+    // option 1: c
+    if (use_sexp) out << "(";
+    out << type << ".const " << value;
+    if (use_sexp) out << ")";
+
+    // option 2: ((c + R) - R)  // TODO: make this also vary between sexp/stackbased
+    // note: should keep simple in order to replace with function call?
+  }
+
+  void SymWasmLower::Visit(const Term &t) { 
+    if (t.GetType() != SymIR::Type::I32) {
+      Panic("Unsupported term type");
+    }
+
+    if (t.GetOp() == Term::Op::OP_CST) {
+      // just coef
+      t.GetCoef()->Accept(*this);
+      return;
+    }
+
+    std::string op;
+    switch (t.GetOp()) {
+      case Term::Op::OP_ADD: op = "i32.add"; break;
+      case Term::Op::OP_SUB: op = "i32.sub"; break;
+      case Term::Op::OP_MUL: op = "i32.mul"; break;
+      case Term::Op::OP_DIV: op = "i32.div_s"; break;
+      case Term::Op::OP_REM: op = "i32.rem_s"; break;
+      default: Panic("Unsupported operation");
+    }
+
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+
+    if (use_sexp) {
+      bool old_force = force_sexp;
+      force_sexp = true;
+      
+      out << "(" << op;
+      if (t.GetCoef()) {
+        out << " ";
+        t.GetCoef()->Accept(*this);
+      }
+      if (t.GetVar()) {
+        out << " ";
+        t.GetVar()->Accept(*this);
+      }
+      out << ")";
+      
+      force_sexp = old_force;
+    } else {
+      if (t.GetCoef()) {
+        t.GetCoef()->Accept(*this);
+        out << std::endl; indent();
+      }
+      if (t.GetVar()) { 
+        t.GetVar()->Accept(*this);
+        out << std::endl; indent();
+      }
+      out << op;
+    }
+  }
+
+  void SymWasmLower::Visit(const Expr &e) {
+    if (e.GetType() != SymIR::I32) {
+      Panic("Unsupported expression type");
+    }
+    
+    const auto& terms = e.GetTerms();
+    if (terms.empty()) {
+      // using 0 as a default  // TODO: will this ever occur? should maybe error instead?
+      out << (force_sexp ? "(i32.const 0)" : "i32.const 0");
+      return;
+    }
+    
+    if (terms.size() == 1) {
+      terms[0]->Accept(*this);
+      return;
+    }
+
+    std::string op;
+    switch(e.GetOp()) {
+      case Expr::Op::OP_ADD: op = "i32.add"; break;
+      case Expr::Op::OP_SUB: op = "i32.sub"; break;
+      default: Panic("Unsupported expression operation");
+    }
+
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+
+    if (use_sexp) {
+      bool old_force = force_sexp;
+      force_sexp = true; 
+
+      // for left-assoc, have to emit (op (op (op 1 2) 3) 4)
+      for (size_t i = 0; i < terms.size() - 1; ++i) {
+        out << "(" << op << " ";
+      }
+      
+      terms[0]->Accept(*this); // first/core term
+      
+      for (size_t i = 1; i < terms.size(); ++i) {
+        out << " ";
+        terms[i]->Accept(*this);
+        out << ")";
+      }
+
+      force_sexp = old_force;
+    } else {
+      // stackbased is naturally left-assoc in order
+      terms[0]->Accept(*this);
+      for (size_t i = 1; i < terms.size(); ++i) {
+        out << std::endl; indent();
+        terms[i]->Accept(*this);
+        out << std::endl; indent();
+        out << op;
+      }
+    }
+  }
+
+  void SymWasmLower::Visit(const Cond &c) {
+    if (c.GetType() != SymIR::I32) {
+      Panic("Unsupported condition type");
+    }
+
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    Cond::Op op = c.GetOp();
+
+    if (use_sexp) {
+      bool old_force = force_sexp;
+      force_sexp = true;
+
+      if (op == Cond::Op::OP_EQZ) {
+        out << "(i32.eqz ";
+        c.GetExpr()->Accept(*this);
+        out << ")";
+      } else {
+        // represent gtz and ltz by comparing with 0 (pushed const)
+        std::string op_str = (op == Cond::Op::OP_GTZ) ? "i32.gt_s" : "i32.lt_s";
+        out << "(" << op_str << " ";
+        c.GetExpr()->Accept(*this);
+        out << " (i32.const 0))";
+      }
+
+      force_sexp = old_force;
+    } else {
+      c.GetExpr()->Accept(*this);
+      out << std::endl; indent();
+
+      if (op == Cond::Op::OP_EQZ) {
+        out << "i32.eqz";
+      } else {
+        // represent gtz and ltz by comparing with 0 (pushed const)
+        out << "i32.const 0";
+        out << std::endl; indent();
+        out << ((op == Cond::Op::OP_GTZ) ? "i32.gt_s" : "i32.lt_s");
+      }
+    }
+  }
+
+  void SymWasmLower::Visit(const AssStmt &e) {
+    std::string var_name = e.GetVar()->GetName();
+    bool use_index = is_anonymous.count(var_name) || (rand() % 2 == 0);
+    std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
+    
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+
+    if (use_sexp) {
+      bool old_force = force_sexp;
+      force_sexp = true;
+
+      out << "(local.set " << var_id << " ";
+      e.GetExpr()->Accept(*this);
+      out << ")";
+
+      force_sexp = old_force;
+    } else {
+      e.GetExpr()->Accept(*this);
+      out << std::endl; indent();
+      out << "local.set " << var_id;
+    }
+  }
+
+  // note: returning all vars with multi-return
+  void SymWasmLower::Visit(const RetStmt &r) {
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+
+    if (use_sexp) {
+      bool old_force = force_sexp;
+      force_sexp = true;
+
+      out << "(return";
+      for (auto &v : r.GetVars()) {
+        out << " ";
+        v->Accept(*this);
+      }
+      out << ")";
+      
+      force_sexp = old_force;
+    } else {
+      for (auto &v : r.GetVars()) {
+        v->Accept(*this);
+        out << std::endl; indent();
+      }
+      out << "return";
+    }
+  }
+
+  void SymWasmLower::Visit(const Branch &b) {
+    int true_id = block_inds[std::stoi(b.GetTrueTarget().substr(2))];
+    int false_id = block_inds[std::stoi(b.GetFalseTarget().substr(2))];
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
+    
+    if (use_sexp) {
+      bool old_force = force_sexp;
+      out << "(local.set " << next_block_id << " ";
+      force_sexp = true; 
+      
+      out << "(if (result i32) ";
+      b.GetCond()->Accept(*this);
+      out << " (then (i32.const " << true_id << "))";
+      out << " (else (i32.const " << false_id << "))";
+      out << "))";
+      
+      force_sexp = old_force;
+    } else {
+      // cond, if, true_block, else, false_block, end, set next_block
+      b.GetCond()->Accept(*this); 
+      out << std::endl; indent();
+
+      out << "if (result i32)" << std::endl;
+      incIndent(); indent();
+      out << "i32.const " << true_id << std::endl;
+      decIndent(); indent();
+      
+      out << "else" << std::endl;
+      incIndent(); indent();
+      out << "i32.const " << false_id << std::endl;
+      decIndent(); indent();
+
+      out << "end" << std::endl;
+      indent();
+
+      out << "local.set " << next_block_id;
+    }
+
+    // randomize again for br
+    use_sexp = force_sexp || (rand() % 2 == 0);
+
+    out << std::endl; indent();
+    if (use_sexp) out << "(";
+    out << "br $" << WASM_DISPATCHER;
+    if (use_sexp) out << ")";
+  }
+
+  void SymWasmLower::Visit(const Goto &g) {
+    int target_id = block_inds[std::stoi(g.GetTarget().substr(2))];
+    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
+
+    if (use_sexp) {
+      out << "(local.set " << next_block_id << " ";
+      out << "(i32.const " << target_id << ")"; 
+      out << ")";
+    } else {
+      out << "i32.const " << target_id << std::endl;
+      indent();
+      out << "local.set " << next_block_id;
+    }
+
+    // randomize again for br
+    use_sexp = force_sexp || (rand() % 2 == 0);
+
+    out << std::endl; indent();
+    if (use_sexp) out << "(";
+    out << "br $" << WASM_DISPATCHER;
+    if (use_sexp) out << ")";
+  }
+
+  // unused
+  void SymWasmLower::Visit(const ScaParam &p) {
+    out << "(param $" << p.GetName() << " ";
+      switch (p.GetType()) {
+        case SymIR::Type::I32: out << "i32"; break;
+        default: Panic("Unsupported parameter type %s", SymIR::GetTypeName(p.GetType()).c_str());
+      }
+    out << ")";
+  }
+
+  // unused
+  void SymWasmLower::Visit(const VecParam &p) {
+    out << "(param $" << p.GetName() << " v128)";
+  }
+
+  // unused
+  void SymWasmLower::Visit(const ScaLocal &l) {
+    out << "(local $" << l.GetName() << " ";
+      switch (l.GetType()) {
+        case SymIR::Type::I32: out << "i32"; break;
+        default: Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
+      }
+    out << ")";
+  }
+
+  // unused
+  void SymWasmLower::Visit(const VecLocal &l) {
+    out << "(local $" << l.GetName() << " v128)";
+  }
+
+  void SymWasmLower::Visit(const Block &b) { 
+    // visit all instrs inside the block
+    for (const auto &s: b.GetStmts()) {
+      indent();
+      s->Accept(*this);
+      out << std::endl;
+    }
+  }
+
+  void SymWasmLower::Visit(const Funct &f) {
+    incIndent();  // should by default be 1
+    
+    // initialize blocks and order
+    for (const auto &b : f.GetBlocks()) {
+      blocks.push_back(b);
+    }
+
+    // initialize in-scope-variable name : idx map
+    int idx = 0;
+    for (const auto &p : f.GetParams()) {
+      locals[p->GetName()] = idx++;
+    }
+    locals[WASM_NEXT_BLOCK] = idx++;
+    for (const auto &l : f.GetLocals()) {
+      locals[l->GetName()] = idx++;
+    }
+
+    indent(); out << "(func $" << f.GetName() << " ";
+
+    // loop directly here instead of visiting to allow folding/anonymization
+    const auto& params = f.GetParams();
+    size_t i = 0;
+    while (i < params.size()) {
+      // how many params are left
+      int remaining = params.size() - i;
+      // can only fold if there are 2+ remaining
+      bool can_group = (remaining >= 2);
+      bool group = can_group && (rand() % 2 == 0);
+
+      if (group) {
+        out << "(param";
+        // random group size between 2 and 'remaining'
+        int group_size = (rand() % (remaining - 1)) + 2; 
+        for (int j = 0; j < group_size; ++j) {
+          out << " " << getWasmType(params[i]->GetType());
+          // update is_anonymous
+          is_anonymous.insert(params[i]->GetName());
+          i++;
+        }
+        out << ") ";
+      } else {
+        // named, ungrouped/single
+        out << "(param $" << params[i]->GetName() << " " << getWasmType(params[i]->GetType()) << ") ";
+        // update is_anonymous
+        is_anonymous.erase(params[i]->GetName());
+        i++;
+      }
+    }
+
+    out << "(result";
+    switch (f.GetRetType()) {
+      case SymIR::Type::I32:
+        // just return all params final state  // TODO: will need to modify with v128 addition
+        for (size_t i = 0; i < f.GetParams().size(); i++) {
+          out << " i32";
+        }
+        break;
+      default: Panic("Unsupported return type %s in method %s", SymIR::GetTypeName(f.GetRetType()).c_str(), f.GetName().c_str());
+    }
+
+    out << ")" << std::endl;
+
+    incIndent(); indent();
+
+    // can just shuffle block order, since doesn't affect dispatcher pattern
+    // IDEA: toggling force_sexp from the beginning can enable 'pretty print'
+    if (!force_sexp) {
+      std::random_device rd;
+      std::mt19937 r(rd());
+      std::shuffle(blocks.begin(), blocks.end(), r);
+    }
+
+    // initialize block_inds
+    for (size_t i = 0; i < blocks.size(); i++) {
+      block_inds[std::stoi(blocks[i]->GetLabel().substr(2))] = i;
+    }
+
+    // emit next_block, no folding but possible anonymization
+    if (rand() % 2 == 0) {
+      // anon
+      out << "(local i32)" << std::endl;
+      indent();
+      is_anonymous.insert(WASM_NEXT_BLOCK);
+    } else {
+      // named
+      out << "(local $" << WASM_NEXT_BLOCK << " i32)" << std::endl;
+      indent();
+      is_anonymous.erase(WASM_NEXT_BLOCK);
+    }
+
+    // loop directly here instead of visiting to allow folding/anonymization
+    i = 0;
+    const auto& ir_locals = f.GetLocals();
+    while (i < ir_locals.size()) {
+      int remaining = ir_locals.size() - i;
+      bool can_group = (remaining >= 2);
+      bool group = can_group && (rand() % 2 == 0);
+
+      if (group) {
+        out << "(local";
+        int group_size = (rand() % (remaining - 1)) + 2; 
+        for (int j = 0; j < group_size; ++j) {
+          out << " " << getWasmType(ir_locals[i]->GetType());
+          is_anonymous.insert(ir_locals[i]->GetName());
+          i++;
+        }
+        out << ")" << std::endl; indent();
+      } else {
+        out << "(local $" << ir_locals[i]->GetName() << " " << getWasmType(ir_locals[i]->GetType()) << ")";
+        out << std::endl; indent();
+        is_anonymous.erase(ir_locals[i]->GetName());
+        i++;
+      }
+    }
+
+    if (block_inds[0] != 0) {
+      out << std::endl; indent();
+      // set nextblock to bb0idx if not 0
+      std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
+      out << "(local.set " << next_block_id << " (i32.const " << block_inds[0] << "))" << std::endl;
+      indent();
+    }
+    // init values of locals (have to actually just set them separately as they are auto init to 0)
+    for (const auto &l : f.GetLocals()) {
+      if (auto sca = dynamic_cast<const ScaLocal*>(l)) {
+        int coef = sca->GetCoef()->GetI32Value();
+        if (coef != 0) {
+          // TODO: create an equivalent assn stmt and visit?
+          std::string var_name = l->GetName();
+          bool use_index = is_anonymous.count(var_name) || (rand() % 2 == 0);
+          std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
+          out << "(local.set " << var_id << " (i32.const " << coef << "))" << std::endl;
+          indent();
+        }
+      }
+      // TODO: veclocal
+    }
+
+    if (!blocks.empty()) {
+      out << std::endl;
+
+      // dispatcher header
+      indent();
+      out << "(loop $" << WASM_DISPATCHER << std::endl;;
+      incIndent(); indent();
+
+      for (int i = blocks.size() - 1; i >= 0; i--) {
+        out << "(block $" << blocks[i]->GetLabel() << " ";
+      }
+      out << std::endl;
+
+      // dispatcher body
+      incIndent(); indent();
+      std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
+      if (force_sexp || rand() % 2 == 0) {
+        out << "(br_table";
+        for (const auto &b : blocks) {
+          out << " $" << b->GetLabel();
+        }
+        out << " (local.get " << next_block_id << "))" << std::endl;
+        decIndent();
+      } else {
+        out << "local.get " << next_block_id << std::endl;
+        indent();
+        out << "br_table";
+        for (const auto &b : blocks) {
+          out << " $" << b->GetLabel();
+        }
+        out << std::endl;
+        decIndent();
+      }
+
+      // block bodies
+      for (const auto &b : blocks) {
+        indent();
+        out << ")" << std::endl;
+        incIndent(); indent();
+        out << ";; -- block " << b->GetLabel() << " --" << std::endl;
+        b->Accept(*this);
+        decIndent();
+      }
+    }
+
+    // dispatcher close paren
+    decIndent(); indent();
+    out << ")" << std::endl;
+    indent();
+    out << "(return";
+    for (size_t i = 0; i < f.GetParams().size(); i++) {
+      out << " (i32.const 0)";  // required return after all blocks, just using 0 as default
+    }
+
+    out << ")" << std::endl;
+    decIndent(); indent();
+    out << ")" << std::endl;
+
+    // (export "function_name" (func $function_name))
+    out << std::endl; indent();
+    out << "(export \"" << f.GetName() << "\" (func $" << f.GetName() << "))" << std::endl;
+  }
+
   void SymJavaBytecodeLower::CreateArray(
       jnif::Method &met, const VarDef &var, const std::vector<Coef *> &inits
   ) {

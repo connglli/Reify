@@ -440,6 +440,10 @@ static std::filesystem::path GetSexpressionsDir(const std::filesystem::path &out
   return output / "sexpressions";
 }
 
+static std::filesystem::path GetWasmDir(const std::filesystem::path &output) {
+  return output / "wasm";
+}
+
 static std::filesystem::path GetJavaClassesDir(const std::filesystem::path &output) {
   return output / "javaclasses";
 }
@@ -516,6 +520,16 @@ static std::filesystem::path GetProgramPath(
     const std::string &uuid, const std::string &sno, const std::filesystem::path &output
 ) {
   return GetProgramsDir(output) / GetProgramNameForFunctionName(GetFunctionName(uuid, sno));
+}
+
+static std::string GetWasmNameForFunctionName(const std::string &functionName) {
+  return functionName.substr(std::string(FUNCTION_NAME_PREFIX).size() + 1) + ".wat";
+}
+
+static std::filesystem::path GetWasmPath(
+    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
+) {
+  return GetWasmDir(output) / GetWasmNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
 static std::filesystem::path

@@ -471,6 +471,19 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   return main.str();
 }
 
+std::string FunPlus::GenerateWasmCode(const UBFreeExec &exec) const {
+  Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
+  const auto *fun = exec.GetFun();
+  Assert(fun != nullptr, "Function is not generated yet!");
+
+  std::ostringstream oss;
+  oss << "(module" << std::endl;
+  symir::SymWasmLower lower(oss);
+  lower.Lower(*exec.GetFun());
+  oss << ")" << std::endl;
+  return oss.str();
+}
+
 std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
   std::ostringstream mapping;
