@@ -1,5 +1,10 @@
 # Reify
 
+> [!WARNING]
+> This is a working-in-progress branch.
+> The organization of the generated files are changed.
+> ./scripts/fuzz.py and ./scripts/fuzz_jvm.sh does not work.
+
 Reify is a random program generator based on *semantic reification*.
 It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
 Using Reify, 59 bugs have been discovered and reported in GCC and LLVM.
