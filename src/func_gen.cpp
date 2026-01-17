@@ -28,54 +28,13 @@
 #include <filesystem>
 #include <fstream>
 
+#include "artifacts.hpp"
 #include "global.hpp"
 #include "lib/chksum.hpp"
 #include "lib/logger.hpp"
+#include "lib/lowers.hpp"
 #include "lib/random.hpp"
 #include "lib/ubfexec.hpp"
-
-std::ofstream functionFile;
-std::ofstream mappingFile;
-std::filesystem::path mapFilePath;
-std::filesystem::path funcFilePath;
-
-static bool isFormulaSatisfiable = false;
-
-// Write a signal handler to handle SIGINT and SIGTERM signals
-void cleanupIfEmpty() {
-  if (functionFile.is_open()) {
-    functionFile.close();
-  }
-  if (mappingFile.is_open()) {
-    mappingFile.close();
-  }
-  // if output file is empty, remove it from the filesystem
-  std::ifstream f(funcFilePath);
-  std::ifstream f2(mapFilePath);
-  if (f.peek() == std::ifstream::traits_type::eof() ||
-      f2.peek() == std::ifstream::traits_type::eof()) {
-    std::remove(funcFilePath.c_str());
-    std::remove(mapFilePath.c_str());
-  }
-  f.close();
-  f2.close();
-}
-
-void signalHandler(int signum) {
-  Log::Get().Out() << "Interrupt signal (" << signum << ") received." << std::endl;
-  if (isFormulaSatisfiable) {
-    return;
-  } else {
-    if (functionFile.is_open()) {
-      functionFile.close();
-    }
-    if (mappingFile.is_open()) {
-      mappingFile.close();
-    }
-    cleanupIfEmpty();
-    exit(signum);
-  }
-};
 
 struct FunGenOpts {
   std::string uuid, sno;
@@ -166,7 +125,7 @@ struct FunGenOpts {
                   << std::endl;
         exit(1);
       }
-      if (!std::filesystem::exists(file)) {
+      if (!fs::exists(file)) {
         std::cerr << "Error: The graph database file (--unstable-graphdb) does not exist: " << file
                   << std::endl;
         exit(1);
@@ -209,30 +168,20 @@ int main(int argc, char **argv) {
   bool javaclass = cliOpts.javaclass;
   bool verbose = cliOpts.verbose;
 
-  std::filesystem::path outputDirectory = cliOpts.output;
-  std::filesystem::create_directories(outputDirectory);
-  std::filesystem::create_directories(GetFunctionsDir(outputDirectory));
-  std::filesystem::create_directories(GetMappingsDir(outputDirectory));
+  FunArts arts(uuid, sno, cliOpts.output);
+  fs::create_directories(arts.GetTestDir());
 
-  funcFilePath = GetFunctionPath(uuid, sno, outputDirectory);
-  mapFilePath = GetMappingPath(uuid, sno, outputDirectory);
   if (verbose) {
-    std::filesystem::create_directories(GetLoggingsDir(outputDirectory));
-    Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/false));
+    Log::Get().SetFout(arts.GetLogPath(/*devnull=*/false));
   } else {
-    Log::Get().SetFout(GetGenLogPath(uuid, sno, outputDirectory, /*devnull=*/true));
+    Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
   }
-
-  std::signal(SIGINT, signalHandler);
-  std::signal(SIGTERM, signalHandler);
-  std::signal(SIGKILL, signalHandler);
 
   z3::set_param("parallel.enable", true);
 
   // Generate the function code
   FunPlus fun(
-      GetFunctionName(uuid, sno),
-      GlobalOptions::Get().NumVarsPerFun - GlobalOptions::Get().NumLocalsPerFun,
+      arts.GetFunName(), GlobalOptions::Get().NumVarsPerFun - GlobalOptions::Get().NumLocalsPerFun,
       GlobalOptions::Get().NumLocalsPerFun, GlobalOptions::Get().NumBblsPerFun,
       GlobalOptions::Get().MaxNumLoopsPerFun, GlobalOptions::Get().MaxNumBblsPerLoop
   );
@@ -267,36 +216,33 @@ int main(int argc, char **argv) {
   if (exec == nullptr) {
     std::cerr << "Unable to obtain any UB-free solutions within "
               << GlobalOptions::Get().MaxNumExecsPerFun << " execution samples" << std::endl;
+    fs::remove_all(arts.GetTestDir());
     return -1; // Unable find any good solutions for the execution
     // TODO: Perhaps we can sample a new execution and fail after N samples?
   }
 
   // Generate our code with respect to the UB-free execution
   std::string funCode = fun.GenerateFunCode(*exec);
-  functionFile = std::ofstream(funcFilePath);
+  std::ofstream functionFile(arts.GetFunPath());
   functionFile << funCode << std::endl;
   functionFile.close();
 
   // Generate the s-expressions if necessary
   if (sexpression) {
     std::string sexpCode = fun.GenerateFunSexpCode(*exec);
-    std::filesystem::create_directories(GetSexpressionsDir(outputDirectory));
-    std::ofstream sexpressionFile = std::ofstream(GetSexpressionPath(uuid, sno, outputDirectory));
+    std::ofstream sexpressionFile = std::ofstream(arts.GetSexpPath());
     sexpressionFile << sexpCode << std::endl;
     sexpressionFile.close();
   }
 
   // Generate the initialization-finalization mapping
-  mappingFile = std::ofstream(mapFilePath);
+  std::ofstream mappingFile(arts.GetMapPath());
   mappingFile << fun.GenerateMappingCode(*exec);
   mappingFile.close();
 
   // Generate an executable program if necessary
   if (mainfun) {
-    std::filesystem::create_directories(GetProgramsDir(outputDirectory));
-    std::ofstream programFile = std::ofstream(GetProgramPath(uuid, sno, outputDirectory));
-    programFile << StatelessChecksum::GetRawCode() << std::endl;
-    programFile << funCode << std::endl;
+    std::ofstream programFile = std::ofstream(arts.GetMainPath());
     programFile << fun.GenerateMainCode(*exec, /*debug=*/verbose) << std::endl;
     programFile.close();
   }
@@ -306,14 +252,11 @@ int main(int argc, char **argv) {
     std::cout << "WARNING: The Java class generation is unstable and may not work as expected "
                  "(common failures include bytecode verification failures."
               << std::endl;
-    std::filesystem::create_directories(GetJavaClassesDir(outputDirectory));
     Log::Get().OpenSection("Java Class Generation");
     // TODO: Copy the checksum classes to the output directory if they are not already there
-    auto javaClass = fun.GenerateFunJavaCode(*exec, GetJavaClassName(uuid, sno), mainfun, verbose);
+    auto javaClass = fun.GenerateFunJavaCode(*exec, arts.GetJavaClsName(), mainfun, verbose);
     Log::Get().CloseSection();
-    jnif::stream::OClassFileStream ofs(
-        GetJavaClassPath(uuid, sno, outputDirectory).c_str(), javaClass.get()
-    );
+    jnif::stream::OClassFileStream ofs(arts.GetJavaClsPath().c_str(), javaClass.get());
   }
 
   return 0;

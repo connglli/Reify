@@ -194,6 +194,29 @@ namespace symir {
     out << ")" << std::endl;
   }
 
+  std::string SymCxLower::GetFunPrototype(const Funct &f) {
+    std::ostringstream oss;
+    oss << symir::SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
+    auto params = f.GetParams();
+    for (size_t i = 0; i < params.size(); ++i) {
+      const auto &p = params[i];
+      if (p->IsVolatile()) {
+        oss << "volatile ";
+      }
+      oss << symir::SymIR::GetTypeCName(p->GetType()) << " " << p->GetName();
+      if (p->IsVector()) {
+        for (const auto &l: p->GetVecShape()) {
+          oss << "[" << l << "]";
+        }
+      }
+      if (i != params.size() - 1) {
+        oss << ", ";
+      }
+    }
+    oss << ")";
+    return oss.str();
+  }
+
   void SymCxLower::Visit(const VarUse &v) {
     out << v.GetName();
     if (v.IsVector()) {

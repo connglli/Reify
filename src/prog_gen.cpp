@@ -26,6 +26,7 @@
 #include <set>
 #include <string>
 
+#include "artifacts.hpp"
 #include "cxxopts.hpp"
 #include "global.hpp"
 #include "lib/logger.hpp"
@@ -118,7 +119,6 @@ int main(int argc, char *argv[]) {
   std::string progUuid = cliOpts.uuid;
 
   fs::path inputDir = cliOpts.input;
-  fs::path funsDir(GetFunctionsDir(inputDir));
 
   int genLimit = cliOpts.limits;
   bool enableDebug = cliOpts.debug;
@@ -129,13 +129,13 @@ int main(int argc, char *argv[]) {
   // Read all function files from the input directory
   std::vector<std::string> allFunPaths;
   // Open the directory and read all files
-  for (const auto &entry: fs::directory_iterator(funsDir)) {
-    if (entry.is_regular_file()) {
+  for (const auto &entry: fs::recursive_directory_iterator(inputDir)) {
+    if (FunArts::IsTestDir(entry.path())) {
       allFunPaths.push_back(entry.path());
     }
   }
   Assert(
-      !allFunPaths.empty(), "No function files found in the input directory: %s", funsDir.c_str()
+      !allFunPaths.empty(), "No function files found in the input directory: %s", inputDir.c_str()
   );
 
   // Without a sorting, our results may not be deterministic as
@@ -171,9 +171,8 @@ int main(int argc, char *argv[]) {
 
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
-    prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + ".c"), enableDebug);
-    prog->GenerateCode(
-        GetProgramsDir(inputDir) / (prog->GetName() + "_static.c"), enableDebug, true
-    );
+    ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
+    fs::create_directories(arts.GetTestDir());
+    prog->GenerateCode(arts, enableDebug);
   }
 }

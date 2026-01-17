@@ -1,4 +1,7 @@
 C/C++:
+0. fuzz.py does not support multi-unit tests.
+   Particularly, Creal and ccomp cannot handle this.
+   Remove Creal; Replace ccomp with llubi.
 1. separate into different compilation units
 2. add a pool of common -f flags and pick them randomly
 3. use alive2/smt
