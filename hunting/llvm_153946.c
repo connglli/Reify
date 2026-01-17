@@ -1,4 +1,5 @@
 int a, b, c, d, e, h, i;
+
 int f(int g) {
   a = 0;
   for (; a < 8; a++) {
@@ -8,6 +9,7 @@ int f(int g) {
   }
   return 0;
 }
+
 int main() {
   int j = 1 << c;
   while (e)

@@ -1,4 +1,5 @@
 int a[] = {-3, 2, -2}, b, d, e;
+
 void f(int g, int h) {
   int i = 12 / h;
   do {
@@ -12,6 +13,7 @@ void f(int g, int h) {
     if (j[c] != a[c])
       __builtin_abort();
 }
+
 int main() {
   d = 2;
   f(-2, d);

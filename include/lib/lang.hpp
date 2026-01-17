@@ -910,7 +910,9 @@ namespace symir {
     explicit VecLocal(
         std::string name, const std::vector<int> &shape, std::vector<Coef *> inits,
         Type type = Type::I32
-    ) : Local(SIR_LOCAL_VEC, std::move(name), shape, type), coefs(std::move(inits)) {
+    ) :
+        Local(SIR_LOCAL_VEC, std::move(name), shape, type),
+        coefs(std::move(inits)) {
       const int expectedNumEls = GetVecNumEls(this->vecShape);
       Assert(
           expectedNumEls == static_cast<int>(this->coefs.size()),
@@ -948,8 +950,8 @@ namespace symir {
       std::unique_ptr<Target> target
         // clang-format on
     ) :
-        SymIR(SIR_BLOCK), label(std::move(label)), stmts(std::move(stmts)),
-        target(std::move(target)) {}
+        SymIR(SIR_BLOCK),
+        label(std::move(label)), stmts(std::move(stmts)), target(std::move(target)) {}
 
     [[nodiscard]] std::string GetLabel() const { return label; }
 
@@ -1050,7 +1052,8 @@ namespace symir {
         std::vector<std::unique_ptr<Block>> blocks
         // clang-format on
     ) :
-        SymIR(SIR_FUNCT), WithType(retType), name(std::move(name)), params(std::move(params)),
+        SymIR(SIR_FUNCT),
+        WithType(retType), name(std::move(name)), params(std::move(params)),
         locals(std::move(locals)), symbols(std::move(symbols)), blocks(std::move(blocks)) {
       Assert(!this->params.empty(), "No parameters are given");
       Assert(!this->blocks.empty(), "No basic blocks are given");
@@ -1602,7 +1605,8 @@ namespace symir {
         AfterBlockClosedHook afterBlockClosedHook = nullptr
         // clang-format on
     ) :
-        src(src), beforeBlockOpenHook(std::move(beforeBlockOpenHook)),
+        src(src),
+        beforeBlockOpenHook(std::move(beforeBlockOpenHook)),
         afterBlockOpenedHook(std::move(afterBlockOpenedHook)),
         beforeBlockCloseHook(std::move(beforeBlockCloseHook)),
         afterBlockClosedHook(std::move(afterBlockClosedHook)) {

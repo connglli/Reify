@@ -1,6 +1,8 @@
 unsigned b[256], *c = b;
 int d, e, f, g, h, l, ab, m, ae, n, af, ag, ah, ai, aj, o = -1, p, q = -1;
+
 unsigned aa(unsigned t, char u) { return t >> 8 ^ b[(t ^ u) & 255]; }
+
 unsigned k(unsigned t, unsigned u) {
   p = t >> 8 ^ b[(t ^ u) & 255];
   t = p;
@@ -9,6 +11,7 @@ unsigned k(unsigned t, unsigned u) {
   t = aa(t, u >> 4);
   return t;
 }
+
 int ac(int t) {
   d = -t - 1;
   f = (-1 - 1) * d - 1;
@@ -19,6 +22,7 @@ int ac(int t) {
   ad = (ad ^ -1) % 2147483647;
   return ad;
 }
+
 int r(int t, int u, int v, int w, int x, int y, int z, int ak) {
   l = (ac(-2) - 58245758) * u;
   m = 1 - l - 1;
@@ -31,6 +35,7 @@ int r(int t, int u, int v, int w, int x, int y, int z, int ak) {
   ad = (ad ^ -1) % 2147483647;
   return ad;
 }
+
 int am(int t, int u) {
   int s = -999 * t - 2147483647;
   if (t)
@@ -58,6 +63,7 @@ an:
   o = o ^ 4294967295;
   return o;
 }
+
 int aq(int t, int u) {
   af = -1;
   int a[] = {f, t, af, u, ag};
@@ -66,6 +72,7 @@ int aq(int t, int u) {
   q = q ^ 4294967295;
   return q;
 }
+
 int main() {
   for (unsigned i = 0; i < 256; i++) {
     unsigned ar = i;

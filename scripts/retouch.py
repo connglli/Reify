@@ -41,13 +41,13 @@ if __name__ == "__main__":
     # Check if we'd delete the generated function
     del_cond = (
       # The .c is empty
-        func_path.stat().st_size == 0
-        or
-        # The .map does not exist
-        not map_path.exists()
-        or
-        # The .map is empty
-        map_path.stat().st_size == 0
+      func_path.stat().st_size == 0
+      or
+      # The .map does not exist
+      not map_path.exists()
+      or
+      # The .map is empty
+      map_path.stat().st_size == 0
     )
     if not del_cond:
       continue
