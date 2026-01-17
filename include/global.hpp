@@ -141,7 +141,8 @@ struct GlobalOptions {
   // Probability of replacing a coefficient with a call to another function
   double ReplaceProba = 0.5;
   // Number of functions we want to knit together
-  int FunctionDepth = 10;
+  // Fix: Large values would make the generated programs too slow due to bad LTO
+  int FunctionDepth = 5;
 
   ////////////////////////////////////////////////////////////
   ////// Helper Functions
@@ -424,126 +425,5 @@ private:
   // Private constructor to enforce singleton pattern
   GlobalOptions() = default;
 };
-
-////////////////////////////////////////////////////////////
-////// Outputs
-////////////////////////////////////////////////////////////
-
-#define FUNCTION_NAME_PREFIX "function"
-#define JAVA_CLASS_NAME_PREFIX "Class"
-
-static std::filesystem::path GetFunctionsDir(const std::filesystem::path &output) {
-  return output / "functions";
-}
-
-static std::filesystem::path GetSexpressionsDir(const std::filesystem::path &output) {
-  return output / "sexpressions";
-}
-
-static std::filesystem::path GetJavaClassesDir(const std::filesystem::path &output) {
-  return output / "javaclasses";
-}
-
-static std::filesystem::path GetMappingsDir(const std::filesystem::path &output) {
-  return output / "mappings";
-}
-
-static std::filesystem::path GetLoggingsDir(const std::filesystem::path &output) {
-  return output / "loggings";
-}
-
-static std::filesystem::path GetProgramsDir(const std::filesystem::path &output) {
-  return output / "programs";
-}
-
-static std::string GetFunctionName(const std::string &uuid, const std::string &sno) {
-  return std::string(FUNCTION_NAME_PREFIX) + "_" + uuid + "_" + sno;
-}
-
-static std::string GetJavaClassName(const std::string &uuid, const std::string &sno) {
-  return std::string(JAVA_CLASS_NAME_PREFIX) + "_" + uuid + "_" + sno;
-}
-
-static std::filesystem::path GetFunctionPath(
-    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
-) {
-  return GetFunctionsDir(output) / (GetFunctionName(uuid, sno) + ".c");
-}
-
-static std::string GetSexpressionNameForFunctionName(const std::string &functionName) {
-  return functionName + ".sexp";
-}
-
-static std::filesystem::path GetSexpressionPath(
-    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
-) {
-  return GetSexpressionsDir(output) / (GetFunctionName(uuid, sno) + ".sexp");
-}
-
-static std::filesystem::path
-GetSexpressionPathForFunctionPath(const std::filesystem::path &functionPath) {
-  return GetSexpressionsDir(functionPath.parent_path().parent_path()) /
-         GetSexpressionNameForFunctionName(functionPath.stem());
-}
-
-static std::filesystem::path GetJavaClassPath(
-    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
-) {
-  return GetJavaClassesDir(output) / (GetJavaClassName(uuid, sno) + ".class");
-}
-
-static std::string GetMappingNameForFunctionName(const std::string &functionName) {
-  return functionName + ".jsonl";
-}
-
-static std::filesystem::path GetMappingPath(
-    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
-) {
-  return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
-}
-
-static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
-) {
-  return GetMappingsDir(functionPath.parent_path().parent_path()) /
-         GetMappingNameForFunctionName(functionPath.stem());
-}
-
-static std::string GetProgramNameForFunctionName(const std::string &functionName) {
-  return functionName.substr(std::string(FUNCTION_NAME_PREFIX).size() + 1) + ".c";
-}
-
-static std::filesystem::path GetProgramPath(
-    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
-) {
-  return GetProgramsDir(output) / GetProgramNameForFunctionName(GetFunctionName(uuid, sno));
-}
-
-static std::filesystem::path
-GetGetProgramPathPathForFunctionPath(const std::filesystem::path &functionPath) {
-  return GetProgramsDir(functionPath.parent_path().parent_path()) /
-         GetProgramNameForFunctionName(functionPath.stem());
-}
-
-static std::string GetLoggingNameForFunctionName(const std::string &functionName) {
-  return functionName + ".log";
-}
-
-static std::filesystem::path GetGenLogPath(
-    const std::string &uuid, const std::string &sno, const std::filesystem::path &output,
-    bool devnull = true
-) {
-  if (devnull) {
-    return {"/dev/null"};
-  } else {
-    return GetLoggingsDir(output) / GetLoggingNameForFunctionName(GetFunctionName(uuid, sno));
-  }
-}
-
-static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
-) {
-  return GetLoggingsDir(functionPath.parent_path().parent_path()) /
-         GetLoggingNameForFunctionName(functionPath.stem());
-}
-
 
 #endif // REIFY_GLOBAL_HPP

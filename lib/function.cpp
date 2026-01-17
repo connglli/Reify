@@ -304,6 +304,7 @@ std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
   const auto *fun = exec.GetFun();
   Assert(fun != nullptr, "Function is not generated yet!");
   std::ostringstream oss;
+  oss << "extern " << StatelessChecksum::GetComputePrototype() << ";" << std::endl;
   SymCxLowerWithLoops lower(oss, *this);
   lower.Lower(*exec.GetFun());
   return oss.str();
@@ -447,7 +448,15 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
       "Initializations and finalizations must have the same size"
   );
   std::ostringstream main;
+
+  // Generate the checksum code
+  main << StatelessChecksum::GetRawCode() << std::endl;
   main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
+
+  // Declare the function prototype
+  main << "extern " << symir::SymCxLower::GetFunPrototype(*fun) << ";" << std::endl << std::endl;
+
+  // Generate the main function
   main << "int main(int argc, char* argv[])" << std::endl;
   main << "{" << std::endl;
   main << "  " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
@@ -468,6 +477,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   }
   main << "  return 0;" << std::endl;
   main << "}" << std::endl;
+
   return main.str();
 }
 

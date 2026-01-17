@@ -34,10 +34,16 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
   // Parse all selected function files
   for (const auto &funPath: funPaths) {
-    fs::path sexpPath = GetSexpressionPathForFunctionPath(funPath);
+    FunArts arts(funPath);
+    fs::path sexpPath = arts.GetSexpPath();
+    if (!fs::exists(sexpPath)) {
+      Panic(
+          "S Expression file not found for file: %s. Did you run fgen with --sexpression?",
+          sexpPath.c_str()
+      );
+    }
     functions.push_back(FunPlus::ParseFunSexpCode(sexpPath));
-    fs::path mapPath = GetMappingPathForFunctionPath(funPath);
-    mappings.push_back(FunPlus::ParseMappingCode(mapPath));
+    mappings.push_back(FunPlus::ParseMappingCode(arts.GetMapPath()));
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
   }
 }
@@ -304,45 +310,57 @@ void ProgPlus::Generate() const {
   }
 }
 
-void ProgPlus::GenerateCode(const fs::path &file, bool debug, bool staticModifier) const {
-  std::ofstream oss(file);
-  oss << StatelessChecksum::GetRawCode() << std::endl;
-  oss << "#include <stdio.h>" << std::endl;
-  oss << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
-  auto rand = Random::Get().UniformReal();
-  for (int i = static_cast<int>(functions.size()) - 1; i >= 0; --i) {
-    // Output inline with 60% probability
-    auto probability = rand();
-    if (staticModifier) {
-      oss << "static ";
-    }
-    if (probability < 0.6) {
-      if (!staticModifier) {
-        oss << "static inline ";
-      } else {
-        oss << "inline ";
-      }
-    }
-    symir::SymCxLower lower(oss);
-    lower.Lower(*functions[i]);
-    oss << std::endl;
+void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
+  // Generate the checksum code
+  std::ofstream chksumFile(arts.GetChksumPath());
+  chksumFile << StatelessChecksum::GetRawCode() << std::endl;
+  chksumFile.close();
+
+  // Generate all functions' prototypes
+  std::ofstream protoFile(arts.GetProtoPath());
+  protoFile << "#ifndef PROTOTYPES_H" << std::endl;
+  protoFile << "#define PROTOTYPES_H" << std::endl << std::endl;
+  protoFile << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
+  protoFile << "extern " << StatelessChecksum::GetCrc32InitPrototype() << ";" << std::endl;
+  protoFile << "extern " << StatelessChecksum::GetComputePrototype() << ";" << std::endl;
+  for (const auto &fun: functions) {
+    protoFile << symir::SymCxLower::GetFunPrototype(*fun) << ";" << std::endl;
   }
-  oss << "int main() {" << std::endl;
-  oss << "    " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
+  protoFile << std::endl << "#endif" << std::endl;
+  protoFile.close();
+
+  // Generate all functions
+  for (const auto &fun: functions) {
+    std::ofstream funFile(arts.GetFunPath(fun->GetName()));
+    funFile << "#include \"" << FILENAME_PROTOTYPES_H << "\"" << std::endl << std::endl;
+    symir::SymCxLower lower(funFile);
+    lower.Lower(*fun);
+    funFile.close();
+  }
+
+  // Generate the main function
+  std::ofstream mainFile(arts.GetMainPath());
+  mainFile << "#include <stdio.h>" << std::endl;
+  mainFile << "#include \"" << FILENAME_PROTOTYPES_H << "\"" << std::endl;
+  mainFile << "int main() {" << std::endl;
+  mainFile << "    " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
+
+  // Use the first function (index 0) as the entry point
   int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
   const std::vector<ArgPlus<int>> *init = &(mappings[0].first[index]);
   const std::vector<ArgPlus<int>> *fina = &(mappings[0].second[index]);
   int checksum = StatelessChecksum::Compute(*fina);
-  oss << "    printf(\"%d\\n\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
-      << ", " << functions[0]->GetName() << "(";
+
+  mainFile << "    printf(\"%d\\n\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
+           << ", " << functions[0]->GetName() << "(";
   for (size_t i = 0; i < init->size(); ++i) {
-    oss << (*init)[i].ToCxStr();
+    mainFile << (*init)[i].ToCxStr();
     if (i != init->size() - 1) {
-      oss << ", ";
+      mainFile << ", ";
     }
   }
-  oss << ")));" << std::endl;
-  oss << "    return 0;" << std::endl;
-  oss << "}" << std::endl;
-  oss.close();
+  mainFile << ")));" << std::endl;
+  mainFile << "    return 0;" << std::endl;
+  mainFile << "}" << std::endl;
+  mainFile.close();
 }

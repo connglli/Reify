@@ -29,6 +29,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "artifacts.hpp"
 #include "lib/function.hpp"
 
 namespace fs = std::filesystem;
@@ -42,7 +43,7 @@ public:
   [[nodiscard]] std::string GetName() const { return uuid + "_" + sno; }
 
   void Generate() const;
-  void GenerateCode(const fs::path &file, bool debug = false, bool staticModifier = false) const;
+  void GenerateCode(const ProgArts &arts, bool debug = false) const;
 
 private:
   bool replaceFirstCoef(
