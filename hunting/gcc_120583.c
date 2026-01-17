@@ -1,4 +1,5 @@
 int a, b, c;
+
 static int d(int e) {
   do {
     c = a = -998 * b - 5000000;
@@ -6,6 +7,7 @@ static int d(int e) {
   } while (c <= 0 && 10 * b - a <= 0);
   return c;
 }
+
 int main() {
   if (a)
     d(1);

@@ -167,7 +167,8 @@ protected:
     a.GetVar()->Accept(*this);
   }
 
-  void Visit(const symir::RetStmt &r) override { /* Do Nothing */ }
+  void Visit(const symir::RetStmt &r) override { /* Do Nothing */
+  }
 
   void Visit(const symir::Branch &b) override {
     if (succeeded) {
@@ -176,7 +177,8 @@ protected:
     b.GetCond()->Accept(*this);
   }
 
-  void Visit(const symir::Goto &g) override { /* Do Nothing */ }
+  void Visit(const symir::Goto &g) override { /* Do Nothing */
+  }
 
   void Visit(const symir::ScaParam &p) override {
     Panic("Cannot reach here: ScaParam variables should not be replaced");
@@ -272,9 +274,9 @@ void ProgPlus::Generate() const {
     CoefRepl repl(host);
     int numRepCoeffs = repl.GetNumCoefs();
 
-    Log::Get().Out() << "[" << sno << "] Replacing function" << ": index=" << i
-                     << ", name=" << host->GetName() << ", num_replaceable=" << numRepCoeffs
-                     << std::endl;
+    Log::Get().Out() << "[" << sno << "] Replacing function"
+                     << ": index=" << i << ", name=" << host->GetName()
+                     << ", num_replaceable=" << numRepCoeffs << std::endl;
 
     // Sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);

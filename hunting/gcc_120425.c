@@ -1,4 +1,5 @@
 int b;
+
 int h(int i) {
   if (i == 0)
     return 0;
@@ -6,6 +7,7 @@ int h(int i) {
     return -1788482226;
   return 100;
 }
+
 int main() {
   int f = 987751161, g = -1211051206;
   goto aq;

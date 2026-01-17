@@ -1,4 +1,5 @@
 int a, b, d, g, ab, ae, af, h, i, j, l, n = 1;
+
 int aa(int u[]) {
   for (int c = 0; c < 3; c++) {
     for (int e = 0; e < 11; e++)
@@ -11,6 +12,7 @@ int aa(int u[]) {
   }
   __builtin_abort();
 }
+
 void f(int u, int x, int y) {
   int v, o = 0, p, q;
   p = u;
@@ -27,6 +29,7 @@ void f(int u, int x, int y) {
   int t[] = {u, h, x, i, q, v, j, l, y, o, p};
   aa(t);
 }
+
 int main() {
   ab = 1;
   for (; ab; ab = 0)

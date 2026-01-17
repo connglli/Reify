@@ -100,7 +100,7 @@ The next step populates the CFG into a *symbolic leaf function* using SymIR. Sym
   (loc c s2 i32)               // s2: symbol
 
   (bbl B1
-    (asn c (eadd 
+    (asn c (eadd
       (mul a s3)               // s3=symbol
       (mul b s4)               // s4=symbol
       (cst s5 i32)             // s5=symbol
@@ -118,7 +118,7 @@ The next step populates the CFG into a *symbolic leaf function* using SymIR. Sym
   )
 
   (bbl B3
-    (asn a (eadd 
+    (asn a (eadd
       (mul c s8)               // s8=symbol
       (cst s9 i32)             // s9=symbol
     ))
@@ -139,13 +139,13 @@ It is a leaf function that does not contain any function calls. Each basic block
 
 This step concretizes the symbolic function into the concrete function:
 
-```symir 
+```symir
 (fun func i32 (par b i32)      // s0=-2147483647
   (loc a 0 i32)                // s1=0
   (loc c 0 i32)                // s2=0
 
   (bbl B1
-    (asn c (eadd 
+    (asn c (eadd
       (mul a 1)                // s3=1
       (mul b 0)                // s4=0
       (cst 2147483647 i32)     // s5=2147483647
@@ -163,7 +163,7 @@ This step concretizes the symbolic function into the concrete function:
   )
 
   (bbl B3
-    (asn a (eadd 
+    (asn a (eadd
       (mul c 1)                // s8=1
       (cst 1 i32)              // s9=1
     ))
@@ -192,4 +192,4 @@ For example, a constant `-2147483647` in a generated caller function can be rewr
 
 Once Reify generates a concrete program, it compiles and executes it using the generated input. It then validates whether the program output matches the generated output. For example, if compiling the program with `-O3` and running it yields `-2147483646`, which differs from the expected value `-2147483645`, Reify reports a potential compiler bug.
 
-Of course, one can also use differential testing to validate the compiler using Reify-generated programs. For example, differential via 
+Of course, one can also use differential testing to validate the compiler using Reify-generated programs. For example, differential via

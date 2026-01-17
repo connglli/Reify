@@ -1,17 +1,20 @@
 #include <stdarg.h>
 int a, c, d;
+
 int e(int b, ...) {
-    va_list args;
-    va_start(args, b);
-    int r = 0;
-    for (int i = 0; i < b; i++) {
-        int v = va_arg(args, int);
-        r += v;
-    }
-    va_end(args);
-    return r;
+  va_list args;
+  va_start(args, b);
+  int r = 0;
+  for (int i = 0; i < b; i++) {
+    int v = va_arg(args, int);
+    r += v;
+  }
+  va_end(args);
+  return r;
 }
+
 int f() { e(0); }
+
 int main() {
   int h = 0, g = 0;
   goto l;
@@ -22,9 +25,9 @@ j:
   h = h - 2;
 k:
   d = 1200000000 * h + 10;
-  g = (long)g + -1000000000 * d + 1;
+  g = (long) g + -1000000000 * d + 1;
   if (a * h >= 0) {
-    if (g + (c - (long)1) >= 0)
+    if (g + (c - (long) 1) >= 0)
       goto i;
     return 0;
   }

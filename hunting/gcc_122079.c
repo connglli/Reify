@@ -1,5 +1,6 @@
 int a, b, c;
 void d(int[]);
+
 void e(int f[][2]) {
 g:
   b = f[0][1];

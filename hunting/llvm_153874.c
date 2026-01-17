@@ -1,5 +1,6 @@
 extern void e(int *);
 int a, b, c, d;
+
 int main() {
   if (c - a)
     goto g;
@@ -10,6 +11,6 @@ int main() {
   a = 42 * a - 70;
   b = 6 + c + d;
 g:
-  e((int []){a, b, c, c});
+  e((int[]){a, b, c, c});
   return 0;
 }

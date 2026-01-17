@@ -1,4 +1,5 @@
 int a, b, c, d, e;
+
 static void f(int g, int h) {
   int i;
   b = -999 - 999 * g - 999 - 2147483647;
@@ -19,6 +20,7 @@ m:
       goto m;
   }
 }
+
 int main() {
   f(-2149633, -2147483647);
   if (a != 0)

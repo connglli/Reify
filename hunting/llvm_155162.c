@@ -1,4 +1,5 @@
 int a, b;
+
 void c(int *d, int e) {
   int f = 0;
   for (b = 0; b < e; b++)
@@ -6,11 +7,13 @@ void c(int *d, int e) {
       if (d[b] << f)
         return;
 }
+
 int g(int h) {
   int i[] = {h};
   c(i, 8);
   return a;
 }
+
 int main() {
   if (g(1) != 0)
     __builtin_abort();

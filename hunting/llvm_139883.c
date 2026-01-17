@@ -1,5 +1,6 @@
 int a, b = 4, c, d, e, f, g, i, j, k, l, m, n, o;
 static int h;
+
 int main() {
   h = a;
   if (d * o * b >= 0)

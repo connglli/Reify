@@ -1,4 +1,5 @@
 int a, b, c, e, f;
+
 int main() {
   int d, g, i;
 j:

@@ -1,4 +1,5 @@
 int a, b, *c = &b;
+
 void g(int i) {
   int d = 0, e, f[] = {a}, j = a;
   e = b;
@@ -23,6 +24,7 @@ h:
     }
   }
 }
+
 int main() {
   g(1);
   return 0;

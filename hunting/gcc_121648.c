@@ -1,4 +1,5 @@
 int a = -2;
+
 int main() {
   int b = -2, c = 12 / a;
   do {

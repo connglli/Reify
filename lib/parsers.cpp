@@ -141,6 +141,7 @@ namespace symir {
     return TK_UNKNOWN;
   }
 } // namespace symir
+
 // clang-format on
 
 namespace symir {
