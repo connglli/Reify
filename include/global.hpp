@@ -502,8 +502,8 @@ static std::filesystem::path GetMappingPath(
   return GetMappingsDir(output) / GetMappingNameForFunctionName(GetFunctionName(uuid, sno));
 }
 
-static std::filesystem::path
-GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
+static std::filesystem::path GetMappingPathForFunctionPath(const std::filesystem::path &functionPath
+) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
 }
@@ -539,8 +539,8 @@ static std::filesystem::path GetGenLogPath(
   }
 }
 
-static std::filesystem::path
-GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath) {
+static std::filesystem::path GetGenLogPathForFunctionPath(const std::filesystem::path &functionPath
+) {
   return GetLoggingsDir(functionPath.parent_path().parent_path()) /
          GetLoggingNameForFunctionName(functionPath.stem());
 }

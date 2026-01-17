@@ -153,7 +153,7 @@ class ArgVal:
       if not shape:
         return flat[0]
       if len(shape) == 1:
-        return flat[:shape[0]]
+        return flat[: shape[0]]
       stride = 1
       for d in shape[1:]:
         stride *= d
@@ -181,7 +181,7 @@ class ArgVal:
       oss = []
       oss.append(f"(int(*){''.join('[' + str(d) + ']' for d in self.shape[1:])})")
       oss.append(f"((int[{len(self.elems)}])")
-      oss.append('{' + ", ".join(str(e) for e in self.elems) + "})")
+      oss.append("{" + ", ".join(str(e) for e in self.elems) + "})")
       return "".join(oss)
 
   @staticmethod
@@ -203,9 +203,11 @@ def parse_mapping(map_path):
   maps = []
   for line in Path(map_path).read_text().splitlines():
     obj = json.loads(line)
-    maps.append((
-      [ArgVal.from_json(a) for a in obj["ini"]],
-      [ArgVal.from_json(a) for a in obj["fin"]],
-      obj["chk"],
-    ))
+    maps.append(
+      (
+        [ArgVal.from_json(a) for a in obj["ini"]],
+        [ArgVal.from_json(a) for a in obj["fin"]],
+        obj["chk"],
+      )
+    )
   return maps

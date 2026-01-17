@@ -52,8 +52,9 @@ public:
       std::string name, int numParams, int numLocals, int numBBs, int maxNumLoops,
       int maxNumBblsPerLoop
   ) :
-      cfg(numBBs), name(std::move(name)), numParams(numParams), numLocals(numLocals),
-      maxNumLoops(maxNumLoops), maxNumBblsPerLoop(maxNumBblsPerLoop) {}
+      cfg(numBBs),
+      name(std::move(name)), numParams(numParams), numLocals(numLocals), maxNumLoops(maxNumLoops),
+      maxNumBblsPerLoop(maxNumBblsPerLoop) {}
 
   // Get the name of the function
   [[nodiscard]] const std::string &GetName() const { return name; }

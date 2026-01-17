@@ -53,14 +53,14 @@ import configs
 
 # Configuration tuple for function generation
 FuncGenConfig = namedtuple(
-  'FuncGenConfig',
+  "FuncGenConfig",
   [
-    'bbls',  # Number of basic blocks per function
-    'vars',  # Number of variables per basic block
-    'assn',  # Number of assignments per basic block
-    'tera',  # Number of terms per assignment per function
-    'terc',  # Number of terms per condition per function
-  ]
+    "bbls",  # Number of basic blocks per function
+    "vars",  # Number of variables per basic block
+    "assn",  # Number of assignments per basic block
+    "tera",  # Number of terms per assignment per function
+    "terc",  # Number of terms per condition per function
+  ],
 )
 
 # List of suggested function generation configurations
@@ -89,37 +89,52 @@ class FuncGenOptions:
   verbose: bool = False  # Whether to print verbose output
   main: bool = True  # Whether to include a main function in the generated program
   sexp: bool = True  # Whether to include S-expression output
-  allops: bool = True  # Whether to consider all possible operations in the generated program
-  injubs: bool = True  # Whether to inject undefined behaviors for those unexecuted blocks
-  seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
-  extra: Optional[str] = None  # Extra options to control the function generation process
+  allops: bool = (
+    True  # Whether to consider all possible operations in the generated program
+  )
+  injubs: bool = (
+    True  # Whether to inject undefined behaviors for those unexecuted blocks
+  )
+  seed: Optional[
+    int
+  ] = None  # Seed for the random number generator (None means no seed)
+  extra: Optional[
+    str
+  ] = None  # Extra options to control the function generation process
 
   def to_dict(self) -> dict:
     return {
-      'bin': self.bin,
-      'uuid': self.uuid,
-      'sno': self.sno,
-      'outdir': str(self.outdir),
-      'config': tuple(self.config),
-      'verbose': self.verbose,
-      'main': self.main,
-      'sexp': self.sexp,
-      'allops': self.allops,
-      'injubs': self.injubs,
-      'seed': self.seed,
-      'extra': self.extra
+      "bin": self.bin,
+      "uuid": self.uuid,
+      "sno": self.sno,
+      "outdir": str(self.outdir),
+      "config": tuple(self.config),
+      "verbose": self.verbose,
+      "main": self.main,
+      "sexp": self.sexp,
+      "allops": self.allops,
+      "injubs": self.injubs,
+      "seed": self.seed,
+      "extra": self.extra,
     }
 
 
-def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path], Optional[str]]:
+def generate_function(
+  opts: FuncGenOptions, timeout: int
+) -> Tuple[Optional[Path], Optional[str]]:
   try:
     cmd = [
       opts.bin,
-      '--Xnum-bbls-per-fun', str(opts.config.bbls),
-      '--Xnum-vars-per-fun', str(opts.config.vars),
-      '--Xnum-assigns-per-bbl', str(opts.config.assn),
-      '--Xnum-vars-per-assign', str(opts.config.tera),
-      '--Xnum-vars-in-cond', str(opts.config.terc),
+      "--Xnum-bbls-per-fun",
+      str(opts.config.bbls),
+      "--Xnum-vars-per-fun",
+      str(opts.config.vars),
+      "--Xnum-assigns-per-bbl",
+      str(opts.config.assn),
+      "--Xnum-vars-per-assign",
+      str(opts.config.tera),
+      "--Xnum-vars-in-cond",
+      str(opts.config.terc),
     ]
     if opts.main:
       cmd += ["-m"]
@@ -139,9 +154,7 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
     cmdline.check_out(cmd, timeout=timeout)
     result = configs.get_prog_file(opts.uuid, opts.sno, gen_dir=opts.outdir), None
   except CalledProcessError as e:
-    result = None, (
-      f"exit with {e.returncode}, message: {e.stdout or '<no output>'}"
-    )
+    result = None, (f"exit with {e.returncode}, message: {e.stdout or '<no output>'}")
   except TimeoutExpired:
     result = None, f"generation timeout: exceeding {timeout}s"
   except Exception as e:
@@ -154,16 +167,14 @@ def generate_function(opts: FuncGenOptions, timeout: int) -> Tuple[Optional[Path
 
 # Configuration tuple for function generation
 ProgGenConfig = namedtuple(
-  'ProgGenConfig',
+  "ProgGenConfig",
   [
-    'funs',  # Number of functions per program
-  ]
+    "funs",  # Number of functions per program
+  ],
 )
 
 # List of suggested program generation configurations
-PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [
-  ProgGenConfig(n) for n in range(3, 15)
-]
+PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [ProgGenConfig(n) for n in range(3, 15)]
 
 
 @dataclass
@@ -173,20 +184,22 @@ class ProgGenOptions:
   indir: Path  # Directory to read the input function files
   limit: int  # The maximum number of programs to generate (0 means unlimited)
   config: ProgGenConfig  # Configuration for the program generation
-  seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
+  seed: Optional[
+    int
+  ] = None  # Seed for the random number generator (None means no seed)
   debug = False  # Whether to print debug information
   extra: Optional[str] = None  # Extra options to control the program generation process
 
   def to_dict(self) -> dict:
     return {
-      'bin': self.bin,
-      'uuid': self.uuid,
-      'indir': str(self.indir),
-      'limit': self.limit,
-      'config': tuple(self.config),
-      'seed': self.seed,
-      'debug': self.debug,
-      'extra': self.extra
+      "bin": self.bin,
+      "uuid": self.uuid,
+      "indir": str(self.indir),
+      "limit": self.limit,
+      "config": tuple(self.config),
+      "seed": self.seed,
+      "debug": self.debug,
+      "extra": self.extra,
     }
 
 
@@ -194,9 +207,12 @@ def generate_programs(opts: ProgGenOptions) -> Optional[str]:
   try:
     cmd = [
       opts.bin,
-      "-i", str(opts.indir),
-      "-l", str(opts.limit),
-      '--Xfunction-depth', str(opts.config.funs)
+      "-i",
+      str(opts.indir),
+      "-l",
+      str(opts.limit),
+      "--Xfunction-depth",
+      str(opts.config.funs),
     ]
     if opts.seed:
       cmd += ["-s", str(opts.seed)]
@@ -226,25 +242,37 @@ def rand_int(a: int = 0, b=MAX_I32) -> int:
 
 
 def next_uuid():
-  return str(uuidgen()).replace('-', '_')
+  return str(uuidgen()).replace("-", "_")
 
 
-def log(title: str, msg: str, *, color: Optional[str] = None, end: str = '\n', flush: bool = False, file=sys.stderr):
+def log(
+  title: str,
+  msg: str,
+  *,
+  color: Optional[str] = None,
+  end: str = "\n",
+  flush: bool = False,
+  file=sys.stderr,
+):
   enable = {
-    'red': '\033[91m',
-    'green': '\033[92m',
-    'yellow': '\033[93m',
-    'blue': '\033[94m',
-    'magenta': '\033[95m',
-    'cyan': '\033[96m',
-    'white': '\033[97m',
-  }.get(color, '')
-  disable = '\033[0m' if enable else ''
-  print(f"{enable}[{datetime.datetime.now().strftime('%Y-%m-%d::%H:%M:%S')}::{title}] {msg}{disable}", end=end,
-        flush=flush, file=file)
+    "red": "\033[91m",
+    "green": "\033[92m",
+    "yellow": "\033[93m",
+    "blue": "\033[94m",
+    "magenta": "\033[95m",
+    "cyan": "\033[96m",
+    "white": "\033[97m",
+  }.get(color, "")
+  disable = "\033[0m" if enable else ""
+  print(
+    f"{enable}[{datetime.datetime.now().strftime('%Y-%m-%d::%H:%M:%S')}::{title}] {msg}{disable}",
+    end=end,
+    flush=flush,
+    file=file,
+  )
 
 
-def mlog(msg, *, color: Optional[str] = None, end: str = '\n', flush: bool = False):
+def mlog(msg, *, color: Optional[str] = None, end: str = "\n", flush: bool = False):
   log("Main", msg=msg, color=color, end=end, flush=flush)
 
 
@@ -260,11 +288,11 @@ EXITCODE_TIMEOUT = 100001
 class TestRes:
   @enum.unique
   class Type(enum.Enum):
-    SUC = 'success'
-    ICE = 'internal_compiler_error'
-    WRC = 'wrong_code'
-    CTO = 'compilation_timeout'
-    ETO = 'execution_timeout'
+    SUC = "success"
+    ICE = "internal_compiler_error"
+    WRC = "wrong_code"
+    CTO = "compilation_timeout"
+    ETO = "execution_timeout"
 
   cmd: str
   type: Type
@@ -295,37 +323,55 @@ class TestRes:
       return "Unknown"
     else:
       try:
-        return f"{signal.Signals(-self.exitcode).name} ({signal.strsignal(-self.exitcode)})"
+        return (
+          f"{signal.Signals(-self.exitcode).name} ({signal.strsignal(-self.exitcode)})"
+        )
       except ValueError:
         return "Unknown"
 
   def to_dict(self) -> dict:
     return {
-      'cmd': self.cmd,
-      'type': self.type.value,
-      'exitcode': self.exitcode,
-      'exitcode_str': self.exitcode_str(),
-      'error_msg': self.errmsg or '<no-error-message>',
-      'timestamp': datetime.datetime.now().isoformat()
+      "cmd": self.cmd,
+      "type": self.type.value,
+      "exitcode": self.exitcode,
+      "exitcode_str": self.exitcode_str(),
+      "error_msg": self.errmsg or "<no-error-message>",
+      "timestamp": datetime.datetime.now().isoformat(),
     }
 
 
 def test_compiler(cc: str, cfile: Path, ofile: Path, timeout: int) -> TestRes:
   comp_cmd = f"{cc} -o {ofile} {cfile}"
   try:
-    proc = cmdline.run_proc(shlex.split(comp_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 10, check=False)
+    proc = cmdline.run_proc(
+      shlex.split(comp_cmd),
+      stdout=PIPE,
+      stderr=STDOUT,
+      timeout=timeout * 10,
+      check=False,
+    )
   except TimeoutExpired as e:
     return TestRes(comp_cmd, TestRes.Type.CTO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
-    return TestRes(comp_cmd, TestRes.Type.ICE, exitcode=-proc.returncode, errmsg=proc.stdout)
+    return TestRes(
+      comp_cmd, TestRes.Type.ICE, exitcode=-proc.returncode, errmsg=proc.stdout
+    )
   exec_cmd = f"{ofile}"
   full_cmd = f"{comp_cmd}; {exec_cmd}"
   try:
-    proc = cmdline.run_proc(shlex.split(exec_cmd), stdout=PIPE, stderr=STDOUT, timeout=timeout * 20, check=False)
+    proc = cmdline.run_proc(
+      shlex.split(exec_cmd),
+      stdout=PIPE,
+      stderr=STDOUT,
+      timeout=timeout * 20,
+      check=False,
+    )
   except TimeoutExpired as e:
     return TestRes(full_cmd, TestRes.Type.ETO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
-    return TestRes(full_cmd, TestRes.Type.WRC, exitcode=proc.returncode, errmsg=proc.stdout)
+    return TestRes(
+      full_cmd, TestRes.Type.WRC, exitcode=proc.returncode, errmsg=proc.stdout
+    )
   return TestRes(full_cmd, TestRes.Type.SUC, exitcode=0, errmsg=None)
 
 
@@ -340,19 +386,25 @@ class CrealOptions:
   dst: Path  # Directory to store the generated mutants
   mutants: int = 3  # The number of mutants to generate per function (default: 3)
   prob: int = 80  # Probability of synthesizing a new function (0-100, default: 80)
-  src: Optional[Path] = None  # Path to the source file for generating mutants (None means Csmith)
-  cdb: Optional[Path] = None  # Path to the function database for generating mutants (None means default database)
-  seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
+  src: Optional[
+    Path
+  ] = None  # Path to the source file for generating mutants (None means Csmith)
+  cdb: Optional[
+    Path
+  ] = None  # Path to the function database for generating mutants (None means default database)
+  seed: Optional[
+    int
+  ] = None  # Seed for the random number generator (None means no seed)
 
   def to_dict(self):
     return {
-      'bin': self.bin,
-      'dst': str(self.dst),
-      'mutants': self.mutants,
-      'prob': self.prob,
-      'src': str(self.src) if self.src else None,
-      'cdb': str(self.cdb) if self.cdb else None,
-      'seed': self.seed if self.seed else None,
+      "bin": self.bin,
+      "dst": str(self.dst),
+      "mutants": self.mutants,
+      "prob": self.prob,
+      "src": str(self.src) if self.src else None,
+      "cdb": str(self.cdb) if self.cdb else None,
+      "seed": self.seed if self.seed else None,
     }
 
 
@@ -363,27 +415,37 @@ class CrealEnv:
   ccomp_home: Path  # Path to the CompCert home directory
 
   def creal_bin(self) -> Path:
-    return self.creal_home / 'creal.py'
+    return self.creal_home / "creal.py"
 
   def creal_gm_bin(self) -> Path:
-    return self.creal_home / 'generate_mutants.py'
+    return self.creal_home / "generate_mutants.py"
 
   def csmith_bin(self) -> Path:
-    return self.csmith_home / 'bin' / 'csmith'
+    return self.csmith_home / "bin" / "csmith"
 
   def csmith_incl_dir(self) -> Path:
-    return self.csmith_home / 'include'
+    return self.csmith_home / "include"
 
   def ccomp_bin(self) -> Path:
-    return self.ccomp_home / 'bin' / 'ccomp'
+    return self.ccomp_home / "bin" / "ccomp"
 
 
 def is_creal_mutant(m: Path) -> bool:
   return m.is_file() and m.suffix == ".c" and "_syn" in m.stem
 
 
-def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], Optional[str]]:
-  cmd = [opts.bin, "--dst", str(opts.dst), "--syn-prob", str(opts.prob), "--num-mutants", str(opts.mutants)]
+def run_creal(
+  opts: CrealOptions, timeout: int
+) -> Tuple[Optional[List[Path]], Optional[str]]:
+  cmd = [
+    opts.bin,
+    "--dst",
+    str(opts.dst),
+    "--syn-prob",
+    str(opts.prob),
+    "--num-mutants",
+    str(opts.mutants),
+  ]
   if opts.src:
     cmd += ["--seed", str(opts.src)]
   if opts.cdb:
@@ -396,7 +458,10 @@ def run_creal(opts: CrealOptions, timeout: int) -> Tuple[Optional[List[Path]], O
   except TimeoutExpired as e:
     return None, f"Creal generation timed out: {e}"
   except CalledProcessError as e:
-    return None, f"Creal generation failed with exit code {e.returncode}: {e.stdout or '<no output>'}"
+    return (
+      None,
+      f"Creal generation failed with exit code {e.returncode}: {e.stdout or '<no output>'}",
+    )
   except Exception as e:
     return None, f"Unexpected error during Creal generation: {e}"
 
@@ -440,9 +505,7 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
   num_maps = len(func_maps)
   if num_maps == 0:
     return False
-  param_types = [
-    a.get_c_type() for a in func_maps[0][0]
-  ]
+  param_types = [a.get_c_type() for a in func_maps[0][0]]
   num_flat_params = sum(a.num_els() for a in func_maps[0][0])
 
   # Change the checksum function into a checksum check function
@@ -453,26 +516,33 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
     chkchk_name=chkchk_name,
     num_maps=num_maps,
     num_flat_params=num_flat_params,
-    outputs=",\n".join(["    {" + ",".join([x.flat_c_str() for x in m[1]]) + "}" for m in func_maps]),
+    outputs=",\n".join(
+      ["    {" + ",".join([x.flat_c_str() for x in m[1]]) + "}" for m in func_maps]
+    ),
     checksums=",".join([str(m[2]) for m in func_maps]),
     chkchk_signal=CREALIZE_CHK_SIGN,
     func_code=func_code,
   )
 
   with cdb_file.open("a") as fout:
-    fout.write(json.dumps({
-      "function_name": func_name,
-      "parameter_types": param_types,
-      "return_type": "int",
-      "function": func_code,
-      "io_list": [[
-        [x.get_shaped_value() for x in m[0]], int(m[2])
-      ] for m in func_maps],
-      "misc": [],
-      "src_file": "",
-      "include_headers": ["stdlib.h"],  # for exit()
-      "include_sources": [],
-    }) + "\n")
+    fout.write(
+      json.dumps(
+        {
+          "function_name": func_name,
+          "parameter_types": param_types,
+          "return_type": "int",
+          "function": func_code,
+          "io_list": [
+            [[x.get_shaped_value() for x in m[0]], int(m[2])] for m in func_maps
+          ],
+          "misc": [],
+          "src_file": "",
+          "include_headers": ["stdlib.h"],  # for exit()
+          "include_sources": [],
+        }
+      )
+      + "\n"
+    )
 
   return True
 
@@ -483,11 +553,11 @@ def crealize(cdb_file: Path, func_file: Path, map_file: Path):
 
 
 def verify_ubfree(
-    ccomp: str, prog: str, *, timeout: int, extra: Optional[List[str]] = None
+  ccomp: str, prog: str, *, timeout: int, extra: Optional[List[str]] = None
 ) -> Tuple[bool, Optional[str]]:
   try:
     extra = extra if extra else []
-    out = cmdline.get_out([ccomp, '-fall'] + extra + ['-interp', prog], timeout=timeout)
+    out = cmdline.get_out([ccomp, "-fall"] + extra + ["-interp", prog], timeout=timeout)
     if "ERROR: Undefined behavior" in out:
       return False, out
     else:
@@ -507,13 +577,15 @@ class WorkerConf:
   wdir: Path  # Working directory for the worker
   switch_limit: int  # Number of functions before switching to program generation
   prog_limit: int  # Limit for the number of generated programs per switch
-  creal_env: Optional[CrealEnv] = (
-    None  # Creal environment for generating mutants (None means disabled)
-  )
+  creal_env: Optional[
+    CrealEnv
+  ] = None  # Creal environment for generating mutants (None means disabled)
   creal_limit: int = (
     500  # Limit for the total number of mutants generated by Creal per switch
   )
-  creal_limit_per_func: int = 5  # Limit for the number of mutants generated by Creal per function
+  creal_limit_per_func: int = (
+    5  # Limit for the number of mutants generated by Creal per function
+  )
 
 
 @dataclass
@@ -532,16 +604,16 @@ class Worker:
     self.wid = wid
     self.wconf = wconf
     self.msgq = msgq
-    self.ice_dir = wconf.wdir / 'intern_errors'
-    self.hang_dir = wconf.wdir / 'prog_hangs'
-    self.wrc_dir = wconf.wdir / 'wrong_codes'
-    self.log_file = wconf.wdir / 'worker.log'
-    self.log_file_fd = self.log_file.open(mode='w', encoding='utf-8')
+    self.ice_dir = wconf.wdir / "intern_errors"
+    self.hang_dir = wconf.wdir / "prog_hangs"
+    self.wrc_dir = wconf.wdir / "wrong_codes"
+    self.log_file = wconf.wdir / "worker.log"
+    self.log_file_fd = self.log_file.open(mode="w", encoding="utf-8")
     self.ice_dir.mkdir(parents=True, exist_ok=True)
     self.hang_dir.mkdir(parents=True, exist_ok=True)
     self.wrc_dir.mkdir(parents=True, exist_ok=True)
     if wconf.creal_env:
-      self.creal_dir = wconf.wdir / 'realsmiths'
+      self.creal_dir = wconf.wdir / "realsmiths"
       self.creal_dir.mkdir(parents=True, exist_ok=True)
     else:
       self.creal_dir = None
@@ -558,20 +630,18 @@ class Worker:
       sno=0,
       outdir=self.wconf.wdir,
       config=FGEN_SUGGESTED_CONFIGS[0],
-      extra='--Xinject-ub-proba 0.1'
+      extra="--Xinject-ub-proba 0.1",
     )
     popts = ProgGenOptions(
       bin="./build/bin/pgen",
-      uuid='<placeholder>',
+      uuid="<placeholder>",
       indir=self.wconf.wdir,
       limit=self.wconf.prog_limit,
       config=PGEN_SUGGESTED_CONFIGS[0],
-      extra='--Xreplace-proba 0.4'
+      extra="--Xreplace-proba 0.4",
     )
     copts = CrealOptions(
-      bin="<placeholder>",
-      dst=self.creal_dir,
-      mutants=self.wconf.creal_limit_per_func
+      bin="<placeholder>", dst=self.creal_dir, mutants=self.wconf.creal_limit_per_func
     )
     start_msg = (
       f"Worker started successfully: workdir={self.wconf.wdir}, "
@@ -617,8 +687,12 @@ class Worker:
         fopts.sno = 0
       self.iter += 1
 
-  def run_func(self, opts: FuncGenOptions, gen_tmo: int, test_tmo: int) -> Optional[Path]:
-    self.log(f"Generating function: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}")
+  def run_func(
+    self, opts: FuncGenOptions, gen_tmo: int, test_tmo: int
+  ) -> Optional[Path]:
+    self.log(
+      f"Generating function: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}"
+    )
     prog, errmsg = generate_function(opts, timeout=gen_tmo)
     if not prog:
       # TODO: Save it as it might be our bugs
@@ -626,15 +700,19 @@ class Worker:
       return None
     self.log(f"Generated function: {prog}")
     self.log(f"Testing the compiler with the generated function: {prog}")
-    with prog.open('a') as fout:
+    with prog.open("a") as fout:
       fout.write(f"\n\n// Fgen Options: {json.dumps(opts.to_dict())}")
-    bina = (prog.parent / (prog.name + '.out'))
-    artifacts = list(configs.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values()) + [bina]
+    bina = prog.parent / (prog.name + ".out")
+    artifacts = list(
+      configs.get_artifacts(opts.uuid, opts.sno, gen_dir=opts.outdir).values()
+    ) + [bina]
     self.test(prog, bina, artifacts=artifacts, timeout=test_tmo)
     return prog
 
   def run_prog(self, opts: ProgGenOptions, test_tmo: int):
-    self.log(f"Generating programs: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}")
+    self.log(
+      f"Generating programs: {", ".join([str(x[0]) + "=" + str(x[1]) for x in opts.to_dict().items()])}"
+    )
     errmsg = generate_programs(opts)
     if errmsg:
       self.log(f"Failure: {errmsg}", color="yellow")
@@ -642,23 +720,23 @@ class Worker:
     self.log(f"Testing the compiler with the generated programs")
     index = 0
     for prog in configs.get_progs_dir(opts.indir).iterdir():
-      if not prog.name.startswith(opts.uuid) or prog.suffix != '.c':
+      if not prog.name.startswith(opts.uuid) or prog.suffix != ".c":
         continue
       self.log(f"{index}: Testing the compiler with the generated program: {prog}")
-      with prog.open('a') as fout:
+      with prog.open("a") as fout:
         fout.write(f"\n\n// Pgen Options: {json.dumps(opts.to_dict())}")
-      bina = (prog.parent / (prog.name + '.out'))
+      bina = prog.parent / (prog.name + ".out")
       artifacts = [prog, bina]
       self.test(prog, bina, artifacts=artifacts, timeout=test_tmo)
       index += 1
 
   def build_crealdb(self, fopts: FuncGenOptions) -> Optional[Path]:
     self.log("Building CrealDB from the generated functions")
-    tmp_file = self.wconf.wdir / 'crealdb.tmp.jsonl'
-    cdb_file = self.wconf.wdir / 'crealdb.json'
+    tmp_file = self.wconf.wdir / "crealdb.tmp.jsonl"
+    cdb_file = self.wconf.wdir / "crealdb.json"
     for i in range(fopts.sno + 1):
       arts = configs.get_artifacts(fopts.uuid, i, gen_dir=fopts.outdir)
-      func, map = arts['func'], arts['map']
+      func, map = arts["func"], arts["map"]
       if not func or not map:
         continue  # Skip if the function or map file does not exist
       if not func.exists() or not map.exists():
@@ -686,13 +764,18 @@ class Worker:
       return
     self.log(f"Succeeded in generating {len(mutants)} mutants")
     for i, mut in enumerate(mutants):
-      self.log(f"{i}: Testing the compiler with the Creal-generated mutant: " + str(mut))
-      with mut.open('a') as fou:
+      self.log(
+        f"{i}: Testing the compiler with the Creal-generated mutant: " + str(mut)
+      )
+      with mut.open("a") as fou:
         fou.write(f"\n\n// Creal Options: {json.dumps(opts.to_dict())}")
-      bina = (mut.parent / (mut.name + '.out'))
+      bina = mut.parent / (mut.name + ".out")
       self.test(
-        mut, bina, artifacts=[mut, bina], timeout=timeout,
-        extra_cc_opts=f"-I{self.wconf.creal_env.csmith_incl_dir()}"
+        mut,
+        bina,
+        artifacts=[mut, bina],
+        timeout=timeout,
+        extra_cc_opts=f"-I{self.wconf.creal_env.csmith_incl_dir()}",
       )
       if mut.exists():  # No bugs found
         mut.unlink(missing_ok=False)  # Remove the mutant file after testing
@@ -704,7 +787,7 @@ class Worker:
 
   def remove_useless_progs(self, opts: ProgGenOptions):
     for prog in configs.get_progs_dir(opts.indir).iterdir():
-      if not prog.name.startswith(opts.uuid) or prog.suffix != '.c':
+      if not prog.name.startswith(opts.uuid) or prog.suffix != ".c":
         continue
       prog.unlink(missing_ok=True)
 
@@ -715,13 +798,28 @@ class Worker:
     if opts.cdb:
       opts.cdb.unlink(missing_ok=True)
 
-  def test(self, prog: Path, bina: Path, *, artifacts: List[Path], timeout: int, extra_cc_opts: str = ''):
-    test_res = test_compiler(f"{self.wconf.cc} {extra_cc_opts}", cfile=prog, ofile=bina, timeout=timeout)
+  def test(
+    self,
+    prog: Path,
+    bina: Path,
+    *,
+    artifacts: List[Path],
+    timeout: int,
+    extra_cc_opts: str = "",
+  ):
+    test_res = test_compiler(
+      f"{self.wconf.cc} {extra_cc_opts}", cfile=prog, ofile=bina, timeout=timeout
+    )
     if test_res.is_internal_compiler_error():
-      self.log(f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
+      self.log(
+        f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}",
+        color="green",
+      )
       self.store_bug(test_res, artifacts, self.ice_dir)
     elif test_res.is_compilation_timeout():
-      self.log(f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue")
+      self.log(
+        f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue"
+      )
       self.store_bug(test_res, artifacts, self.hang_dir)
     elif test_res.is_wrong_code():
       # There're cases that Creal-generated mutants are not UB-free
@@ -734,16 +832,27 @@ class Worker:
         self.log(
           f"Verifying Creal-generated mutant towards UBs: ccomp={ccomp}, prog={prog}, extra={' '.join(extra_ccomp_opts)}"
         )
-        ubfree, errmsg = verify_ubfree(str(ccomp), str(prog), extra=extra_ccomp_opts, timeout=timeout * 2)
+        ubfree, errmsg = verify_ubfree(
+          str(ccomp), str(prog), extra=extra_ccomp_opts, timeout=timeout * 2
+        )
         # CompCert recognizes exit() as UB but llubi (dtcxzyw/llvm-ub-aware-interpreter) does not
         if not ubfree:  # Creal generated mutant with UBs, we drop it
-          if CREALIZE_CHK_SIGN in errmsg:  # For this case, Creal's mutant is UB-free, but incorrect
-            self.log(f"Creal generated UB-free yet checksum mismatching mutant (skip): {errmsg}", color="yellow")
+          if (
+            CREALIZE_CHK_SIGN in errmsg
+          ):  # For this case, Creal's mutant is UB-free, but incorrect
+            self.log(
+              f"Creal generated UB-free yet checksum mismatching mutant (skip): {errmsg}",
+              color="yellow",
+            )
           else:
-            self.log(f"Creal generated UB-seeded mutant (skip): {errmsg}", color="yellow")
+            self.log(
+              f"Creal generated UB-seeded mutant (skip): {errmsg}", color="yellow"
+            )
           self.remove_all(artifacts)
           return
-      self.log(f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
+      self.log(
+        f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green"
+      )
       self.store_bug(test_res, artifacts, self.wrc_dir)
     elif test_res.is_execution_timeout():
       self.log(f"The generated program timed out (skip): {test_res.errmsg}")
@@ -760,8 +869,8 @@ class Worker:
     for art in artifacts:
       if art.exists():
         art.rename(bug_dir / art.name)
-    with (bug_dir / 'result.jsonl').open('a') as fou:
-      fou.write(json.dumps(res.to_dict(), ensure_ascii=False) + '\n')
+    with (bug_dir / "result.jsonl").open("a") as fou:
+      fou.write(json.dumps(res.to_dict(), ensure_ascii=False) + "\n")
 
   def remove_all(self, artifacts: List[Path]):
     for art in artifacts:
@@ -771,14 +880,14 @@ class Worker:
   def notify(self, msg: str):
     self.msgq.put(f"Worker@{self.wid}: {msg}")
 
-  def log(self, msg: str, *, color: Optional[str] = None, end: str = '\n'):
+  def log(self, msg: str, *, color: Optional[str] = None, end: str = "\n"):
     log(
       f"Worker@{self.wid}",
       msg=f"[{self.iter}] " + msg,
       file=self.log_file_fd,
       color=color,
       end=end,
-      flush=True
+      flush=True,
     )
 
 
@@ -787,7 +896,9 @@ class Worker:
 # -==========================================================
 
 
-def run_worker(*, wid: int, wconf: WorkerConf, ropts: WorkerRunOptions, seed: int, msgq: Queue):
+def run_worker(
+  *, wid: int, wconf: WorkerConf, ropts: WorkerRunOptions, seed: int, msgq: Queue
+):
   wconf.wdir.mkdir(parents=False, exist_ok=False)
   random.seed(seed)
   worker = Worker(wid, wconf=wconf, msgq=msgq)
@@ -814,12 +925,21 @@ def run_msgq(msgq: Queue, stop: Event):
   mlog(f"Waiting for remaining messages to come ...", color="yellow")
   time.sleep(5)  # Give some time for the last messages to be processed
   while not msgq.empty():
-    msg = msgq.get(timeout=.5)
+    msg = msgq.get(timeout=0.5)
     mlog(msg)
 
 
-def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: int, plimit: int,
-                  creal: Optional[CrealEnv], crlimit: int):
+def run_fuzz_main(
+  cc: str,
+  *,
+  outdir: Path,
+  workers: int,
+  ilimit: int,
+  slimit: int,
+  plimit: int,
+  creal: Optional[CrealEnv],
+  crlimit: int,
+):
   class SignalInterrupt(Exception):
     def __init__(self, sig):
       super().__init__(f"Process killed by user signal: {sig}")
@@ -881,20 +1001,20 @@ def run_fuzz_main(cc: str, *, outdir: Path, workers: int, ilimit: int, slimit: i
     mlog("All workers have finished their tasks successfully.")
     stop.set()
   except SignalInterrupt as e:
-    mlog(f"Fuzzing process was interrupted by user signal: {e.sig.name}", color='red')
+    mlog(f"Fuzzing process was interrupted by user signal: {e.sig.name}", color="red")
     stop.set()
   except KeyboardInterrupt:
-    mlog(f"Fuzzing process was interrupted by user's Ctrl-C", color='red')
+    mlog(f"Fuzzing process was interrupted by user's Ctrl-C", color="red")
     stop.set()
   except Exception as e:
-    mlog(f"Fuzzing process was interrupted by exception: {e}", color='red')
+    mlog(f"Fuzzing process was interrupted by exception: {e}", color="red")
     stop.set()
   finally:
     mlog("Fuzzing process is shutting down ...")
     worker_pool.join()
     msgq_thread.join()
 
-  mlog(f"Exit. All results are stored inside {outdir}.", color='green')
+  mlog(f"Exit. All results are stored inside {outdir}.", color="green")
 
 
 def main():
@@ -905,25 +1025,29 @@ def main():
   )
 
   parser.add_argument(
-    "-o", "--outdir",
+    "-o",
+    "--outdir",
     type=str,
     default="fuzzout",
     help="Directory to store the output of the fuzzing process (default: 'fuzzout')",
   )
   parser.add_argument(
-    "-s", "--seed",
+    "-s",
+    "--seed",
     type=int,
     default=-1,
     help="Seed for the randomness of the fuzzing process, negative meaning no seed (default: -1)",
   )
   parser.add_argument(
-    "-j", "--workers",
+    "-j",
+    "--workers",
     type=int,
     default=os.cpu_count(),
     help=f"Number of workers to use for fuzzing (default: {os.cpu_count()})",
   )
   parser.add_argument(
-    "-l", "--limit",
+    "-l",
+    "--limit",
     type=int,
     default=MAX_I32,
     help=f"The maximum number of fuzz iterations, non-positive meaning default (default: {MAX_I32})",
@@ -983,22 +1107,30 @@ def main():
 
   workers = args.workers
   if workers <= 0:
-    mlog(f"Error: Invalid number of workers specified: {workers}.", color='red')
+    mlog(f"Error: Invalid number of workers specified: {workers}.", color="red")
     sys.exit(1)
   if workers > os.cpu_count():
-    mlog(f"Warning: Number of workers ({workers}) exceeds available CPU cores ({os.cpu_count()}).", color='yellow')
+    mlog(
+      f"Warning: Number of workers ({workers}) exceeds available CPU cores ({os.cpu_count()}).",
+      color="yellow",
+    )
 
   limit = args.limit
   if limit <= 0:
     limit = MAX_I32
   elif limit > MAX_I32:
-    mlog(f"Warning: Limit ({limit}) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.",
-         color='yellow')
+    mlog(
+      f"Warning: Limit ({limit}) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.",
+      color="yellow",
+    )
     limit = MAX_I32
 
   switch_limit = args.switch_limit
   if switch_limit <= 0:
-    mlog(f"Error: Invalid switch limit specified: {switch_limit}. Must be a positive number", color='red')
+    mlog(
+      f"Error: Invalid switch limit specified: {switch_limit}. Must be a positive number",
+      color="red",
+    )
     sys.exit(1)
   if switch_limit > MAX_I32:
     mlog(
@@ -1009,7 +1141,10 @@ def main():
 
   prog_limit = args.prog_limit
   if prog_limit <= 0:
-    mlog(f"Error: Invalid program limit specified: {prog_limit}. Must be a positive number", color='red')
+    mlog(
+      f"Error: Invalid program limit specified: {prog_limit}. Must be a positive number",
+      color="red",
+    )
     sys.exit(1)
   if prog_limit > MAX_I32:
     mlog(
@@ -1023,11 +1158,17 @@ def main():
 
   outdir = Path(args.outdir).resolve().absolute()
   if outdir.exists():
-    mlog("Output directory already exists. Would you like to overwrite it? (Y/n)> ", color='yellow', end='',
-         flush=True)
+    mlog(
+      "Output directory already exists. Would you like to overwrite it? (Y/n)> ",
+      color="yellow",
+      end="",
+      flush=True,
+    )
     yes = input()
     if yes != "Y":
-      mlog("The user chose not to overwrite the output directory. Exiting.", color='red')
+      mlog(
+        "The user chose not to overwrite the output directory. Exiting.", color="red"
+      )
       sys.exit(0)
     shutil.rmtree(args.outdir)
   mlog(f"Creating output directory: {outdir}")
@@ -1036,47 +1177,85 @@ def main():
   creal_env = None
   if args.creal:
     if not args.csmith:
-      mlog(f"Error: Csmith's home directory is required when Creal is enabled.", color='red')
+      mlog(
+        f"Error: Csmith's home directory is required when Creal is enabled.",
+        color="red",
+      )
       sys.exit(1)
     if not args.ccomp:
-      mlog(f"Error: CompCert's home directory is required when Creal is enabled.", color='red')
+      mlog(
+        f"Error: CompCert's home directory is required when Creal is enabled.",
+        color="red",
+      )
       sys.exit(1)
     creal = Path(args.creal).resolve().absolute()
     csmith = Path(args.csmith).resolve().absolute()
     ccomp = Path(args.ccomp).resolve().absolute()
     creal_env = CrealEnv(creal, csmith, ccomp)
     if not creal.exists():
-      mlog(f"Error: The given Creal's home directory does not exist: {creal}", color='red')
+      mlog(
+        f"Error: The given Creal's home directory does not exist: {creal}", color="red"
+      )
       sys.exit(1)
     if not creal.is_dir():
-      mlog(f"Error: The given Creal's home directory is not a directory: {creal}", color='red')
+      mlog(
+        f"Error: The given Creal's home directory is not a directory: {creal}",
+        color="red",
+      )
       sys.exit(1)
     if not creal_env.creal_bin().exists():
-      mlog(f"Error: Creal's home directory does not contain '{creal_env.creal_bin().name}': {creal}", color='red')
+      mlog(
+        f"Error: Creal's home directory does not contain '{creal_env.creal_bin().name}': {creal}",
+        color="red",
+      )
       sys.exit(1)
     if not creal_env.creal_gm_bin().exists():
-      mlog(f"Error: Creal's home directory does not contain '{creal_env.creal_gm_bin().name}': {creal}", color='red')
+      mlog(
+        f"Error: Creal's home directory does not contain '{creal_env.creal_gm_bin().name}': {creal}",
+        color="red",
+      )
       sys.exit(1)
     if not csmith.exists():
-      mlog(f"Error: The given Csmith's home directory does not exist: {csmith}", color='red')
+      mlog(
+        f"Error: The given Csmith's home directory does not exist: {csmith}",
+        color="red",
+      )
       sys.exit(1)
     if not csmith.is_dir():
-      mlog(f"Error: The given Csmith's home directory is not a directory: {csmith}", color='red')
+      mlog(
+        f"Error: The given Csmith's home directory is not a directory: {csmith}",
+        color="red",
+      )
       sys.exit(1)
     if not creal_env.csmith_bin().exists():
-      mlog(f"Error: Csmith's home directory does not contain '{creal_env.csmith_bin().name}'", color='red')
+      mlog(
+        f"Error: Csmith's home directory does not contain '{creal_env.csmith_bin().name}'",
+        color="red",
+      )
       sys.exit(1)
     if not creal_env.csmith_incl_dir().exists():
-      mlog(f"Error: Csmith's home directory does not contain '{creal_env.csmith_incl_dir().name}'", color='red')
+      mlog(
+        f"Error: Csmith's home directory does not contain '{creal_env.csmith_incl_dir().name}'",
+        color="red",
+      )
       sys.exit(1)
     if not ccomp.exists():
-      mlog(f"Error: The given CompCert's home directory does not exist: {ccomp}", color='red')
+      mlog(
+        f"Error: The given CompCert's home directory does not exist: {ccomp}",
+        color="red",
+      )
       sys.exit(1)
     if not ccomp.is_dir():
-      mlog(f"Error: The given CompCert's home directory is not a directory: {ccomp}", color='red')
+      mlog(
+        f"Error: The given CompCert's home directory is not a directory: {ccomp}",
+        color="red",
+      )
       sys.exit(1)
     if not creal_env.ccomp_bin().exists():
-      mlog(f"Error: CompCert's home directory does not contain '{creal_env.ccomp_bin().name}'", color='red')
+      mlog(
+        f"Error: CompCert's home directory does not contain '{creal_env.ccomp_bin().name}'",
+        color="red",
+      )
       sys.exit(1)
     mlog(f"Testing if Creal is valid ...")
     test_out = outdir / "realsmith"
@@ -1097,7 +1276,10 @@ def main():
   creal_limit = args.creal_limit
   if creal_env:
     if creal_limit <= 0:
-      mlog(f"Error: Invalid Creal limit specified: {creal_limit}. Must be a positive number", color='red')
+      mlog(
+        f"Error: Invalid Creal limit specified: {creal_limit}. Must be a positive number",
+        color="red",
+      )
       sys.exit(1)
     if creal_limit > MAX_I32:
       mlog(
@@ -1107,24 +1289,23 @@ def main():
       creal_limit = MAX_I32
 
   compiler = args.compiler
-  test_input = outdir / 'a.c'
-  test_input.write_text("int main() { return 0; }", encoding='utf-8')
-  test_output = outdir / 'a.out'
+  test_input = outdir / "a.c"
+  test_input.write_text("int main() { return 0; }", encoding="utf-8")
+  test_output = outdir / "a.out"
   mlog(f"Testing if the compiler command is valid ...")
   test_res = test_compiler(compiler, cfile=test_input, ofile=test_output, timeout=1)
   test_input.unlink()
   test_output.unlink()
   if not test_res.is_success():
-    mlog(f"Invalid: {test_res.errmsg}", color='red')
+    mlog(f"Invalid: {test_res.errmsg}", color="red")
     sys.exit(1)
   else:
     mlog("Valid")
 
   # Save the command line arguments to a JSON file
-  (outdir / 'command.json').write_text(json.dumps({
-    **vars(args),
-    'seed': seed
-  }, indent=2))
+  (outdir / "command.json").write_text(
+    json.dumps({**vars(args), "seed": seed}, indent=2)
+  )
 
   # Start the fuzzing loop
   run_fuzz_main(

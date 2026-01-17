@@ -1,4 +1,5 @@
 int a, d, e, g, h, i, j = 0, k = 1, l = 0, m = 0;
+
 int n(int p[]) {
   for (int b = 0; b < 3; b++)
     for (int c = 0; c < 3; c++)
@@ -6,6 +7,7 @@ int n(int p[]) {
         return b;
   return 0;
 }
+
 int main() {
   while (1) {
     int f = j, o[] = {l, f, 0};

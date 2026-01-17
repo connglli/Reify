@@ -1,4 +1,5 @@
 int a, c, d, e;
+
 int b(volatile int f, int g) {
   f = -2;
   if (!f)
@@ -9,6 +10,7 @@ int b(volatile int f, int g) {
     a = 1;
   return a + f;
 }
+
 int main() {
   do {
     e = (b(1, -1) - 30885397) % 2 - 3;

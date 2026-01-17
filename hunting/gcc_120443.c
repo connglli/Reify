@@ -1,4 +1,5 @@
 int a, b, c, ae, af;
+
 int d(int e, int f, int ag) {
 g:
   if (f <= 0)
@@ -25,14 +26,12 @@ j:
   ag = ag - 184330119 * ae;
   goto ai;
 }
-__attribute__((noinline))
-int f() {
+
+__attribute__((noinline)) int f() {
   int ak = d(-227068032, 1290222211, -184330117);
   if (ak != -1)
     __builtin_abort();
   return 0;
 }
-int main()
-{
-  return f();
-}
+
+int main() { return f(); }

@@ -1,4 +1,5 @@
 int a, b;
+
 int f(int g) {
   a = 0;
   for (; a < 32; a++)
@@ -6,8 +7,9 @@ int f(int g) {
       return a;
   return 0;
 }
+
 int main() {
-  if (f(b-2) != 1)
+  if (f(b - 2) != 1)
     __builtin_abort();
   return 0;
 }

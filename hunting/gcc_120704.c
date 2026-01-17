@@ -1,5 +1,6 @@
 long a, b;
 int c, d, e, g;
+
 static int n(int k) {
   goto ao;
 ap:
@@ -28,10 +29,11 @@ au:
   g = -999 * c - 2147483647;
   goto as;
 ar:
-  if(c != -2147634)
-  __builtin_abort();
+  if (c != -2147634)
+    __builtin_abort();
   return a;
 }
+
 int main() {
   while (!(n(-2145487648) - 1))
     ;

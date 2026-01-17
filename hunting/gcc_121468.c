@@ -1,8 +1,15 @@
 int e, f, n;
-static int a () { return e; }
-void b () { while (a()); }
-static int d () { return e; }
-static void g (int h) {
+
+static int a() { return e; }
+
+void b() {
+  while (a())
+    ;
+}
+
+static int d() { return e; }
+
+static void g(int h) {
   if (e)
   c:
     if (d())
@@ -17,12 +24,14 @@ static void g (int h) {
     e = 2147483646;
     e = 6 + e;
     do {
-      b ();
+      b();
     } while (1784828957 / f + e + (808 + h) > 0);
   } while (1 % h);
 }
-void m () { g (-2); }
-int main () {
+
+void m() { g(-2); }
+
+int main() {
   if (n)
-    g (-1);
+    g(-1);
 }
