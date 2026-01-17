@@ -50,6 +50,7 @@ static uint32_t crc32_tab[256] = {
   3183342108, 3401237130, 1404277552,  615818150, 3134207493, 3453421203, 1423857449,  601450431,
   3009837614, 3294710456, 1567103746,  711928724, 3020668471, 3272380065, 1510334235,  755167117,
 };
+
 // clang-format on
 
 static int32_t uint32_to_int32(uint32_t u) { return u % 2147483647; }
@@ -76,49 +77,59 @@ int computeStatelessChecksum(int num_args, int args[]) {
   return checksum;
 }
 
-int function_e4aff3cc_00c7_469c_bccf_785dd52922c3_2798(int var_0, int var_1, int var_2, int var_3, int var_4[2], int var_5[3]) {
+int function_e4aff3cc_00c7_469c_bccf_785dd52922c3_2798(
+    int var_0, int var_1, int var_2, int var_3, int var_4[2], int var_5[3]
+) {
   int var_6 = 0;
   int var_7[1] = {-2};
 BB0:
   var_3 = (1 / var_3) + (-1 * var_6) + (-2);
-  if ((-1 * var_3) - (1 % var_7[0]) - (1 % var_4[0]) - (1 % var_5[1]) - (-2) > 0) goto BB11;
+  if ((-1 * var_3) - (1 % var_7[0]) - (1 % var_4[0]) - (1 % var_5[1]) - (-2) > 0)
+    goto BB11;
   goto BB13;
 BB1:
   var_6 = (0 * var_6) + (1146232591);
   var_2 = (0 * var_2) + (1476394992);
   var_3 = (1 - var_6) - (-96 - var_2) - (567);
-  if ((923 + var_3) + (-916 * var_4[1]) + (16 / var_7[0]) + (-238 * var_0) + (-766) < 0) goto BB2;
+  if ((923 + var_3) + (-916 * var_4[1]) + (16 / var_7[0]) + (-238 * var_0) + (-766) < 0)
+    goto BB2;
   goto BB6;
 BB2:
   var_3 = (260 - var_0) + (543 + var_5[-250]) + (24);
-  if ((9 + var_3) - (805 + var_0) - (799 + var_6) - (-754 * var_1) - (293) == 0) goto BB3;
+  if ((9 + var_3) - (805 + var_0) - (799 + var_6) - (-754 * var_1) - (293) == 0)
+    goto BB3;
   goto BB13;
 BB3:
   var_2 = (1 % var_6) - (-4 / var_7[0]) - (-1);
-  if ((-1 - var_2) + (-1 - var_6) + (-1 + var_4[0]) + (-2 * var_7[0]) + (-1) < 0) goto BB11;
+  if ((-1 - var_2) + (-1 - var_6) + (-1 + var_4[0]) + (-2 * var_7[0]) + (-1) < 0)
+    goto BB11;
   goto BB13;
 BB4:
   var_2 = (-550 + var_1) - (285 % var_2) - (420);
   goto BB12;
 BB5:
   var_4[1] = (-1 + var_2) - (1 % var_3) - (-2);
-  if ((1 / var_4[1]) - (-1 - var_7[0]) - (1 % var_2) - (-1 * var_1) - (-4) == 0) goto BB3;
+  if ((1 / var_4[1]) - (-1 - var_7[0]) - (1 % var_2) - (-1 * var_1) - (-4) == 0)
+    goto BB3;
   goto BB4;
   do {
-BB6:
+  BB6:
     var_7[0] = (0 * var_7[0]) + (2147483647);
     var_4[1] = (0 * var_4[1]) + (1378881560);
     var_0 = (28 - var_7[0]) + (-287 * var_4[1]) + (260);
-    if ((12 - var_0) - (-20 / var_3) - (17 + var_1) - (0 / var_7[0]) - (9) < 0) goto BB7;
+    if ((12 - var_0) - (-20 / var_3) - (17 + var_1) - (0 / var_7[0]) - (9) < 0)
+      goto BB7;
     goto BB9;
-BB7:
+  BB7:
     var_7[-794] = (-85 + var_0) - (92 / var_7[-338]) - (-859);
-    if ((-209 + var_7[-761]) + (531 * var_5[-416]) + (-767 - var_4[28]) + (507 % var_6) + (441) == 0) goto BB8;
+    if ((-209 + var_7[-761]) + (531 * var_5[-416]) + (-767 - var_4[28]) + (507 % var_6) + (441) ==
+        0)
+      goto BB8;
     goto BB9;
-BB8:
+  BB8:
     var_0 = (-917 + var_3) - (639 / var_7[-778]) - (-960);
     goto BB7;
-BB9:
+  BB9:
     var_1 = (0 * var_1) + (-932315136);
     var_3 = (0 * var_3) + (89157632);
     var_6 = (128 % var_1) - (-31 % var_3) - (12);
@@ -131,23 +142,29 @@ BB10:
   goto BB1;
 BB11:
   var_6 = (-2 * var_2) - (-4 * var_7[0]) - (-2);
-  if ((1 % var_6) + (1 % var_7[0]) + (-1 * var_1) + (1 % var_3) + (-5) == 0) goto BB5;
+  if ((1 % var_6) + (1 % var_7[0]) + (-1 * var_1) + (1 % var_3) + (-5) == 0)
+    goto BB5;
   goto BB6;
 BB12:
   var_0 = (0 - var_3) + (-483 + var_7[559]) + (-591);
   goto BB13;
 BB13:
   var_4[1] = (1 % var_1) + (-1 - var_7[0]) + (-2);
-  return computeStatelessChecksum(9, (int[9]){var_0, var_1, var_2, var_3, var_4[0], var_4[1], var_5[0], var_5[1], var_5[2]});
+  return computeStatelessChecksum(
+      9, (int[9]){var_0, var_1, var_2, var_3, var_4[0], var_4[1], var_5[0], var_5[1], var_5[2]}
+  );
 }
 
 #include <assert.h>
 
-#define check_chksum(expected, actual) (assert((expected)==(actual) && "Checksum not equal"), (actual))
+#define check_chksum(expected, actual)                                                             \
+  (assert((expected) == (actual) && "Checksum not equal"), (actual))
 
-int main(int argc, char* argv[])
-{
-    check_chksum(1673016041, function_e4aff3cc_00c7_469c_bccf_785dd52922c3_2798(0, -2, -2, -2, (int(*))((int[2]){-2, 0}), (int(*))((int[3]){0, -2, 0})));
+int main(int argc, char *argv[]) {
+  check_chksum(
+      1673016041, function_e4aff3cc_00c7_469c_bccf_785dd52922c3_2798(
+                      0, -2, -2, -2, (int(*))((int[2]){-2, 0}), (int(*))((int[3]){0, -2, 0})
+                  )
+  );
   return 0;
 }
-

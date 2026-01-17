@@ -29,7 +29,12 @@ import uuid
 from argparse import ArgumentParser
 from pathlib import Path
 
-from configs import DEFAULT_OUTPUT_DIR, get_func_map_files, get_prog_file, get_crealdb_file
+from configs import (
+  DEFAULT_OUTPUT_DIR,
+  get_func_map_files,
+  get_prog_file,
+  get_crealdb_file,
+)
 from fuzz import FuncGenOptions, generate_function, crealize, FGEN_SUGGESTED_CONFIGS
 from ubchk import check_ubs, check_ubs_once
 
@@ -48,7 +53,9 @@ def get_tmp_crealdb_file(gen_dir: Path):
   return gen_dir / "crealdb.tmp.jsonl"
 
 
-def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int, crealdb: bool):
+def run_gen_loop(
+  fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int, crealdb: bool
+):
   if fopts.seed >= 0:
     random.seed(fopts.seed)
     next_seed = lambda: random.randint(0, 2147483647)
@@ -73,13 +80,14 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
       print(f"[{fopts.sno}]: CheckUBs ...", end=" ", flush=True)
       check_ubs(*get_func_map_files(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
       if fopts.main:
-        check_ubs_once(
-          get_prog_file(fopts.uuid, fopts.sno, gen_dir=fopts.outdir)
-        )
+        check_ubs_once(get_prog_file(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
       print("NO UBs")
     if crealdb and succ:
       print(f"[{fopts.sno}]: GenCreal ...", end=" ", flush=True)
-      if crealize(get_tmp_crealdb_file(fopts.outdir), *get_func_map_files(fopts.uuid, fopts.sno, gen_dir=fopts.outdir)):
+      if crealize(
+        get_tmp_crealdb_file(fopts.outdir),
+        *get_func_map_files(fopts.uuid, fopts.sno, gen_dir=fopts.outdir),
+      ):
         print("SUCC")
       else:
         print("FAIL")
@@ -88,9 +96,7 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
 
 
 if __name__ == "__main__":
-  parser = ArgumentParser(
-    "fgen", description="Tool for generating a set of functions"
-  )
+  parser = ArgumentParser("fgen", description="Tool for generating a set of functions")
 
   parser.add_argument(
     "--output",
@@ -180,7 +186,7 @@ if __name__ == "__main__":
     limit=args.limit,
     check=args.check,
     timeout=args.timeout,
-    crealdb=args.crealdb
+    crealdb=args.crealdb,
   )
 
   if args.crealdb:

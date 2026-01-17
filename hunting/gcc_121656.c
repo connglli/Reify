@@ -1,5 +1,6 @@
 int printf(const char *, ...);
 int a;
+
 int main() {
   int b = 0;
   if (a >= 0)

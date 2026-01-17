@@ -1,4 +1,5 @@
 int a, ac, b, c;
+
 int d(int e) {
   do {
     a = -999 * c - 999 * e - 483647;
@@ -7,6 +8,7 @@ int d(int e) {
   } while (b * a);
   return ac;
 }
+
 int main() {
   if (d(-2149633))
     __builtin_abort();

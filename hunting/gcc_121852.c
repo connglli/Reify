@@ -1,6 +1,8 @@
 int a[] = {0}, d, e, h, i, j, k, l, n[1], *o = n;
 volatile int m;
+
 int p(char q) { return a[e ^ (q & 5)]; }
+
 int s(int q[]) {
   int f, g = 0;
   unsigned b = 5;
@@ -10,11 +12,13 @@ int s(int q[]) {
   }
   return b;
 }
+
 int u(volatile int q) {
   k = 5 % q;
   int r[] = {h, i, k, j};
   return s(r);
 }
+
 int main() {
   int t;
   do {

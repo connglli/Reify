@@ -1,5 +1,6 @@
 extern int g(void);
 int a, b, c;
+
 int e(int f) {
   int d = 0;
   for (; d < 6; d++) {
@@ -9,6 +10,7 @@ int e(int f) {
   }
   return a;
 }
+
 void h() {
   int i = 0;
   if (c)
@@ -20,6 +22,7 @@ j:
   if (g() - 508050053 + e(i + 79))
     goto k;
 }
+
 int main() {
   while (a)
     h();

@@ -276,7 +276,8 @@ namespace symir {
 
   void SymCxLower::Visit(const ScaParam &p) {
     if (p.IsVolatile()) {
-      out << "volatile" << " " << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+      out << "volatile"
+          << " " << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
     } else {
       out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
     }
@@ -284,7 +285,8 @@ namespace symir {
 
   void SymCxLower::Visit(const VecParam &p) {
     if (p.IsVolatile()) {
-      out << "volatile" << " ";
+      out << "volatile"
+          << " ";
     }
     out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
     for (const auto &l: p.GetVecShape()) {
@@ -295,7 +297,8 @@ namespace symir {
   void SymCxLower::Visit(const ScaLocal &l) {
     indent();
     if (l.IsVolatile()) {
-      out << "volatile" << " " << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+      out << "volatile"
+          << " " << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
     } else {
       out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
     }
@@ -306,7 +309,8 @@ namespace symir {
   void SymCxLower::Visit(const VecLocal &l) {
     indent();
     if (l.IsVolatile()) {
-      out << "volatile" << " ";
+      out << "volatile"
+          << " ";
     };
     out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
     for (auto len: l.GetVecShape()) {
