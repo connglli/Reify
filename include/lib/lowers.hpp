@@ -129,6 +129,10 @@ namespace symir {
   class SymWasmLower : public SymIRLower {
   public:
     explicit SymWasmLower(std::ostream &out) : SymIRLower(out) {}
+    void SymWasmLowerFunction(const Funct &f, const std::vector<std::string> execPath) {
+      this->exec_path = execPath;
+      Lower(f);
+    }
 
   protected:
     void Visit(const VarUse &v) override;
@@ -158,6 +162,7 @@ namespace symir {
   protected:
     bool force_sexp = false; // Whether current emission must be sexp style
     std::vector<const Block *> blocks; // Blocks in order of appearance
+    std::vector<std::string> exec_path; // Execution path using block numbers
     std::map<int, int> block_inds{}; // Map from block label nums to dispatch indices
     std::map<const std::string, int> locals{}; // Map from variable names to local indices
     std::set<std::string> is_anonymous; // If variable in this set, must use index to refer to

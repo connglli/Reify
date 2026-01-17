@@ -51,6 +51,9 @@ public:
   // Get the execution path of the function
   [[nodiscard]] const std::vector<int> &GetExecution() const { return execution; }
 
+  // Get the execution path of the function by label
+  [[nodiscard]] const std::vector<std::string> &GetExecutionByLabels() const { return executionByLabels; }
+
   // Get all solved initializations
   [[nodiscard]] const std::vector<std::vector<ArgPlus<int>>> &GetInits() const { return inits; }
 

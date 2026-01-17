@@ -689,12 +689,23 @@ namespace symir {
     out << "(local $" << l.GetName() << " v128)";
   }
 
-  void SymWasmLower::Visit(const Block &b) { 
-    // visit all instrs inside the block
-    for (const auto &s: b.GetStmts()) {
+  void SymWasmLower::Visit(const Block &b) {
+    std::string label = b.GetLabel();
+    bool gen_unreachable = std::find(exec_path.begin(), exec_path.end(), label) == exec_path.end() && (rand() % 2 == 0);
+    
+    if (gen_unreachable) {
       indent();
-      s->Accept(*this);
+      if (force_sexp) out << "(";
+      out << "unreachable";
+      if (force_sexp) out << ")";
       out << std::endl;
+    } else {
+      // visit all instrs inside the block
+      for (const auto &s: b.GetStmts()) {
+        indent();
+        s->Accept(*this);
+        out << std::endl;
+      }
     }
   }
 

@@ -479,7 +479,7 @@ std::string FunPlus::GenerateWasmCode(const UBFreeExec &exec) const {
   std::ostringstream oss;
   oss << "(module" << std::endl;
   symir::SymWasmLower lower(oss);
-  lower.Lower(*exec.GetFun());
+  lower.SymWasmLowerFunction(*exec.GetFun(), exec.GetExecutionByLabels());
   oss << ")" << std::endl;
   return oss.str();
 }
