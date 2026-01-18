@@ -36,13 +36,14 @@ Reify is capable of generating *leaf functions* that does not call other functio
 python scripts/fgen.py --allops --injubs --sexp --main --output generated --limit 512
 ```
 
-The output directory (given by the `--output` option) includes the following sub-directories:
+The output directory (given by the `--output` option) includes multiple sub-directories, each for an individual function:
 
-- `functions`: Generated functions in C (not compilable).
-- `mappings`: Input-output mappings of the generated functions, ensuring UB-free execution and terminating
-- `sexpressions`:S expressions of the generated functions, which can be used as seeds for generating whole programs. Require `--sexp`.
-- `programs`: Generated programs corresponding to the functions (compilable). Require `--main`.
-- Others.
+- `func_<uuid>_<sno>`: Contains all artifacts for an individual leaf function, including:
+  - `func.c`: Generated function in C (not compilable alone).
+  - `inout.jsonl`: Input-output mappings ensuring UB-free execution.
+  - `func.sexp`: S-expression of the generated function.
+  - `main.c`: A driver program to test the function (compilable with `func.c`).
+  - `func.log`: Generation logs.
 
 **Or use the following command to generate an individual leaf function**:
 
@@ -83,7 +84,13 @@ Use the following command to generate 512 whole programs based on a set of leaf 
 ./build/bin/pgen --input generated --limit 512 $(uuidgen)
 ```
 
-The generated programs are placed in the `programs` subdirectory of `--input`.
+The generated programs are placed in the `programs` subdirectory of `--input`. Each program has its own directory:
+
+- `prog_<uuid>_<sno>`: Contains all artifacts for a whole program, including:
+  - `main.c`: The entry point.
+  - `chksum.c`: Checksum utilities.
+  - `proto.h`: Prototypes of used leaf functions.
+  - `func_*.c`: Individual function files.
 
 ## 🔎 Fuzzing Compilers
 
@@ -98,23 +105,6 @@ python scripts/fuzz.py -o fuzzdir -j 10 -s 0 'gcc -O3 -fno-tree-slsr -fno-tree-c
 - **`-j 10`**: Run 10 jobs in parallel
 - **`-s 0`**: Seed for random number generator
 
-### Fuzzing Compilers with Creal
-
-Creal can be integrated into testing process.
-Install [Csmith](https://github.com/csmith-project/csmith),
-[CompCert](https://compcert.org/man/manual002.html#install),
-[Creal](https://github.com/connglli/Creal), and optionally
-[YARPGen](https://github.com/intel/yarpgen/).
-Then use:
-
-```bash
-python scripts/fuzz.py -o fuzzdir -s 0 -j 10 \
-  --creal /path/to/Creal \
-  --csmith /path/to/Csmith \
-  --ccomp /path/to/CompCert \
-  'gcc -O3 -fno-tree-slsr -fno-tree-ch'
-```
-
 ### Experimental: Fuzzing JVM
 
 Use the following command to fuzz a Java virtual machine:
@@ -124,7 +114,7 @@ Use the following command to fuzz a Java virtual machine:
 ```
 
 This process adapted leaf function generation to generate Java bytecode.
-An individual Java class can also be generated via `--unstable-javaclass` with `build/bin/fgen` can be used to generate :
+An individual Java class can also be generated via `--unstable-javaclass` into `build/bin/fgen`:
 
 ```bash
 timeout 3s ./build/bin/fgen ... --unstable-javaclass ...
