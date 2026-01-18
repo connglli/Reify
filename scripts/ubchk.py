@@ -32,7 +32,6 @@ from cmdline import run_proc
 from configs import (
   FunArts,
   ProgArts,
-  get_simple_program,
   parse_mapping,
 )
 
@@ -137,7 +136,7 @@ def _check_ubs_without_main(arts):
   tmp_c_path, tmp_o_path = tmp_test_dir / "a.c", tmp_test_dir / "a.out"
 
   for map_ind, (func_args, _, _) in enumerate(parse_mapping(map_path)):
-    tmp_c_path.write_text(get_simple_program(func_name, func_code, func_args))
+    tmp_c_path.write_text(FunArts.get_simple_program(func_name, func_code, func_args))
     ub_res, retc, out = _do_check_ubs(tmp_test_dir, o_file=str(tmp_o_path))
     if ub_res == UBChkRes.UB_FOUND:
       print("****************************")
@@ -186,8 +185,8 @@ if __name__ == "__main__":
     print(f"Check {test_dir.name} ...")
 
     if FunArts.is_test_dir(test_dir):
-      check_func_ubs(FunArts.from_test_dir(test_dir))
+      check_func_ubs(FunArts.from_test_dir(test_dir, gen_dir=gen_dir))
     elif ProgArts.is_test_dir(test_dir):
-      check_prog_ubs(ProgArts.from_test_dir(test_dir))
+      check_prog_ubs(ProgArts.from_test_dir(test_dir, gen_dir=gen_dir))
     else:
       print("Skipping (no main.c or function.c+mapping)")

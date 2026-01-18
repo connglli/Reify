@@ -128,16 +128,15 @@ FGEN_SEXP_OPT := $(if $(FGEN_GEN_SEXP),--sexp,)
 FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
 FGEN_AOPS_OPT := $(if $(FGEN_ALL_OPS),--allops,)
 FGEN_UBIJ_OPT := $(if $(FGEN_INJ_UBS),--injubs,)
-FGEN_CRDB_OPT := $(if $(FGEN_CREALDB),--crealdb,)
-FGEN_EX_OPTS  := $(if $(FGEN_EX_OPTS),--extra "$(FGEN_EX_OPTS)",)
+FGEN_EXT_OPTS  := $(if $(FGEN_EXT_OPTS),--extra="$(FGEN_EXT_OPTS)",)
 
-gen-func-set: fgen
+genfuncs: fgen
 	@mkdir -p $(FGEN_OUT_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_CRDB_OPT) $(FGEN_EX_OPTS)
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS)
 
-gen-func-set-check-ubs: fgen
+testfuncs: fgen
 	@mkdir -p $(FGEN_OUT_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_CRDB_OPT) $(FGEN_EX_OPTS) --check
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS) --check
 
 ## Program Generation
 
@@ -145,11 +144,11 @@ PGEN_IN_DIR    ?= $(FGEN_OUT_DIR)
 PGEN_LIMIT     ?= 100000
 PGEN_EX_OPTS   ?=
 
-gen-prog-set: pgen
+genprogs: pgen
 	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) $(shell uuidgen)
 
-gen-prog-set-check: pgen
+testprogs: pgen
 	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
 	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) --debug $(shell uuidgen)
 	$(PY3) scripts/ubchk.py $(PGEN_IN_DIR)
