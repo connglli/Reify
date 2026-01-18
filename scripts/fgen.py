@@ -22,7 +22,7 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
-import json
+
 import random
 import time
 import uuid
@@ -32,29 +32,22 @@ from pathlib import Path
 from configs import (
   DEFAULT_OUTPUT_DIR,
   FunArts,
-  get_crealdb_file,
 )
-from fuzz import FGEN_SUGGESTED_CONFIGS, FuncGenOptions, crealize, generate_function
+from fuzz import FGEN_SUGGESTED_CONFIGS, FuncGenOptions, generate_function
 from ubchk import check_func_ubs
 
 
 def generate(opts: FuncGenOptions, *, timeout: int):
   st_time = time.time()
-  func, errmsg = generate_function(opts, timeout=timeout)
+  arts, errmsg = generate_function(opts, timeout=timeout)
   ed_time = time.time()
-  if func is None:
+  if arts is None:
     print(f"GEN ERROR (.): {errmsg or '<no output>'}")
     return False, None
   return True, ed_time - st_time
 
 
-def get_tmp_crealdb_file(gen_dir: Path):
-  return gen_dir / "crealdb.tmp.jsonl"
-
-
-def run_gen_loop(
-  fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int, crealdb: bool
-):
+def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int):
   if fopts.seed >= 0:
     random.seed(fopts.seed)
     next_seed = lambda: random.randint(0, 2147483647)
@@ -65,7 +58,7 @@ def run_gen_loop(
     f"limit={limit if limit != 0 else '<INF>'}, "
     f"seed={fopts.seed if fopts.seed >= 0 else '<RND>'}, "
     f"sexp={fopts.sexp}, main={fopts.main}, allops={fopts.allops}, injubs={fopts.injubs}, "
-    f"check={check}, crealdb={crealdb}, timeout={timeout}s, "
+    f"check={check}, timeout={timeout}s, "
     f"extra={"'" + fopts.extra + "'" if fopts.extra else '<NONE>'}"
   )
   fopts.sno = 0
@@ -79,16 +72,6 @@ def run_gen_loop(
       print(f"[{fopts.sno}]: CheckUBs ...", end=" ", flush=True)
       check_func_ubs(FunArts(fopts.uuid, fopts.sno, gen_dir=fopts.outdir))
       print("NO UBs")
-    if crealdb and succ:
-      print(f"[{fopts.sno}]: GenCreal ...", end=" ", flush=True)
-      if crealize(
-        get_tmp_crealdb_file(fopts.outdir),
-        FunArts(fopts.uuid, fopts.sno, gen_dir=fopts.outdir).get_func_file(),
-        FunArts(fopts.uuid, fopts.sno, gen_dir=fopts.outdir).get_map_file(),
-      ):
-        print("SUCC")
-      else:
-        print("FAIL")
 
     fopts.sno += 1
 
@@ -156,12 +139,6 @@ if __name__ == "__main__":
   parser.add_argument(
     "--extra", type=str, default=None, help="extra options passed to fgen"
   )
-  parser.add_argument(
-    "--crealdb",
-    action="store_true",
-    default=False,
-    help="build a Creal compatible function database from the generated functions",
-  )
 
   args = parser.parse_args()
 
@@ -184,19 +161,4 @@ if __name__ == "__main__":
     limit=args.limit,
     check=args.check,
     timeout=args.timeout,
-    crealdb=args.crealdb,
   )
-
-  if args.crealdb:
-    print("Converting CrealDB to JSON format ...")
-    cdb_tmp_file = get_tmp_crealdb_file(outdir)
-    with cdb_tmp_file.open() as fin:
-      items = []
-      for line in fin:
-        if not line:
-          continue
-        items.append(json.loads(line.strip()))
-    cdb_file = get_crealdb_file(outdir)
-    with cdb_file.open("w") as fout:
-      json.dump(items, fout, indent=2)
-    print(f"CrealDB saved to {cdb_file}")
