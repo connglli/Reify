@@ -4,7 +4,6 @@ C/C++:
 4. support more conditions and bitwise ops
 5. use yingwei/ubi and yingwei/csmith
 6. structs and points and memory
-7. add clang format to pre-commit
 8. better optimization passes support, gvn/lvn still not working very well, consider intrinsics, idioms, and more slp patterns, separate functions from main so that hiding input parameters
 9. better type system
 10. sample multiple exec per function
