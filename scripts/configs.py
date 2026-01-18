@@ -109,20 +109,20 @@ class FunArts:
   def get_sexp_file(self):
     return self.get_test_dir() / FILENAME_SEXPRESSION
 
-  def as_dict(self):
-    return {
-      "func": self.get_func_file(),
-      "map": self.get_map_file(),
-      "log": self.get_log_file(),
-      "sexp": self.get_sexp_file(),
-      "main": self.get_main_file(),
-    }
+  @staticmethod
+  def get_simple_program(func_name, func_code, func_args):
+    return PROG_TPL.format(
+      chksum_code=CHKSUM_CODE,
+      func_code=func_code,
+      func_name=func_name,
+      func_args=", ".join(x.unflat_c_str() for x in func_args),
+    )
 
 
 class ProgArts:
-  def __init__(self, fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-    self.fuuid = str(fuuid).replace("-", "_")
-    self.fsano = fsano
+  def __init__(self, puuid, psano, gen_dir=DEFAULT_OUTPUT_DIR):
+    self.puuid = str(puuid).replace("-", "_")
+    self.psano = psano
     self.gen_dir = Path(gen_dir)
 
   @staticmethod
@@ -144,12 +144,12 @@ class ProgArts:
     parts = test_dir.name.split("_")
     if len(parts) < 3:
       raise ValueError(f"Invalid test dir name: {test_dir.name}")
-    fuuid = "_".join(parts[1:-1]).replace("_", "-")
-    fsano = parts[-1]
-    return ProgArts(fuuid, fsano, gen_dir)
+    puuid = "_".join(parts[1:-1]).replace("_", "-")
+    psano = parts[-1]
+    return ProgArts(puuid, psano, gen_dir)
 
   def get_test_dir(self):
-    return self.gen_dir / f"{PROGRAM_PREFIX}_{self.fuuid}_{self.fsano}"
+    return self.gen_dir / f"{PROGRAM_PREFIX}_{self.puuid}_{self.psano}"
 
   def get_main_file(self):
     return self.get_test_dir() / FILENAME_MAIN_C
@@ -162,23 +162,6 @@ class ProgArts:
 
   def get_func_file(self, fname):
     return self.get_test_dir() / (fname + ".c")
-
-
-def get_crealdb_file(gen_dir=DEFAULT_OUTPUT_DIR):
-  return gen_dir / "crealdb.json"
-
-
-def get_artifacts(fuuid, fsano, gen_dir=DEFAULT_OUTPUT_DIR):
-  return FunArts(fuuid, fsano, gen_dir).as_dict()
-
-
-def get_simple_program(func_name, func_code, func_args):
-  return PROG_TPL.format(
-    chksum_code=CHKSUM_CODE,
-    func_code=func_code,
-    func_name=func_name,
-    func_args=", ".join(x.unflat_c_str() for x in func_args),
-  )
 
 
 class ArgVal:

@@ -52,7 +52,7 @@ struct GlobalOptions {
   int UpperInitBound = INT_MAX;
 
   // The number of assignment statements in a basic block
-  int NumAssignsPerBBL = 2;
+  int NumAssignsPerBBL = 1;
   // The number of variables in each assignment statement
   int NumVarsPerAssign = 2;
   // The number of variables in each conditional statement
@@ -84,7 +84,7 @@ struct GlobalOptions {
   ////////////////////////////////////////////////////////////
 
   // The number of basic blocks for each control flow graph
-  int NumBblsPerFun = 15;
+  int NumBblsPerFun = 10;
   // Probability of sampling a base graph from an existing control-flow graph
   // database (if available) during control-flow graph generation
   double SampleBaseGraphProba = 0.5;
