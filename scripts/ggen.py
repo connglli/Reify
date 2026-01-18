@@ -22,6 +22,7 @@
 #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
+
 import glob
 import json
 import random
@@ -30,18 +31,17 @@ import shlex
 import shutil
 import tempfile
 import time
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import CalledProcessError, TimeoutExpired
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 from uuid import uuid4 as uuid
 
-import pydot
-
 import cmdline
+import pydot
 from fuzz import MAX_I32, mlog, rand_int
 
 SUPPORTED_PROGRAM_GENERATORS = ["csmith", "yarpgen", "preset"]
@@ -138,8 +138,7 @@ class LLVM:
         cfg_files = [bprog.parent / f"{prefix}.{fn}.dot" for fn in funcs]
       else:
         cfg_files = [
-          bprog.parent / s
-          for s in glob.glob(f"{prefix}.*.dot", root_dir=str(bprog.parent))
+          bprog.parent / s for s in glob.glob(f"{prefix}.*.dot", root_dir=str(bprog.parent))
         ]
       # There're chances that the functions are inlined and not found in the LLVM program
       return [cf for cf in cfg_files if cf.exists()], None
@@ -208,7 +207,7 @@ class Csmith(LLVMProgGen):
     if res.file is None:
       return res
     mlog(f"Succeeded: {res.file}")
-    mlog(f"Compiling the C program into LLVM (bitcode) program (text) ... ")
+    mlog("Compiling the C program into LLVM (bitcode) program (text) ... ")
     bprog, errmsg = self.llvm.emit_llvm(
       res.file, extra_opts=[f"-I{self.home / 'include'}"], timeout=10
     )  # seconds
@@ -219,17 +218,15 @@ class Csmith(LLVMProgGen):
   def fn_pat(self) -> str:
     return "func_"
 
-  def next_cprog(
-    self, name: str, outdir: Path, seed: int, timeout: int
-  ) -> LLVMProgGenRes:
+  def next_cprog(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
     out_file = outdir / f"{name}.c"
     try:
       cmdline.check_out(
         [
           str(self.bin),
-          f"--seed",
+          "--seed",
           str(seed),
-          f"--output",
+          "--output",
           str(out_file),
         ],
         timeout=timeout,
@@ -287,7 +284,7 @@ class YARPGen(LLVMProgGen):
     if cres.file is None:
       return cres
     mlog(f"Succeeded: {cres.file}")
-    mlog(f"Compiling the C program into LLVM (bitcode) program (text) ... ")
+    mlog("Compiling the C program into LLVM (bitcode) program (text) ... ")
     bprog, errmsg = self.llvm.emit_llvm(
       cres.file, extra_opts=["-mcmodel=large"], timeout=10
     )  # seconds
@@ -295,9 +292,7 @@ class YARPGen(LLVMProgGen):
       return LLVMProgGenRes.failure(errmsg)
     return LLVMProgGenRes.success(bprog, cres.funcs)
 
-  def next_cprog(
-    self, name: str, outdir: Path, seed: int, timeout: int
-  ) -> LLVMProgGenRes:
+  def next_cprog(self, name: str, outdir: Path, seed: int, timeout: int) -> LLVMProgGenRes:
     tmpdir = tempfile.mkdtemp(prefix="yarpgen-", dir=tempfile.gettempdir())
     try:
       cmdline.check_out(
@@ -342,9 +337,7 @@ class YARPGen(LLVMProgGen):
 
 
 class Preset(LLVMProgGen):
-  _C_COMMAND_PATTERN = re.compile(
-    r"^(/?(?:\w+/)*(?:clang|gcc|cc))\s+(.*?)\s+(-o\s+.*?)\s+(.*?)"
-  )
+  _C_COMMAND_PATTERN = re.compile(r"^(/?(?:\w+/)*(?:clang|gcc|cc))\s+(.*?)\s+(-o\s+.*?)\s+(.*?)")
   _CXX_COMMAND_PATTERN = re.compile(
     r"^(/?(?:\w+/)*(?:clang\+\+|g\+\+|c\+\+))\s+(.*?)\s+(-o\s+.*?)\s+(.*?)"
   )
@@ -353,9 +346,7 @@ class Preset(LLVMProgGen):
     super().__init__()
     self.preset = preset
     if not self.preset.exists():
-      merror(
-        f"Preset file (should be a compile_commands.json) not found at {self.preset}."
-      )
+      merror(f"Preset file (should be a compile_commands.json) not found at {self.preset}.")
     with self.preset.open() as fin:
       self.commands = json.load(fin)
     self._ptr = -1
@@ -373,9 +364,7 @@ class Preset(LLVMProgGen):
     except TimeoutExpired as e:
       return LLVMProgGenRes.failure(f"LLVM compilation timed out: {e.stdout}")
     except Exception as e:
-      return LLVMProgGenRes.failure(
-        f"Unexpected error during LLVM compilation: {str(e)}"
-      )
+      return LLVMProgGenRes.failure(f"Unexpected error during LLVM compilation: {str(e)}")
 
   def fn_pat(self) -> str:
     return ""  # Indicating all found functions in the preset
@@ -389,9 +378,7 @@ class Preset(LLVMProgGen):
         + (cmd_obj["file"] if "file" in cmd_obj else "<unknown-file>")
       )
       if "directory" not in cmd_obj:
-        mwarning(
-          f"Failure: 'directory' not found in the command object, skipping: {cmd_obj}"
-        )
+        mwarning(f"Failure: 'directory' not found in the command object, skipping: {cmd_obj}")
         continue
       workdir = cmd_obj["directory"]
       if "command" not in cmd_obj:
@@ -410,9 +397,7 @@ class Preset(LLVMProgGen):
         compiler = str(self.llvm.clangxx)
         extra_incl = "-I/usr/include/c++/v1 "  # For libc++ headers
       if match is None:
-        mwarning(
-          f"Failure: Invalid command (neither for C nor for C++), skipping: {orig_cmd}"
-        )
+        mwarning(f"Failure: Invalid command (neither for C nor for C++), skipping: {orig_cmd}")
         continue
       cmd = f"{compiler} -Xclang -disable-llvm-passes -emit-llvm -S {extra_incl} {match[2]} -o {bprog} {match[4]}"
       mlog(f"Success: Transform to command: {cmd}")
@@ -540,23 +525,20 @@ def parse_dot_to_cfgs(dot_file: Path) -> List[CfgSkel]:
     except Exception as e:
       mwarning(f"Failed to parse CFG: {e}")
       continue
-    mlog(
-      f">> Parsed CFG with {cfg.num_bbls()} basic blocks and {cfg.num_jmps()} block jumps."
-    )
+    mlog(f">> Parsed CFG with {cfg.num_bbls()} basic blocks and {cfg.num_jmps()} block jumps.")
     if cfg.num_bbls() == 0 and cfg.num_jmps() == 0:
-      mwarning(f"Empty CFG: Skipping.")
+      mwarning("Empty CFG: Skipping.")
       continue
     elif (
       cfg.num_bbls() <= GLOBAL_OPTION_MIN_CFG_BLOCKS
       or cfg.num_jmps() <= GLOBAL_OPTION_MIN_CFG_JUMPS
     ):
-      mwarning(f"Small CFG: Skipping.")
+      mwarning("Small CFG: Skipping.")
       continue
     elif (
-      cfg.num_bbls() > GLOBAL_OPTION_MAX_CFG_BLOCKS
-      or cfg.num_jmps() > GLOBAL_OPTION_MAX_CFG_JUMPS
+      cfg.num_bbls() > GLOBAL_OPTION_MAX_CFG_BLOCKS or cfg.num_jmps() > GLOBAL_OPTION_MAX_CFG_JUMPS
     ):
-      mwarning(f"Large CFG: Skipping.")
+      mwarning("Large CFG: Skipping.")
       continue
     # TODO: More strategies to cut large CFGs
     results.append(cfg)
@@ -647,16 +629,14 @@ def run_gen_loop(
       mwarning(f"Failed: {gen_res.errmsg}")
       continue
     mlog(f"Succeeded: {gen_res.file}")
-    mlog(f"Extracting the control flow graph ... ")
+    mlog("Extracting the control flow graph ... ")
     cfg_files, errmsg = llvm.emit_cfg_dots(
       gen_res.file, fn_pat=pgen.fn_pat(), funcs=gen_res.funcs, timeout=15 + timeout
     )
     if not cfg_files:
       mwarning(f"Failed: {errmsg}")
       continue
-    mlog(
-      f"Succeeded: {len(cfg_files)} returned ([{cfg_files[0].relative_to(outdir)}, ...])"
-    )
+    mlog(f"Succeeded: {len(cfg_files)} returned ([{cfg_files[0].relative_to(outdir)}, ...])")
     mlog("Parsing the DOT file into a CFG skeleton ... ")
     cfgs = []
     for cf in cfg_files:
@@ -694,16 +674,12 @@ def run_gen_loop(
   mlog(
     f"  Total time spent (seconds)    : {stats.time_spent:.2f} (ave: {stats.time_spent_per:.2f})"
   )
-  mlog(f"  Basic blocks distribution     :")
+  mlog("  Basic blocks distribution     :")
   for bbl, count in stats.bbl_dist.most_common(10):
-    mlog(
-      f"    {bbl:5d} basic blocks          : {count:5d} ({count / stats.num_graphs * 100:.2f}%)"
-    )
-  mlog(f"  Block jumps distribution      :")
+    mlog(f"    {bbl:5d} basic blocks          : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
+  mlog("  Block jumps distribution      :")
   for jmp, count in stats.jmp_dist.most_common(10):
-    mlog(
-      f"    {jmp:5d} block jumps           : {count:5d} ({count / stats.num_graphs * 100:.2f}%)"
-    )
+    mlog(f"    {jmp:5d} block jumps           : {count:5d} ({count / stats.num_graphs * 100:.2f}%)")
 
 
 def main():
@@ -713,9 +689,7 @@ def main():
     GLOBAL_OPTION_MIN_CFG_JUMPS, \
     GLOBAL_OPTION_MAX_CFG_JUMPS
 
-  parser = ArgumentParser(
-    "gen", description="Generate a graph database from a set of functions"
-  )
+  parser = ArgumentParser("gen", description="Generate a graph database from a set of functions")
   parser.add_argument(
     "-l",
     "--llvm",
@@ -819,21 +793,15 @@ def main():
     )
   if gen == "csmith":
     if args.csmith is None:
-      merror(
-        f"Option --csmith must be specified when using csmith as the program generator."
-      )
+      merror("Option --csmith must be specified when using csmith as the program generator.")
     gen = Csmith(Path(args.csmith), llvm)
   elif gen == "yarpgen":
     if args.yarpgen is None:
-      merror(
-        f"Option --yarpgen must be specified when using YARPGen as the program generator."
-      )
+      merror("Option --yarpgen must be specified when using YARPGen as the program generator.")
     gen = YARPGen(Path(args.yarpgen), llvm)
   elif gen == "preset":
     if args.preset is None:
-      merror(
-        f"Option --preset must be specified when using Preset as the program generator."
-      )
+      merror("Option --preset must be specified when using Preset as the program generator.")
     gen = Preset(Path(args.preset), llvm)
   else:
     merror(f"Unsupported program generator: {gen}")
@@ -842,9 +810,7 @@ def main():
   if limit <= 0:
     limit = MAX_I32
   if limit > MAX_I32:
-    mwarning(
-      f"Limit (--limit) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}."
-    )
+    mwarning(f"Limit (--limit) exceeds maximum allowed value ({MAX_I32}). Setting to {MAX_I32}.")
     limit = MAX_I32
 
   GLOBAL_OPTION_MIN_CFG_BLOCKS = args.min_blocks
@@ -904,9 +870,7 @@ def main():
     )
     yes = input()
     if yes != "Y":
-      mlog(
-        "The user chose not to overwrite the output directory. Exiting.", color="red"
-      )
+      mlog("The user chose not to overwrite the output directory. Exiting.", color="red")
       exit(0)
     output.unlink()
 

@@ -89,18 +89,10 @@ class FuncGenOptions:
   verbose: bool = False  # Whether to print verbose output
   main: bool = True  # Whether to include a main function in the generated program
   sexp: bool = True  # Whether to include S-expression output
-  allops: bool = (
-    True  # Whether to consider all possible operations in the generated program
-  )
-  injubs: bool = (
-    True  # Whether to inject undefined behaviors for those unexecuted blocks
-  )
-  seed: Optional[
-    int
-  ] = None  # Seed for the random number generator (None means no seed)
-  extra: Optional[
-    str
-  ] = None  # Extra options to control the function generation process
+  allops: bool = True  # Whether to consider all possible operations in the generated program
+  injubs: bool = True  # Whether to inject undefined behaviors for those unexecuted blocks
+  seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
+  extra: Optional[str] = None  # Extra options to control the function generation process
 
   def to_dict(self) -> dict:
     return {
@@ -189,9 +181,7 @@ class ProgGenOptions:
   indir: Path  # Directory to read the input function files
   limit: int  # The maximum number of programs to generate (0 means unlimited)
   config: ProgGenConfig  # Configuration for the program generation
-  seed: Optional[
-    int
-  ] = None  # Seed for the random number generator (None means no seed)
+  seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
   debug = False  # Whether to print debug information
   extra: Optional[str] = None  # Extra options to control the program generation process
 
@@ -345,9 +335,7 @@ class TestRes:
       return "Unknown"
     else:
       try:
-        return (
-          f"{signal.Signals(-self.exitcode).name} ({signal.strsignal(-self.exitcode)})"
-        )
+        return f"{signal.Signals(-self.exitcode).name} ({signal.strsignal(-self.exitcode)})"
       except ValueError:
         return "Unknown"
 
@@ -386,9 +374,7 @@ def test_compiler(cc: str, test_dir: Path, out_file: Path, timeout: int) -> Test
   except TimeoutExpired as e:
     return TestRes(comp_cmd, TestRes.Type.CTO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
-    return TestRes(
-      comp_cmd, TestRes.Type.ICE, exitcode=-proc.returncode, errmsg=proc.stdout
-    )
+    return TestRes(comp_cmd, TestRes.Type.ICE, exitcode=-proc.returncode, errmsg=proc.stdout)
   exec_cmd = str(out_file)
   full_cmd = f"{comp_cmd}; {exec_cmd}"
   try:
@@ -402,9 +388,7 @@ def test_compiler(cc: str, test_dir: Path, out_file: Path, timeout: int) -> Test
   except TimeoutExpired as e:
     return TestRes(full_cmd, TestRes.Type.ETO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
-    return TestRes(
-      full_cmd, TestRes.Type.WRC, exitcode=proc.returncode, errmsg=proc.stdout
-    )
+    return TestRes(full_cmd, TestRes.Type.WRC, exitcode=proc.returncode, errmsg=proc.stdout)
   return TestRes(full_cmd, TestRes.Type.SUC, exitcode=0, errmsg=None)
 
 
@@ -426,9 +410,7 @@ class WorkerRunOptions:
   limit: int  # Maximum number of iterations for the worker
   stop: Event  # Synchronizing event to stop the worker
   gen_tmo: int = 3  # Timeout (seconds) for function/program generation
-  test_tmo: int = (
-    10  # Timeout (seconds) for testing the compiler with the generated program
-  )
+  test_tmo: int = 10  # Timeout (seconds) for testing the compiler with the generated program
 
 
 class Worker:
@@ -523,9 +505,7 @@ class Worker:
       return  # All program generation failed
     self.log("Testing the compiler with the generated programs")
     for index, arts in enumerate(all_arts):
-      self.log(
-        f"{index}: Testing the compiler with the generated program: {arts.get_test_dir()}"
-      )
+      self.log(f"{index}: Testing the compiler with the generated program: {arts.get_test_dir()}")
       with arts.get_main_file().open("a") as fout:
         fout.write(f"\n\n// Pgen Options: {json.dumps(opts.to_dict())}")
       binary = arts.get_test_dir() / "main.out"
@@ -545,9 +525,7 @@ class Worker:
         ignore_errors=True,
       )
 
-  def test(
-    self, test_dir: Path, *, binary: Path, timeout: int, extra_cc_opts: str = ""
-  ):
+  def test(self, test_dir: Path, *, binary: Path, timeout: int, extra_cc_opts: str = ""):
     test_res = test_compiler(
       f"{self.wconf.cc} {extra_cc_opts}",
       test_dir=test_dir,
@@ -561,14 +539,10 @@ class Worker:
       )
       self.store_bug(test_res, test_dir, self.ice_dir)
     elif test_res.is_compilation_timeout():
-      self.log(
-        f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue"
-      )
+      self.log(f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue")
       self.store_bug(test_res, test_dir, self.hang_dir)
     elif test_res.is_wrong_code():
-      self.log(
-        f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green"
-      )
+      self.log(f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
       self.store_bug(test_res, test_dir, self.wrc_dir)
     elif test_res.is_execution_timeout():
       self.log(f"The generated program timed out (skip): {test_res.errmsg}")
@@ -610,9 +584,7 @@ class Worker:
 # -==========================================================
 
 
-def run_worker(
-  *, wid: int, wconf: WorkerConf, ropts: WorkerRunOptions, seed: int, msgq: Queue
-):
+def run_worker(*, wid: int, wconf: WorkerConf, ropts: WorkerRunOptions, seed: int, msgq: Queue):
   wconf.wdir.mkdir(parents=False, exist_ok=False)
   random.seed(seed)
   worker = Worker(wid, wconf=wconf, msgq=msgq)
@@ -727,9 +699,7 @@ def run_fuzz_main(
 def main():
   import os
 
-  parser = ArgumentParser(
-    "fuzz", description="Tool for fuzzing a specific C compiler (gcc/llvm)"
-  )
+  parser = ArgumentParser("fuzz", description="Tool for fuzzing a specific C compiler (gcc/llvm)")
 
   parser.add_argument(
     "-o",
@@ -849,9 +819,7 @@ def main():
     )
     yes = input()
     if yes != "Y":
-      mlog(
-        "The user chose not to overwrite the output directory. Exiting.", color="red"
-      )
+      mlog("The user chose not to overwrite the output directory. Exiting.", color="red")
       sys.exit(0)
     shutil.rmtree(args.outdir)
   mlog(f"Creating output directory: {outdir}")
@@ -872,9 +840,7 @@ def main():
     mlog("Valid")
 
   # Save the command line arguments to a JSON file
-  (outdir / "command.json").write_text(
-    json.dumps({**vars(args), "seed": seed}, indent=2)
-  )
+  (outdir / "command.json").write_text(json.dumps({**vars(args), "seed": seed}, indent=2))
 
   # Start the fuzzing loop
   run_fuzz_main(
