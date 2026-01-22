@@ -69,7 +69,7 @@ void FunPlus::Generate(bool allowDeadCode) {
       for (int j = 0; j < randArrayDim(); j++) {
         shape.push_back(randArrayLen());
       }
-      builder->SymVecParam(NameVar(i), shape, symir::SymIR::Type::I32, isVolatile);
+      builder->SymVecParam(NameVar(i), shape, symir::SymIR::Type::I32, "", isVolatile);
     } else {
       builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, isVolatile);
     }
@@ -97,7 +97,7 @@ void FunPlus::Generate(bool allowDeadCode) {
             "init_var" + std::to_string(i) + "_el" + std::to_string(j), symir::SymIR::Type::I32
         ));
       }
-      builder->SymVecLocal(NameVar(i), shape, inits, symir::SymIR::Type::I32, isVolatile);
+      builder->SymVecLocal(NameVar(i), shape, inits, symir::SymIR::Type::I32, "", isVolatile);
     } else {
       builder->SymScaLocal(
           NameVar(i), builder->SymCoef("init_var" + std::to_string(i), symir::SymIR::Type::I32),

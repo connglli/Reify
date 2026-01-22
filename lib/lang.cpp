@@ -29,13 +29,23 @@ namespace symir {
   VarUse::VarUse(const VarDef *var, std::vector<Coef *> access) :
       SymIR(SIR_VAR_USE), var(var), access(std::move(access)) {
     Assert(this->var != nullptr, "No var to use: a nullptr is given");
-    Assert(this->var->IsVector(), "The variable %s is not a vector", var->GetName().c_str());
-    Assert(
-        this->var->GetVecNumDims() == static_cast<int>(this->access.size()),
-        "The number of access indices (%lu) "
-        "should match the number of vector dimensions (%d) for the variable %s",
-        this->access.size(), this->var->GetVecNumDims(), var->GetName().c_str()
-    );
+    if (this->var->IsVector()) {
+      Assert(
+          this->var->GetVecNumDims() <= static_cast<int>(this->access.size()),
+          "The number of access indices (%lu) "
+          "should be at least the number of vector dimensions (%d) for the variable %s",
+          this->access.size(), this->var->GetVecNumDims(), var->GetName().c_str()
+      );
+    } else if (this->var->GetType() == SymIR::STRUCT) {
+      Assert(
+          this->access.size() >= 1,
+          "The number of access indices (%lu) should be at least 1 for the struct variable %s",
+          this->access.size(), var->GetName().c_str()
+      );
+    } else {
+      Panic("The variable %s is not a vector or a struct", var->GetName().c_str());
+    }
+
     for (const auto *c: this->access) {
       Assert(c != nullptr, "The access coefficient cannot be a nullptr");
       Assert(
@@ -46,6 +56,36 @@ namespace symir {
     setType(var->GetType());
   }
 
+  VarUse::VarUse(const VarDef *var, std::vector<Coef *> access, SymIR::Type type) :
+      SymIR(SIR_VAR_USE), var(var), access(std::move(access)) {
+    Assert(this->var != nullptr, "No var to use: a nullptr is given");
+    if (this->var->IsVector()) {
+      Assert(
+          this->var->GetVecNumDims() <= static_cast<int>(this->access.size()),
+          "The number of access indices (%lu) "
+          "should be at least the number of vector dimensions (%d) for the variable %s",
+          this->access.size(), this->var->GetVecNumDims(), var->GetName().c_str()
+      );
+    } else if (this->var->GetType() == SymIR::STRUCT) {
+      Assert(
+          this->access.size() >= 1,
+          "The number of access indices (%lu) should be at least 1 for the struct variable %s",
+          this->access.size(), var->GetName().c_str()
+      );
+    } else {
+      Panic("The variable %s is not a vector or a struct", var->GetName().c_str());
+    }
+
+    for (const auto *c: this->access) {
+      Assert(c != nullptr, "The access coefficient cannot be a nullptr");
+      Assert(
+          c->GetType() == Type::I32, "The access coefficient should be an %s, but got %s",
+          SymIR::GetTypeCName(Type::I32).c_str(), SymIR::GetTypeName(c->GetType()).c_str()
+      );
+    }
+    setType(type);
+  }
+
   SymIRBuilder::TermID BlockBuilder::SymTerm(
       Term::Op op, Coef *coef, const VarDef *var, const std::vector<Coef *> &access
   ) {
@@ -53,16 +93,30 @@ namespace symir {
     TermID tid = numCreatedTerms++;
     if (op == Term::Op::OP_CST) {
       createdTerms[tid] = std::make_unique<Term>(op, coef, nullptr);
-    } else if (var->IsVector()) {
-      Assert(
-          var->GetVecNumDims() == static_cast<int>(access.size()),
-          "The number of access indices (%lu) does not "
-          "match the number of vector dimensions (%d) for the variable %s",
-          access.size(), var->GetVecNumDims(), var->GetName().c_str()
-      );
-      createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var, access));
     } else {
-      createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var));
+      SymIR::Type currType = var->GetType();
+      std::string currStruct = (currType == SymIR::STRUCT) ? var->GetStructName() : "";
+      int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+      for (const auto *c: access) {
+        if (remainingDims > 0) {
+          remainingDims--;
+        } else if (currType == SymIR::STRUCT) {
+          int idx = c->GetI32Value();
+          const auto *sDef = GetParent()->FindStruct(currStruct);
+          Assert(sDef, "Struct %s not found", currStruct.c_str());
+          const auto &field = sDef->GetField(idx);
+          currType = field.type;
+          if (currType == SymIR::STRUCT)
+            currStruct = field.structName;
+          remainingDims = field.shape.size();
+        }
+      }
+      if (var->IsVector() || var->GetType() == SymIR::STRUCT) {
+        createdTerms[tid] =
+            std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var, access, currType));
+      } else {
+        createdTerms[tid] = std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var));
+      }
     }
     return tid;
   }
@@ -70,14 +124,14 @@ namespace symir {
   SymIRBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID> &termIds) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     ExprID eid = numCreatedExprs++;
-    std::vector<std::unique_ptr<Term>> terms;
+    std::vector<std::unique_ptr<Term>> terms_;
     for (const auto tid: termIds) {
       auto it = createdTerms.find(tid);
       Assert(it != createdTerms.end(), "Term with ID \"%lu\" does not exist", tid);
-      terms.push_back(std::move(it->second));
+      terms_.push_back(std::move(it->second));
       createdTerms.erase(it);
     }
-    createdExprs[eid] = std::make_unique<Expr>(op, std::move(terms));
+    createdExprs[eid] = std::make_unique<Expr>(op, std::move(terms_));
     return eid;
   }
 
@@ -96,21 +150,35 @@ namespace symir {
     Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
-    if (var->IsVector()) {
-      Assert(
-          var->GetVecNumDims() == static_cast<int>(access.size()),
-          "The number of access indices (%lu) does not "
-          "match the number of vector dimensions (%d) for the variable %s",
-          access.size(), var->GetVecNumDims(), var->GetName().c_str()
-      );
-      stmts.push_back(
-          std::make_unique<AssStmt>(std::make_unique<VarUse>(var, access), std::move(it->second))
-      );
+
+    SymIR::Type currType = var->GetType();
+    std::string currStruct = (currType == SymIR::STRUCT) ? var->GetStructName() : "";
+    int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+    for (const auto *c: access) {
+      if (remainingDims > 0) {
+        remainingDims--;
+      } else if (currType == SymIR::STRUCT) {
+        int idx = c->GetI32Value();
+        const auto *sDef = GetParent()->FindStruct(currStruct);
+        Assert(sDef, "Struct %s not found", currStruct.c_str());
+        const auto &field = sDef->GetField(idx);
+        currType = field.type;
+        if (currType == SymIR::STRUCT)
+          currStruct = field.structName;
+        remainingDims = field.shape.size();
+      }
+    }
+
+    if (var->IsVector() || var->GetType() == SymIR::STRUCT) {
+      stmts.push_back(std::make_unique<AssStmt>(
+          std::make_unique<VarUse>(var, access, currType), std::move(it->second)
+      ));
     } else {
       stmts.push_back(
           std::make_unique<AssStmt>(std::make_unique<VarUse>(var), std::move(it->second))
       );
     }
+
     createdExprs.erase(it);
     return dynamic_cast<const AssStmt *>(stmts.back().get());
   }
@@ -183,6 +251,19 @@ namespace symir {
     return std::make_unique<Block>(label, std::move(stmts), std::move(target));
   }
 
+  const StructDef *
+  FunctBuilder::SymStruct(const std::string &name, const std::vector<StructDef::Field> &fields) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    Assert(
+        !structMap.contains(name), "Struct with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    structs.push_back(std::make_unique<StructDef>(name, fields));
+    const auto s = structs.back().get();
+    structMap[name] = s;
+    return s;
+  }
+
   Coef *FunctBuilder::SymCoef(const std::string &name, SymIR::Type type) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
@@ -228,7 +309,8 @@ namespace symir {
   }
 
   const VecParam *FunctBuilder::SymVecParam(
-      const std::string &name, const std::vector<int> &shape, SymIR::Type type, bool isVolatile
+      const std::string &name, const std::vector<int> &shape, SymIR::Type type,
+      std::string structName, bool isVolatile
   ) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
@@ -239,13 +321,33 @@ namespace symir {
         !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
         name.c_str()
     );
-    params.push_back(std::make_unique<VecParam>(name, shape, type));
+    params.push_back(std::make_unique<VecParam>(name, shape, type, structName));
     const auto v = params.back().get();
     if (isVolatile) {
       v->SetVolatile();
     }
     paramMap[name] = v;
     return dynamic_cast<VecParam *>(v);
+  }
+
+  const StructParam *
+  FunctBuilder::SymStructParam(const std::string &name, const std::string &structName) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    Assert(
+        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        structMap.contains(structName), "Struct with name \"%s\" is not defined", structName.c_str()
+    );
+    params.push_back(std::make_unique<StructParam>(name, structName));
+    const auto v = params.back().get();
+    paramMap[name] = v;
+    return dynamic_cast<StructParam *>(v);
   }
 
   const ScaLocal *FunctBuilder::SymScaLocal(
@@ -271,7 +373,7 @@ namespace symir {
 
   const VecLocal *FunctBuilder::SymVecLocal(
       const std::string &name, const std::vector<int> &shape, const std::vector<Coef *> coefs,
-      SymIR::Type type, bool isVolatile
+      SymIR::Type type, std::string structName, bool isVolatile
   ) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     Assert(
@@ -282,13 +384,34 @@ namespace symir {
         !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
         name.c_str()
     );
-    locals.push_back(std::make_unique<VecLocal>(name, shape, coefs, type));
+    locals.push_back(std::make_unique<VecLocal>(name, shape, coefs, type, structName));
     const auto v = locals.back().get();
     if (isVolatile) {
       v->SetVolatile();
     }
     localMap[name] = v;
     return dynamic_cast<const VecLocal *>(v);
+  }
+
+  const StructLocal *FunctBuilder::SymStructLocal(
+      const std::string &name, const std::string &structName, const std::vector<Coef *> coefs
+  ) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    Assert(
+        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        structMap.contains(structName), "Struct with name \"%s\" is not defined", structName.c_str()
+    );
+    locals.push_back(std::make_unique<StructLocal>(name, structName, coefs));
+    const auto v = locals.back().get();
+    localMap[name] = v;
+    return dynamic_cast<const StructLocal *>(v);
   }
 
   const Block *
@@ -350,7 +473,8 @@ namespace symir {
     Assert(isActive(), "The FunctBuilder is no longer active");
     deactivate();
     return std::make_unique<Funct>(
-        name, retType, std::move(params), std::move(locals), std::move(symbols), std::move(blocks)
+        name, retType, std::move(structs), std::move(params), std::move(locals), std::move(symbols),
+        std::move(blocks)
     );
   }
 
@@ -454,7 +578,12 @@ namespace symir {
   }
 
   void FunctCopier::Visit(const VecParam &p) {
-    builder->SymVecParam(p.GetName(), p.GetVecShape(), p.GetType(), p.IsVolatile());
+    std::string sName = (p.GetType() == SymIR::STRUCT) ? p.GetStructName() : "";
+    builder->SymVecParam(p.GetName(), p.GetVecShape(), p.GetType(), sName, p.IsVolatile());
+  }
+
+  void FunctCopier::Visit(const StructParam &p) {
+    builder->SymStructParam(p.GetName(), p.GetStructName());
   }
 
   void FunctCopier::Visit(const ScaLocal &l) {
@@ -468,8 +597,20 @@ namespace symir {
       c->Accept(*this);
       coefs.push_back(popCoef());
     }
-    builder->SymVecLocal(l.GetName(), l.GetVecShape(), coefs, l.GetType(), l.IsVolatile());
+    std::string sName = (l.GetType() == SymIR::STRUCT) ? l.GetStructName() : "";
+    builder->SymVecLocal(l.GetName(), l.GetVecShape(), coefs, l.GetType(), sName, l.IsVolatile());
   }
+
+  void FunctCopier::Visit(const StructLocal &l) {
+    std::vector<Coef *> coefs{};
+    for (auto &c: l.GetCoefs()) {
+      c->Accept(*this);
+      coefs.push_back(popCoef());
+    }
+    builder->SymStructLocal(l.GetName(), l.GetStructName(), coefs);
+  }
+
+  void FunctCopier::Visit(const StructDef &s) { builder->SymStruct(s.GetName(), s.GetFields()); }
 
   void FunctCopier::Visit(const Block &b) {
     Assert(currentBlock == nullptr, "The FunctCopier already has a current block");
@@ -501,6 +642,9 @@ namespace symir {
     Assert(exprStack.empty(), "The FunctCopier has a non-empty expression stack");
     Assert(condStack.empty(), "The FunctCopier has a non-empty condition stack");
     builder = std::make_unique<FunctBuilder>(f.GetName(), f.GetRetType());
+    for (const auto &s: f.GetStructs()) {
+      s->Accept(*this);
+    }
     for (const auto &p: f.GetParams()) {
       p->Accept(*this);
     }
