@@ -107,11 +107,17 @@ $(BIN_DIR)/pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+$(BIN_DIR)/symircc: $(LIB_OBJ) $(OBJ_DIR)/symircc.o
+	@mkdir -p $(dir $@)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
 fgen: $(BIN_DIR)/fgen
 
 pgen: $(BIN_DIR)/pgen
 
-bins: fgen pgen
+symircc: $(BIN_DIR)/symircc
+
+bins: fgen pgen symircc
 
 
 ########################################################################

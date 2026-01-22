@@ -399,6 +399,8 @@ void UBSan::Visit(const symir::VecParam &p) {
   }
 }
 
+void UBSan::Visit(const symir::StructParam &p) { Panic("Structs are not supported in UBSan yet"); }
+
 void UBSan::Visit(const symir::ScaLocal &l) {
   l.GetCoef()->Accept(*this);
   auto coefExpr = popExpression();
@@ -427,6 +429,10 @@ void UBSan::Visit(const symir::VecLocal &l) {
     makeCoefsInteresting(inits);
   }
 }
+
+void UBSan::Visit(const symir::StructLocal &l) { Panic("Structs are not supported in UBSan yet"); }
+
+void UBSan::Visit(const symir::StructDef &s) { Panic("Structs are not supported in UBSan yet"); }
 
 void UBSan::Visit(const symir::Block &b) {
   for (const auto &stmt: b.GetStmts()) {
