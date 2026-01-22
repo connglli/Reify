@@ -36,6 +36,10 @@ namespace symir {
       "TK_LPAREN",
       "TK_RPAREN",
 
+      // Brackets
+      "TK_LBRACKET",
+      "TK_RBRACKET",
+
       // Keywords
 #define XX(name, ...) "TK_KW_" #name,
       SYMIR_KEYWORD_LIST(XX)
@@ -255,6 +259,7 @@ namespace symir {
       Assert(token != nullptr, "No available token is obtained");
       Assert(lastToken == nullptr, "The last token is still non-null");
       const auto kind = token->kind;
+
       if (kind == SymSexpLexer::Token::Kind::TK_EOF) {
         delete token;
         break;
@@ -271,6 +276,10 @@ namespace symir {
           case SymSexpLexer::Token::Kind::TK_KW_FUN:
             prepFun(stream);
             pushOp(opToken.kind);
+            break;
+
+          case SymSexpLexer::Token::Kind::TK_KW_STRUCT:
+            prepStruct(stream);
             break;
 
           case SymSexpLexer::Token::Kind::TK_KW_BBL:
@@ -416,6 +425,75 @@ namespace symir {
     funBd = std::make_unique<FunctBuilder>(
         nameToken.ToStr(), SymIR::GetTypeFromSName(typeToken.ToStr())
     );
+    // Add pending structs
+    for (const auto &p: pendingStructs) {
+      funBd->SymStruct(p.first, p.second);
+    }
+    pendingStructs.clear();
+  }
+
+  void SymSexpParser::prepStruct(const SymSexpLexer::TokenStream &stream) {
+    const auto nameToken = stream();
+    Assert(
+        nameToken.kind == SymSexpLexer::Token::Kind::TK_IDENT,
+        "The 1st child (%s) of the struct node is not an identifier", nameToken.FullInfo().c_str()
+    );
+    const auto fieldsStart = stream();
+    Assert(
+        fieldsStart.kind == SymSexpLexer::Token::Kind::TK_LPAREN, "Expected ( to start fields list"
+    );
+    std::vector<StructDef::Field> fields;
+    while (true) {
+      auto t = stream();
+      if (t.kind == SymSexpLexer::Token::Kind::TK_RPAREN)
+        break;
+      Assert(t.kind == SymSexpLexer::Token::Kind::TK_LPAREN, "Expected ( for field definition");
+
+      auto fName = stream();
+      Assert(fName.kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected field name");
+
+      std::vector<int> shape;
+      auto typeToken = [&]() {
+        while (true) {
+          auto t = stream();
+          if (t.kind == SymSexpLexer::Token::Kind::TK_LBRACKET) {
+            auto dimT = stream();
+            Assert(dimT.kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected dimension size");
+            shape.push_back(std::stoi(dimT.ToStr()));
+            auto rb = stream();
+            Assert(rb.kind == SymSexpLexer::Token::Kind::TK_RBRACKET, "Expected ]");
+          } else {
+            return t;
+          }
+        }
+      }();
+
+      SymIR::Type type = SymIR::I32;
+      std::string sName;
+      if (typeToken.kind == SymSexpLexer::Token::Kind::TK_TYPE_I32) {
+        type = SymIR::I32;
+      } else if (typeToken.kind == SymSexpLexer::Token::Kind::TK_IDENT) {
+        type = SymIR::STRUCT;
+        sName = typeToken.ToStr();
+      } else {
+        Panic("Unknown field type");
+      }
+
+      fields.push_back({fName.ToStr(), type, sName, shape});
+
+      auto closing = stream();
+      Assert(
+          closing.kind == SymSexpLexer::Token::Kind::TK_RPAREN, "Expected ) to end field definition"
+      );
+    }
+    // Consume the closing parenthesis of the struct definition
+    auto structClosing = stream();
+    Assert(
+        structClosing.kind == SymSexpLexer::Token::Kind::TK_RPAREN,
+        "Expected ) to end struct definition"
+    );
+
+    pendingStructs.push_back({nameToken.ToStr(), fields});
   }
 
   void SymSexpParser::prepBbl(const SymSexpLexer::TokenStream &stream) {
@@ -430,7 +508,7 @@ namespace symir {
   }
 
   void SymSexpParser::buildTerm(Term::Op op) {
-    std::vector<Coef *> vecAcc{};
+    std::vector<const SymSexpLexer::Token *> accessTokens;
     while (true) {
       const auto opKind = popOp();
       if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
@@ -444,7 +522,7 @@ namespace symir {
           "an access to a vector variable of the term",
           accToken->FullInfo().c_str()
       );
-      vecAcc.insert(vecAcc.begin(), buildCoef(accToken, SymIR::Type::I32));
+      accessTokens.insert(accessTokens.begin(), accToken);
     }
     SymSexpLexer::Token *varToken =
         op != Term::Op::OP_CST ? popArg<SymSexpLexer::Token>() : nullptr;
@@ -464,7 +542,37 @@ namespace symir {
     auto *numTerms = popArg<int>();
     (*numTerms)++;
     const auto varDef = varToken != nullptr ? funBd->FindVar(varToken->ToStr()) : nullptr;
-    const auto termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
+
+    SymIR::Type termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
+    std::string currStruct = (varDef && termType == SymIR::STRUCT) ? varDef->GetStructName() : "";
+    int remainingDims = (varDef && varDef->IsVector()) ? varDef->GetVecNumDims() : 0;
+
+    std::vector<Coef *> vecAcc;
+    for (const auto *t: accessTokens) {
+      if (remainingDims > 0) {
+        vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
+        remainingDims--;
+      } else if (termType == SymIR::STRUCT) {
+        const auto structDef = funBd->FindStruct(currStruct);
+        Assert(structDef != nullptr, "Struct %s not found", currStruct.c_str());
+        int idx = structDef->GetFieldIndex(t->ToStr());
+        Assert(
+            idx != -1, "Field %s not found in struct %s", t->ToStr().c_str(),
+            structDef->GetName().c_str()
+        );
+        vecAcc.push_back(funBd->SymI32Const(idx));
+
+        const auto &field = structDef->GetField(idx);
+        termType = field.type;
+        if (termType == SymIR::STRUCT)
+          currStruct = field.structName;
+        remainingDims = field.shape.size();
+      } else {
+        Panic("Unexpected access to scalar i32");
+      }
+      delete t;
+    }
+
     pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(op, buildCoef(coefToken, termType), varDef, vecAcc)
     );
     pushArg<int>(*numTerms);
@@ -511,12 +619,22 @@ namespace symir {
 
   void SymSexpParser::buildParam() {
     const auto *typeToken = popArg<SymSexpLexer::Token>();
-    Assert(
-        typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
-        "The 3rd child (%s) of the param node is not an identifier, while it should be the "
-        "type of the parameter",
-        typeToken->FullInfo().c_str()
-    );
+    // Check if typeToken is I32 or IDENT (for structs)
+    SymIR::Type type = SymIR::I32;
+    std::string structName;
+    if (typeToken->kind == SymSexpLexer::Token::Kind::TK_IDENT) {
+      type = SymIR::STRUCT;
+      structName = typeToken->ToStr();
+    } else {
+      Assert(
+          typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
+          "The 3rd child (%s) of the param node is not an identifier, while it should be the "
+          "type of the parameter",
+          typeToken->FullInfo().c_str()
+      );
+      type = SymIR::GetTypeFromSName(typeToken->ToStr());
+    }
+
     std::vector<int> vecShape;
     while (true) {
       const auto opKind = popOp();
@@ -547,13 +665,13 @@ namespace symir {
     }
     if (!vecShape.empty()) {
       funBd->SymVecParam(
-          varToken->ToStr(), vecShape, SymIR::GetTypeFromSName(typeToken->ToStr()),
+          varToken->ToStr(), vecShape, type, structName,
           /*isVolatile=*/isVolatile
       );
+    } else if (type == SymIR::STRUCT) {
+      funBd->SymStructParam(varToken->ToStr(), structName);
     } else {
-      funBd->SymScaParam(
-          varToken->ToStr(), SymIR::GetTypeFromSName(typeToken->ToStr()), /*isVolatile=*/isVolatile
-      );
+      funBd->SymScaParam(varToken->ToStr(), type, /*isVolatile=*/isVolatile);
     }
     delete typeToken;
     delete varToken;
@@ -561,12 +679,22 @@ namespace symir {
 
   void SymSexpParser::buildLocal() {
     const auto *typeToken = popArg<SymSexpLexer::Token>();
-    Assert(
-        typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
-        "The 3rd child (%s) of the param node is not an identifier, while it should be the "
-        "type of the term",
-        typeToken->FullInfo().c_str()
-    );
+
+    SymIR::Type localType = SymIR::I32;
+    std::string structName;
+    if (typeToken->kind == SymSexpLexer::Token::Kind::TK_IDENT) {
+      localType = SymIR::STRUCT;
+      structName = typeToken->ToStr();
+    } else {
+      Assert(
+          typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
+          "The 3rd child (%s) of the param node is not an identifier, while it should be the "
+          "type of the term",
+          typeToken->FullInfo().c_str()
+      );
+      localType = SymIR::GetTypeFromSName(typeToken->ToStr());
+    }
+
     std::vector<int> vecShape;
     while (true) {
       const auto opKind = popOp();
@@ -582,7 +710,35 @@ namespace symir {
       );
       vecShape.insert(vecShape.begin(), dimLen);
     }
-    const auto localType = SymIR::GetTypeFromSName(typeToken->ToStr());
+
+    // Calculate total number of scalar initializers required
+    int scalarCount = 1;
+    if (localType == SymIR::STRUCT) {
+      std::function<int(const std::string &)> countStruct = [&](const std::string &sName) {
+        const auto *st = funBd->FindStruct(sName);
+        Assert(st != nullptr, "Struct %s not found", sName.c_str());
+        int c = 0;
+        for (const auto &f: st->GetFields()) {
+          int fc = 1;
+          for (int d: f.shape)
+            fc *= d;
+          if (f.type == SymIR::STRUCT) {
+            fc *= countStruct(f.structName);
+          }
+          c += fc;
+        }
+        return c;
+      };
+      scalarCount = countStruct(structName);
+    }
+
+    int arraySize = 1;
+    if (!vecShape.empty()) {
+      arraySize = VarDef::GetVecNumEls(vecShape);
+    }
+
+    int totalInits = arraySize * scalarCount;
+
     std::vector<Coef *> vecInits;
     const auto *coefToken = popArg<SymSexpLexer::Token>();
     Assert(
@@ -591,21 +747,16 @@ namespace symir {
         "coefficient of the term",
         coefToken->FullInfo().c_str()
     );
-    vecInits.push_back(buildCoef(coefToken, localType));
-    if (!vecShape.empty()) {
-      // It is a vector local variable, there're more following elements
-      int numCoefs = VarDef::GetVecNumEls(vecShape);
-      for (int i = 0; i < numCoefs - 1; i++) {
-        coefToken = popArg<SymSexpLexer::Token>();
-        Assert(
-            coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-            "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
-            "coefficient of the term (one of an init of a vector element)",
-            coefToken->FullInfo().c_str()
-        );
-        vecInits.insert(vecInits.begin(), buildCoef(coefToken, localType));
-      }
+    vecInits.push_back(buildCoef(coefToken, SymIR::I32));
+    delete coefToken;
+
+    for (int i = 0; i < totalInits - 1; i++) {
+      coefToken = popArg<SymSexpLexer::Token>();
+      Assert(coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected init value");
+      vecInits.insert(vecInits.begin(), buildCoef(coefToken, SymIR::I32));
+      delete coefToken;
     }
+
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
         varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
@@ -620,18 +771,21 @@ namespace symir {
       pushOp(opKind); // Push it back as this is a volatile parameter
     }
     if (vecShape.empty()) {
-      funBd->SymScaLocal(varToken->ToStr(), vecInits.front(), localType, isVolatile);
+      if (localType == SymIR::STRUCT) {
+        funBd->SymStructLocal(varToken->ToStr(), structName, vecInits);
+      } else {
+        funBd->SymScaLocal(varToken->ToStr(), vecInits.front(), localType, isVolatile);
+      }
     } else {
-      funBd->SymVecLocal(varToken->ToStr(), vecShape, vecInits, localType, isVolatile);
+      funBd->SymVecLocal(varToken->ToStr(), vecShape, vecInits, localType, structName, isVolatile);
     }
     delete typeToken;
-    delete coefToken;
     delete varToken;
   }
 
   void SymSexpParser::buildAssign() {
     const auto *eid = popArg<SymIRBuilder::ExprID>();
-    std::vector<Coef *> vecAcc{};
+    std::vector<const SymSexpLexer::Token *> accessTokens;
     while (true) {
       const auto opKind = popOp();
       if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
@@ -641,11 +795,9 @@ namespace symir {
       const auto *accToken = popArg<SymSexpLexer::Token>();
       Assert(
           accToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-          "The 2nd child (%s) of the assignment is not a coefficient, while it should be the "
-          "an access to a vector variable of the assignment",
-          accToken->FullInfo().c_str()
+          "The 2nd child (%s) of the assignment is not a coefficient", accToken->FullInfo().c_str()
       );
-      vecAcc.insert(vecAcc.begin(), buildCoef(accToken, SymIR::Type::I32));
+      accessTokens.insert(accessTokens.begin(), accToken);
     }
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
@@ -654,7 +806,40 @@ namespace symir {
         "variable of the assignment",
         varToken->FullInfo().c_str()
     );
-    bblBd->SymAssign(funBd->FindVar(varToken->ToStr()), *eid, vecAcc);
+
+    const auto varDef = funBd->FindVar(varToken->ToStr());
+
+    SymIR::Type termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
+    std::string currStruct = (varDef && termType == SymIR::STRUCT) ? varDef->GetStructName() : "";
+    int remainingDims = (varDef && varDef->IsVector()) ? varDef->GetVecNumDims() : 0;
+
+    std::vector<Coef *> vecAcc;
+    for (const auto *t: accessTokens) {
+      if (remainingDims > 0) {
+        vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
+        remainingDims--;
+      } else if (termType == SymIR::STRUCT) {
+        const auto structDef = funBd->FindStruct(currStruct);
+        Assert(structDef != nullptr, "Struct %s not found", currStruct.c_str());
+        int idx = structDef->GetFieldIndex(t->ToStr());
+        Assert(
+            idx != -1, "Field %s not found in struct %s", t->ToStr().c_str(),
+            structDef->GetName().c_str()
+        );
+        vecAcc.push_back(funBd->SymI32Const(idx));
+
+        const auto &field = structDef->GetField(idx);
+        termType = field.type;
+        if (termType == SymIR::STRUCT)
+          currStruct = field.structName;
+        remainingDims = field.shape.size();
+      } else {
+        Panic("Unexpected access to scalar");
+      }
+      delete t;
+    }
+
+    bblBd->SymAssign(varDef, *eid, vecAcc);
     delete eid;
     delete varToken;
   }

@@ -318,6 +318,18 @@ void IntUBInject::Visit(const symir::VecLocal &l) {
   Panic("Cannot reach here: We only inject UBs into basic blocks, not locals");
 }
 
+void IntUBInject::Visit(const symir::StructParam &p) {
+  Panic("Cannot reach here: We only inject UBs into basic blocks, not parameters");
+}
+
+void IntUBInject::Visit(const symir::StructLocal &l) {
+  Panic("Cannot reach here: We only inject UBs into basic blocks, not locals");
+}
+
+void IntUBInject::Visit(const symir::StructDef &s) {
+  Panic("Cannot reach here: We only inject UBs into basic blocks, not struct defs");
+}
+
 void IntUBInject::Visit(const symir::Block &b) {
   for (const auto s: b.GetStmts()) {
     s->Accept(*this);
