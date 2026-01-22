@@ -194,12 +194,24 @@ protected:
     Panic("Cannot reach here: ArrParam variables should not be replaced");
   }
 
+  void Visit(const symir::StructParam &p) override {
+    Panic("Cannot reach here: StructParam variables should not be replaced");
+  }
+
   void Visit(const symir::ScaLocal &l) override {
     Panic("Cannot reach here: Local variables should not be replaced");
   }
 
   void Visit(const symir::VecLocal &l) override {
     Panic("Cannot reach here: Local variables should not be replaced");
+  }
+
+  void Visit(const symir::StructLocal &l) override {
+    Panic("Cannot reach here: Local variables should not be replaced");
+  }
+
+  void Visit(const symir::StructDef &s) override {
+    Panic("Cannot reach here: Struct definitions should not be replaced");
   }
 
   void Visit(const symir::Block &b) override {

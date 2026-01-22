@@ -33,8 +33,40 @@ namespace symir {
 
   void SymSexpLower::Visit(const VarUse &v) {
     out << v.GetName();
-    if (v.IsVector()) {
-      for (const auto &c: v.GetAccess()) {
+
+    const VarDef *currVar = v.GetDef();
+    SymIR::Type currType = currVar->GetType();
+    std::string currStruct = (currType == SymIR::STRUCT) ? currVar->GetStructName() : "";
+    int remainingDims = currVar->IsVector() ? currVar->GetVecNumDims() : 0;
+
+    for (const auto &c: v.GetAccess()) {
+      if (remainingDims > 0) {
+        out << "[";
+        c->Accept(*this);
+        out << "]";
+        remainingDims--;
+      } else if (currType == SymIR::STRUCT) {
+        if (c->IsValueSet() && curFunct) {
+          int idx = c->GetI32Value();
+          const auto *sDef = curFunct->GetStruct(currStruct);
+          if (sDef && idx >= 0 && idx < (int) sDef->GetFields().size()) {
+            const auto &field = sDef->GetField(idx);
+            out << "[" << field.name << "]";
+
+            currType = field.type;
+            if (currType == SymIR::STRUCT)
+              currStruct = field.structName;
+            remainingDims = field.shape.size();
+          } else {
+            out << "[UNKNOWN_FIELD_" << idx << "]";
+          }
+        } else {
+          out << "[";
+          c->Accept(*this);
+          out << "]";
+        }
+      } else {
+        // Should not happen for scalar i32
         out << "[";
         c->Accept(*this);
         out << "]";
@@ -129,6 +161,10 @@ namespace symir {
     out << " " << SymIR::GetTypeSName(p.GetType()) << ")";
   }
 
+  void SymSexpLower::Visit(const StructParam &p) {
+    out << "(" << KW_PAR << " " << p.GetName() << " " << p.GetStructName() << ")";
+  }
+
   void SymSexpLower::Visit(const ScaLocal &l) {
     indent();
     if (l.IsVolatile()) {
@@ -158,6 +194,35 @@ namespace symir {
     out << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
+  void SymSexpLower::Visit(const StructLocal &l) {
+    indent();
+    out << "(" << KW_LOC << " " << l.GetName() << " ";
+    for (auto c: l.GetCoefs()) {
+      c->Accept(*this);
+      out << " ";
+    }
+    out << l.GetStructName() << ")" << std::endl;
+  }
+
+  void SymSexpLower::Visit(const StructDef &s) {
+    out << "(" << KW_STRUCT << " " << s.GetName() << " (";
+    for (size_t i = 0; i < s.GetFields().size(); ++i) {
+      const auto &f = s.GetField(i);
+      out << "(" << f.name << " ";
+      for (int d: f.shape)
+        out << "[" << d << "] ";
+      if (f.type == SymIR::STRUCT)
+        out << f.structName;
+      else
+        out << SymIR::GetTypeSName(f.type);
+      out << ")";
+      if (i != s.GetFields().size() - 1) {
+        out << " ";
+      }
+    }
+    out << "))" << std::endl;
+  }
+
   void SymSexpLower::Visit(const Block &b) {
     indent();
     out << "(" << KW_BBL << " " << b.GetLabel() << " " << std::endl;
@@ -171,6 +236,10 @@ namespace symir {
   }
 
   void SymSexpLower::Visit(const Funct &f) {
+    curFunct = &f;
+    for (const auto &s: f.GetStructs()) {
+      s->Accept(*this);
+    }
     out << "(" << KW_FUN << " " << f.GetName() << " " << SymIR::GetTypeSName(f.GetRetType());
     out << " (";
     auto params = f.GetParams();
@@ -192,10 +261,26 @@ namespace symir {
       decIndent();
     }
     out << ")" << std::endl;
+    curFunct = nullptr;
   }
 
   std::string SymCxLower::GetFunPrototype(const Funct &f) {
     std::ostringstream oss;
+    for (const auto &s: f.GetStructs()) {
+      oss << "struct " << s->GetName() << " {" << std::endl;
+      for (const auto &field: s->GetFields()) {
+        if (field.type == SymIR::STRUCT) {
+          oss << "  struct " << field.structName << " " << field.name;
+        } else {
+          oss << "  " << symir::SymIR::GetTypeCName(field.type) << " " << field.name;
+        }
+        for (int d: field.shape)
+          oss << "[" << d << "]";
+        oss << ";" << std::endl;
+      }
+      oss << "};" << std::endl;
+    }
+
     oss << symir::SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
     auto params = f.GetParams();
     for (size_t i = 0; i < params.size(); ++i) {
@@ -203,7 +288,11 @@ namespace symir {
       if (p->IsVolatile()) {
         oss << "volatile ";
       }
-      oss << symir::SymIR::GetTypeCName(p->GetType()) << " " << p->GetName();
+      if (p->GetType() == SymIR::STRUCT) {
+        oss << "struct " << p->GetStructName() << " " << p->GetName();
+      } else {
+        oss << symir::SymIR::GetTypeCName(p->GetType()) << " " << p->GetName();
+      }
       if (p->IsVector()) {
         for (const auto &l: p->GetVecShape()) {
           oss << "[" << l << "]";
@@ -219,11 +308,36 @@ namespace symir {
 
   void SymCxLower::Visit(const VarUse &v) {
     out << v.GetName();
-    if (v.IsVector()) {
-      for (const auto &c: v.GetAccess()) {
+
+    const VarDef *currVar = v.GetDef();
+    SymIR::Type currType = currVar->GetType();
+    std::string currStruct = (currType == SymIR::STRUCT) ? currVar->GetStructName() : "";
+    int remainingDims = currVar->IsVector() ? currVar->GetVecNumDims() : 0;
+
+    for (const auto &c: v.GetAccess()) {
+      if (remainingDims > 0) {
         out << "[";
         c->Accept(*this);
         out << "]";
+        remainingDims--;
+      } else if (currType == SymIR::STRUCT) {
+        if (c->IsValueSet() && curFunct) {
+          int idx = c->GetI32Value();
+          const auto *sDef = curFunct->GetStruct(currStruct);
+          if (sDef && idx >= 0 && idx < (int) sDef->GetFields().size()) {
+            const auto &field = sDef->GetField(idx);
+            out << "." << field.name;
+
+            currType = field.type;
+            if (currType == SymIR::STRUCT)
+              currStruct = field.structName;
+            remainingDims = field.shape.size();
+          } else {
+            out << ".field_" << idx;
+          }
+        } else {
+          out << ".UNKNOWN";
+        }
       }
     }
   }
@@ -271,16 +385,86 @@ namespace symir {
 
   void SymCxLower::Visit(const RetStmt &r) {
     indent();
+    out << "{" << std::endl;
+    incIndent();
+    indent();
+    out << "int __chk_args[] = {";
+
     auto vars = r.GetVars();
-    out << "return " << StatelessChecksum::GetComputeName() << "(" << vars.size() << ", (int["
-        << vars.size() << "]){";
-    for (size_t i = 0; i < vars.size(); ++i) {
-      vars[i]->Accept(*this);
-      if (i != vars.size() - 1) {
+    bool first = true;
+
+    auto printVal = [&](std::function<void()> printer) {
+      if (!first)
         out << ", ";
+      first = false;
+      printer();
+    };
+
+    std::function<void(const StructDef *, std::function<void()>)> printStruct;
+    printStruct = [&](const StructDef *sDef, std::function<void()> printPrefix) {
+      for (const auto &f: sDef->GetFields()) {
+        if (f.type == SymIR::STRUCT) {
+          const auto *subDef = curFunct->GetStruct(f.structName);
+          std::function<void(const std::vector<int> &, std::function<void()>)> printArray =
+              [&](const std::vector<int> &shape, std::function<void()> pP) {
+                if (shape.empty()) {
+                  printStruct(subDef, pP);
+                } else {
+                  int d = shape[0];
+                  std::vector<int> subShape(shape.begin() + 1, shape.end());
+                  for (int i = 0; i < d; ++i) {
+                    printArray(subShape, [=]() {
+                      pP();
+                      out << "[" << i << "]";
+                    });
+                  }
+                }
+              };
+          printArray(f.shape, [=]() {
+            printPrefix();
+            out << "." << f.name;
+          });
+        } else {
+          std::function<void(const std::vector<int> &, std::function<void()>)> printArray =
+              [&](const std::vector<int> &shape, std::function<void()> pP) {
+                if (shape.empty()) {
+                  printVal(pP);
+                } else {
+                  int d = shape[0];
+                  std::vector<int> subShape(shape.begin() + 1, shape.end());
+                  for (int i = 0; i < d; ++i) {
+                    printArray(subShape, [=]() {
+                      pP();
+                      out << "[" << i << "]";
+                    });
+                  }
+                }
+              };
+          printArray(f.shape, [=]() {
+            printPrefix();
+            out << "." << f.name;
+          });
+        }
+      }
+    };
+
+    for (const auto *v: vars) {
+      if (v->GetDef()->GetType() == SymIR::STRUCT) {
+        const auto *sDef = curFunct->GetStruct(v->GetDef()->GetStructName());
+        printStruct(sDef, [=]() { v->Accept(*this); });
+      } else {
+        printVal([=]() { v->Accept(*this); });
       }
     }
-    out << "});" << std::endl;
+
+    out << "};" << std::endl;
+    indent();
+    out << "return " << StatelessChecksum::GetComputeName()
+        << "(sizeof(__chk_args)/sizeof(int), __chk_args);" << std::endl;
+
+    decIndent();
+    indent();
+    out << "}" << std::endl;
   }
 
   void SymCxLower::Visit(const Branch &b) {
@@ -311,10 +495,18 @@ namespace symir {
       out << "volatile"
           << " ";
     }
-    out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    if (p.GetType() == SymIR::STRUCT) {
+      out << "struct " << p.GetStructName() << " " << p.GetName();
+    } else {
+      out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+    }
     for (const auto &l: p.GetVecShape()) {
       out << "[" << l << "]";
     }
+  }
+
+  void SymCxLower::Visit(const StructParam &p) {
+    out << "struct " << p.GetStructName() << " " << p.GetName();
   }
 
   void SymCxLower::Visit(const ScaLocal &l) {
@@ -335,19 +527,59 @@ namespace symir {
       out << "volatile"
           << " ";
     };
-    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
+    if (l.GetType() == SymIR::STRUCT) {
+      out << "struct " << l.GetStructName() << " " << l.GetName();
+    } else {
+      out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
+    }
     for (auto len: l.GetVecShape()) {
       out << "[" << len << "]";
     }
     out << " = {";
     const auto &cs = l.GetCoefs();
-    const auto ncs = l.GetVecNumEls();
-    for (int i = 0; i < ncs; ++i) {
+    const auto ncs = l.GetVecNumEls(); // This is number of elements (structs).
+    // Coefs list is flattened scalars.
+    // We need to group them if we want nice output, but C allows flat initialization for arrays of
+    // structs? "struct P arr[2] = {1, 2, 3, 4};" works? Yes, generally works (braces elision). But
+    // SymCxLower iterates `ncs`. `GetVecNumEls` counts array elements. If element is struct,
+    // `GetCoefs` has `ncs * struct_size` entries. So `cs.size() != ncs` if struct! We should
+    // iterate `cs.size()`.
+
+    const size_t totalScalars = l.GetCoefs().size();
+    for (size_t i = 0; i < totalScalars; ++i) {
       auto c = cs[i];
       c->Accept(*this);
-      if (i != ncs - 1) {
+      if (i != totalScalars - 1) {
         out << ", ";
       }
+    }
+    out << "};" << std::endl;
+  }
+
+  void SymCxLower::Visit(const StructLocal &l) {
+    indent();
+    out << "struct " << l.GetStructName() << " " << l.GetName() << " = {";
+    const auto &cs = l.GetCoefs();
+    for (size_t i = 0; i < cs.size(); ++i) {
+      cs[i]->Accept(*this);
+      if (i != cs.size() - 1)
+        out << ", ";
+    }
+    out << "};" << std::endl;
+  }
+
+  void SymCxLower::Visit(const StructDef &s) {
+    out << "struct " << s.GetName() << " {" << std::endl;
+    for (const auto &field: s.GetFields()) {
+      // indent();
+      if (field.type == SymIR::STRUCT) {
+        out << "  struct " << field.structName << " " << field.name;
+      } else {
+        out << "  " << SymIR::GetTypeCName(field.type) << " " << field.name;
+      }
+      for (int d: field.shape)
+        out << "[" << d << "]";
+      out << ";" << std::endl;
     }
     out << "};" << std::endl;
   }
@@ -360,6 +592,7 @@ namespace symir {
   }
 
   void SymCxLower::Visit(const Funct &f) {
+    curFunct = &f;
     out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
     auto params = f.GetParams();
     for (size_t i = 0; i < params.size(); ++i) {
@@ -380,6 +613,7 @@ namespace symir {
       decIndent();
     }
     out << "}" << std::endl;
+    curFunct = nullptr;
   }
 
   void SymJavaBytecodeLower::CreateArray(
@@ -603,6 +837,10 @@ namespace symir {
 
   void SymJavaBytecodeLower::Visit(const VecParam &p) {}
 
+  void SymJavaBytecodeLower::Visit(const StructParam &p) {
+    Panic("Structs are not supported in Java backend yet");
+  }
+
   void SymJavaBytecodeLower::Visit(const ScaLocal &l) {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
@@ -617,6 +855,14 @@ namespace symir {
     }
     CreateArray(*method, l, l.GetCoefs());
     method->instList().addVar(jnif::Opcode::astore, locals[l.GetName()]);
+  }
+
+  void SymJavaBytecodeLower::Visit(const StructLocal &l) {
+    Panic("Structs are not supported in Java backend yet");
+  }
+
+  void SymJavaBytecodeLower::Visit(const StructDef &s) {
+    Panic("Structs are not supported in Java backend yet");
   }
 
   void SymJavaBytecodeLower::Visit(const Block &b) {

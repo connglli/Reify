@@ -208,6 +208,7 @@ namespace symir {
     }
 
     void prepFun(const SymSexpLexer::TokenStream &stream);
+    void prepStruct(const SymSexpLexer::TokenStream &stream);
     void prepBbl(const SymSexpLexer::TokenStream &stream);
 
     void buildTerm(Term::Op op);
@@ -224,6 +225,7 @@ namespace symir {
 #undef XX
     void buildParam();
     void buildLocal();
+    void buildStruct();
     void buildAssign();
     void buildReturn();
     void buildBranch();
@@ -241,6 +243,9 @@ namespace symir {
     BlockBuilder *bblBd = nullptr;                   // The current block builder
     std::stack<SymSexpLexer::Token::Kind> opStack{}; // The operator stack
     std::stack<void *> argStack{};                   // The operand/argument stack
+
+    // Structs defined before the function starts
+    std::vector<std::pair<std::string, std::vector<StructDef::Field>>> pendingStructs{};
   };
 } // namespace symir
 #endif // REIFY_PARSERS_HPP

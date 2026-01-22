@@ -41,7 +41,8 @@
   XX(ASS, asn)                                                                                     \
   XX(RET, ret)                                                                                     \
   XX(BRH, brh)                                                                                     \
-  XX(GOTO, goto)
+  XX(GOTO, goto)                                                                                   \
+  XX(STRUCT, struct)
 
 namespace symir {
   using namespace symir;
@@ -94,10 +95,16 @@ namespace symir {
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
+    void Visit(const StructParam &p) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
+    void Visit(const StructLocal &l) override;
+    void Visit(const StructDef &s) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
+
+  private:
+    const Funct *curFunct = nullptr;
   };
 
   /// An "SymIR -> C/C++" lower
@@ -120,10 +127,16 @@ namespace symir {
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
+    void Visit(const StructParam &p) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
+    void Visit(const StructLocal &l) override;
+    void Visit(const StructDef &s) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
+
+  private:
+    const Funct *curFunct = nullptr;
   };
 
   /// An "SymIR -> Java Bytecode" lower
@@ -225,8 +238,11 @@ namespace symir {
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
+    void Visit(const StructParam &p) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
+    void Visit(const StructLocal &l) override;
+    void Visit(const StructDef &s) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
 

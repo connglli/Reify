@@ -58,6 +58,9 @@ namespace symir {
   class VecParam;
   class ScaLocal;
   class VecLocal;
+  class StructLocal; // Forward declaration
+  class StructDef;   // Forward declaration
+  class StructParam; // Forward declaration
   class Block;
   class Funct;
 
@@ -75,8 +78,11 @@ namespace symir {
     virtual void Visit(const Goto &g) = 0;
     virtual void Visit(const ScaParam &p) = 0;
     virtual void Visit(const VecParam &p) = 0;
+    virtual void Visit(const StructParam &p) = 0;
     virtual void Visit(const ScaLocal &l) = 0;
     virtual void Visit(const VecLocal &l) = 0;
+    virtual void Visit(const StructLocal &l) = 0;
+    virtual void Visit(const StructDef &s) = 0;
     virtual void Visit(const Block &b) = 0;
     virtual void Visit(const Funct &f) = 0;
   };
@@ -113,29 +119,27 @@ namespace symir {
    * Cond    -> CondOp Expr
    * Expr    -> ExprOp Term Term+   // We intentionally avoid "Expr -> ExprOp Expr Expr"
    * Term    -> TermOp Coef Var
-   * Var     -> Name | Name ('[' Coef ']')+  // Variable (scalar or vector) access
-   * ---
-   * Name    -> f1, f2, f3, v1, v2, ...
-   * Label   -> BB1, BB2, BB3, ...
-   * Type    -> int
-   * Coef    -> c1, c2, 0, 1, 2, ...
-   * CondOp  -> >, <, ==             // Remove other ops as they are identical
-   * ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
-   * TermOp  -> +, -, *, /, %        // Avoid bit-wise ops as we are not using bv theories
+   *   Var     -> Name | Name ('[' Coef ']' | '[' Name ']')+ // Variable access: array index or
+   * struct field
+   *   ---
+   *   Name    -> f1, f2, f3, v1, v2, ...
+   *   Label   -> BB1, BB2, BB3, ...
+   *   Type    -> int | Name           // Scalar int or Struct type
+   *   Coef    -> c1, c2, 0, 1, 2, ...
+   *   CondOp  -> >, <, ==             // Remove other ops as they are identical
+   *   ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
+   *   TermOp  -> +, -, *, /, %        // Avoid bit-wise ops as we are not using bv theories
    * -----------------------------------------------
    *
    * Example:
    *
    * -----------------------------------------------
-   * (fun f0 i32 ((par v0 i32) (par v1 i32))
+   * (struct Point ((x i32) (y i32)))
+   * (struct Rect ((tl Point) (br Point)))
+   * (fun f0 i32 ((par v0 [10] i32) (par v1 Rect))
    *   (loc v2 #100 i32)
-   *   (loc v3 c2 i32)
    *   (bbl BB1
-   *     (asn v0 (eadd (mul #12 v1) (mul c4 v1)))
-   *     (brh BB1 BB2 (gtz (eadd (mul c5 v2) (mul #33 v1))))
-   *   )
-   *   (bbl BB2
-   *     (asn v3 (eadd (mul #9 v1) (mul c8 v2)))
+   *     (asn v0[#0] (eadd (mul #12 v1[tl][x]) (mul c4 v2)))
    *     (ret)
    *   )
    * )
@@ -143,9 +147,10 @@ namespace symir {
    *
    * TODOs:
    *
-   * 1. Add support for on-stack structs.
+   * 1. Add support for on-stack structs. (Done)
    * 2. Add support for heap and pointer arithemics.
    */
+
   class SymIR {
   public:
     using ID = int;
@@ -162,13 +167,18 @@ namespace symir {
       SIR_TGT_GOTO,
       SIR_PARAM_SCA,
       SIR_PARAM_VEC,
+      SIR_PARAM_STRUCT,
       SIR_LOCAL_SCA,
       SIR_LOCAL_VEC,
+      SIR_LOCAL_STRUCT,
+      SIR_STRUCT_DEF,
       SIR_BLOCK,
       SIR_FUNCT,
     };
 
-#define SYMIR_TYPE_LIST(XX) XX(I32, "int", "i32")
+#define SYMIR_TYPE_LIST(XX)                                                                        \
+  XX(I32, "int", "i32")                                                                            \
+  XX(STRUCT, "struct", "struct")
 
     enum Type {
 
@@ -244,10 +254,15 @@ namespace symir {
   /// VarDef is an annotator for SymIR nodes which defines a scalar/vector variable
   class VarDef : public WithType {
   public:
-    VarDef(std::string name, const SymIR::Type type) : WithType(type), name(std::move(name)) {}
+    VarDef(std::string name, const SymIR::Type type, std::string structName = "") :
+        WithType(type), name(std::move(name)), structName(std::move(structName)) {}
 
-    VarDef(std::string name, std::vector<int> vecShape, const SymIR::Type type) :
-        WithType(type), name(std::move(name)), vecShape(std::move(vecShape)) {
+    VarDef(
+        std::string name, std::vector<int> vecShape, const SymIR::Type type,
+        std::string structName = ""
+    ) :
+        WithType(type),
+        name(std::move(name)), vecShape(std::move(vecShape)), structName(std::move(structName)) {
       Assert(
           !this->vecShape.empty(), "The vector dimensions for variable %s should be non-negative",
           name.c_str()
@@ -308,12 +323,18 @@ namespace symir {
 
     void SetVolatile(const bool set = true) { isVolatile = set; }
 
+    [[nodiscard]] const std::string &GetStructName() const {
+      Assert(type == SymIR::STRUCT, "The variable \"%s\" is not a struct", name.c_str());
+      return structName;
+    }
+
   protected:
     std::string name;
     // Empty vector means scalar. Otherwise, vecShape is the shape of the vector, where
     // each element in vecShape is the length of the vector at that dimension.
     std::vector<int> vecShape{};
     bool isVolatile = false;
+    std::string structName;
   };
 
   /// SymDef is a definition of a symbolic value, either been solved or not yet.
@@ -396,6 +417,8 @@ namespace symir {
     }
 
     explicit VarUse(const VarDef *var, std::vector<Coef *> access);
+
+    explicit VarUse(const VarDef *var, std::vector<Coef *> access, SymIR::Type type);
 
     [[nodiscard]] const VarDef *GetDef() const { return var; }
 
@@ -844,11 +867,57 @@ namespace symir {
   /// A Param is a declaration of a function's parameter.
   class Param : public SymIR, public VarDef {
   public:
-    explicit Param(ID irId, std::string name, Type type = Type::I32) :
-        SymIR(irId), VarDef(std::move(name), type) {}
+    explicit Param(ID irId, std::string name, Type type = Type::I32, std::string structName = "") :
+        SymIR(irId), VarDef(std::move(name), type, std::move(structName)) {}
 
-    explicit Param(ID irId, std::string name, std::vector<int> shape, Type type = Type::I32) :
-        SymIR(irId), VarDef(std::move(name), shape, type) {}
+    explicit Param(
+        ID irId, std::string name, std::vector<int> shape, Type type = Type::I32,
+        std::string structName = ""
+    ) :
+        SymIR(irId),
+        VarDef(std::move(name), std::move(shape), type, std::move(structName)) {}
+  };
+
+  /// A StructDef defines a named struct type.
+  class StructDef : public SymIR {
+  public:
+    struct Field {
+      std::string name;
+      Type type;
+      std::string structName;
+      std::vector<int> shape;
+    };
+
+    StructDef(std::string name, std::vector<Field> fields) :
+        SymIR(SIR_STRUCT_DEF), name(std::move(name)), fields(std::move(fields)) {}
+
+    [[nodiscard]] const std::string &GetName() const { return name; }
+
+    [[nodiscard]] const std::vector<Field> &GetFields() const { return fields; }
+
+    [[nodiscard]] int GetFieldIndex(const std::string &fieldName) const {
+      for (size_t i = 0; i < fields.size(); i++) {
+        if (fields[i].name == fieldName) {
+          return static_cast<int>(i);
+        }
+      }
+      return -1;
+    }
+
+    [[nodiscard]] const Field &GetField(int index) const {
+      Assert(
+          index >= 0 && index < static_cast<int>(fields.size()),
+          "The field index (%d) is out of bound (%lu) for struct %s", index, fields.size(),
+          name.c_str()
+      );
+      return fields[index];
+    }
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+
+  private:
+    std::string name;
+    std::vector<Field> fields;
   };
 
   /// An ScaParam is a declaration of a function's parameter which is a scalar.
@@ -863,8 +932,19 @@ namespace symir {
   /// An VecParam is a declaration of a function's parameter which is a vector.
   class VecParam : public Param {
   public:
-    explicit VecParam(std::string name, std::vector<int> shape, Type type = Type::I32) :
-        Param(SIR_PARAM_VEC, std::move(name), std::move(shape), type) {}
+    explicit VecParam(
+        std::string name, std::vector<int> shape, Type type = Type::I32, std::string structName = ""
+    ) :
+        Param(SIR_PARAM_VEC, std::move(name), std::move(shape), type, std::move(structName)) {}
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+  };
+
+  /// A StructParam is a declaration of a function's parameter which is a struct.
+  class StructParam : public Param {
+  public:
+    explicit StructParam(std::string name, std::string structName) :
+        Param(SIR_PARAM_STRUCT, std::move(name), SymIR::STRUCT, std::move(structName)) {}
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
   };
@@ -872,18 +952,28 @@ namespace symir {
   /// A Local is a declaration of a local variable within the function.
   class Local : public Stmt, public VarDef {
   public:
-    explicit Local(ID irId, std::string name, Type type = Type::I32) :
-        Stmt(irId), VarDef(std::move(name), type) {}
+    explicit Local(ID irId, std::string name, Type type = Type::I32, std::string structName = "") :
+        Stmt(irId), VarDef(std::move(name), type, std::move(structName)) {}
 
-    explicit Local(ID irId, std::string name, const std::vector<int> shape, Type type = Type::I32) :
-        Stmt(irId), VarDef(std::move(name), shape, type) {}
+    explicit Local(
+        ID irId, std::string name, const std::vector<int> shape, Type type = Type::I32,
+        std::string structName = ""
+    ) :
+        Stmt(irId),
+        VarDef(std::move(name), shape, type, std::move(structName)) {}
   };
 
   /// A ScaLocal is a declaration of a local variable with an initial value within the function.
   class ScaLocal : public Local {
   public:
-    explicit ScaLocal(std::string name, Coef *init, Type type = Type::I32) :
-        Local(SIR_LOCAL_SCA, std::move(name), type), coef(std::move(init)) {
+    explicit ScaLocal(
+        std::string name, Coef *init, Type type = Type::I32, bool isVolatile = false
+    ) :
+        Local(SIR_LOCAL_SCA, std::move(name), type),
+        coef(std::move(init)) {
+      if (isVolatile) {
+        SetVolatile();
+      }
       Assert(this->coef != nullptr, "The coef is given a nullptr");
       Assert(
           type == this->coef->GetType(), "The coef (%s) and the var (%s) are of different types",
@@ -909,23 +999,47 @@ namespace symir {
   public:
     explicit VecLocal(
         std::string name, const std::vector<int> &shape, std::vector<Coef *> inits,
-        Type type = Type::I32
+        Type type = Type::I32, std::string structName = ""
     ) :
-        Local(SIR_LOCAL_VEC, std::move(name), shape, type),
+        Local(SIR_LOCAL_VEC, std::move(name), shape, type, std::move(structName)),
         coefs(std::move(inits)) {
       const int expectedNumEls = GetVecNumEls(this->vecShape);
-      Assert(
-          expectedNumEls == static_cast<int>(this->coefs.size()),
-          "The number of initial values (%lu) does not match the number of elements (%d) of "
-          "the vector variable %s",
-          this->coefs.size(), expectedNumEls, this->GetName().c_str()
-      );
-      for (const auto &c: this->coefs) {
+      if (this->type != SymIR::STRUCT) {
         Assert(
-            type == c->GetType(), "The coef (%s) and the var (%s) are of different types",
-            GetTypeSName(c->GetType()).c_str(), GetTypeSName(type).c_str()
+            expectedNumEls == static_cast<int>(this->coefs.size()),
+            "The number of initial values (%lu) does not match the number of elements (%d) of "
+            "the vector variable %s",
+            this->coefs.size(), expectedNumEls, this->GetName().c_str()
         );
       }
+      for (const auto &c: this->coefs) {
+        if (this->type != SymIR::STRUCT) {
+          Assert(
+              type == c->GetType(), "The coef (%s) and the var (%s) are of different types",
+              GetTypeSName(c->GetType()).c_str(), GetTypeSName(type).c_str()
+          );
+        }
+      }
+    }
+
+    [[nodiscard]] const std::vector<Coef *> &GetCoefs() const { return coefs; }
+
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return this; }
+
+    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+
+  private:
+    std::vector<Coef *> coefs;
+  };
+
+  /// A StructLocal is a declaration of a struct local variable.
+  class StructLocal : public Local {
+  public:
+    explicit StructLocal(std::string name, std::string structName, std::vector<Coef *> inits) :
+        Local(SIR_LOCAL_STRUCT, std::move(name), SymIR::STRUCT), coefs(std::move(inits)) {
+      this->structName = std::move(structName);
     }
 
     [[nodiscard]] const std::vector<Coef *> &GetCoefs() const { return coefs; }
@@ -1046,6 +1160,7 @@ namespace symir {
         // clang-format off
         std::string name,
         Type retType,
+        std::vector<std::unique_ptr<StructDef>> structs,
         std::vector<std::unique_ptr<Param>> params,
         std::vector<std::unique_ptr<Local>> locals,
         std::vector<std::unique_ptr<SymDef>> symbols,
@@ -1053,8 +1168,9 @@ namespace symir {
         // clang-format on
     ) :
         SymIR(SIR_FUNCT),
-        WithType(retType), name(std::move(name)), params(std::move(params)),
-        locals(std::move(locals)), symbols(std::move(symbols)), blocks(std::move(blocks)) {
+        WithType(retType), name(std::move(name)), structs(std::move(structs)),
+        params(std::move(params)), locals(std::move(locals)), symbols(std::move(symbols)),
+        blocks(std::move(blocks)) {
       Assert(!this->params.empty(), "No parameters are given");
       Assert(!this->blocks.empty(), "No basic blocks are given");
       for (size_t i = 0; i < this->blocks.size(); i++) {
@@ -1065,6 +1181,15 @@ namespace symir {
             blkLabel.c_str()
         );
         blockMap[blkLabel] = blk.get();
+      }
+      for (size_t i = 0; i < this->structs.size(); i++) {
+        const auto &st = this->structs[i];
+        const auto &stName = st->GetName();
+        Assert(
+            !structMap.contains(stName), "Structs with the same name \"%s\" is already defined",
+            stName.c_str()
+        );
+        structMap[stName] = st.get();
       }
       for (size_t i = 0; i < this->params.size(); i++) {
         const auto &prm = this->params[i];
@@ -1104,6 +1229,22 @@ namespace symir {
     [[nodiscard]] const std::string &GetName() const { return name; }
 
     [[nodiscard]] int NumParams() const { return params.size(); }
+
+    [[nodiscard]] std::vector<const StructDef *> GetStructs() const {
+      std::vector<const StructDef *> r;
+      for (const auto &v: structs) {
+        r.push_back(v.get());
+      }
+      return r;
+    }
+
+    [[nodiscard]] const StructDef *GetStruct(const std::string &name) const {
+      if (structMap.contains(name)) {
+        return structMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
 
     [[nodiscard]] std::vector<const Param *> GetParams() const {
       std::vector<const Param *> r;
@@ -1231,6 +1372,8 @@ namespace symir {
 
   private:
     std::string name;
+    std::vector<std::unique_ptr<StructDef>> structs;
+    std::map<std::string, const StructDef *> structMap;
     std::vector<std::unique_ptr<Param>> params;
     std::map<std::string, const Param *> paramMap;
     std::vector<std::unique_ptr<Local>> locals;
@@ -1506,6 +1649,15 @@ namespace symir {
       }
     }
 
+    /// Find a defined struct
+    [[nodiscard]] const StructDef *FindStruct(const std::string &name) const {
+      if (structMap.contains(name)) {
+        return structMap.find(name)->second;
+      } else {
+        return nullptr;
+      }
+    }
+
     /// Define a solved coefficient with the given integer value
     Coef *SymI32Const(int value) {
       const auto valueStr = std::to_string(value);
@@ -1521,6 +1673,10 @@ namespace symir {
       }
     }
 
+    /// Define and commit a new struct
+    const StructDef *
+    SymStruct(const std::string &name, const std::vector<StructDef::Field> &fields);
+
     /// Define and commit a new unsolved coefficient
     Coef *SymCoef(const std::string &name, SymIR::Type type = SymIR::I32);
 
@@ -1534,8 +1690,11 @@ namespace symir {
     /// Define and commit a new VecParam
     const VecParam *SymVecParam(
         const std::string &name, const std::vector<int> &shape, SymIR::Type type = SymIR::I32,
-        bool isVolatile = false
+        std::string structName = "", bool isVolatile = false
     );
+
+    /// Define and commit a new StructParam
+    const StructParam *SymStructParam(const std::string &name, const std::string &structName);
 
     /// Define and commit a new ScaLocal
     const ScaLocal *SymScaLocal(
@@ -1545,7 +1704,12 @@ namespace symir {
     /// Define and commit a new VecLocal
     const VecLocal *SymVecLocal(
         const std::string &name, const std::vector<int> &shape, const std::vector<Coef *> coefs,
-        SymIR::Type type = SymIR::I32, bool isVolatile = false
+        SymIR::Type type = SymIR::I32, std::string structName = "", bool isVolatile = false
+    );
+
+    /// Define and commit a new StructLocal
+    const StructLocal *SymStructLocal(
+        const std::string &name, const std::string &structName, const std::vector<Coef *> coefs
     );
 
     /// Define and commit a new basic block with defined body
@@ -1568,12 +1732,14 @@ namespace symir {
     // Ingredients for building a function
     std::string name;
     SymIR::Type retType;
+    std::vector<std::unique_ptr<StructDef>> structs{};
     std::vector<std::unique_ptr<SymDef>> symbols{};
     std::vector<std::unique_ptr<Param>> params{};
     std::vector<std::unique_ptr<Local>> locals{};
     std::vector<std::unique_ptr<Block>> blocks{};
 
     // For ease of managing and manipulating
+    std::map<std::string, const StructDef *> structMap{};
     std::map<std::string, SymDef *> symMap{};
     std::map<std::string, const Param *> paramMap{};
     std::map<std::string, const Local *> localMap{};
@@ -1631,8 +1797,11 @@ namespace symir {
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
+    void Visit(const StructParam &p) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
+    void Visit(const StructLocal &l) override;
+    void Visit(const StructDef &s) override;
     void Visit(const Block &b) override;
     void Visit(const Funct &f) override;
 
