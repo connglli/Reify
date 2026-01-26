@@ -24,6 +24,9 @@
 // SOFTWARE.
 
 #include "lib/lang.hpp"
+#include <algorithm>
+#include <iostream>
+#include <ranges>
 
 namespace symir {
   VarUse::VarUse(const VarDef *var, std::vector<Coef *> access) :
@@ -493,10 +496,8 @@ namespace symir {
   }
 
   void FunctCopier::Visit(const VarUse &v) {
-    if (v.IsVector()) {
-      for (auto &c: v.GetAccess()) {
-        c->Accept(*this);
-      }
+    for (auto &c: v.GetAccess()) {
+      c->Accept(*this);
     }
   }
 
@@ -523,7 +524,7 @@ namespace symir {
       var = builder->FindVar(name);
       Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
       t.GetVar()->Accept(*this);
-      for (int i = 0; i < t.GetVar()->GetVecNumDims(); i++) {
+      for (size_t i = 0; i < t.GetVar()->GetAccess().size(); i++) {
         access.insert(access.begin(), popCoef());
       }
     }
@@ -550,14 +551,14 @@ namespace symir {
     const auto use = a.GetVar();
     const auto name = use->GetName();
     const auto var = builder->FindVar(name);
-    std::vector<Coef *> access{};
-    if (var->IsVector()) {
-      use->Accept(*this);
-      for (int i = 0; i < use->GetVecNumDims(); i++) {
-        access.insert(access.begin(), popCoef());
-      }
-    }
     Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+
+    use->Accept(*this);
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
     a.GetExpr()->Accept(*this);
     auto exprId = popExpr();
     currentBlock->SymAssign(var, exprId, access);

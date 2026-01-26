@@ -328,6 +328,11 @@ namespace symir {
       return structName;
     }
 
+    void SetStructName(std::string name) {
+      Assert(type == SymIR::STRUCT, "The variable \"%s\" is not a struct", this->name.c_str());
+      structName = std::move(name);
+    }
+
   protected:
     std::string name;
     // Empty vector means scalar. Otherwise, vecShape is the shape of the vector, where
@@ -913,6 +918,10 @@ namespace symir {
       return fields[index];
     }
 
+    void Rename(std::string newName) { name = std::move(newName); }
+
+    std::vector<Field> &GetMutableFields() { return fields; }
+
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
@@ -1366,6 +1375,16 @@ namespace symir {
         ret.insert(ret.end(), sr.begin(), sr.end());
       }
       return ret;
+    }
+
+    void RenameStruct(const std::string &oldName, const std::string &newName) {
+      auto it = structMap.find(oldName);
+      Assert(it != structMap.end(), "Struct %s not found", oldName.c_str());
+      const StructDef *s = it->second;
+      structMap.erase(it);
+      // We know we own it, so const_cast is safe here to update internal consistency
+      const_cast<StructDef *>(s)->Rename(newName);
+      structMap[newName] = s;
     }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }

@@ -406,41 +406,41 @@ namespace symir {
         if (f.type == SymIR::STRUCT) {
           const auto *subDef = curFunct->GetStruct(f.structName);
           std::function<void(const std::vector<int> &, std::function<void()>)> printArray =
-              [&](const std::vector<int> &shape, std::function<void()> pP) {
+              [&, this](const std::vector<int> &shape, std::function<void()> pP) {
                 if (shape.empty()) {
                   printStruct(subDef, pP);
                 } else {
                   int d = shape[0];
                   std::vector<int> subShape(shape.begin() + 1, shape.end());
                   for (int i = 0; i < d; ++i) {
-                    printArray(subShape, [=]() {
+                    printArray(subShape, [=, this]() {
                       pP();
                       out << "[" << i << "]";
                     });
                   }
                 }
               };
-          printArray(f.shape, [=]() {
+          printArray(f.shape, [=, this]() {
             printPrefix();
             out << "." << f.name;
           });
         } else {
           std::function<void(const std::vector<int> &, std::function<void()>)> printArray =
-              [&](const std::vector<int> &shape, std::function<void()> pP) {
+              [&, this](const std::vector<int> &shape, std::function<void()> pP) {
                 if (shape.empty()) {
                   printVal(pP);
                 } else {
                   int d = shape[0];
                   std::vector<int> subShape(shape.begin() + 1, shape.end());
                   for (int i = 0; i < d; ++i) {
-                    printArray(subShape, [=]() {
+                    printArray(subShape, [=, this]() {
                       pP();
                       out << "[" << i << "]";
                     });
                   }
                 }
               };
-          printArray(f.shape, [=]() {
+          printArray(f.shape, [=, this]() {
             printPrefix();
             out << "." << f.name;
           });
@@ -451,9 +451,9 @@ namespace symir {
     for (const auto *v: vars) {
       if (v->GetDef()->GetType() == SymIR::STRUCT) {
         const auto *sDef = curFunct->GetStruct(v->GetDef()->GetStructName());
-        printStruct(sDef, [=]() { v->Accept(*this); });
+        printStruct(sDef, [=, this]() { v->Accept(*this); });
       } else {
-        printVal([=]() { v->Accept(*this); });
+        printVal([=, this]() { v->Accept(*this); });
       }
     }
 
@@ -537,7 +537,6 @@ namespace symir {
     }
     out << " = {";
     const auto &cs = l.GetCoefs();
-    const auto ncs = l.GetVecNumEls(); // This is number of elements (structs).
     // Coefs list is flattened scalars.
     // We need to group them if we want nice output, but C allows flat initialization for arrays of
     // structs? "struct P arr[2] = {1, 2, 3, 4};" works? Yes, generally works (braces elision). But
@@ -593,6 +592,11 @@ namespace symir {
 
   void SymCxLower::Visit(const Funct &f) {
     curFunct = &f;
+    if (emitStructs) {
+      for (const auto &s: f.GetStructs()) {
+        s->Accept(*this);
+      }
+    }
     out << SymIR::GetTypeCName(f.GetRetType()) << " " << f.GetName() << "(";
     auto params = f.GetParams();
     for (size_t i = 0; i < params.size(); ++i) {
