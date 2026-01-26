@@ -48,6 +48,23 @@ public:
     f.Accept(*this);
   }
 
+  void RenameMapping(FunPlus::IniFinMap &mapping) {
+    for (auto &inits: mapping.first) {
+      for (auto &arg: inits) {
+        if (arg.IsStruct()) {
+          arg.SetStructName(getNewName(arg.GetStructName()));
+        }
+      }
+    }
+    for (auto &finas: mapping.second) {
+      for (auto &arg: finas) {
+        if (arg.IsStruct()) {
+          arg.SetStructName(getNewName(arg.GetStructName()));
+        }
+      }
+    }
+  }
+
 private:
   std::string prefix;
   std::map<std::string, std::string> oldToNew;
@@ -152,7 +169,9 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     renamer.Rename(*func);
 
     functions.push_back(std::move(func));
-    mappings.push_back(FunPlus::ParseMappingCode(arts.GetMapPath()));
+    auto mapping = FunPlus::ParseMappingCode(arts.GetMapPath());
+    renamer.RenameMapping(mapping);
+    mappings.push_back(std::move(mapping));
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
     idx++;
   }

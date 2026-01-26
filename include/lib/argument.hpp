@@ -137,6 +137,11 @@ public:
     return fieldNames;
   }
 
+  void SetStructName(std::string name) {
+    Assert(IsStruct(), "Cannot set struct name for a non-struct variable");
+    structName = std::move(name);
+  }
+
   void SetValue(IntType val) {
     Assert(IsScalar(), "Cannot set a scalar value for a vector or struct");
     elems = {val};
