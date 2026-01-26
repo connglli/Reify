@@ -53,9 +53,6 @@ void FunPlus::Generate(bool allowDeadCode) {
   // Create the function builder to build the function
   auto builder = std::make_unique<symir::FunctBuilder>(name, symir::SymIR::I32);
 
-  // Generate random structs
-  generateStructDefs(builder.get());
-
   // The first numParams variables are parameters
   for (int i = 0; i < numParams; i++) {
     bool isVolatile = false;
@@ -77,23 +74,9 @@ void FunPlus::Generate(bool allowDeadCode) {
     }
 
     if (isStruct) {
-      // Pick a random struct
-      // For now, let's just try to find S0, S1... until fail.
-      std::vector<std::string> availStructs;
-      int sIdx = 0;
-      while (true) {
-        std::string sName = "S" + std::to_string(sIdx);
-        if (builder->FindStruct(sName)) {
-          availStructs.push_back(sName);
-          sIdx++;
-        } else {
-          break;
-        }
-      }
-
-      if (!availStructs.empty()) {
-        int idx = Random::Get().Uniform(0, (int) availStructs.size() - 1)();
-        builder->SymStructParam(NameVar(i), availStructs[idx]);
+      std::string structName = pickOrGenerateStruct(builder.get());
+      if (!structName.empty()) {
+        builder->SymStructParam(NameVar(i), structName);
       } else {
         // Fallback to scalar
         builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, isVolatile);
@@ -127,21 +110,8 @@ void FunPlus::Generate(bool allowDeadCode) {
     }
 
     if (isStruct) {
-      std::vector<std::string> availStructs;
-      int sIdx = 0;
-      while (true) {
-        std::string sName = "S" + std::to_string(sIdx);
-        if (builder->FindStruct(sName)) {
-          availStructs.push_back(sName);
-          sIdx++;
-        } else {
-          break;
-        }
-      }
-
-      if (!availStructs.empty()) {
-        int idx = Random::Get().Uniform(0, (int) availStructs.size() - 1)();
-        std::string structName = availStructs[idx];
+      std::string structName = pickOrGenerateStruct(builder.get());
+      if (!structName.empty()) {
         const auto *sDef = builder->FindStruct(structName);
 
         // Initialize struct fields
@@ -192,13 +162,17 @@ void FunPlus::Generate(bool allowDeadCode) {
   Log::Get().CloseSection();
 }
 
-void FunPlus::generateStructDefs(symir::FunctBuilder *funBd) {
+std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
   if (!GlobalOptions::Get().EnableStructVars) {
-    return;
+    return "";
   }
-  int numStructs = Random::Get().Uniform(1, 3)();
-  for (int i = 0; i < numStructs; ++i) {
-    std::string structName = "S" + std::to_string(i);
+
+  auto availStructs = funBd->GetStructs();
+  bool shouldGenerate =
+      availStructs.empty() || (Random::Get().UniformReal()() < 0.3 && availStructs.size() < 5);
+
+  if (shouldGenerate) {
+    std::string structName = "S" + std::to_string(availStructs.size());
     std::vector<symir::StructDef::Field> fields;
     int numFields = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumStructFields)();
     for (int j = 0; j < numFields; ++j) {
@@ -210,6 +184,10 @@ void FunPlus::generateStructDefs(symir::FunctBuilder *funBd) {
       fields.push_back(field);
     }
     funBd->SymStruct(structName, fields);
+    return structName;
+  } else {
+    int idx = Random::Get().Uniform(0, (int) availStructs.size() - 1)();
+    return availStructs[idx]->GetName();
   }
 }
 
