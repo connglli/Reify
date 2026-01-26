@@ -117,18 +117,19 @@ namespace symir {
    * RetStmt -> 'return' Var+
    * ---
    * Cond    -> CondOp Expr
-   * Expr    -> ExprOp Term Term+   // We intentionally avoid "Expr -> ExprOp Expr Expr"
+   * Expr    -> ExprOp Term Term+    // We intentionally avoid "Expr -> ExprOp Expr Expr"
    * Term    -> TermOp Coef Var
-   *   Var     -> Name | Name ('[' Coef ']' | '[' Name ']')+ // Variable access: array index or
-   * struct field
-   *   ---
-   *   Name    -> f1, f2, f3, v1, v2, ...
-   *   Label   -> BB1, BB2, BB3, ...
-   *   Type    -> int | Name           // Scalar int or Struct type
-   *   Coef    -> c1, c2, 0, 1, 2, ...
-   *   CondOp  -> >, <, ==             // Remove other ops as they are identical
-   *   ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
-   *   TermOp  -> +, -, *, /, %        // Avoid bit-wise ops as we are not using bv theories
+   * Var     -> Name |
+   *            Name ('[' Coef ']' | // Variable access: array index
+   *            '[' Name ']')+       // Variable access: struct field
+   * ---
+   * Name    -> f1, f2, f3, v1, v2, ...
+   * Label   -> BB1, BB2, BB3, ...
+   * Type    -> int | Name           // Scalar int or Struct type
+   * Coef    -> c1, c2, 0, 1, 2, ...
+   * CondOp  -> >, <, ==             // Remove other ops as they are identical
+   * ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
+   * TermOp  -> +, -, *, /, %        // Avoid bit-wise ops as we are not using bv theories
    * -----------------------------------------------
    *
    * Example:
@@ -1619,6 +1620,15 @@ namespace symir {
       std::vector<SymDef *> r;
       for (size_t i = 0; i < symbols.size(); i++) {
         r.push_back(symbols[i].get());
+      }
+      return r;
+    }
+
+    /// Get all defined structs
+    [[nodiscard]] std::vector<const StructDef *> GetStructs() const {
+      std::vector<const StructDef *> r;
+      for (size_t i = 0; i < structs.size(); i++) {
+        r.push_back(structs[i].get());
       }
       return r;
     }
