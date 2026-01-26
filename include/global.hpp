@@ -65,6 +65,13 @@ struct GlobalOptions {
   int MaxNumArrayDims = 3;
   // The maximum number of elements for each dimension of an array variable
   int MaxNumElsPerArrayDim = 3;
+  // When enabled, some variables can be structs
+  bool EnableStructVars = true;
+  // The probability of generating a struct variable
+  double StructVariableProba = 0.2;
+  // The maximum number of fields for a struct
+  int MaxNumStructFields = 3;
+
   // These are our anti-UB (mostly just checking for overflow and underflow) checks
   bool EnableSafetyChecks = true;
   // I don't want all coefficients to be 0, so this constraint takes care of that
@@ -167,6 +174,9 @@ struct GlobalOptions {
       ("Xvolatile-var-proba", "Probability of declaring a variable as a volatile variable", cxxopts::value<double>())
       ("Xdisable-array-vars", "Disable generating array variables", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xarray-var-proba", "Probability of declaring a variable as an array", cxxopts::value<double>())
+      ("Xdisable-struct-vars", "Enable generating struct variables", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xstruct-var-proba", "Probability of declaring a variable as a struct", cxxopts::value<double>())
+      ("Xmax-struct-fields", "The maximum number of fields for a struct", cxxopts::value<int>())
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xdisable-dead-code", "Disable the generation of dead code", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -276,6 +286,30 @@ struct GlobalOptions {
                   << std::endl;
         exit(1);
       }
+    }
+
+    EnableStructVars = !args["Xdisable-struct-vars"].as<bool>();
+
+    if (args.count("Xstruct-var-proba")) {
+      StructVariableProba = args["Xstruct-var-proba"].as<double>();
+      if (StructVariableProba <= 0) {
+        std::cerr << "Error: The probability for declaring a variable as a struct "
+                     "(--Xstruct-var-proba) cannot be less than or equal to 0. It should be "
+                     "within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+      if (StructVariableProba > 1) {
+        std::cerr << "Error: The probability for declaring a variable as a struct "
+                  << "(--Xstruct-var-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("Xmax-struct-fields")) {
+      MaxNumStructFields = args["Xmax-struct-fields"].as<int>();
+      ensurePositive(MaxNumStructFields, "Xmax-struct-fields");
     }
 
     if (args.count("Xnum-bbls-per-fun")) {

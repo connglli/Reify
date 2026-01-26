@@ -50,24 +50,33 @@ public:
     elems.resize(numEls);
   }
 
-  [[nodiscard]] bool IsScalar() const { return shape.size() == 0; }
+  explicit ArgPlus(std::string structName, std::vector<std::string> fieldNames) :
+      shape({}), elems(fieldNames.size()), structName(std::move(structName)),
+      fieldNames(std::move(fieldNames)) {}
 
-  [[nodiscard]] bool IsVector() const { return shape.size() != 0; }
+  [[nodiscard]] bool IsScalar() const { return shape.empty() && structName.empty(); }
+
+  [[nodiscard]] bool IsVector() const { return !shape.empty(); }
+
+  [[nodiscard]] bool IsStruct() const { return !structName.empty(); }
 
   [[nodiscard]] IntType GetValue() const {
-    Assert(IsScalar(), "Cannot get a scalar value for a vector");
+    Assert(IsScalar(), "Cannot get a scalar value for a vector or struct");
     Assert(elems.size() == 1, "The scalar variable should have exactly one element");
     return elems[0];
   }
 
   [[nodiscard]] IntType GetValue(int at) const {
-    Assert(IsVector(), "Cannot get a value for a scalar variable");
-    Assert(at < GetVecNumEls(), "The index (%d) is out of bound (%d)", at, GetVecNumEls());
+    Assert(IsVector() || IsStruct(), "Cannot get a value by index for a scalar variable");
+    Assert(
+        at < static_cast<int>(elems.size()), "The index (%d) is out of bound (%lu)", at,
+        elems.size()
+    );
     return elems[at];
   }
 
   [[nodiscard]] IntType GetValue(const std::vector<int> &indices) const {
-    Assert(IsVector(), "Cannot get a value for a scalar variable");
+    Assert(IsVector(), "Cannot get a multi-dim value for a non-vector variable");
     Assert(
         indices.size() == shape.size(),
         "The indices (size=%lu) does not align with the dimensions (%lu)", indices.size(),
@@ -90,18 +99,20 @@ public:
   [[nodiscard]] std::vector<int> GetVecShape() const { return shape; }
 
   [[nodiscard]] int GetVecDimLen(int d) const {
-    Assert(IsVector(), "Cannot get the length of a vector dimension lengths for a scalar");
+    Assert(
+        IsVector(), "Cannot get the length of a vector dimension lengths for a scalar or struct"
+    );
     Assert(d < GetVecNumDims(), "The dimension (%d) is out of bound (%d)", d, GetVecNumDims());
     return shape[d];
   }
 
   [[nodiscard]] int GetVecNumDims() const {
-    Assert(IsVector(), "Cannot get number of dimensions for a scalar");
+    Assert(IsVector(), "Cannot get number of dimensions for a scalar or struct");
     return static_cast<int>(shape.size());
   }
 
   [[nodiscard]] int GetVecNumEls(int dim = -1) const {
-    Assert(IsVector(), "Cannot get number of elements for a scalar");
+    Assert(IsVector() || IsStruct(), "Cannot get number of elements for a scalar");
     if (dim == -1) {
       return static_cast<int>(elems.size());
     }
@@ -116,23 +127,45 @@ public:
     return num;
   }
 
+  [[nodiscard]] const std::string &GetStructName() const {
+    Assert(IsStruct(), "Cannot get struct name for a non-struct variable");
+    return structName;
+  }
+
+  [[nodiscard]] const std::vector<std::string> &GetFieldNames() const {
+    Assert(IsStruct(), "Cannot get field names for a non-struct variable");
+    return fieldNames;
+  }
+
   void SetValue(IntType val) {
-    Assert(IsScalar(), "Cannot set a scalar value for a vector");
+    Assert(IsScalar(), "Cannot set a scalar value for a vector or struct");
     elems = {val};
   }
 
   void SetValue(int at, IntType val) {
-    Assert(IsVector(), "Cannot set a value for a scalar variable");
-    Assert(at < GetVecNumEls(), "The index (%d) is out of bound (%d)", at, GetVecNumEls());
-    elems[at] = {val};
+    Assert(IsVector() || IsStruct(), "Cannot set a value by index for a scalar variable");
+    Assert(
+        at < static_cast<int>(elems.size()), "The index (%d) is out of bound (%lu)", at,
+        elems.size()
+    );
+    elems[at] = val;
   }
 
   [[nodiscard]] std::string ToCxStr() const {
     std::ostringstream oss;
-    if (IsScalar()) {
+    if (IsStruct()) {
+      oss << "(struct " << structName << "){";
+      for (size_t i = 0; i < fieldNames.size(); ++i) {
+        oss << "." << fieldNames[i] << " = " << GetValue(i);
+        if (i != fieldNames.size() - 1) {
+          oss << ", ";
+        }
+      }
+      oss << "}";
+    } else if (IsScalar()) {
       oss << GetValue();
     } else {
-      const auto numEls = GetVecNumEls();
+      const auto numEls = static_cast<int>(elems.size());
       oss << "(int(*)";
       for (int d = 1; d < GetVecNumDims(); d++) {
         oss << "[" << GetVecDimLen(d) << "]";
@@ -153,6 +186,10 @@ public:
     auto obj = nlohmann::json::object();
     obj["shape"] = shape;
     obj["elems"] = elems;
+    if (IsStruct()) {
+      obj["structName"] = structName;
+      obj["fieldNames"] = fieldNames;
+    }
     return obj;
   }
 
@@ -165,6 +202,20 @@ public:
 
     std::vector<int> shape = obj["shape"].get<std::vector<int>>();
     std::vector<IntType> elems = obj["elems"].get<std::vector<IntType>>();
+
+    if (obj.contains("structName") && obj.contains("fieldNames")) {
+      std::string structName = obj["structName"].get<std::string>();
+      std::vector<std::string> fieldNames = obj["fieldNames"].get<std::vector<std::string>>();
+      auto arg = ArgPlus<IntType>(structName, fieldNames);
+      Assert(
+          elems.size() == arg.elems.size(),
+          "The number of elements (%lu) does not match the expected size (%lu)", elems.size(),
+          arg.elems.size()
+      );
+      arg.elems = std::move(elems);
+      return arg;
+    }
+
     if (shape.empty()) {
       auto arg = ArgPlus<IntType>();
       arg.SetValue(elems[0]);
@@ -172,13 +223,11 @@ public:
     } else {
       auto arg = ArgPlus<IntType>(shape);
       Assert(
-          static_cast<int>(elems.size()) == arg.GetVecNumEls(),
-          "The number of elements (%lu) does not match the expected size (%d)", elems.size(),
-          arg.GetVecNumEls()
+          static_cast<int>(elems.size()) == static_cast<int>(arg.elems.size()),
+          "The number of elements (%lu) does not match the expected size (%lu)", elems.size(),
+          arg.elems.size()
       );
-      for (int i = 0; i < static_cast<int>(elems.size()); i++) {
-        arg.SetValue(i, elems[i]);
-      }
+      arg.elems = std::move(elems);
       return arg;
     }
   }
@@ -186,6 +235,8 @@ public:
 private:
   std::vector<int> shape;
   std::vector<IntType> elems{};
+  std::string structName = "";
+  std::vector<std::string> fieldNames{};
 };
 
 

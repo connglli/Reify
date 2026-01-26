@@ -100,6 +100,22 @@ z3::expr UBSan::CreateVecElExpr(const symir::VarDef *var, int loc, int version) 
   return ctx.int_const((elName + "_v" + std::to_string(version)).c_str());
 }
 
+std::string UBSan::GetStructFieldName(const symir::VarDef *var, const std::string &field) const {
+  return var->GetName() + "_" + field;
+}
+
+z3::expr
+UBSan::CreateStructFieldExpr(const symir::VarDef *var, const std::string &field, int version) {
+  std::string name = GetStructFieldName(var, field);
+  if (version == -1) {
+    version = versions[name];
+  } else if (version == -2) {
+    version = ++versions[name];
+    verbbls[name] = currBbl;
+  }
+  return ctx.int_const((name + "_v" + std::to_string(version)).c_str());
+}
+
 z3::expr UBSan::CreateCoefExpr(const symir::Coef &coef) {
   // If we've already extracted the value from the model, we use that value,
   // otherwise it's an uninterpreted constant which the solver needs to figure
@@ -115,7 +131,14 @@ void UBSan::MakeInitInteresting() {
   std::vector<z3::expr> params;
   for (auto param: fun.GetParams()) {
     if (param->IsScalar()) {
-      params.push_back(CreateScaExpr(param, 0));
+      if (param->GetType() == symir::SymIR::STRUCT) {
+        const auto *sDef = fun.GetStruct(param->GetStructName());
+        for (const auto &field: sDef->GetFields()) {
+          params.push_back(CreateStructFieldExpr(param, field.name, 0));
+        }
+      } else {
+        params.push_back(CreateScaExpr(param, 0));
+      }
     } else {
       for (int i = 0; i < param->GetVecNumEls(); i++) {
         params.push_back(CreateVecElExpr(param, i, 0));
@@ -131,7 +154,14 @@ void UBSan::MakeInitWithRandomValue() {
   );
   for (auto param: fun.GetParams()) {
     if (param->IsScalar()) {
-      constraints.push_back(CreateScaExpr(param, 0) == rand());
+      if (param->GetType() == symir::SymIR::STRUCT) {
+        const auto *sDef = fun.GetStruct(param->GetStructName());
+        for (const auto &field: sDef->GetFields()) {
+          constraints.push_back(CreateStructFieldExpr(param, field.name, 0) == rand());
+        }
+      } else {
+        constraints.push_back(CreateScaExpr(param, 0) == rand());
+      }
     } else {
       for (int i = 0; i < param->GetVecNumEls(); i++) {
         constraints.push_back(CreateVecElExpr(param, i, 0) == rand());
@@ -147,8 +177,18 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
     const auto p = fun.GetParams()[i];
     const auto &oldValue = init[i];
     if (p->IsScalar()) {
-      z3::expr newValue = CreateScaExpr(p, 0);
-      params.push_back(z3::ite(newValue != oldValue.GetValue(), ctx.int_val(1), ctx.int_val(0)));
+      if (p->GetType() == symir::SymIR::STRUCT) {
+        const auto *sDef = fun.GetStruct(p->GetStructName());
+        const auto &fields = sDef->GetFields();
+        for (size_t k = 0; k < fields.size(); ++k) {
+          z3::expr newValue = CreateStructFieldExpr(p, fields[k].name, 0);
+          params.push_back(z3::ite(newValue != oldValue.GetValue(k), ctx.int_val(1), ctx.int_val(0))
+          );
+        }
+      } else {
+        z3::expr newValue = CreateScaExpr(p, 0);
+        params.push_back(z3::ite(newValue != oldValue.GetValue(), ctx.int_val(1), ctx.int_val(0)));
+      }
     } else {
       for (int j = 0; j < p->GetVecNumEls(); j++) {
         z3::expr newValue = CreateVecElExpr(p, j, 0);
@@ -163,10 +203,44 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
 void UBSan::Visit(const symir::VarUse &v) {
   Assert(v.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
   if (v.IsScalar()) {
-    auto varExpr = CreateScaExpr(v.GetDef());
-    constraints.push_back(varExpr >= GlobalOptions::Get().LowerBound);
-    constraints.push_back(varExpr <= GlobalOptions::Get().UpperBound);
-    pushExpression(varExpr);
+    if (v.GetDef()->GetType() == symir::SymIR::STRUCT) {
+      // Struct field access
+      const auto access = v.GetAccess();
+      Assert(access.size() == 1, "Only single field access supported for now");
+
+      access[0]->Accept(*this);
+      auto fieldIdxExpr = popExpression();
+
+      const auto *sDef = fun.GetStruct(v.GetDef()->GetStructName());
+      int numFields = sDef->GetFields().size();
+
+      constraints.push_back(fieldIdxExpr >= 0);
+      constraints.push_back(fieldIdxExpr < numFields);
+
+      // Concretize access
+      int elLoc = 0;
+      int constIdx = 0;
+      if (fieldIdxExpr.is_numeral_i(constIdx)) {
+        elLoc = constIdx;
+        // No need to add constraint fieldIdxExpr == elLoc as it is trivially true
+      } else {
+        elLoc = Random::Get().Uniform(0, numFields - 1)();
+        constraints.push_back(fieldIdxExpr == elLoc);
+      }
+
+      std::string fieldName = sDef->GetField(elLoc).name;
+      auto elExpr = CreateStructFieldExpr(v.GetDef(), fieldName);
+
+      constraints.push_back(elExpr >= GlobalOptions::Get().LowerBound);
+      constraints.push_back(elExpr <= GlobalOptions::Get().UpperBound);
+      pushExpression(elExpr);
+      pushVecElLoc(elLoc); // Reuse vecElLocStack
+    } else {
+      auto varExpr = CreateScaExpr(v.GetDef());
+      constraints.push_back(varExpr >= GlobalOptions::Get().LowerBound);
+      constraints.push_back(varExpr <= GlobalOptions::Get().UpperBound);
+      pushExpression(varExpr);
+    }
   } else {
     const auto access = v.GetAccess();
     z3::expr locExpr = ctx.int_val(0);
@@ -307,7 +381,12 @@ void UBSan::Visit(const symir::AssStmt &a) {
   auto exprExpr = popExpression();
   a.GetVar()->Accept(*this);
   auto newVerExpr = popExpression(); // It's indeed the old expr; we don't need it
-  if (a.GetVar()->IsScalar()) {
+  if (a.GetVar()->GetDef()->GetType() == symir::SymIR::STRUCT) {
+    int loc = popVecElLoc(); // Field index
+    const auto *sDef = fun.GetStruct(a.GetVar()->GetDef()->GetStructName());
+    std::string fieldName = sDef->GetField(loc).name;
+    newVerExpr = CreateStructFieldExpr(a.GetVar()->GetDef(), fieldName, -2);
+  } else if (a.GetVar()->IsScalar()) {
     newVerExpr = CreateScaExpr(a.GetVar()->GetDef(), -2);
   } else {
     auto loc = popVecElLoc();
@@ -346,6 +425,16 @@ void UBSan::Visit(const symir::AssStmt &a) {
       return; // Give up
     }
     const auto otherVar = fun.FindVar(otherName);
+    if (!otherVar) {
+      return;
+    } // Might be struct field which is not easily found via FindVar
+    // If otherVar is null (e.g. it was a struct field name in verbbls), we skip value numbering for
+    // now.
+
+    // Also if otherVar is struct, we skip.
+    if (otherVar->GetType() == symir::SymIR::STRUCT)
+      return;
+
     auto otherVarExpr = CreateScaExpr(otherVar);
     constraints.push_back(newVerExpr == otherVarExpr);
     Log::Get().Out() << "Value numbering enforced: " << ourName << "(version=" << versions[ourName]
@@ -399,7 +488,17 @@ void UBSan::Visit(const symir::VecParam &p) {
   }
 }
 
-void UBSan::Visit(const symir::StructParam &p) { Panic("Structs are not supported in UBSan yet"); }
+void UBSan::Visit(const symir::StructParam &p) {
+  const auto *sDef = fun.GetStruct(p.GetStructName());
+  for (const auto &field: sDef->GetFields()) {
+    auto fieldExpr = CreateStructFieldExpr(&p, field.name, 0);
+    std::string fullFieldName = GetStructFieldName(&p, field.name);
+    versions[fullFieldName] = 0;
+    verbbls[fullFieldName] = "___entry_bbl";
+    constraints.push_back(fieldExpr <= GlobalOptions::Get().UpperInitBound);
+    constraints.push_back(fieldExpr >= GlobalOptions::Get().LowerInitBound);
+  }
+}
 
 void UBSan::Visit(const symir::ScaLocal &l) {
   l.GetCoef()->Accept(*this);
@@ -430,9 +529,35 @@ void UBSan::Visit(const symir::VecLocal &l) {
   }
 }
 
-void UBSan::Visit(const symir::StructLocal &l) { Panic("Structs are not supported in UBSan yet"); }
+void UBSan::Visit(const symir::StructLocal &l) {
+  const auto *sDef = fun.GetStruct(l.GetStructName());
+  const auto &inits = l.GetCoefs();
+  const auto &fields = sDef->GetFields();
+  Assert(
+      inits.size() == fields.size(), "Mismatch init size for struct local %s", l.GetName().c_str()
+  );
 
-void UBSan::Visit(const symir::StructDef &s) { Panic("Structs are not supported in UBSan yet"); }
+  for (size_t i = 0; i < fields.size(); ++i) {
+    inits[i]->Accept(*this);
+    auto coefExpr = popExpression();
+
+    auto fieldExpr = CreateStructFieldExpr(l.GetDefinition(), fields[i].name, 0);
+    std::string fullFieldName = GetStructFieldName(l.GetDefinition(), fields[i].name);
+    versions[fullFieldName] = 0;
+    verbbls[fullFieldName] = "___entry_bbl";
+
+    constraints.push_back(fieldExpr <= GlobalOptions::Get().UpperInitBound);
+    constraints.push_back(fieldExpr >= GlobalOptions::Get().LowerInitBound);
+    constraints.push_back(fieldExpr == coefExpr);
+  }
+  if (enableInterestCoefs) {
+    makeCoefsInteresting(inits);
+  }
+}
+
+void UBSan::Visit(const symir::StructDef &s) {
+  // Struct definition doesn't introduce variables, so nothing to do for UBSan.
+}
 
 void UBSan::Visit(const symir::Block &b) {
   for (const auto &stmt: b.GetStmts()) {

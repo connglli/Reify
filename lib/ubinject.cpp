@@ -79,6 +79,23 @@ z3::expr IntUBInject::CreateVecElExpr(const symir::VarDef *var, int loc, int ver
   return ctx->bv_const((eleName + "_v" + std::to_string(version)).c_str(), 33);
 }
 
+std::string
+IntUBInject::GetStructFieldName(const symir::VarDef *var, const std::string &field) const {
+  return var->GetName() + "_" + field;
+}
+
+z3::expr IntUBInject::CreateStructFieldExpr(
+    const symir::VarDef *var, const std::string &field, int version
+) {
+  std::string name = GetStructFieldName(var, field);
+  if (version == -1) {
+    version = versions[name];
+  } else if (version == -2) {
+    version = ++versions[name];
+  }
+  return ctx->bv_const((name + "_v" + std::to_string(version)).c_str(), 33);
+}
+
 z3::expr IntUBInject::CreateCoefExpr(const symir::Coef &coef) {
   Assert(
       coef.GetType() == symir::SymIR::I32,
@@ -99,6 +116,7 @@ z3::expr IntUBInject::CreateCoefExpr(const symir::Coef &coef) {
 
 std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, const symir::Block *b) {
   Assert(b != nullptr, "The basic block to inject UBs is a nullptr");
+  currentFun = f;
 
   Log::Get().OpenSection("IntUBInject: Inject Int UBs to Block " + b->GetLabel());
 
@@ -116,6 +134,7 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
   solver->add(*constraints);
   if (solver->check() != z3::sat) {
     Log::Get().Out() << "UNSAT" << std::endl;
+    currentFun = nullptr;
     return nullptr;
   }
   Log::Get().Out() << "SAT" << std::endl;
@@ -144,6 +163,7 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
   extractSymbolsFromModel(model, nf.get(), nf->FindBlock(b->GetLabel()));
 
   Log::Get().CloseSection();
+  currentFun = nullptr;
 
   return nf;
 }
@@ -151,8 +171,20 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
 void IntUBInject::Visit(const symir::VarUse &v) {
   Assert(v.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
   if (v.IsScalar()) {
-    // We're not going to restrict the value of any variable
-    pushExpression(CreateScaExpr(v.GetDef()));
+    if (v.GetDef()->GetType() == symir::SymIR::STRUCT) {
+      const auto access = v.GetAccess();
+      Assert(!access.empty(), "Struct access must have index");
+      const auto *c = access[0];
+      Assert(c->IsSolved(), "Struct access index must be solved");
+
+      int idx = c->GetI32Value();
+      const auto *sDef = currentFun->GetStruct(v.GetDef()->GetStructName());
+      std::string fieldName = sDef->GetField(idx).name;
+      pushExpression(CreateStructFieldExpr(v.GetDef(), fieldName));
+    } else {
+      // We're not going to restrict the value of any variable
+      pushExpression(CreateScaExpr(v.GetDef()));
+    }
   } else {
     const auto access = v.GetAccess();
     // We asked them to access the very last element
@@ -280,8 +312,18 @@ void IntUBInject::Visit(const symir::AssStmt &a) {
       expr > GlobalOptions::Get().UpperBound || expr < GlobalOptions::Get().LowerBound
   ); // Inserts signed overflow
   if (a.GetVar()->IsScalar()) {
-    auto varNewExpr = CreateScaExpr(a.GetVar()->GetDef(), -2);
-    constraints->push_back(varNewExpr == expr);
+    if (a.GetVar()->GetDef()->GetType() == symir::SymIR::STRUCT) {
+      const auto access = a.GetVar()->GetAccess();
+      Assert(!access.empty(), "Struct access must have index");
+      int idx = access[0]->GetI32Value();
+      const auto *sDef = currentFun->GetStruct(a.GetVar()->GetDef()->GetStructName());
+      std::string fieldName = sDef->GetField(idx).name;
+      auto varNewExpr = CreateStructFieldExpr(a.GetVar()->GetDef(), fieldName, -2);
+      constraints->push_back(varNewExpr == expr);
+    } else {
+      auto varNewExpr = CreateScaExpr(a.GetVar()->GetDef(), -2);
+      constraints->push_back(varNewExpr == expr);
+    }
   } else {
     // We only access the very last element. See Visit(const symir::VarUse &v).
     auto elNewExpr = CreateVecElExpr(a.GetVar()->GetDef(), a.GetVar()->GetVecNumEls() - 1, -2);
@@ -358,7 +400,21 @@ void IntUBInject::ensureValidInitsForUses(const symir::Block *b) {
   for (const auto uv: b->GetUses()) {
     z3::expr varExpr{*ctx};
     if (uv->IsScalar()) {
-      varExpr = CreateScaExpr(uv->GetDef(), 0);
+      if (uv->GetDef()->GetType() == symir::SymIR::STRUCT) {
+        const auto *sDef = currentFun->GetStruct(uv->GetDef()->GetStructName());
+        for (const auto &field: sDef->GetFields()) {
+          varExpr = CreateStructFieldExpr(uv->GetDef(), field.name, 0);
+          constraints->push_back(
+              varExpr >= GlobalOptions::Get().LowerBound &&
+              varExpr <= GlobalOptions::Get().UpperBound
+          );
+          z3::expr varAsInt = mapBitVecExprToIntExpr(varExpr);
+          constraints->push_back(varAsInt == z3::bv2int(varExpr, true));
+        }
+        continue;
+      } else {
+        varExpr = CreateScaExpr(uv->GetDef(), 0);
+      }
     } else {
       // We only access the very last element. See Visit(const symir::VarUse &v).
       varExpr = CreateVecElExpr(uv->GetDef(), uv->GetVecNumEls() - 1, 0);
@@ -380,8 +436,18 @@ void IntUBInject::extractAndInitializeUses(
     std::string varName;
     z3::func_decl varInitExpr{*ctx};
     if (uv->IsScalar()) {
-      varName = uv->GetName();
-      varInitExpr = mapBitVecExprToIntExpr(CreateScaExpr(nuvd, 0)).decl();
+      if (nuvd->GetType() == symir::SymIR::STRUCT) {
+        const auto access = uv->GetAccess();
+        Assert(!access.empty(), "Struct access must have index");
+        int idx = access[0]->GetI32Value();
+        const auto *sDef = currentFun->GetStruct(nuvd->GetStructName());
+        std::string fieldName = sDef->GetField(idx).name;
+        varName = GetStructFieldName(nuvd, fieldName);
+        varInitExpr = mapBitVecExprToIntExpr(CreateStructFieldExpr(nuvd, fieldName, 0)).decl();
+      } else {
+        varName = uv->GetName();
+        varInitExpr = mapBitVecExprToIntExpr(CreateScaExpr(nuvd, 0)).decl();
+      }
     } else {
       // We only access the very last element. See Visit(const symir::VarUse &v).
       varName = GetVecElName(nuvd, uv->GetVecNumEls() - 1);
@@ -405,12 +471,28 @@ void IntUBInject::extractAndInitializeUses(
     // Insert an assignment to the variable with its initial value like: uv <- 0* uv +
     // initial_value
     if (uv->IsScalar()) {
-      blkBd->SymAssign(
-          nuvd, blkBd->SymAddExpr(
-                    {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd),
-                     blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
-                )
-      );
+      if (nuvd->GetType() == symir::SymIR::STRUCT) {
+        const auto uaccess = uv->GetAccess();
+        Assert(!uaccess.empty(), "Struct access must have index");
+        int idx = uaccess[0]->GetI32Value();
+        std::vector<symir::Coef *> access;
+        access.push_back(funBd->SymI32Const(idx));
+        blkBd->SymAssign(
+            nuvd,
+            blkBd->SymAddExpr(
+                {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd, access),
+                 blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
+            ),
+            access
+        );
+      } else {
+        blkBd->SymAssign(
+            nuvd, blkBd->SymAddExpr(
+                      {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd),
+                       blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
+                  )
+        );
+      }
     } else {
       std::vector<symir::Coef *> access;
       for (int d = 0; d < uv->GetVecNumDims(); d++) {

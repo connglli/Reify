@@ -82,6 +82,15 @@ public:
   // When version==-2, the version in the version table is incremented and the new version is used
   z3::expr CreateVecElExpr(const symir::VarDef *var, int loc, int version = -1);
 
+  /// Return the name of the field of the struct variable
+  std::string GetStructFieldName(const symir::VarDef *var, const std::string &field) const;
+
+  // Create a versioned variable expression for the field of the struct variable
+  // When version==-1, the current version in the version table is used
+  // When version==-2, the version in the version table is incremented and the new version is used
+  z3::expr
+  CreateStructFieldExpr(const symir::VarDef *var, const std::string &field, int version = -1);
+
   // Create a coefficient expression for the given name
   z3::expr CreateCoefExpr(const symir::Coef &coef);
 
@@ -141,6 +150,7 @@ private:
   // Context used in collecting UB-free constraints
   std::stack<z3::expr> exprStack{};      // The expression stack for evaluating the SymIR program
   std::map<std::string, int> versions{}; // The SSA version table for each variable
+  const symir::Funct *currentFun = nullptr;
 };
 
 #endif // REIFY_UBINJECT_HPP
