@@ -310,6 +310,16 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
       for (int i = 0; i < param->GetVecNumEls(); i++) {
         paramKeys.push_back(ubSan->CreateVecElExpr(param, i, version));
       }
+    } else if (param->GetType() == symir::SymIR::STRUCT) {
+      const auto *sDef = fun->GetStruct(param->GetStructName());
+      std::vector<std::string> fieldNames;
+      for (const auto &field: sDef->GetFields()) {
+        fieldNames.push_back(field.name);
+      }
+      args.emplace_back(sDef->GetName(), fieldNames); // Use new struct constructor
+      for (const auto &field: sDef->GetFields()) {
+        paramKeys.push_back(ubSan->CreateStructFieldExpr(param, field.name, version));
+      }
     } else {
       args.emplace_back();
       paramKeys.push_back(ubSan->CreateScaExpr(param, version));
