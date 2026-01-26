@@ -48,7 +48,7 @@ int StatelessChecksum::Compute(const std::vector<int> &values) {
 int StatelessChecksum::Compute(const std::vector<ArgPlus<int>> &args) {
   std::vector<int> values;
   for (const auto &a: args) {
-    if (a.IsVector()) {
+    if (a.IsVector() || a.IsStruct()) {
       for (int i = 0; i < a.GetVecNumEls(); i++) {
         values.push_back(a.GetValue(i));
       }

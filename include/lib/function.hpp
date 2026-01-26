@@ -126,6 +126,9 @@ private:
   // Generate a new basic block with random statements and symbols
   void generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const BblSketch &bblSkt);
 
+  // Generate random structure definitions
+  void generateStructDefs(symir::FunctBuilder *funBd);
+
   // Generate an access for an array variable or return an empty vector if it is not an array
   std::vector<symir::Coef *> generateVarAccess(
       symir::FunctBuilder *funBd, const symir::VarDef *var, int bbl, int stmt, int which

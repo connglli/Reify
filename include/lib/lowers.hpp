@@ -110,7 +110,8 @@ namespace symir {
   /// An "SymIR -> C/C++" lower
   class SymCxLower : public SymIRLower {
   public:
-    explicit SymCxLower(std::ostream &out) : SymIRLower(out) {}
+    explicit SymCxLower(std::ostream &out, bool emitStructs = true) :
+        SymIRLower(out), emitStructs(emitStructs) {}
 
   public:
     static std::string GetFunPrototype(const Funct &f);
@@ -136,6 +137,7 @@ namespace symir {
     void Visit(const Funct &f) override;
 
   private:
+    bool emitStructs;
     const Funct *curFunct = nullptr;
   };
 

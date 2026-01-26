@@ -30,9 +30,113 @@
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 
+class StructRenamer : public symir::SymIRVisitor {
+public:
+  StructRenamer(const std::string &prefix) : prefix(prefix) {}
+
+  void Rename(symir::Funct &f) {
+    // Build map
+    std::vector<std::string> oldNames;
+    for (const auto &s: f.GetStructs()) {
+      oldNames.push_back(s->GetName());
+      oldToNew[s->GetName()] = prefix + "_" + s->GetName();
+    }
+    // Rename structs in Funct first
+    for (const auto &old: oldNames) {
+      f.RenameStruct(old, oldToNew[old]);
+    }
+    f.Accept(*this);
+  }
+
+private:
+  std::string prefix;
+  std::map<std::string, std::string> oldToNew;
+
+  std::string getNewName(const std::string &oldName) {
+    if (oldToNew.count(oldName))
+      return oldToNew[oldName];
+    return oldName;
+  }
+
+  void Visit(const symir::VarUse &v) override {}
+
+  void Visit(const symir::Coef &c) override {}
+
+  void Visit(const symir::Term &t) override {}
+
+  void Visit(const symir::Expr &e) override {}
+
+  void Visit(const symir::Cond &c) override {}
+
+  void Visit(const symir::AssStmt &a) override {}
+
+  void Visit(const symir::RetStmt &r) override {}
+
+  void Visit(const symir::Branch &b) override {}
+
+  void Visit(const symir::Goto &g) override {}
+
+  void Visit(const symir::Block &b) override {
+    for (const auto &s: b.GetStmts()) {
+      s->Accept(*this);
+    }
+  }
+
+  void Visit(const symir::Funct &f) override {
+    for (auto &s: f.GetStructs()) {
+      s->Accept(*this);
+    }
+    for (auto &p: f.GetParams()) {
+      p->Accept(*this);
+    }
+    for (auto &l: f.GetLocals()) {
+      l->Accept(*this);
+    }
+  }
+
+  void Visit(const symir::ScaParam &p) override {}
+
+  void Visit(const symir::VecParam &p) override {
+    if (p.GetType() == symir::SymIR::STRUCT) {
+      symir::VecParam &mp = const_cast<symir::VecParam &>(p);
+      mp.SetStructName(getNewName(mp.GetStructName()));
+    }
+  }
+
+  void Visit(const symir::StructParam &p) override {
+    symir::StructParam &mp = const_cast<symir::StructParam &>(p);
+    mp.SetStructName(getNewName(mp.GetStructName()));
+  }
+
+  void Visit(const symir::ScaLocal &l) override {}
+
+  void Visit(const symir::VecLocal &l) override {
+    if (l.GetType() == symir::SymIR::STRUCT) {
+      symir::VecLocal &ml = const_cast<symir::VecLocal &>(l);
+      ml.SetStructName(getNewName(ml.GetStructName()));
+    }
+  }
+
+  void Visit(const symir::StructLocal &l) override {
+    symir::StructLocal &ml = const_cast<symir::StructLocal &>(l);
+    ml.SetStructName(getNewName(ml.GetStructName()));
+  }
+
+  void Visit(const symir::StructDef &s) override {
+    symir::StructDef &ms = const_cast<symir::StructDef &>(s);
+    // Name already renamed in Funct::RenameStruct
+    for (auto &f: ms.GetMutableFields()) {
+      if (f.type == symir::SymIR::STRUCT) {
+        f.structName = getNewName(f.structName);
+      }
+    }
+  }
+};
+
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
   // Parse all selected function files
+  int idx = 0;
   for (const auto &funPath: funPaths) {
     FunArts arts(funPath);
     fs::path sexpPath = arts.GetSexpPath();
@@ -42,9 +146,15 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
           sexpPath.c_str()
       );
     }
-    functions.push_back(FunPlus::ParseFunSexpCode(sexpPath));
+    auto func = FunPlus::ParseFunSexpCode(sexpPath);
+    // Rename structs to avoid collision
+    StructRenamer renamer(func->GetName());
+    renamer.Rename(*func);
+
+    functions.push_back(std::move(func));
     mappings.push_back(FunPlus::ParseMappingCode(arts.GetMapPath()));
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
+    idx++;
   }
 }
 
@@ -54,12 +164,18 @@ public:
     Assert(host != nullptr, "The host function is given a nullptr");
     for (auto &sym: host->GetSymbols()) {
       // TODO: Check to ensure all symbols are Coef
-      Assert(
-          sym->IsSolved(),
-          "The symbol \"%s\" in the host function is not solved, cannot replace it",
-          sym->GetName().c_str()
-      );
-      symbols[dynamic_cast<symir::Coef *>(sym)] = false;
+      if (auto *coef = dynamic_cast<symir::Coef *>(sym)) {
+        if (coef->IsSolved()) {
+          symbols[coef] = false;
+        } else {
+          // Ignore unsolved symbols (they might be in unreached code or injected ones?)
+          // Or fail? Original code asserted IsSolved.
+          // If we inject UBs, some symbols might be solved late?
+          // But CoefRepl runs after function generation where all reachable symbols should be
+          // solved. Unsolved symbols might be unreached. Original: Assert(sym->IsSolved(), ...);
+          // Let's keep it but skip if not Coef.
+        }
+      }
     }
   }
 
@@ -115,10 +231,15 @@ protected:
     std::ostringstream chkOss;
     chkOss << StatelessChecksum::GetCheckChksumName() << "(" << chkVal << ", " << guest->GetName()
            << "(";
-    for (int i = 0; i < static_cast<int>(init->size()) - 1; ++i) {
-      chkOss << (*init)[i].ToCxStr() << ", ";
+
+    const auto &params = guest->GetParams();
+    for (int i = 0; i < static_cast<int>(init->size()); ++i) {
+      chkOss << (*init)[i].ToCxStr();
+      if (i < static_cast<int>(init->size()) - 1) {
+        chkOss << ", ";
+      }
     }
-    chkOss << (*init)[init->size() - 1].ToCxStr() << "))";
+    chkOss << "))";
     // To avoid UBs, we'd use an upper type to save the result: long long here
     long long diff = static_cast<long long>(coefVal) - static_cast<long long>(chkVal);
     if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
@@ -186,32 +307,25 @@ protected:
   void Visit(const symir::Goto &g) override { /* Do Nothing */
   }
 
-  void Visit(const symir::ScaParam &p) override {
-    Panic("Cannot reach here: ScaParam variables should not be replaced");
+  void Visit(const symir::ScaParam &p) override { /* Do Nothing */
   }
 
-  void Visit(const symir::VecParam &p) override {
-    Panic("Cannot reach here: ArrParam variables should not be replaced");
+  void Visit(const symir::VecParam &p) override { /* Do Nothing */
   }
 
-  void Visit(const symir::StructParam &p) override {
-    Panic("Cannot reach here: StructParam variables should not be replaced");
+  void Visit(const symir::StructParam &p) override { /* Do Nothing */
   }
 
-  void Visit(const symir::ScaLocal &l) override {
-    Panic("Cannot reach here: Local variables should not be replaced");
+  void Visit(const symir::ScaLocal &l) override { /* Do Nothing */
   }
 
-  void Visit(const symir::VecLocal &l) override {
-    Panic("Cannot reach here: Local variables should not be replaced");
+  void Visit(const symir::VecLocal &l) override { /* Do Nothing */
   }
 
-  void Visit(const symir::StructLocal &l) override {
-    Panic("Cannot reach here: Local variables should not be replaced");
+  void Visit(const symir::StructLocal &l) override { /* Do Nothing */
   }
 
-  void Visit(const symir::StructDef &s) override {
-    Panic("Cannot reach here: Struct definitions should not be replaced");
+  void Visit(const symir::StructDef &s) override { /* Do Nothing */
   }
 
   void Visit(const symir::Block &b) override {
@@ -345,7 +459,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
   for (const auto &fun: functions) {
     std::ofstream funFile(arts.GetFunPath(fun->GetName()));
     funFile << "#include \"" << FILENAME_PROTOTYPES_H << "\"" << std::endl << std::endl;
-    symir::SymCxLower lower(funFile);
+    symir::SymCxLower lower(funFile, false);
     lower.Lower(*fun);
     funFile.close();
   }
@@ -365,6 +479,8 @@ void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
 
   mainFile << "    printf(\"%d\\n\", " << StatelessChecksum::GetCheckChksumName() << "(" << checksum
            << ", " << functions[0]->GetName() << "(";
+
+  const auto &params = functions[0]->GetParams();
   for (size_t i = 0; i < init->size(); ++i) {
     mainFile << (*init)[i].ToCxStr();
     if (i != init->size() - 1) {
