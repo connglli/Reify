@@ -36,6 +36,7 @@ namespace symir {
 
     const VarDef *currVar = v.GetDef();
     SymIR::Type currType = currVar->GetType();
+    SymIR::Type currBaseType = currVar->GetBaseType();
     std::string currStruct = (currType == SymIR::STRUCT) ? currVar->GetStructName() : "";
     int remainingDims = currVar->IsVector() ? currVar->GetVecNumDims() : 0;
 
@@ -45,6 +46,12 @@ namespace symir {
         c->Accept(*this);
         out << "]";
         remainingDims--;
+        // After consuming all array dimensions, resolve to baseType
+        if (remainingDims == 0 && currType == SymIR::ARRAY) {
+          currType = currBaseType;
+          // Note: currStruct should already be set correctly from field access
+          // Don't overwrite it here!
+        }
       } else if (currType == SymIR::STRUCT) {
         if (c->IsValueSet() && curFunct) {
           int idx = c->GetI32Value();
@@ -53,10 +60,20 @@ namespace symir {
             const auto &field = sDef->GetField(idx);
             out << "[" << field.name << "]";
 
+            // Update type tracking similar to SymCxLower
             currType = field.type;
-            if (currType == SymIR::STRUCT)
+            currBaseType = field.baseType;
+            if (field.type == SymIR::ARRAY) {
+              remainingDims = field.shape.size();
+              if (field.baseType == SymIR::STRUCT) {
+                currStruct = field.structName;
+              }
+            } else if (field.type == SymIR::STRUCT) {
               currStruct = field.structName;
-            remainingDims = field.shape.size();
+              remainingDims = 0;
+            } else {
+              remainingDims = 0;
+            }
           } else {
             out << "[UNKNOWN_FIELD_" << idx << "]";
           }
@@ -319,6 +336,7 @@ namespace symir {
 
     const VarDef *currVar = v.GetDef();
     SymIR::Type currType = currVar->GetType();
+    SymIR::Type currBaseType = currVar->GetBaseType();
     std::string currStruct = (currType == SymIR::STRUCT) ? currVar->GetStructName() : "";
     int remainingDims = currVar->IsVector() ? currVar->GetVecNumDims() : 0;
 
@@ -328,6 +346,12 @@ namespace symir {
         c->Accept(*this);
         out << "]";
         remainingDims--;
+        // After consuming all array dimensions, resolve to baseType
+        if (remainingDims == 0 && currType == SymIR::ARRAY) {
+          currType = currBaseType;
+          // Note: currStruct should already be set correctly from field access
+          // Don't overwrite it here!
+        }
       } else if (currType == SymIR::STRUCT) {
         if (c->IsValueSet() && curFunct) {
           int idx = c->GetI32Value();
@@ -336,10 +360,23 @@ namespace symir {
             const auto &field = sDef->GetField(idx);
             out << "." << field.name;
 
+            // Update type tracking: if field is an array, track dimensions
+            // If field is a struct (or array of struct), track the struct name
             currType = field.type;
-            if (currType == SymIR::STRUCT)
+            currBaseType = field.baseType;
+            if (field.type == SymIR::ARRAY) {
+              remainingDims = field.shape.size();
+              // After consuming array dimensions, we'll have baseType
+              if (field.baseType == SymIR::STRUCT) {
+                currStruct = field.structName;
+              }
+            } else if (field.type == SymIR::STRUCT) {
               currStruct = field.structName;
-            remainingDims = field.shape.size();
+              remainingDims = 0;
+            } else {
+              // Scalar field (I32)
+              remainingDims = 0;
+            }
           } else {
             out << ".field_" << idx;
           }
