@@ -39,12 +39,14 @@ namespace symir {
           "should be at least the number of vector dimensions (%d) for the variable %s",
           this->access.size(), this->var->GetVecNumDims(), var->GetName().c_str()
       );
-    } else if (this->var->GetType() == SymIR::STRUCT) {
+    } else if (this->var->GetType() == SymIR::Type::STRUCT) {
       Assert(
           this->access.size() >= 1,
           "The number of access indices (%lu) should be at least 1 for the struct variable %s",
           this->access.size(), var->GetName().c_str()
       );
+    } else if (this->var->GetType() == SymIR::Type::ARRAY) {
+      // Should be covered by IsVector(), but just in case
     } else {
       Panic("The variable %s is not a vector or a struct", var->GetName().c_str());
     }
@@ -56,7 +58,44 @@ namespace symir {
           SymIR::GetTypeCName(Type::I32).c_str(), SymIR::GetTypeName(c->GetType()).c_str()
       );
     }
-    setType(var->GetType());
+
+    // Resolve Type
+    SymIR::Type currType = var->GetType();
+    std::string currStruct = (currType == SymIR::Type::STRUCT) ? var->GetStructName() : "";
+    int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+    int accessIdx = 0;
+    int totalAccess = static_cast<int>(this->access.size());
+
+    if (remainingDims > 0) {
+      int consumed = std::min(remainingDims, totalAccess);
+      remainingDims -= consumed;
+      accessIdx += consumed;
+      if (remainingDims == 0) {
+        currType = var->GetBaseType();
+        if (currType == SymIR::Type::STRUCT) {
+          currStruct = var->GetStructName();
+        }
+      }
+    }
+
+    while (accessIdx < totalAccess) {
+      if (currType == SymIR::Type::STRUCT) {
+        Assert(!currStruct.empty(), "Current type is struct but name is empty");
+        const auto *c = this->access[accessIdx];
+        Assert(c->IsSolved(), "Accessing struct field with non-constant coefficient");
+        // If we can't look up struct definition easily here, we just assume checking is done
+        // elsewhere. But for type resolution, we need it. Given limitations, we assume this
+        // constructor is used for scalar element access (as in SymReturn). If we can't resolve, we
+        // default to I32? Or maybe we leave it as STRUCT if we can't look inside? Since VarUse
+        // doesn't have FunctBuilder, we are stuck. We will assume I32 if we are drilling into a
+        // struct.
+        currType = SymIR::Type::I32;
+        break;
+      } else {
+        break;
+      }
+    }
+    setType(currType);
   }
 
   VarUse::VarUse(const VarDef *var, std::vector<Coef *> access, SymIR::Type type) :
@@ -98,23 +137,44 @@ namespace symir {
       createdTerms[tid] = std::make_unique<Term>(op, coef, nullptr);
     } else {
       SymIR::Type currType = var->GetType();
-      std::string currStruct = (currType == SymIR::STRUCT) ? var->GetStructName() : "";
+      SymIR::Type currBaseType = var->GetBaseType();
+      std::string currStruct =
+          (currType == SymIR::Type::STRUCT)
+              ? var->GetStructName()
+              : (currBaseType == SymIR::Type::STRUCT ? var->GetStructName() : "");
       int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+
       for (const auto *c: access) {
         if (remainingDims > 0) {
           remainingDims--;
-        } else if (currType == SymIR::STRUCT) {
+          if (remainingDims == 0) {
+            currType = currBaseType;
+          }
+        } else if (currType == SymIR::Type::STRUCT) {
           int idx = c->GetI32Value();
           const auto *sDef = GetParent()->FindStruct(currStruct);
           Assert(sDef, "Struct %s not found", currStruct.c_str());
           const auto &field = sDef->GetField(idx);
           currType = field.type;
-          if (currType == SymIR::STRUCT)
+          currBaseType = field.baseType;
+          if (currType == SymIR::Type::STRUCT) {
             currStruct = field.structName;
-          remainingDims = field.shape.size();
+          } else if (currType == SymIR::Type::ARRAY) {
+            remainingDims = field.shape.size();
+            if (currBaseType == SymIR::Type::STRUCT) {
+              currStruct = field.structName;
+            }
+          }
         }
       }
-      if (var->IsVector() || var->GetType() == SymIR::STRUCT) {
+
+      // If we have ARRAY type with all dimensions consumed, resolve to base type
+      if (currType == SymIR::Type::ARRAY && remainingDims == 0) {
+        currType = currBaseType;
+      }
+
+      if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
+          var->GetType() == SymIR::Type::ARRAY) {
         createdTerms[tid] =
             std::make_unique<Term>(op, coef, std::make_unique<VarUse>(var, access, currType));
       } else {
@@ -155,24 +215,44 @@ namespace symir {
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
 
     SymIR::Type currType = var->GetType();
-    std::string currStruct = (currType == SymIR::STRUCT) ? var->GetStructName() : "";
+    SymIR::Type currBaseType = var->GetBaseType();
+    std::string currStruct =
+        (currType == SymIR::Type::STRUCT)
+            ? var->GetStructName()
+            : (currBaseType == SymIR::Type::STRUCT ? var->GetStructName() : "");
     int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+
     for (const auto *c: access) {
       if (remainingDims > 0) {
         remainingDims--;
-      } else if (currType == SymIR::STRUCT) {
+        if (remainingDims == 0) {
+          currType = currBaseType;
+        }
+      } else if (currType == SymIR::Type::STRUCT) {
         int idx = c->GetI32Value();
         const auto *sDef = GetParent()->FindStruct(currStruct);
         Assert(sDef, "Struct %s not found", currStruct.c_str());
         const auto &field = sDef->GetField(idx);
         currType = field.type;
-        if (currType == SymIR::STRUCT)
+        currBaseType = field.baseType;
+        if (currType == SymIR::Type::STRUCT) {
           currStruct = field.structName;
-        remainingDims = field.shape.size();
+        } else if (currType == SymIR::Type::ARRAY) {
+          remainingDims = field.shape.size();
+          if (currBaseType == SymIR::Type::STRUCT) {
+            currStruct = field.structName;
+          }
+        }
       }
     }
 
-    if (var->IsVector() || var->GetType() == SymIR::STRUCT) {
+    // After processing all accesses, if we still have an ARRAY type and no remaining dims,
+    // that means we've consumed all array dimensions and should use the base type
+    if (currType == SymIR::Type::ARRAY && remainingDims == 0) {
+      currType = currBaseType;
+    }
+
+    if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT) {
       stmts.push_back(std::make_unique<AssStmt>(
           std::make_unique<VarUse>(var, access, currType), std::move(it->second)
       ));
@@ -187,7 +267,10 @@ namespace symir {
   }
 
   std::vector<std::vector<int>> BlockBuilder::GatherVecAccesses(const VarDef *var) const {
-    Assert(var->IsVector(), "The variable %s is not a vector", var->GetName().c_str());
+    Assert(
+        var->IsVector() || var->GetType() == SymIR::Type::ARRAY, "The variable %s is not a vector",
+        var->GetName().c_str()
+    );
 
     std::vector<std::vector<int>> accesses(var->GetVecNumEls());
     const std::function<void(int, int)> gather = [&](int dim, int offset) {
@@ -213,20 +296,46 @@ namespace symir {
   const RetStmt *BlockBuilder::SymReturn() {
     Assert(isActive(), "The BlockBuilder is no longer active");
     std::vector<std::unique_ptr<VarUse>> uses;
-    for (const auto *p: GetParent()->GetParams()) {
-      if (p->IsVector()) {
-        // Put every element of the vector parameter into the return statement
-        const auto accesses = GatherVecAccesses(p);
-        for (const auto &acc: accesses) {
-          std::vector<Coef *> coefs;
-          for (const auto idx: acc) {
-            coefs.push_back(GetParent()->SymI32Const(idx));
+
+    std::function<void(
+        const VarDef *, std::vector<Coef *>, SymIR::Type, std::string, const std::vector<int> &,
+        size_t
+    )>
+        expand = [&](const VarDef *var, std::vector<Coef *> access, SymIR::Type type,
+                     std::string sName, const std::vector<int> &shape, size_t shapeIdx) {
+          if (shapeIdx < shape.size()) {
+            // Expand Array Dimension
+            int dimLen = shape[shapeIdx];
+            for (int i = 0; i < dimLen; ++i) {
+              auto nextAcc = access;
+              nextAcc.push_back(GetParent()->SymI32Const(i));
+              expand(var, nextAcc, type, sName, shape, shapeIdx + 1);
+            }
+          } else if (type == SymIR::Type::STRUCT) {
+            // Expand Struct Fields
+            const auto *sDef = GetParent()->FindStruct(sName);
+            Assert(sDef, "Struct %s not found", sName.c_str());
+            for (int i = 0; i < (int) sDef->GetFields().size(); ++i) {
+              const auto &field = sDef->GetField(i);
+              auto nextAcc = access;
+              nextAcc.push_back(GetParent()->SymI32Const(i));
+              expand(var, nextAcc, field.baseType, field.structName, field.shape, 0);
+            }
+          } else {
+            // Scalar leaf
+            if (access.empty()) {
+              uses.push_back(std::make_unique<VarUse>(var));
+            } else {
+              uses.push_back(std::make_unique<VarUse>(var, access, type));
+            }
           }
-          uses.push_back(std::make_unique<VarUse>(p, coefs));
-        }
-      } else {
-        uses.push_back(std::make_unique<VarUse>(p));
-      }
+        };
+
+    for (const auto *p: GetParent()->GetParams()) {
+      expand(
+          p, {}, p->GetBaseType(),
+          (p->GetBaseType() == SymIR::Type::STRUCT ? p->GetStructName() : ""), p->GetVecShape(), 0
+      );
     }
     stmts.push_back(std::make_unique<RetStmt>(std::move(uses)));
     return dynamic_cast<const RetStmt *>(stmts.back().get());
