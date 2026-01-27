@@ -179,7 +179,8 @@ namespace symir {
 
 #define SYMIR_TYPE_LIST(XX)                                                                        \
   XX(I32, "int", "i32")                                                                            \
-  XX(STRUCT, "struct", "struct")
+  XX(STRUCT, "struct", "struct")                                                                   \
+  XX(ARRAY, "array", "array")
 
     enum Type {
 
@@ -256,14 +257,18 @@ namespace symir {
   class VarDef : public WithType {
   public:
     VarDef(std::string name, const SymIR::Type type, std::string structName = "") :
-        WithType(type), name(std::move(name)), structName(std::move(structName)) {}
+        WithType(type), name(std::move(name)), structName(std::move(structName)), baseType(type) {}
 
     VarDef(
         std::string name, std::vector<int> vecShape, const SymIR::Type type,
         std::string structName = ""
     ) :
         WithType(type),
-        name(std::move(name)), vecShape(std::move(vecShape)), structName(std::move(structName)) {
+        name(std::move(name)), vecShape(std::move(vecShape)), structName(std::move(structName)),
+        baseType(type) {
+      if (!this->vecShape.empty()) {
+        setType(SymIR::Type::ARRAY);
+      }
       Assert(
           !this->vecShape.empty(), "The vector dimensions for variable %s should be non-negative",
           name.c_str()
@@ -334,6 +339,8 @@ namespace symir {
       structName = std::move(name);
     }
 
+    [[nodiscard]] SymIR::Type GetBaseType() const { return baseType; }
+
   protected:
     std::string name;
     // Empty vector means scalar. Otherwise, vecShape is the shape of the vector, where
@@ -341,6 +348,7 @@ namespace symir {
     std::vector<int> vecShape{};
     bool isVolatile = false;
     std::string structName;
+    SymIR::Type baseType;
   };
 
   /// SymDef is a definition of a symbolic value, either been solved or not yet.
@@ -892,6 +900,7 @@ namespace symir {
       Type type;
       std::string structName;
       std::vector<int> shape;
+      Type baseType;
     };
 
     StructDef(std::string name, std::vector<Field> fields) :
