@@ -158,7 +158,11 @@ namespace symir {
     for (const auto &l: p.GetVecShape()) {
       out << "[" << l << "]";
     }
-    out << " " << SymIR::GetTypeSName(p.GetType()) << ")";
+    if (p.GetBaseType() == SymIR::STRUCT) {
+      out << " " << p.GetStructName() << ")";
+    } else {
+      out << " " << SymIR::GetTypeSName(p.GetBaseType()) << ")";
+    }
   }
 
   void SymSexpLower::Visit(const StructParam &p) {
@@ -191,7 +195,11 @@ namespace symir {
       c->Accept(*this);
       out << " ";
     }
-    out << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
+    if (l.GetBaseType() == SymIR::STRUCT) {
+      out << l.GetStructName() << ")" << std::endl;
+    } else {
+      out << SymIR::GetTypeSName(l.GetBaseType()) << ")" << std::endl;
+    }
   }
 
   void SymSexpLower::Visit(const StructLocal &l) {
@@ -210,11 +218,11 @@ namespace symir {
       const auto &f = s.GetField(i);
       out << "(" << f.name << " ";
       for (int d: f.shape)
-        out << "[" << d << "] ";
-      if (f.type == SymIR::STRUCT)
+        out << "[" << d << "]";
+      if (f.baseType == SymIR::STRUCT)
         out << f.structName;
       else
-        out << SymIR::GetTypeSName(f.type);
+        out << SymIR::GetTypeSName(f.baseType);
       out << ")";
       if (i != s.GetFields().size() - 1) {
         out << " ";
@@ -269,10 +277,10 @@ namespace symir {
     for (const auto &s: f.GetStructs()) {
       oss << "struct " << s->GetName() << " {" << std::endl;
       for (const auto &field: s->GetFields()) {
-        if (field.type == SymIR::STRUCT) {
+        if (field.baseType == SymIR::STRUCT) {
           oss << "  struct " << field.structName << " " << field.name;
         } else {
-          oss << "  " << symir::SymIR::GetTypeCName(field.type) << " " << field.name;
+          oss << "  " << symir::SymIR::GetTypeCName(field.baseType) << " " << field.name;
         }
         for (int d: field.shape)
           oss << "[" << d << "]";
@@ -403,7 +411,7 @@ namespace symir {
     std::function<void(const StructDef *, std::function<void()>)> printStruct;
     printStruct = [&](const StructDef *sDef, std::function<void()> printPrefix) {
       for (const auto &f: sDef->GetFields()) {
-        if (f.type == SymIR::STRUCT) {
+        if (f.baseType == SymIR::STRUCT) {
           const auto *subDef = curFunct->GetStruct(f.structName);
           std::function<void(const std::vector<int> &, std::function<void()>)> printArray =
               [&, this](const std::vector<int> &shape, std::function<void()> pP) {
@@ -449,12 +457,8 @@ namespace symir {
     };
 
     for (const auto *v: vars) {
-      if (v->GetDef()->GetType() == SymIR::STRUCT) {
-        const auto *sDef = curFunct->GetStruct(v->GetDef()->GetStructName());
-        printStruct(sDef, [=, this]() { v->Accept(*this); });
-      } else {
-        printVal([=, this]() { v->Accept(*this); });
-      }
+      // The VarUse has already been expanded by SymReturn(), so we just need to print it
+      printVal([=, this]() { v->Accept(*this); });
     }
 
     out << "};" << std::endl;
@@ -495,10 +499,11 @@ namespace symir {
       out << "volatile"
           << " ";
     }
-    if (p.GetType() == SymIR::STRUCT) {
+    // For ARRAY type, use GetBaseType() to get the element type
+    if (p.GetBaseType() == SymIR::STRUCT) {
       out << "struct " << p.GetStructName() << " " << p.GetName();
     } else {
-      out << SymIR::GetTypeCName(p.GetType()) << " " << p.GetName();
+      out << SymIR::GetTypeCName(p.GetBaseType()) << " " << p.GetName();
     }
     for (const auto &l: p.GetVecShape()) {
       out << "[" << l << "]";
@@ -527,10 +532,11 @@ namespace symir {
       out << "volatile"
           << " ";
     };
-    if (l.GetType() == SymIR::STRUCT) {
+    // For ARRAY type, use GetBaseType() to get the element type
+    if (l.GetBaseType() == SymIR::STRUCT) {
       out << "struct " << l.GetStructName() << " " << l.GetName();
     } else {
-      out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
+      out << SymIR::GetTypeCName(l.GetBaseType()) << " " << l.GetName();
     }
     for (auto len: l.GetVecShape()) {
       out << "[" << len << "]";
@@ -571,10 +577,13 @@ namespace symir {
     out << "struct " << s.GetName() << " {" << std::endl;
     for (const auto &field: s.GetFields()) {
       // indent();
-      if (field.type == SymIR::STRUCT) {
+      // For ARRAY type, use baseType to get the element type
+      // For STRUCT type, use "struct <structName>"
+      // For scalar types (I32), use the type directly
+      if (field.baseType == SymIR::STRUCT) {
         out << "  struct " << field.structName << " " << field.name;
       } else {
-        out << "  " << SymIR::GetTypeCName(field.type) << " " << field.name;
+        out << "  " << SymIR::GetTypeCName(field.baseType) << " " << field.name;
       }
       for (int d: field.shape)
         out << "[" << d << "]";

@@ -299,31 +299,80 @@ void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
 }
 
 std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, int version) {
-  Assert(version == 0 || version == -1, "Version must be 0 (init) or 1 (fina)");
+  Assert(version == 0 || version == -1, "Version must be 0 (init) or -1 (fina)");
   const auto verTag = version == 0 ? "initialization" : "finalization";
   std::vector<ArgPlus<int>> args;
+
+  std::function<
+      void(const symir::VarDef *, symir::SymIR::Type, const std::string &, const std::vector<int> &, size_t, std::string, ArgPlus<int> &, std::vector<z3::expr> &)>
+      expand = [&](const symir::VarDef *var, symir::SymIR::Type type, const std::string &sName,
+                   const std::vector<int> &shape, size_t shapeIdx, std::string z3Suffix,
+                   ArgPlus<int> &arg, std::vector<z3::expr> &keys) {
+        if (shapeIdx < shape.size()) {
+          int dimLen = shape[shapeIdx];
+          for (int i = 0; i < dimLen; ++i) {
+            std::string nextZ3 = z3Suffix + "_el" + std::to_string(i);
+            expand(var, type, sName, shape, shapeIdx + 1, nextZ3, arg[i], keys);
+          }
+        } else if (type == symir::SymIR::Type::STRUCT) {
+          const auto *sDef = fun->GetStruct(sName);
+          for (int i = 0; i < (int) sDef->GetFields().size(); ++i) {
+            const auto &field = sDef->GetField(i);
+            std::string nextZ3 = z3Suffix + "_" + field.name;
+            expand(var, field.baseType, field.structName, field.shape, 0, nextZ3, arg[i], keys);
+          }
+        } else {
+          // Leaf
+          keys.push_back(ubSan->CreateVersionedExpr(var, z3Suffix, version));
+        }
+      };
+
+  std::function<
+      ArgPlus<int>(symir::SymIR::Type, const std::string &, const std::vector<int> &, size_t)>
+      createSchema = [&](symir::SymIR::Type type, const std::string &sName,
+                         const std::vector<int> &shape, size_t shapeIdx) -> ArgPlus<int> {
+    if (shapeIdx < shape.size()) {
+      auto res = ArgPlus<int>(std::vector<int>{shape[shapeIdx]});
+      std::vector<int> nextShape = shape;
+      for (int i = 0; i < shape[shapeIdx]; ++i) {
+        res[i] = createSchema(type, sName, shape, shapeIdx + 1);
+      }
+      // Fix shape for top-level if it was multi-dim
+      if (shapeIdx == 0)
+        res = ArgPlus<int>(shape);
+      // Wait, recursive schema creation is simpler:
+      return ArgPlus<int>(shape); // Original constructor handles multi-dim flattening
+    } else if (type == symir::SymIR::Type::STRUCT) {
+      const auto *sDef = fun->GetStruct(sName);
+      std::vector<std::string> fNames;
+      for (const auto &f: sDef->GetFields())
+        fNames.push_back(f.name);
+      auto res = ArgPlus<int>(sName, fNames);
+      for (int i = 0; i < (int) sDef->GetFields().size(); ++i) {
+        const auto &f = sDef->GetField(i);
+        res[i] = createSchema(f.baseType, f.structName, f.shape, 0);
+      }
+      return res;
+    } else {
+      return ArgPlus<int>(0);
+    }
+  };
+
   for (auto param: fun->GetParams()) {
     const auto paramName = param->GetName().c_str();
+    args.push_back(createSchema(
+        param->GetBaseType(),
+        (param->GetBaseType() == symir::SymIR::Type::STRUCT ? param->GetStructName() : ""),
+        param->GetVecShape(), 0
+    ));
+
     std::vector<z3::expr> paramKeys;
-    if (param->IsVector()) {
-      args.emplace_back(param->GetVecShape());
-      for (int i = 0; i < param->GetVecNumEls(); i++) {
-        paramKeys.push_back(ubSan->CreateVecElExpr(param, i, version));
-      }
-    } else if (param->GetType() == symir::SymIR::STRUCT) {
-      const auto *sDef = fun->GetStruct(param->GetStructName());
-      std::vector<std::string> fieldNames;
-      for (const auto &field: sDef->GetFields()) {
-        fieldNames.push_back(field.name);
-      }
-      args.emplace_back(sDef->GetName(), fieldNames); // Use new struct constructor
-      for (const auto &field: sDef->GetFields()) {
-        paramKeys.push_back(ubSan->CreateStructFieldExpr(param, field.name, version));
-      }
-    } else {
-      args.emplace_back();
-      paramKeys.push_back(ubSan->CreateScaExpr(param, version));
-    }
+    expand(
+        param, param->GetBaseType(),
+        (param->GetBaseType() == symir::SymIR::Type::STRUCT ? param->GetStructName() : ""),
+        param->GetVecShape(), 0, "", args.back(), paramKeys
+    );
+
     for (int i = 0; i < static_cast<int>(paramKeys.size()); i++) {
       z3::expr &paramKey = paramKeys[i];
       if (model.has_interp(paramKey.decl())) {
@@ -334,22 +383,11 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
             paramConst.is_numeral_i(paramVal),
             "Failed to obtain the value of parameter %s from the model", paramName
         );
-        if (args.back().IsScalar()) {
-          args.back().SetValue(paramVal);
-        } else {
-          args.back().SetValue(i, paramVal);
-        }
+        args.back().SetValue(i, paramVal);
         Log::Get().Out() << "Extract " << verTag << ": param=" << paramName
                          << ", value=" << paramVal << std::endl;
       } else {
-        // The parameter is never used by any executed block. We assign it a default value.
-        // Note, the assigned value should be the same as its value in finalization (as it
-        // is never used means it is never evaluated/changed).
-        if (args.back().IsVector()) {
-          args.back().SetValue(i, GlobalOptions::Get().LowerBound);
-        } else {
-          args.back().SetValue(GlobalOptions::Get().LowerBound);
-        }
+        args.back().SetValue(i, GlobalOptions::Get().LowerBound);
         Log::Get().Out() << "Extract " << verTag << ": param=" << paramName << ", value=<unused>"
                          << std::endl;
       }
