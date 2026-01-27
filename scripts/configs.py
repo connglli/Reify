@@ -219,17 +219,49 @@ class ArgVal:
 
   @staticmethod
   def from_json(obj):
-    shape = obj["shape"]
-    elems = obj["elems"]
-    # Validate size
-    expected = 1
-    for d in shape:
-      expected *= d
-    if expected != len(elems):
-      raise ValueError(
-        f"The elements length {len(elems)} doesn't match shape (expecting {expected} elements)"
-      )
-    return ArgVal(shape, elems)
+    # Handle new format (recursive tree structure with isScalar, children, etc.)
+    if "isScalar" in obj:
+      if obj["isScalar"]:
+        # Scalar value
+        return ArgVal([], [obj["val"]])
+      else:
+        # Non-scalar: could be array, struct, or array of structs
+        # For now, we flatten all children recursively into a flat list
+        def flatten(node):
+          if isinstance(node, dict):
+            if node.get("isScalar", False):
+              return [node["val"]]
+            elif "children" in node:
+              result = []
+              for child in node["children"]:
+                result.extend(flatten(child))
+              return result
+          return []
+
+        elems = flatten(obj)
+        shape = obj.get("shape", [])
+
+        # If no shape provided but we have children, infer shape
+        if not shape and "children" in obj:
+          shape = [len(obj["children"])]
+
+        return ArgVal(shape, elems)
+
+    # Handle old format (shape + elems)
+    if "shape" in obj and "elems" in obj:
+      shape = obj["shape"]
+      elems = obj["elems"]
+      # Validate size
+      expected = 1
+      for d in shape:
+        expected *= d
+      if expected != len(elems):
+        raise ValueError(
+          f"The elements length {len(elems)} doesn't match shape (expecting {expected} elements)"
+        )
+      return ArgVal(shape, elems)
+
+    raise ValueError(f"Unknown JSON format for ArgVal: {obj}")
 
 
 def parse_mapping(map_path):
