@@ -173,6 +173,15 @@ namespace symir {
         currType = currBaseType;
       }
 
+      // Terms should NEVER have STRUCT type - they must be scalars for arithmetic operations
+      Assert(
+          currType != SymIR::Type::STRUCT && currType != SymIR::Type::ARRAY,
+          "Term cannot be created with STRUCT or ARRAY type. Variable %s with access path of "
+          "length %lu resulted in type %s. This indicates generateVarAccess() did not drill down "
+          "to a scalar type.",
+          var->GetName().c_str(), access.size(), SymIR::GetTypeSName(currType).c_str()
+      );
+
       if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
           var->GetType() == SymIR::Type::ARRAY) {
         createdTerms[tid] =
