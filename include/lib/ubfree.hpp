@@ -56,6 +56,7 @@ public:
     constraints = z3::expr_vector(ctx);
     versions.clear();
     exprStack = std::stack<z3::expr>();
+    suffixStack = std::stack<std::string>();
     prevBbl = "___entry_bbl";
     currBbl = "";
     nextBbl = "";
@@ -89,6 +90,10 @@ public:
   // When version==-2, the version in the version table is incremented and the new version is used
   z3::expr
   CreateStructFieldExpr(const symir::VarDef *var, const std::string &field, int version = -1);
+
+  // Create a versioned variable expression using a suffix
+  z3::expr
+  CreateVersionedExpr(const symir::VarDef *var, const std::string &suffix, int version = -1);
 
   // Create a coefficient expression for the given name
   z3::expr CreateCoefExpr(const symir::Coef &coef);
@@ -150,6 +155,16 @@ private:
     return loc;
   }
 
+  // Push a suffix to the suffix stack
+  void pushSuffix(std::string s) { suffixStack.push(std::move(s)); }
+
+  // Pop a suffix from the suffix stack
+  std::string popSuffix() {
+    auto s = suffixStack.top();
+    suffixStack.pop();
+    return s;
+  }
+
   // Generate constraints to make the coefficients interesting
   void makeCoefsInteresting(const std::vector<symir::Coef *> &coefs);
 
@@ -163,6 +178,7 @@ private:
   // Context used in collecting UB-free constraints
   std::stack<z3::expr> exprStack{}; // The expression stack for evaluating the SymIR program
   std::stack<int> vecElLocStack{};  // The element location stack for evaluating the SymIR program
+  std::stack<std::string> suffixStack{}; // The suffix stack for evaluating variable access
   std::string prevBbl = "", currBbl = "",
               nextBbl = ""; // The previous/current/next blocks been/being/to-be evaluated
   std::map<std::string, int> versions{};        // The SSA version table for each variable

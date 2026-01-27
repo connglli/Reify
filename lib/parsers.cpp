@@ -479,7 +479,11 @@ namespace symir {
         Panic("Unknown field type");
       }
 
-      fields.push_back({fName.ToStr(), type, sName, shape});
+      SymIR::Type baseType = type;
+      if (!shape.empty()) {
+        type = SymIR::Type::ARRAY;
+      }
+      fields.push_back({fName.ToStr(), type, sName, shape, baseType});
 
       auto closing = stream();
       Assert(
@@ -544,6 +548,7 @@ namespace symir {
     const auto varDef = varToken != nullptr ? funBd->FindVar(varToken->ToStr()) : nullptr;
 
     SymIR::Type termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
+    SymIR::Type termBaseType = varDef != nullptr ? varDef->GetBaseType() : SymIR::Type::I32;
     std::string currStruct = (varDef && termType == SymIR::STRUCT) ? varDef->GetStructName() : "";
     int remainingDims = (varDef && varDef->IsVector()) ? varDef->GetVecNumDims() : 0;
 
@@ -552,6 +557,10 @@ namespace symir {
       if (remainingDims > 0) {
         vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
         remainingDims--;
+        // After consuming all array dimensions, resolve to base type
+        if (remainingDims == 0 && termType == SymIR::ARRAY) {
+          termType = termBaseType;
+        }
       } else if (termType == SymIR::STRUCT) {
         const auto structDef = funBd->FindStruct(currStruct);
         Assert(structDef != nullptr, "Struct %s not found", currStruct.c_str());
@@ -564,7 +573,8 @@ namespace symir {
 
         const auto &field = structDef->GetField(idx);
         termType = field.type;
-        if (termType == SymIR::STRUCT)
+        termBaseType = field.baseType;
+        if (termBaseType == SymIR::STRUCT)
           currStruct = field.structName;
         remainingDims = field.shape.size();
       } else {
