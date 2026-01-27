@@ -333,15 +333,10 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
                          const std::vector<int> &shape, size_t shapeIdx) -> ArgPlus<int> {
     if (shapeIdx < shape.size()) {
       auto res = ArgPlus<int>(std::vector<int>{shape[shapeIdx]});
-      std::vector<int> nextShape = shape;
       for (int i = 0; i < shape[shapeIdx]; ++i) {
         res[i] = createSchema(type, sName, shape, shapeIdx + 1);
       }
-      // Fix shape for top-level if it was multi-dim
-      if (shapeIdx == 0)
-        res = ArgPlus<int>(shape);
-      // Wait, recursive schema creation is simpler:
-      return ArgPlus<int>(shape); // Original constructor handles multi-dim flattening
+      return res;
     } else if (type == symir::SymIR::Type::STRUCT) {
       const auto *sDef = fun->GetStruct(sName);
       std::vector<std::string> fNames;
