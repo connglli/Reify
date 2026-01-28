@@ -144,7 +144,9 @@ namespace symir {
               : (currBaseType == SymIR::Type::STRUCT ? var->GetStructName() : "");
       int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
 
-      for (const auto *c: access) {
+      for (size_t i = 0; i < access.size(); i++) {
+        const auto *c = access[i];
+
         if (remainingDims > 0) {
           remainingDims--;
           if (remainingDims == 0) {
@@ -181,6 +183,7 @@ namespace symir {
           "to a scalar type.",
           var->GetName().c_str(), access.size(), SymIR::GetTypeSName(currType).c_str()
       );
+
 
       if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
           var->GetType() == SymIR::Type::ARRAY) {
@@ -261,7 +264,8 @@ namespace symir {
       currType = currBaseType;
     }
 
-    if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT) {
+    if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
+        var->GetType() == SymIR::Type::ARRAY) {
       stmts.push_back(std::make_unique<AssStmt>(
           std::make_unique<VarUse>(var, access, currType), std::move(it->second)
       ));
@@ -697,8 +701,8 @@ namespace symir {
   }
 
   void FunctCopier::Visit(const VecParam &p) {
-    std::string sName = (p.GetType() == SymIR::STRUCT) ? p.GetStructName() : "";
-    builder->SymVecParam(p.GetName(), p.GetVecShape(), p.GetType(), sName, p.IsVolatile());
+    std::string sName = (p.GetBaseType() == SymIR::STRUCT) ? p.GetStructName() : "";
+    builder->SymVecParam(p.GetName(), p.GetVecShape(), p.GetBaseType(), sName, p.IsVolatile());
   }
 
   void FunctCopier::Visit(const StructParam &p) {
@@ -716,8 +720,10 @@ namespace symir {
       c->Accept(*this);
       coefs.push_back(popCoef());
     }
-    std::string sName = (l.GetType() == SymIR::STRUCT) ? l.GetStructName() : "";
-    builder->SymVecLocal(l.GetName(), l.GetVecShape(), coefs, l.GetType(), sName, l.IsVolatile());
+    std::string sName = (l.GetBaseType() == SymIR::STRUCT) ? l.GetStructName() : "";
+    builder->SymVecLocal(
+        l.GetName(), l.GetVecShape(), coefs, l.GetBaseType(), sName, l.IsVolatile()
+    );
   }
 
   void FunctCopier::Visit(const StructLocal &l) {

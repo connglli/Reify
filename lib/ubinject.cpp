@@ -473,10 +473,59 @@ void IntUBInject::extractAndInitializeUses(
     if (uv->IsScalar()) {
       if (nuvd->GetType() == symir::SymIR::STRUCT) {
         const auto uaccess = uv->GetAccess();
-        Assert(!uaccess.empty(), "Struct access must have index");
-        int idx = uaccess[0]->GetI32Value();
+        Assert(!uaccess.empty(), "Struct access must have at least field index");
+
+        // The first access element is always the field index (a constant)
+        Assert(uaccess[0]->IsSolved(), "Field index must be a constant");
+        int fieldIdx = uaccess[0]->GetI32Value();
+
+        // Get the struct definition to check the field type
+        const auto *sDef = funBd->FindStruct(nuvd->GetStructName());
+        Assert(sDef, "Struct definition not found");
+        const auto &field = sDef->GetField(fieldIdx);
+
+        // Build the access path: start with field index and drill down to scalar
         std::vector<symir::Coef *> access;
-        access.push_back(funBd->SymI32Const(idx));
+        access.push_back(funBd->SymI32Const(fieldIdx));
+        // Recursively handle the field's type until we reach a scalar
+        symir::SymIR::Type currType = field.type;
+        symir::SymIR::Type currBaseType = field.baseType;
+        std::string currStructName = field.structName;
+        std::vector<int> currShape = field.shape;
+
+        while (currType == symir::SymIR::Type::ARRAY || currType == symir::SymIR::Type::STRUCT) {
+          // Handle arrays
+          if (currType == symir::SymIR::Type::ARRAY) {
+            // Add constant indices for all array dimensions
+            for (int dim: currShape) {
+              access.push_back(funBd->SymI32Const(dim - 1));
+            }
+            // After consuming all array dimensions, continue with base type
+            currType = currBaseType;
+            currShape.clear();
+          }
+          // Handle structs - drill down to a scalar field
+          else if (currType == symir::SymIR::Type::STRUCT) {
+            const auto *nestedSDef = funBd->FindStruct(currStructName);
+            Assert(nestedSDef, "Nested struct definition not found for %s", currStructName.c_str());
+            int numFields = nestedSDef->GetFields().size();
+            Assert(numFields > 0, "Struct %s has no fields", currStructName.c_str());
+
+            // Pick the first field (deterministic for UB injection)
+            int nestedFieldIdx = 0;
+            access.push_back(funBd->SymI32Const(nestedFieldIdx));
+
+            const auto &nestedField = nestedSDef->GetField(nestedFieldIdx);
+            currType = nestedField.type;
+            currBaseType = nestedField.baseType;
+            currStructName = nestedField.structName;
+            currShape = nestedField.shape;
+          } else {
+            // Should never reach here
+            Assert(false, "Unexpected type in UB injection struct field drilling");
+          }
+        }
+
         blkBd->SymAssign(
             nuvd,
             blkBd->SymAddExpr(
