@@ -232,7 +232,8 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
                       fieldIsArray = true;
                     } else if (p < 0.7 && GlobalOptions::Get().EnableStructVars) { // Struct
                       fieldIsStruct = true;
-                    } else if (p < 0.9 && GlobalOptions::Get().EnableArrayVars && GlobalOptions::Get().EnableStructVars) { // Array Struct
+                    } else if (p < 0.9 && GlobalOptions::Get().EnableArrayVars &&
+                 GlobalOptions::Get().EnableStructVars) { // Array Struct
                       fieldIsArray = true;
                       fieldIsStruct = true;
                     }
@@ -408,53 +409,42 @@ std::vector<symir::Coef *> FunPlus::generateVarAccess(
 ) const {
   std::vector<symir::Coef *> access;
 
-  std::function<void(symir::SymIR::Type, std::string, const std::vector<int> &, int)> walk =
-      [&](symir::SymIR::Type type, std::string sName, const std::vector<int> &shape, int depth) {
+  std::function<
+      void(symir::SymIR::Type, symir::SymIR::Type, std::string, const std::vector<int> &, int)>
+      walk = [&](symir::SymIR::Type type, symir::SymIR::Type baseType, std::string sName,
+                 const std::vector<int> &shape, int depth) {
         // 1. Handle Array Dimensions
         if (!shape.empty()) {
           for (size_t d = 0; d < shape.size(); ++d) {
-            access.push_back(
-                funBd->SymCoef(NameAccess(bbl, stmt, which, access.size()), symir::SymIR::Type::I32)
-            );
+            // Use the last element of each dimension (to avoid out-of-bounds)
+            int idx = shape[d] - 1;
+            access.push_back(funBd->SymI32Const(idx));
           }
+          // After consuming all array dimensions, continue with the base type
+          type = baseType;
         }
 
-        // 2. Handle Struct
-        symir::SymIR::Type effType = type;
-        std::string effSName = sName;
-        if (type == symir::SymIR::Type::ARRAY) {
-          // If type passed is ARRAY, we assume the shape handled it, and we are looking at
-          // baseType. But wait, the recursion passed 'baseType' from field? If the field was ARRAY
-          // of STRUCT, we passed STRUCT. If the var is ARRAY of STRUCT, var->GetBaseType() returns
-          // STRUCT. So 'type' here is already the element type. The check 'type == ARRAY' is
-          // probably redundant or wrong if we pass GetBaseType(). Let's assume we always pass the
-          // *element* type if we are recursing on an array field. But if we have an ARRAY field, we
-          // pass 'field.baseType'.
-
-          // However, my previous logic in walk(...) call was:
-          // walk(field.baseType, ...)
-          // If field.type is ARRAY, field.baseType is the element type.
-          // So 'type' in walk is the element type.
-          // So we don't need to check for ARRAY here.
-        }
-
-        if (effType == symir::SymIR::Type::STRUCT) {
-          const auto *sDef = funBd->FindStruct(effSName);
-          Assert(sDef, "Struct definition not found for %s", effSName.c_str());
+        // 2. Handle Struct - drill down to a scalar field
+        if (type == symir::SymIR::Type::STRUCT) {
+          const auto *sDef = funBd->FindStruct(sName);
+          Assert(sDef, "Struct definition not found for %s", sName.c_str());
           int numFields = sDef->GetFields().size();
-          if (numFields > 0) {
-            int fieldIdx = Random::Get().Uniform(0, numFields - 1)();
-            access.push_back(funBd->SymI32Const(fieldIdx));
-            const auto &field = sDef->GetField(fieldIdx);
-            walk(field.baseType, field.structName, field.shape, depth + 1);
-          } else {
-            access.push_back(funBd->SymI32Const(0));
-          }
+          Assert(numFields > 0, "Struct %s has no fields, cannot generate access", sName.c_str());
+          int fieldIdx = Random::Get().Uniform(0, numFields - 1)();
+          access.push_back(funBd->SymI32Const(fieldIdx));
+          const auto &field = sDef->GetField(fieldIdx);
+          // Recurse with the field's type, baseType, and shape
+          walk(field.type, field.baseType, field.structName, field.shape, depth + 1);
         }
+
+        // If type is a scalar (I32, etc.), we're done - no more access needed
       };
 
   walk(
-      var->GetBaseType(), (var->GetBaseType() == symir::SymIR::STRUCT ? var->GetStructName() : ""),
+      var->GetType(), var->GetBaseType(),
+      (var->GetType() == symir::SymIR::STRUCT || var->GetBaseType() == symir::SymIR::STRUCT
+           ? var->GetStructName()
+           : ""),
       var->GetVecShape(), 0
   );
 
@@ -666,11 +656,48 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
     const auto &init = initializations[i];
     const auto &fina = finalizations[i];
     const auto numParams = static_cast<int>(init.size());
-    std::ostringstream chk_oss;
+
+    // First, declare temporary variables for array/struct parameters
+    std::vector<std::string> argNames;
+    for (int j = 0; j < numParams; j++) {
+      const auto *param = params[j];
+      const auto &arg = init[j];
+
+      if (arg.IsVector()) {
+        // Array parameter - need a temporary variable
+        std::string tmpName = "tmp_" + std::to_string(i) + "_" + std::to_string(j);
+        argNames.push_back(tmpName);
+
+        // Get the array type from the parameter
+        const auto *vecParam = dynamic_cast<const symir::VecParam *>(param);
+        Assert(vecParam != nullptr, "Expected VecParam for array argument");
+
+        // Generate the array declaration with proper dimensions
+        main << "  ";
+        if (vecParam->GetBaseType() == symir::SymIR::STRUCT) {
+          main << "struct " << vecParam->GetStructName();
+        } else {
+          main << symir::SymIR::GetTypeCName(vecParam->GetBaseType());
+        }
+        main << " " << tmpName;
+        for (int dim: vecParam->GetVecShape()) {
+          main << "[" << dim << "]";
+        }
+        main << " = " << arg.ToCxStr() << ";" << std::endl;
+      } else if (arg.IsStruct()) {
+        // Struct parameter - can use compound literal directly in C99
+        argNames.push_back(arg.ToCxStr());
+      } else {
+        // Scalar parameter - pass directly
+        argNames.push_back(arg.ToCxStr());
+      }
+    }
+
+    // Now generate the function call with proper arguments
     main << "  " << StatelessChecksum::GetCheckChksumName() << "("
          << StatelessChecksum::Compute(fina) << ", " << fun->GetName() << "(";
     for (int j = 0; j < numParams; j++) {
-      main << init[j].ToCxStr();
+      main << argNames[j];
       if (j != numParams - 1) {
         main << ", ";
       }
