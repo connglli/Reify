@@ -313,15 +313,20 @@ namespace symir {
       if (p->IsVolatile()) {
         oss << "volatile ";
       }
-      if (p->GetType() == SymIR::STRUCT) {
-        oss << "struct " << p->GetStructName() << " " << p->GetName();
-      } else {
-        oss << symir::SymIR::GetTypeCName(p->GetType()) << " " << p->GetName();
-      }
-      if (p->IsVector()) {
+      // For vector/array parameters, use GetBaseType() to get the element type
+      if (p->IsVector() || p->GetType() == SymIR::ARRAY) {
+        if (p->GetBaseType() == SymIR::STRUCT) {
+          oss << "struct " << p->GetStructName() << " " << p->GetName();
+        } else {
+          oss << symir::SymIR::GetTypeCName(p->GetBaseType()) << " " << p->GetName();
+        }
         for (const auto &l: p->GetVecShape()) {
           oss << "[" << l << "]";
         }
+      } else if (p->GetType() == SymIR::STRUCT) {
+        oss << "struct " << p->GetStructName() << " " << p->GetName();
+      } else {
+        oss << symir::SymIR::GetTypeCName(p->GetType()) << " " << p->GetName();
       }
       if (i != params.size() - 1) {
         oss << ", ";
