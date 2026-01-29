@@ -56,11 +56,15 @@ def _do_check_ubs(test_dir, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
   c_files = [str(f) for f in c_files + h_files]
   try:
     run_proc(
+      # TODO: support llubi
       [
         "gcc",
         "-fno-tree-slsr",
         "-fno-ivopts",
-        "-fsanitize=undefined",
+        # We now support array and struct, so we'd have to check the memory usages
+        "-fsanitize=undefined,address",
+        # Perhaps consider continuing the execution after UB is found?
+        # "-fsanitize-recover=undefined,address,memory",
         "-o",
         str(o_file),
       ]
@@ -177,6 +181,14 @@ if __name__ == "__main__":
     exit(1)
 
   gen_dir = Path(sys.argv[1])
+
+  # Allow passing a single generated test directory directly.
+  if gen_dir.is_dir() and FunArts.is_test_dir(gen_dir):
+    check_func_ubs(FunArts.from_test_dir(gen_dir, gen_dir=gen_dir.parent))
+    sys.exit(0)
+  if gen_dir.is_dir() and ProgArts.is_test_dir(gen_dir):
+    check_prog_ubs(ProgArts.from_test_dir(gen_dir, gen_dir=gen_dir.parent))
+    sys.exit(0)
 
   for test_dir in gen_dir.iterdir():
     if not test_dir.is_dir():

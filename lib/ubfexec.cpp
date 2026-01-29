@@ -304,22 +304,32 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
   std::vector<ArgPlus<int>> args;
 
   std::function<
-      void(const symir::VarDef *, symir::SymIR::Type, const std::string &, const std::vector<int> &, size_t, std::string, ArgPlus<int> &, std::vector<z3::expr> &)>
+      void(const symir::VarDef *, symir::SymIR::Type, const std::string &, const std::vector<int> &, size_t, std::string, int, bool, ArgPlus<int> &, std::vector<z3::expr> &)>
       expand = [&](const symir::VarDef *var, symir::SymIR::Type type, const std::string &sName,
                    const std::vector<int> &shape, size_t shapeIdx, std::string z3Suffix,
-                   ArgPlus<int> &arg, std::vector<z3::expr> &keys) {
+                   int flatIdx, bool hasArray, ArgPlus<int> &arg, std::vector<z3::expr> &keys) {
         if (shapeIdx < shape.size()) {
-          int dimLen = shape[shapeIdx];
+          const int dimLen = shape[shapeIdx];
           for (int i = 0; i < dimLen; ++i) {
-            std::string nextZ3 = z3Suffix + "_el" + std::to_string(i);
-            expand(var, type, sName, shape, shapeIdx + 1, nextZ3, arg[i], keys);
+            const int nextFlat = flatIdx * dimLen + i;
+            expand(var, type, sName, shape, shapeIdx + 1, z3Suffix, nextFlat, true, arg[i], keys);
           }
-        } else if (type == symir::SymIR::Type::STRUCT) {
+          return;
+        }
+
+        if (hasArray) {
+          z3Suffix += "_el" + std::to_string(flatIdx);
+        }
+
+        if (type == symir::SymIR::Type::STRUCT) {
           const auto *sDef = fun->GetStruct(sName);
           for (int i = 0; i < (int) sDef->GetFields().size(); ++i) {
             const auto &field = sDef->GetField(i);
             std::string nextZ3 = z3Suffix + "_" + field.name;
-            expand(var, field.baseType, field.structName, field.shape, 0, nextZ3, arg[i], keys);
+            expand(
+                var, field.baseType, field.structName, field.shape, 0, nextZ3, 0, false, arg[i],
+                keys
+            );
           }
         } else {
           // Leaf
@@ -365,7 +375,7 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
     expand(
         param, param->GetBaseType(),
         (param->GetBaseType() == symir::SymIR::Type::STRUCT ? param->GetStructName() : ""),
-        param->GetVecShape(), 0, "", args.back(), paramKeys
+        param->GetVecShape(), 0, "", 0, false, args.back(), paramKeys
     );
 
     for (int i = 0; i < static_cast<int>(paramKeys.size()); i++) {

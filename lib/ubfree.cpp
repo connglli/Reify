@@ -56,6 +56,25 @@ namespace {
       }
     }
   }
+
+  int FlattenRowMajorIndex(const std::vector<int> &shape, const std::vector<int> &indices) {
+    Assert(
+        shape.size() == indices.size(),
+        "Cannot flatten index: shape dims (%zu) != indices dims (%zu)", shape.size(), indices.size()
+    );
+    int flat = 0;
+    for (size_t i = 0; i < shape.size(); ++i) {
+      Assert(shape[i] > 0, "Invalid shape dim (%d) while flattening", shape[i]);
+
+      // Indices should already be constrained to be in-bounds at this point.
+      Assert(
+          indices[i] >= 0 && indices[i] < shape[i],
+          "Index out of bounds while flattening: idx=%d dim=%d", indices[i], shape[i]
+      );
+      flat = flat * shape[i] + indices[i];
+    }
+    return flat;
+  }
 } // namespace
 
 void UBSan::Optimize() {
@@ -262,6 +281,10 @@ void UBSan::Visit(const symir::VarUse &v) {
 
   std::string suffix = "";
 
+  // Row-major flattening for the current contiguous array access chain.
+  std::vector<int> pendingArrayIndices;
+  std::vector<int> pendingArrayShape;
+
   for (size_t i = 0; i < access.size(); ++i) {
     access[i]->Accept(*this);
     auto idxExpr = popExpression();
@@ -283,10 +306,16 @@ void UBSan::Visit(const symir::VarUse &v) {
         constraints.push_back(idxExpr == elLoc);
       }
 
-      suffix += "_el" + std::to_string(elLoc);
+      pendingArrayShape.push_back(dimLen);
+      pendingArrayIndices.push_back(elLoc);
       currentShapeIdx++;
 
       if (currentShapeIdx == currShape.size()) {
+        const int flatLoc = FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
+        suffix += "_el" + std::to_string(flatLoc);
+        pendingArrayShape.clear();
+        pendingArrayIndices.clear();
+
         // Array exhausted. Switch to base type.
         currType = currBaseType;
         // Struct name is already set if base is struct
@@ -322,6 +351,9 @@ void UBSan::Visit(const symir::VarUse &v) {
       }
       currShape = field.shape;
       currentShapeIdx = 0;
+
+      pendingArrayShape.clear();
+      pendingArrayIndices.clear();
     }
   }
 
