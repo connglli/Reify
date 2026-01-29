@@ -2,7 +2,7 @@
 
 + Knowledge Background: Optimizing Compilers, Program Generation, SMT theories
 + Implementation Language: C++ 20 (source: ./src)
-+ Scripting Language: Python 3.12 (source: ./scripts, virtualenv: ./scripts/venv)
++ Scripting Language: Python 3.12 (source: ./scripts, virtualenv: ./venv)
 
 ## Project Overview
 
