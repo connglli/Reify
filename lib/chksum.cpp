@@ -82,13 +82,26 @@ std::string StatelessChecksum::GetCheckChksumName() { return "check_chksum"; }
 std::string StatelessChecksum::GetCheckChksumCode(bool debug) {
   std::ostringstream oss;
   if (debug) {
-    oss << "#include <assert.h>" << std::endl << std::endl;
-    oss << "#define " << GetCheckChksumName()
-        << "(expected, actual) (assert((expected)==(actual) && \"Checksum "
-           "not equal\"), (actual))"
+    oss << "#include <assert.h>" << std::endl;
+    oss << "#include <stdio.h>" << std::endl << std::endl;
+    oss << "static inline int " << GetCheckChksumName() << "(int expected, int actual)"
         << std::endl;
+    oss << "{" << std::endl;
+    oss << "  if (expected != actual) {" << std::endl;
+    oss << "    fprintf(stderr, \"Checksum not equal: expected=%d actual=%d\\n\", expected, "
+           "actual);"
+        << std::endl;
+    oss << "  }" << std::endl;
+    oss << "  assert(expected == actual && \"Checksum not equal\");" << std::endl;
+    oss << "  return actual;" << std::endl;
+    oss << "}" << std::endl;
   } else {
-    oss << "#define " << GetCheckChksumName() << "(expected, actual) (actual)" << std::endl;
+    oss << "static inline int " << GetCheckChksumName() << "(int expected, int actual)"
+        << std::endl;
+    oss << "{" << std::endl;
+    oss << "  (void)expected;" << std::endl;
+    oss << "  return actual;" << std::endl;
+    oss << "}" << std::endl;
   }
   return oss.str();
 }
