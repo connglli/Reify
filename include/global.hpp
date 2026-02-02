@@ -71,6 +71,8 @@ struct GlobalOptions {
   double StructVariableProba = 0.2;
   // The maximum number of fields for a struct
   int MaxNumStructFields = 3;
+  // The maximum, recursive depth of a struct
+  int MaxStructDepth = 2;
 
   // These are our anti-UB (mostly just checking for overflow and underflow) checks
   bool EnableSafetyChecks = true;
@@ -176,7 +178,6 @@ struct GlobalOptions {
       ("Xarray-var-proba", "Probability of declaring a variable as an array", cxxopts::value<double>())
       ("Xdisable-struct-vars", "Enable generating struct variables", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xstruct-var-proba", "Probability of declaring a variable as a struct", cxxopts::value<double>())
-      ("Xmax-struct-fields", "The maximum number of fields for a struct", cxxopts::value<int>())
       // Function generation
       ("Xnum-bbls-per-fun", "The number of allowed nodes for each control flow graph", cxxopts::value<int>())
       ("Xdisable-dead-code", "Disable the generation of dead code", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -305,11 +306,6 @@ struct GlobalOptions {
                   << std::endl;
         exit(1);
       }
-    }
-
-    if (args.count("Xmax-struct-fields")) {
-      MaxNumStructFields = args["Xmax-struct-fields"].as<int>();
-      ensurePositive(MaxNumStructFields, "Xmax-struct-fields");
     }
 
     if (args.count("Xnum-bbls-per-fun")) {
