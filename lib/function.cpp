@@ -12,8 +12,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -129,7 +129,8 @@ void FunPlus::Generate(bool allowDeadCode) {
                       fName + (field.shape.empty() ? "" : "_el" + std::to_string(k));
                   if (field.baseType == symir::SymIR::Type::STRUCT ||
                       field.type == symir::SymIR::Type::STRUCT) {
-                    // field.type could be ARRAY (with baseType=STRUCT) or STRUCT
+                    // field.type could be ARRAY (with baseType=STRUCT) or
+                    // STRUCT
                     const auto *innerDef = builder->FindStruct(field.structName);
                     initStruct(elName, innerDef, acc);
                   } else {
@@ -193,10 +194,10 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
           ) -> std::
                 string {
                   const auto availStructs = funBd->GetStructs();
-                  // Allow picking existing if available. If depth limit reached, MUST pick existing
-                  // or avoid Struct.
+                  // Allow picking existing if available. If depth limit reached, MUST pick
+                  // existing or avoid Struct.
                   const bool canPick = !availStructs.empty();
-                  const bool mustPick = depth >= 2;
+                  const bool mustPick = depth >= GlobalOptions::Get().MaxStructDepth;
 
                   // Probabilities
                   if (canPick && (mustPick || (Random::Get().UniformReal()() < 0.3))) {
@@ -299,14 +300,16 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
     Assert(var != nullptr, "Variable %d for definition is not defined!", varIndex);
     Log::Get().Out() << "Generate assignment: " << varIndex << " <- ";
 
-    // Sample the variables which will be used in the RHS of the assignment statement
+    // Sample the variables which will be used in the RHS of the assignment
+    // statement
     const auto numVarsPerAss = GlobalOptions::Get().NumVarsPerAssign;
     const auto assDeps = SampleKDistinct(NumVars(), numVarsPerAss);
     Log::Get().Out() << JoinInt(assDeps, ", ") << std::endl;
 
     // Create the terms for each assigment
     std::vector<symir::SymIRBuilder::TermID> terms;
-    // Assign a coefficient for each variable that contributes to the current one
+    // Assign a coefficient for each variable that contributes to the current
+    // one
     for (int i = 0; i < numVarsPerAss; i++) {
       int depIndex = assDeps[i];
       const auto depVar = funBd->FindVar(NameVar(depIndex));
@@ -336,9 +339,10 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
 
   // Define a specific target that our conditional/unconditional controls
   if (bblSkt.GetSuccessors().size() > 1) {
-    // Our conditional is controlled by all variables defined in this basic block.
-    // In case we need more variables beyond the number of variables we already defined,
-    // let's refer to some variables defined in other basic blocks.
+    // Our conditional is controlled by all variables defined in this basic
+    // block. In case we need more variables beyond the number of variables we
+    // already defined, let's refer to some variables defined in other basic
+    // blocks.
     const auto randVar = Random::Get().Uniform(0, NumVars() - 1);
     auto condDeps = assignments;
     const auto numVarsInCond = GlobalOptions::Get().NumVarsInCond;
@@ -377,7 +381,8 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
 
     // Target block is a parameter here if we ever wanted to support more that
     // 2 potential targets for the same basic block. We will always branch to
-    // the very first successor in the condition of the conditional evals to true.
+    // the very first successor in the condition of the conditional evals to
+    // true.
     const auto randCondOp = Random::Get().Uniform(
         GlobalOptions::Get().EnableAllOps ? 0 : symir::Cond::Op::OP_GTZ,
         GlobalOptions::Get().EnableAllOps ? symir::Cond::Op::NUM_OPS - 1 : symir::Cond::Op::OP_GTZ
@@ -509,7 +514,8 @@ std::string FunPlus::GenerateFunSexpCode(const UBFreeExec &exec) const {
   return oss.str();
 }
 
-// TODO: This implementation is exactly the same as SymJavaBytecodeLower::CreateArray,
+// TODO: This implementation is exactly the same as
+// SymJavaBytecodeLower::CreateArray,
 //       we should refactor it to avoid code duplication.
 void createArray(jnif::ClassFile &cls, jnif::Method &met, const ArgPlus<int> &var) {
   Assert(var.IsVector(), "The variable for creating array is a scalar");
