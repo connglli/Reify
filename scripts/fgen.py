@@ -104,12 +104,6 @@ if __name__ == "__main__":
     help="enable the generation of the S Expression",
   )
   parser.add_argument(
-    "--main",
-    action="store_true",
-    default=False,
-    help="enable the generation of a main function",
-  )
-  parser.add_argument(
     "--allops",
     action="store_true",
     default=False,
@@ -136,9 +130,7 @@ if __name__ == "__main__":
     default=3,
     help="timeout (in seconds) for generating a function",
   )
-  parser.add_argument(
-    "--extra", type=str, default=None, help="extra options passed to fgen"
-  )
+  parser.add_argument("--extra", type=str, default=None, help="extra options passed to fgen")
 
   args = parser.parse_args()
 
@@ -151,7 +143,7 @@ if __name__ == "__main__":
       outdir=outdir,
       config=FGEN_SUGGESTED_CONFIGS[0],
       verbose=args.check,
-      main=args.main,
+      main=True,
       sexp=args.sexp,
       allops=args.allops,
       injubs=args.injubs,
