@@ -32,7 +32,6 @@ from cmdline import run_proc
 from configs import (
   FunArts,
   ProgArts,
-  parse_mapping,
 )
 
 
@@ -103,7 +102,7 @@ def _do_check_ubs(test_dir, o_file="/tmp/a.out", cmp_tmo=60, exe_tmo=120):
     return UBChkRes.EXE_HANG, 0, f"execution timeout (>{exe_tmo}s)"
 
 
-def _check_ubs_with_main(test_dir):
+def _check_ubs(test_dir):
   ub_res, retc, out = _do_check_ubs(test_dir)
   if ub_res == UBChkRes.UB_FOUND:
     print("****************************")
@@ -128,51 +127,14 @@ def _check_ubs_with_main(test_dir):
     pass
 
 
-def _check_ubs_without_main(arts):
-  func_name = arts.get_func_name()
-  func_path = arts.get_func_file()
-  map_path = arts.get_map_file()
-
-  func_code = func_path.read_text()
-  tmp_test_dir = Path("/tmp") / "ubchk_tmp"
-  tmp_test_dir.mkdir(parents=True, exist_ok=True)
-
-  tmp_c_path, tmp_o_path = tmp_test_dir / "a.c", tmp_test_dir / "a.out"
-
-  for map_ind, (func_args, _, _) in enumerate(parse_mapping(map_path)):
-    tmp_c_path.write_text(FunArts.get_simple_program(func_name, func_code, func_args))
-    ub_res, retc, out = _do_check_ubs(tmp_test_dir, o_file=str(tmp_o_path))
-    if ub_res == UBChkRes.UB_FOUND:
-      print("****************************")
-      print("********* FOUND UB *********")
-      print("****************************")
-      print(f"Func : {func_path.absolute()}")
-      print(f"Maps : {map_path.absolute()}")
-      print(f"Retc : {retc}")
-      print(f"Mesg : {out}")
-      exit(1)
-    elif ub_res == UBChkRes.CMP_ERROR:
-      print(f"{map_ind}: CMP ERROR ({retc}): {out}")
-    elif ub_res == UBChkRes.CMP_HANG:
-      print(f"{map_ind}: CMP HANG (.): {out}")
-    elif ub_res == UBChkRes.EXE_ERROR:
-      print(f"{map_ind}: EXE ERROR ({retc}): {out}")
-    elif ub_res == UBChkRes.EXE_HANG:
-      print(f"{map_ind}: EXE HANG (.): {out}")
-    elif ub_res == UBChkRes.UB_FREE:
-      pass
-
-
 def check_func_ubs(arts):
   main_file = arts.get_main_file()
-  if main_file.exists():
-    _check_ubs_with_main(arts.get_test_dir())
-  else:
-    _check_ubs_without_main(arts)
+  assert main_file.exists(), f"main.c not found in {arts.get_test_dir()}"
+  _check_ubs(arts.get_test_dir())
 
 
 def check_prog_ubs(arts):
-  _check_ubs_with_main(arts.get_test_dir())
+  _check_ubs(arts.get_test_dir())
 
 
 if __name__ == "__main__":

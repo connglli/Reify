@@ -131,18 +131,17 @@ GEN_SEED ?= -1
 FGEN_OUT_DIR  ?= generated
 FGEN_LIMIT    ?= 1000000
 FGEN_SEXP_OPT := $(if $(FGEN_GEN_SEXP),--sexp,)
-FGEN_MAIN_OPT := $(if $(FGEN_GEN_MAIN),--main,)
 FGEN_AOPS_OPT := $(if $(FGEN_ALL_OPS),--allops,)
 FGEN_UBIJ_OPT := $(if $(FGEN_INJ_UBS),--injubs,)
 FGEN_EXT_OPTS  := $(if $(FGEN_EXT_OPTS),--extra="$(FGEN_EXT_OPTS)",)
 
 genfuncs: fgen
 	@mkdir -p $(FGEN_OUT_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS)
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS)
 
 testfuncs: fgen
 	@mkdir -p $(FGEN_OUT_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_MAIN_OPT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS) --check
+	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS) --check
 
 ## Program Generation
 
