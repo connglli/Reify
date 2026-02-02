@@ -69,7 +69,8 @@ void FunPlus::Generate(bool allowDeadCode) {
     if (GlobalOptions::Get().EnableStructVars &&
         randProba() < GlobalOptions::Get().StructVariableProba) {
       isStruct = true;
-    } else if (GlobalOptions::Get().EnableArrayVars && randProba() < GlobalOptions::Get().ArrayVariableProba) {
+    } else if (GlobalOptions::Get().EnableArrayVars &&
+               randProba() < GlobalOptions::Get().ArrayVariableProba) {
       isArray = true;
     }
 
@@ -105,7 +106,8 @@ void FunPlus::Generate(bool allowDeadCode) {
     if (GlobalOptions::Get().EnableStructVars &&
         randProba() < GlobalOptions::Get().StructVariableProba) {
       isStruct = true;
-    } else if (GlobalOptions::Get().EnableArrayVars && randProba() < GlobalOptions::Get().ArrayVariableProba) {
+    } else if (GlobalOptions::Get().EnableArrayVars &&
+               randProba() < GlobalOptions::Get().ArrayVariableProba) {
       isArray = true;
     }
 
@@ -184,87 +186,79 @@ void FunPlus::Generate(bool allowDeadCode) {
 
 std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
   // Helper for recursive generation
-  std::function<std::string(int)>
-      generate = [&](const int depth
-                 ) -> std::
-                       string {
-                         const auto availStructs = funBd->GetStructs();
-                         // Allow picking existing if available. If depth limit reached, MUST pick
-                         // existing or avoid Struct.
-                         const bool canPick = !availStructs.empty();
-                         const bool mustPick = depth >= GlobalOptions::Get().MaxStructDepth;
+  std::function<std::string(int)> generate = [&](const int depth) -> std::string {
+    const auto availStructs = funBd->GetStructs();
+    // Allow picking existing if available. If depth limit reached, MUST pick
+    // existing or avoid Struct.
+    const bool canPick = !availStructs.empty();
+    const bool mustPick = depth >= GlobalOptions::Get().MaxStructDepth;
 
-                         // Probabilities
-                         if (canPick && (mustPick || (Random::Get().UniformReal()() < 0.3))) {
-                           const int idx =
-                               Random::Get().Uniform(0, (int) availStructs.size() - 1)();
-                           return availStructs[idx]->GetName();
-                         }
-                         if (mustPick) {
-                           return ""; // Indicates fallback to I32 (or non-struct)
-                         }
+    // Probabilities
+    if (canPick && (mustPick || (Random::Get().UniformReal()() < 0.3))) {
+      const int idx = Random::Get().Uniform(0, (int) availStructs.size() - 1)();
+      return availStructs[idx]->GetName();
+    }
+    if (mustPick) {
+      return ""; // Indicates fallback to I32 (or non-struct)
+    }
 
-                         // Generate New Struct
-                         std::vector<symir::StructDef::Field> fields;
-                         const int numFields =
-                             Random::Get().Uniform(1, GlobalOptions::Get().MaxNumStructFields)();
+    // Generate New Struct
+    std::vector<symir::StructDef::Field> fields;
+    const int numFields = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumStructFields)();
 
-                         // Reduce array sizes to avoid OOM with nesting
-                         auto randArrayDim = Random::Get().Uniform(1, 2);
-                         auto randArrayLen = Random::Get().Uniform(1, 2);
-                         auto randProba = Random::Get().UniformReal();
+    // Reduce array sizes to avoid OOM with nesting
+    auto randArrayDim = Random::Get().Uniform(1, 2);
+    auto randArrayLen = Random::Get().Uniform(1, 2);
+    auto randProba = Random::Get().UniformReal();
 
-                         for (int j = 0; j < numFields; ++j) {
-                           symir::StructDef::Field field;
-                           field.name = NameField(j);
+    for (int j = 0; j < numFields; ++j) {
+      symir::StructDef::Field field;
+      field.name = NameField(j);
 
-                           float p = randProba();
-                           bool fieldIsArray = false;
-                           bool fieldIsStruct = false;
+      float p = randProba();
+      bool fieldIsArray = false;
+      bool fieldIsStruct = false;
 
-                           if (p < 0.3 && GlobalOptions::Get().EnableArrayVars) { // Array I32
-                             fieldIsArray = true;
-                           } else if (p < 0.45 && GlobalOptions::Get().EnableStructVars) { // Struct
-                             fieldIsStruct = true;
-                           } else if (p < 0.6 && GlobalOptions::Get().EnableArrayVars &&
-                 GlobalOptions::Get().EnableStructVars) { // Array Struct
-                             fieldIsArray = true;
-                             fieldIsStruct = true;
-                           } else { // Scalar I32
-                           }
+      if (p < 0.3 && GlobalOptions::Get().EnableArrayVars) { // Array I32
+        fieldIsArray = true;
+      } else if (p < 0.45 && GlobalOptions::Get().EnableStructVars) { // Struct
+        fieldIsStruct = true;
+      } else if (p < 0.6 && GlobalOptions::Get().EnableArrayVars &&
+                 GlobalOptions::Get().EnableStructVars) { // Array
+        // Struct
+        fieldIsArray = true;
+        fieldIsStruct = true;
+      } else { // Scalar I32
+      }
 
-                           if (fieldIsStruct) {
-                             std::string sName = generate(depth + 1);
-                             if (sName.empty()) {
-                               field.type = fieldIsArray ? symir::SymIR::Type::ARRAY
-                                                         : symir::SymIR::Type::I32;
-                               field.baseType = symir::SymIR::Type::I32;
-                             } else {
-                               field.structName = sName;
-                               field.type = fieldIsArray ? symir::SymIR::Type::ARRAY
-                                                         : symir::SymIR::Type::STRUCT;
-                               field.baseType = symir::SymIR::Type::STRUCT;
-                             }
-                           } else {
-                             field.type =
-                                 fieldIsArray ? symir::SymIR::Type::ARRAY : symir::SymIR::Type::I32;
-                             field.baseType = symir::SymIR::Type::I32;
-                           }
+      if (fieldIsStruct) {
+        std::string sName = generate(depth + 1);
+        if (sName.empty()) {
+          field.type = fieldIsArray ? symir::SymIR::Type::ARRAY : symir::SymIR::Type::I32;
+          field.baseType = symir::SymIR::Type::I32;
+        } else {
+          field.structName = sName;
+          field.type = fieldIsArray ? symir::SymIR::Type::ARRAY : symir::SymIR::Type::STRUCT;
+          field.baseType = symir::SymIR::Type::STRUCT;
+        }
+      } else {
+        field.type = fieldIsArray ? symir::SymIR::Type::ARRAY : symir::SymIR::Type::I32;
+        field.baseType = symir::SymIR::Type::I32;
+      }
 
-                           if (fieldIsArray) {
-                             for (int k = 0; k < randArrayDim(); k++) {
-                               field.shape.push_back(randArrayLen());
-                             }
-                           }
+      if (fieldIsArray) {
+        for (int k = 0; k < randArrayDim(); k++) {
+          field.shape.push_back(randArrayLen());
+        }
+      }
 
-                           fields.push_back(field);
-                         }
+      fields.push_back(field);
+    }
 
-                         std::string structName =
-                             NameStruct(name, static_cast<int>(funBd->GetStructs().size()));
-                         funBd->SymStruct(structName, fields);
-                         return structName;
-                       };
+    std::string structName = NameStruct(name, static_cast<int>(funBd->GetStructs().size()));
+    funBd->SymStruct(structName, fields);
+    return structName;
+  };
 
   return generate(0);
 }

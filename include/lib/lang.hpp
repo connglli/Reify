@@ -263,9 +263,8 @@ namespace symir {
         std::string name, std::vector<int> vecShape, const SymIR::Type type,
         std::string structName = ""
     ) :
-        WithType(type),
-        name(std::move(name)), vecShape(std::move(vecShape)), structName(std::move(structName)),
-        baseType(type) {
+        WithType(type), name(std::move(name)), vecShape(std::move(vecShape)),
+        structName(std::move(structName)), baseType(type) {
       if (!this->vecShape.empty()) {
         setType(SymIR::Type::ARRAY);
       }
@@ -893,9 +892,7 @@ namespace symir {
     explicit Param(
         ID irId, std::string name, std::vector<int> shape, Type type = Type::I32,
         std::string structName = ""
-    ) :
-        SymIR(irId),
-        VarDef(std::move(name), std::move(shape), type, std::move(structName)) {}
+    ) : SymIR(irId), VarDef(std::move(name), std::move(shape), type, std::move(structName)) {}
   };
 
   /// A StructDef defines a named struct type.
@@ -959,8 +956,7 @@ namespace symir {
   public:
     explicit VecParam(
         std::string name, std::vector<int> shape, Type type = Type::I32, std::string structName = ""
-    ) :
-        Param(SIR_PARAM_VEC, std::move(name), std::move(shape), type, std::move(structName)) {}
+    ) : Param(SIR_PARAM_VEC, std::move(name), std::move(shape), type, std::move(structName)) {}
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
   };
@@ -983,9 +979,7 @@ namespace symir {
     explicit Local(
         ID irId, std::string name, const std::vector<int> shape, Type type = Type::I32,
         std::string structName = ""
-    ) :
-        Stmt(irId),
-        VarDef(std::move(name), shape, type, std::move(structName)) {}
+    ) : Stmt(irId), VarDef(std::move(name), shape, type, std::move(structName)) {}
   };
 
   /// A ScaLocal is a declaration of a local variable with an initial value within the function.
@@ -993,9 +987,7 @@ namespace symir {
   public:
     explicit ScaLocal(
         std::string name, Coef *init, Type type = Type::I32, bool isVolatile = false
-    ) :
-        Local(SIR_LOCAL_SCA, std::move(name), type),
-        coef(std::move(init)) {
+    ) : Local(SIR_LOCAL_SCA, std::move(name), type), coef(std::move(init)) {
       if (isVolatile) {
         SetVolatile();
       }
@@ -1089,8 +1081,8 @@ namespace symir {
       std::unique_ptr<Target> target
         // clang-format on
     ) :
-        SymIR(SIR_BLOCK),
-        label(std::move(label)), stmts(std::move(stmts)), target(std::move(target)) {}
+        SymIR(SIR_BLOCK), label(std::move(label)), stmts(std::move(stmts)),
+        target(std::move(target)) {}
 
     [[nodiscard]] std::string GetLabel() const { return label; }
 
@@ -1192,8 +1184,7 @@ namespace symir {
         std::vector<std::unique_ptr<Block>> blocks
         // clang-format on
     ) :
-        SymIR(SIR_FUNCT),
-        WithType(retType), name(std::move(name)), structs(std::move(structs)),
+        SymIR(SIR_FUNCT), WithType(retType), name(std::move(name)), structs(std::move(structs)),
         params(std::move(params)), locals(std::move(locals)), symbols(std::move(symbols)),
         blocks(std::move(blocks)) {
       Assert(!this->params.empty(), "No parameters are given");
@@ -1815,8 +1806,7 @@ namespace symir {
         AfterBlockClosedHook afterBlockClosedHook = nullptr
         // clang-format on
     ) :
-        src(src),
-        beforeBlockOpenHook(std::move(beforeBlockOpenHook)),
+        src(src), beforeBlockOpenHook(std::move(beforeBlockOpenHook)),
         afterBlockOpenedHook(std::move(afterBlockOpenedHook)),
         beforeBlockCloseHook(std::move(beforeBlockCloseHook)),
         afterBlockClosedHook(std::move(afterBlockClosedHook)) {
