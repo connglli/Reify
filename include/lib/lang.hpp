@@ -330,12 +330,18 @@ namespace symir {
     void SetVolatile(const bool set = true) { isVolatile = set; }
 
     [[nodiscard]] const std::string &GetStructName() const {
-      Assert(type == SymIR::STRUCT, "The variable \"%s\" is not a struct", name.c_str());
+      Assert(
+          baseType == SymIR::STRUCT, "The variable \"%s\" does not have struct base type",
+          name.c_str()
+      );
       return structName;
     }
 
     void SetStructName(std::string name) {
-      Assert(type == SymIR::STRUCT, "The variable \"%s\" is not a struct", this->name.c_str());
+      Assert(
+          baseType == SymIR::STRUCT, "The variable \"%s\" does not have struct base type",
+          this->name.c_str()
+      );
       structName = std::move(name);
     }
 
@@ -1023,7 +1029,7 @@ namespace symir {
         Local(SIR_LOCAL_VEC, std::move(name), shape, type, std::move(structName)),
         coefs(std::move(inits)) {
       const int expectedNumEls = GetVecNumEls(this->vecShape);
-      if (this->type != SymIR::STRUCT) {
+      if (this->GetBaseType() != SymIR::STRUCT) {
         Assert(
             expectedNumEls == static_cast<int>(this->coefs.size()),
             "The number of initial values (%lu) does not match the number of elements (%d) of "
@@ -1032,7 +1038,7 @@ namespace symir {
         );
       }
       for (const auto &c: this->coefs) {
-        if (this->type != SymIR::STRUCT) {
+        if (this->GetBaseType() != SymIR::STRUCT) {
           Assert(
               type == c->GetType(), "The coef (%s) and the var (%s) are of different types",
               GetTypeSName(c->GetType()).c_str(), GetTypeSName(type).c_str()

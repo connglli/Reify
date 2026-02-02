@@ -549,19 +549,33 @@ namespace symir {
 
     SymIR::Type termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
     SymIR::Type termBaseType = varDef != nullptr ? varDef->GetBaseType() : SymIR::Type::I32;
-    std::string currStruct = (varDef && termType == SymIR::STRUCT) ? varDef->GetStructName() : "";
+    std::string currStruct =
+        (varDef && (termType == SymIR::STRUCT || termBaseType == SymIR::STRUCT))
+            ? varDef->GetStructName()
+            : "";
     int remainingDims = (varDef && varDef->IsVector()) ? varDef->GetVecNumDims() : 0;
 
     std::vector<Coef *> vecAcc;
-    for (const auto *t: accessTokens) {
+    for (int i = 0; i < static_cast<int>(accessTokens.size()); i++) {
+      const auto *t = accessTokens[i];
       if (remainingDims > 0) {
+        // Expect an index token like "#0".
         vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
         remainingDims--;
         // After consuming all array dimensions, resolve to base type
         if (remainingDims == 0 && termType == SymIR::ARRAY) {
           termType = termBaseType;
         }
-      } else if (termType == SymIR::STRUCT) {
+      } else if (t->str.starts_with("#")) {
+        // Indexing token while not expecting an index: treat as indexing into an array/vector.
+        remainingDims = 1;
+        vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
+        remainingDims--;
+        if (remainingDims == 0 && termType == SymIR::ARRAY) {
+          termType = termBaseType;
+        }
+      } else if (termType == SymIR::STRUCT || termBaseType == SymIR::STRUCT) {
+        // Expect a field token like "f0".
         const auto structDef = funBd->FindStruct(currStruct);
         Assert(structDef != nullptr, "Struct %s not found", currStruct.c_str());
         int idx = structDef->GetFieldIndex(t->ToStr());
@@ -574,11 +588,17 @@ namespace symir {
         const auto &field = structDef->GetField(idx);
         termType = field.type;
         termBaseType = field.baseType;
-        if (termBaseType == SymIR::STRUCT)
+        if (termType == SymIR::STRUCT)
+          currStruct = field.structName;
+        else if (termBaseType == SymIR::STRUCT)
           currStruct = field.structName;
         remainingDims = field.shape.size();
       } else {
-        Panic("Unexpected access to scalar i32");
+        Panic(
+            "Unexpected access to scalar %s (base %s), tok=%s, remainingDims=%d, currStruct=%s",
+            SymIR::GetTypeSName(termType).c_str(), SymIR::GetTypeSName(termBaseType).c_str(),
+            t->ToStr().c_str(), remainingDims, currStruct.c_str()
+        );
       }
       delete t;
     }
@@ -721,50 +741,63 @@ namespace symir {
       vecShape.insert(vecShape.begin(), dimLen);
     }
 
-    // Calculate total number of scalar initializers required
-    int scalarCount = 1;
-    if (localType == SymIR::STRUCT) {
-      std::function<int(const std::string &)> countStruct = [&](const std::string &sName) {
-        const auto *st = funBd->FindStruct(sName);
-        Assert(st != nullptr, "Struct %s not found", sName.c_str());
-        int c = 0;
-        for (const auto &f: st->GetFields()) {
-          int fc = 1;
-          for (int d: f.shape)
-            fc *= d;
-          if (f.type == SymIR::STRUCT) {
-            fc *= countStruct(f.structName);
-          }
-          c += fc;
-        }
-        return c;
-      };
-      scalarCount = countStruct(structName);
-    }
-
-    int arraySize = 1;
-    if (!vecShape.empty()) {
-      arraySize = VarDef::GetVecNumEls(vecShape);
-    }
-
-    int totalInits = arraySize * scalarCount;
-
     std::vector<Coef *> vecInits;
-    const auto *coefToken = popArg<SymSexpLexer::Token>();
-    Assert(
-        coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-        "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
-        "coefficient of the term",
-        coefToken->FullInfo().c_str()
-    );
-    vecInits.push_back(buildCoef(coefToken, SymIR::I32));
-    delete coefToken;
+    // Build initializer list.
+    // - Scalar locals: require exactly one init.
+    // - Struct locals (non-vec): require full flattened init list.
+    // - Vec locals with struct baseType: init list is optional and may be empty.
+    // - Vec locals with scalar baseType: require one init per element.
+    if (!vecShape.empty() && localType == SymIR::STRUCT) {
+      // No mandatory initializer tokens here.
+      // (If present, they will be parsed as part of the identifier token stream anyway.)
+    } else {
+      // Calculate total number of scalar initializers required.
+      int scalarCount = 1;
+      if (localType == SymIR::STRUCT) {
+        std::function<int(const std::string &)> countStruct = [&](const std::string &sName) {
+          const auto *st = funBd->FindStruct(sName);
+          Assert(st != nullptr, "Struct %s not found", sName.c_str());
+          int c = 0;
+          for (const auto &f: st->GetFields()) {
+            int fc = 1;
+            for (int d: f.shape)
+              fc *= d;
+            if (f.type == SymIR::STRUCT) {
+              fc *= countStruct(f.structName);
+            } else if (f.baseType == SymIR::STRUCT) {
+              // Array (or vector) of structs.
+              fc *= countStruct(f.structName);
+            }
+            c += fc;
+          }
+          return c;
+        };
+        scalarCount = countStruct(structName);
+      }
 
-    for (int i = 0; i < totalInits - 1; i++) {
-      coefToken = popArg<SymSexpLexer::Token>();
-      Assert(coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected init value");
-      vecInits.insert(vecInits.begin(), buildCoef(coefToken, SymIR::I32));
+      int arraySize = 1;
+      if (!vecShape.empty()) {
+        arraySize = VarDef::GetVecNumEls(vecShape);
+      }
+
+      int totalInits = arraySize * scalarCount;
+
+      const auto *coefToken = popArg<SymSexpLexer::Token>();
+      Assert(
+          coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+          "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
+          "coefficient of the term",
+          coefToken->FullInfo().c_str()
+      );
+      vecInits.push_back(buildCoef(coefToken, SymIR::I32));
       delete coefToken;
+
+      for (int i = 0; i < totalInits - 1; i++) {
+        coefToken = popArg<SymSexpLexer::Token>();
+        Assert(coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected init value");
+        vecInits.insert(vecInits.begin(), buildCoef(coefToken, SymIR::I32));
+        delete coefToken;
+      }
     }
 
     const auto *varToken = popArg<SymSexpLexer::Token>();
@@ -821,11 +854,15 @@ namespace symir {
 
     SymIR::Type termType = varDef != nullptr ? varDef->GetType() : SymIR::Type::I32;
     SymIR::Type termBaseType = varDef != nullptr ? varDef->GetBaseType() : SymIR::Type::I32;
-    std::string currStruct = (varDef && termType == SymIR::STRUCT) ? varDef->GetStructName() : "";
+    std::string currStruct =
+        (varDef && (termType == SymIR::STRUCT || termBaseType == SymIR::STRUCT))
+            ? varDef->GetStructName()
+            : "";
     int remainingDims = (varDef && varDef->IsVector()) ? varDef->GetVecNumDims() : 0;
 
     std::vector<Coef *> vecAcc;
-    for (const auto *t: accessTokens) {
+    for (int i = 0; i < static_cast<int>(accessTokens.size()); i++) {
+      const auto *t = accessTokens[i];
       if (remainingDims > 0) {
         vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
         remainingDims--;
@@ -833,7 +870,14 @@ namespace symir {
         if (remainingDims == 0 && termType == SymIR::ARRAY) {
           termType = termBaseType;
         }
-      } else if (termType == SymIR::STRUCT) {
+      } else if (t->str.starts_with("#")) {
+        remainingDims = 1;
+        vecAcc.push_back(buildCoef(t, SymIR::Type::I32));
+        remainingDims--;
+        if (remainingDims == 0 && termType == SymIR::ARRAY) {
+          termType = termBaseType;
+        }
+      } else if (termType == SymIR::STRUCT || termBaseType == SymIR::STRUCT) {
         const auto structDef = funBd->FindStruct(currStruct);
         Assert(structDef != nullptr, "Struct %s not found", currStruct.c_str());
         int idx = structDef->GetFieldIndex(t->ToStr());
