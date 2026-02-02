@@ -137,19 +137,8 @@ protected:
     for (int i = 0; i < static_cast<int>(init->size()); ++i) {
       const auto &p = params[i];
       const auto &arg = (*init)[i];
-      if (arg.IsVector()) {
-        chkOss << "(";
-        if (p->GetBaseType() == symir::SymIR::STRUCT) {
-          chkOss << "struct " << p->GetStructName();
-        } else {
-          chkOss << symir::SymIR::GetTypeCName(p->GetBaseType());
-        }
-        for (int dim: p->GetVecShape()) {
-          chkOss << "[" << dim << "]";
-        }
-        chkOss << ")";
-      }
-      chkOss << arg.ToCxStr();
+      // Use the new type-safe GetTypeCastStr method
+      chkOss << arg.GetTypeCastStr(p) << arg.ToCxStr();
       if (i < static_cast<int>(init->size()) - 1) {
         chkOss << ", ";
       }
@@ -398,20 +387,8 @@ void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
   const auto &params = functions[0]->GetParams();
   for (size_t i = 0; i < init->size(); ++i) {
     auto arg = (*init)[i];
-    if (arg.IsVector()) {
-      // Prepend type cast for compound literal
-      mainFile << "(";
-      if (params[i]->GetBaseType() == symir::SymIR::STRUCT) {
-        mainFile << "struct " << params[i]->GetStructName();
-      } else {
-        mainFile << symir::SymIR::GetTypeCName(params[i]->GetBaseType());
-      }
-      for (int dim: params[i]->GetVecShape()) {
-        mainFile << "[" << dim << "]";
-      }
-      mainFile << ")";
-    }
-    mainFile << (*init)[i].ToCxStr();
+    // Use the new type-safe GetTypeCastStr method
+    mainFile << arg.GetTypeCastStr(params[i]) << arg.ToCxStr();
     if (i != init->size() - 1) {
       mainFile << ", ";
     }
