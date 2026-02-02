@@ -525,8 +525,7 @@ void UBSan::Visit(const symir::AssStmt &a) {
   }
 }
 
-void UBSan::Visit(const symir::RetStmt &r) { /* DO NOTHING */
-}
+void UBSan::Visit(const symir::RetStmt &r) { /* DO NOTHING */ }
 
 void UBSan::Visit(const symir::Branch &b) {
   b.GetCond()->Accept(*this);
@@ -549,8 +548,7 @@ void UBSan::Visit(const symir::Branch &b) {
   }
 }
 
-void UBSan::Visit(const symir::Goto &g) { /* DO NOTHING */
-}
+void UBSan::Visit(const symir::Goto &g) { /* DO NOTHING */ }
 
 void UBSan::Visit(const symir::ScaParam &p) {
   auto varExpr = CreateScaExpr(&p, 0);
