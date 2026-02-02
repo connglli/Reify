@@ -159,6 +159,8 @@ public:
 
   void SetStructName(std::string name) { structName = std::move(name); }
 
+  [[nodiscard]] size_t NumChildren() const { return children.size(); }
+
   ArgPlus &operator[](int i) { return children[i]; }
 
   const ArgPlus &operator[](int i) const { return children[i]; }
