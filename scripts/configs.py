@@ -23,22 +23,7 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
-import json
 from pathlib import Path
-
-PROG_TPL = """
-{chksum_code}
-
-#include <stdio.h>
-
-{func_code}
-
-int main(int argc, char* argv[]) {{
-    generate_crc32_table();
-    printf("%d", {func_name}({func_args}));
-    return 0;
-}}
-"""
 
 ROOT_DIR = Path(__file__).parent.parent.absolute()
 
@@ -109,15 +94,6 @@ class FunArts:
   def get_sexp_file(self):
     return self.get_test_dir() / FILENAME_SEXPRESSION
 
-  @staticmethod
-  def get_simple_program(func_name, func_code, func_args):
-    return PROG_TPL.format(
-      chksum_code=CHKSUM_CODE,
-      func_code=func_code,
-      func_name=func_name,
-      func_args=", ".join(x.unflat_c_str() for x in func_args),
-    )
-
 
 class ProgArts:
   def __init__(self, puuid, psano, gen_dir=DEFAULT_OUTPUT_DIR):
@@ -162,117 +138,3 @@ class ProgArts:
 
   def get_func_file(self, fname):
     return self.get_test_dir() / (fname + ".c")
-
-
-class ArgVal:
-  def __init__(self, shape, elems):
-    self.shape = shape
-    self.elems = elems
-
-  def is_scalar(self):
-    return len(self.shape) == 0
-
-  def is_vector(self):
-    return len(self.shape) != 0
-
-  def get_c_type(self):
-    return f"int{''.join('[' + str(d) + ']' for d in self.shape) if self.shape else ''}"
-
-  def get_shaped_value(self):
-    if self.is_scalar():
-      return self.elems[0]
-
-    def reshape(flat, shape):
-      if not shape:
-        return flat[0]
-      if len(shape) == 1:
-        return flat[: shape[0]]
-      stride = 1
-      for d in shape[1:]:
-        stride *= d
-      out = []
-      for i in range(shape[0]):
-        start = i * stride
-        end = start + stride
-        out.append(reshape(flat[start:end], shape[1:]))
-      return out
-
-    return reshape(self.elems, self.shape)
-
-  def num_els(self):
-    return len(self.elems)
-
-  def flat_c_str(self):
-    # Flatten all array elements
-    return ",".join(str(e) for e in self.elems)
-
-  def unflat_c_str(self):
-    # Keep the original shape
-    if not self.shape:
-      return str(self.elems[0])
-    else:
-      oss = []
-      oss.append(f"(int(*){''.join('[' + str(d) + ']' for d in self.shape[1:])})")
-      oss.append(f"((int[{len(self.elems)}])")
-      oss.append("{" + ", ".join(str(e) for e in self.elems) + "})")
-      return "".join(oss)
-
-  @staticmethod
-  def from_json(obj):
-    # Handle new format (recursive tree structure with isScalar, children, etc.)
-    if "isScalar" in obj:
-      if obj["isScalar"]:
-        # Scalar value
-        return ArgVal([], [obj["val"]])
-      else:
-        # Non-scalar: could be array, struct, or array of structs
-        # For now, we flatten all children recursively into a flat list
-        def flatten(node):
-          if isinstance(node, dict):
-            if node.get("isScalar", False):
-              return [node["val"]]
-            elif "children" in node:
-              result = []
-              for child in node["children"]:
-                result.extend(flatten(child))
-              return result
-          return []
-
-        elems = flatten(obj)
-        shape = obj.get("shape", [])
-
-        # If no shape provided but we have children, infer shape
-        if not shape and "children" in obj:
-          shape = [len(obj["children"])]
-
-        return ArgVal(shape, elems)
-
-    # Handle old format (shape + elems)
-    if "shape" in obj and "elems" in obj:
-      shape = obj["shape"]
-      elems = obj["elems"]
-      # Validate size
-      expected = 1
-      for d in shape:
-        expected *= d
-      if expected != len(elems):
-        raise ValueError(
-          f"The elements length {len(elems)} doesn't match shape (expecting {expected} elements)"
-        )
-      return ArgVal(shape, elems)
-
-    raise ValueError(f"Unknown JSON format for ArgVal: {obj}")
-
-
-def parse_mapping(map_path):
-  maps = []
-  for line in Path(map_path).read_text().splitlines():
-    obj = json.loads(line)
-    maps.append(
-      (
-        [ArgVal.from_json(a) for a in obj["ini"]],
-        [ArgVal.from_json(a) for a in obj["fin"]],
-        obj["chk"],
-      )
-    )
-  return maps
