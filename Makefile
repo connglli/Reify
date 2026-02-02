@@ -76,7 +76,7 @@ LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread -lz
 ## Building Targets
 ########################################################################
 
-.PHONY: clean all lib fgen pgen bins gen-func-set gen-func-set-check-ubs gen-prog-set gen-prog-set-check
+.PHONY: clean all lib fgen pgen symircc bins test testprogs testfuncs genfuncs genprogs
 
 all: lib bins
 
