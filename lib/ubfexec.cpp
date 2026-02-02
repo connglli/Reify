@@ -342,7 +342,7 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
       createSchema = [&](symir::SymIR::Type type, const std::string &sName,
                          const std::vector<int> &shape, size_t shapeIdx) -> ArgPlus<int> {
     if (shapeIdx < shape.size()) {
-      auto res = ArgPlus<int>(std::vector<int>{shape[shapeIdx]});
+      auto res = ArgPlus<int>(ArrayDim, shape[shapeIdx]);
       for (int i = 0; i < shape[shapeIdx]; ++i) {
         res[i] = createSchema(type, sName, shape, shapeIdx + 1);
       }
