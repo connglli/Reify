@@ -374,27 +374,31 @@ namespace symir {
             Panic("Cannot reach here");
         }
       } else if (kind == SymSexpLexer::Token::Kind::TK_LBRACKET) {
-        // Make the '[' op not closing ')'
+        // Bracket handling - determine context
         const auto closingOp = popOp();
+        // For the new syntax Type[size], brackets come AFTER the type token
+        // We need to handle them for both PAR and LOC, but also for array access in assignments
         if (closingOp == SymSexpLexer::Token::Kind::TK_KW_PAR ||
             closingOp == SymSexpLexer::Token::Kind::TK_KW_LOC) {
-          // The next token is the length of this dimension
+          // In the new syntax, brackets follow the type, so we should encounter them
+          // AFTER reading the type token. The bracket contains the array dimension.
           const auto dimLenToken = stream();
           Assert(
               dimLenToken.kind == SymSexpLexer::Token::Kind::TK_IDENT,
-              "The child (%s) of a left-bracket is not an identifier, while it should be the "
-              "length of a specific dimension of the vector parameter",
+              "The content (%s) of a bracket should be an identifier (dimension size or access "
+              "index)",
               dimLenToken.FullInfo().c_str()
           );
-          // Make it part of the operator
+          // Push dimension length onto operator stack
           pushOp(static_cast<SymSexpLexer::Token::Kind>(std::stoi(dimLenToken.ToStr())));
           pushOp(kind);
         } else {
+          // Regular bracket for array access in other contexts
           pushOp(kind);
         }
         pushOp(closingOp);
       } else if (kind == SymSexpLexer::Token::Kind::TK_RBRACKET) {
-        // DROP IT
+        // DROP IT - right brackets are handled implicitly by the parser functions
       } else {
         pushArg<SymSexpLexer::Token>(*token);
       }
@@ -452,22 +456,8 @@ namespace symir {
       auto fName = stream();
       Assert(fName.kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected field name");
 
-      std::vector<int> shape;
-      auto typeToken = [&]() {
-        while (true) {
-          auto t = stream();
-          if (t.kind == SymSexpLexer::Token::Kind::TK_LBRACKET) {
-            auto dimT = stream();
-            Assert(dimT.kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected dimension size");
-            shape.push_back(std::stoi(dimT.ToStr()));
-            auto rb = stream();
-            Assert(rb.kind == SymSexpLexer::Token::Kind::TK_RBRACKET, "Expected ]");
-          } else {
-            return t;
-          }
-        }
-      }();
-
+      // Parse type first (new syntax: fieldname type[dims]...)
+      auto typeToken = stream();
       SymIR::Type type = SymIR::I32;
       std::string sName;
       if (typeToken.kind == SymSexpLexer::Token::Kind::TK_TYPE_I32) {
@@ -479,16 +469,31 @@ namespace symir {
         Panic("Unknown field type");
       }
 
+      // Now parse dimensions AFTER the type
+      std::vector<int> shape;
+      while (true) {
+        auto t = stream();
+        if (t.kind == SymSexpLexer::Token::Kind::TK_LBRACKET) {
+          auto dimT = stream();
+          Assert(dimT.kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected dimension size");
+          shape.push_back(std::stoi(dimT.ToStr()));
+          auto rb = stream();
+          Assert(rb.kind == SymSexpLexer::Token::Kind::TK_RBRACKET, "Expected ]");
+        } else {
+          // Not a bracket, need to handle closing paren
+          Assert(
+              t.kind == SymSexpLexer::Token::Kind::TK_RPAREN, "Expected ) to end field definition"
+          );
+          break;
+        }
+      }
+
       SymIR::Type baseType = type;
       if (!shape.empty()) {
         type = SymIR::Type::ARRAY;
       }
       fields.push_back({fName.ToStr(), type, sName, shape, baseType});
-
-      auto closing = stream();
-      Assert(
-          closing.kind == SymSexpLexer::Token::Kind::TK_RPAREN, "Expected ) to end field definition"
-      );
+      // Note: closing paren already consumed in the dimension parsing loop above
     }
     // Consume the closing parenthesis of the struct definition
     auto structClosing = stream();
@@ -648,23 +653,11 @@ namespace symir {
 #undef XX
 
   void SymSexpParser::buildParam() {
-    const auto *typeToken = popArg<SymSexpLexer::Token>();
-    // Check if typeToken is I32 or IDENT (for structs)
-    SymIR::Type type = SymIR::I32;
-    std::string structName;
-    if (typeToken->kind == SymSexpLexer::Token::Kind::TK_IDENT) {
-      type = SymIR::STRUCT;
-      structName = typeToken->ToStr();
-    } else {
-      Assert(
-          typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
-          "The 3rd child (%s) of the param node is not an identifier, while it should be the "
-          "type of the parameter",
-          typeToken->FullInfo().c_str()
-      );
-      type = SymIR::GetTypeFromSName(typeToken->ToStr());
-    }
+    // New syntax: (par varname Type[dim1][dim2]...)
+    // Brackets are specially handled: when we see Type[10], the bracket handling code
+    // pushes the size (10) and then TK_LBRACKET onto the op stack
 
+    // Parse array dimensions that come after the type
     std::vector<int> vecShape;
     while (true) {
       const auto opKind = popOp();
@@ -672,27 +665,46 @@ namespace symir {
         pushOp(opKind); // Push it back as this is not a bracket
         break;
       }
+      // The dimension size was pushed before the bracket
       const auto dimLen = static_cast<int>(popOp());
-      Assert(
-          dimLen > 0,
-          "The dimension length (%d) after an left-bracket operator should be a positive integer",
-          dimLen
-      );
+      Assert(dimLen > 0, "The dimension length (%d) should be a positive integer", dimLen);
       vecShape.insert(vecShape.begin(), dimLen);
     }
+
+    // Parse the type token
+    const auto *typeToken = popArg<SymSexpLexer::Token>();
+    SymIR::Type type = SymIR::I32;
+    std::string structName;
+    if (typeToken->kind == SymSexpLexer::Token::Kind::TK_IDENT) {
+      // Struct type
+      type = SymIR::STRUCT;
+      structName = typeToken->ToStr();
+    } else {
+      Assert(
+          typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
+          "The type token (%s) of the param node should be a type (i32) or struct name",
+          typeToken->FullInfo().c_str()
+      );
+      type = SymIR::GetTypeFromSName(typeToken->ToStr());
+    }
+
+    // Parse the variable name
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
         varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-        "The 1st child (%s) of the parameter is not an identifier, while it should be the "
-        "type of the parameter",
+        "The variable name (%s) of the parameter should be an identifier",
         varToken->FullInfo().c_str()
     );
+
+    // Check for volatile keyword
     bool isVolatile = false;
     if (const auto opKind = popOp(); opKind == SymSexpLexer::Token::TK_KW_VOL) {
       isVolatile = true;
     } else {
-      pushOp(opKind); // Push it back as this is a volatile parameter
+      pushOp(opKind); // Push it back as this is not a volatile parameter
     }
+
+    // Create the appropriate parameter type
     if (!vecShape.empty()) {
       funBd->SymVecParam(
           varToken->ToStr(), vecShape, type, structName,
@@ -708,8 +720,26 @@ namespace symir {
   }
 
   void SymSexpParser::buildLocal() {
-    const auto *typeToken = popArg<SymSexpLexer::Token>();
+    // Old syntax (kept for compatibility): (loc varname initvalues... Type[dim1][dim2])
+    // Stack order when popping: Type (top), then inits, then dimensions markers, then varname
+    // (bottom)
 
+    // Parse array dimensions (come after type in stack order)
+    std::vector<int> vecShape;
+    while (true) {
+      const auto opKind = popOp();
+      if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
+        pushOp(opKind); // Push it back as this is not a bracket
+        break;
+      }
+      // The dimension size was pushed before the bracket
+      const auto dimLen = static_cast<int>(popOp());
+      Assert(dimLen > 0, "The dimension length (%d) should be a positive integer", dimLen);
+      vecShape.insert(vecShape.begin(), dimLen);
+    }
+
+    // Parse the type token (top of arg stack)
+    const auto *typeToken = popArg<SymSexpLexer::Token>();
     SymIR::Type localType = SymIR::I32;
     std::string structName;
     if (typeToken->kind == SymSexpLexer::Token::Kind::TK_IDENT) {
@@ -718,30 +748,15 @@ namespace symir {
     } else {
       Assert(
           typeToken->kind == SymSexpLexer::Token::Kind::TK_TYPE_I32,
-          "The 3rd child (%s) of the param node is not an identifier, while it should be the "
-          "type of the term",
+          "The type token (%s) of the local should be a type (i32) or struct name",
           typeToken->FullInfo().c_str()
       );
       localType = SymIR::GetTypeFromSName(typeToken->ToStr());
     }
 
-    std::vector<int> vecShape;
-    while (true) {
-      const auto opKind = popOp();
-      if (opKind != SymSexpLexer::Token::TK_LBRACKET) {
-        pushOp(opKind); // Push it back as this is not a bracket
-        break;
-      }
-      const auto dimLen = static_cast<int>(popOp());
-      Assert(
-          dimLen > 0,
-          "The dimension length (%d) after an left-bracket operator should be a positive integer",
-          dimLen
-      );
-      vecShape.insert(vecShape.begin(), dimLen);
-    }
-
+    // Now collect initializer values (between type and varname)
     std::vector<Coef *> vecInits;
+
     // Build initializer list.
     // - Scalar locals: require exactly one init.
     // - Struct locals (non-vec): require full flattened init list.
@@ -749,7 +764,6 @@ namespace symir {
     // - Vec locals with scalar baseType: require one init per element.
     if (!vecShape.empty() && localType == SymIR::STRUCT) {
       // No mandatory initializer tokens here.
-      // (If present, they will be parsed as part of the identifier token stream anyway.)
     } else {
       // Calculate total number of scalar initializers required.
       int scalarCount = 1;
@@ -782,37 +796,34 @@ namespace symir {
 
       int totalInits = arraySize * scalarCount;
 
-      const auto *coefToken = popArg<SymSexpLexer::Token>();
-      Assert(
-          coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-          "The 2nd child (%s) of the parameter is not an identifier, while it should be the "
-          "coefficient of the term",
-          coefToken->FullInfo().c_str()
-      );
-      vecInits.push_back(buildCoef(coefToken, SymIR::I32));
-      delete coefToken;
-
-      for (int i = 0; i < totalInits - 1; i++) {
-        coefToken = popArg<SymSexpLexer::Token>();
-        Assert(coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT, "Expected init value");
+      // Collect init values from the arg stack (between type and varname)
+      for (int i = 0; i < totalInits; i++) {
+        const auto *coefToken = popArg<SymSexpLexer::Token>();
+        Assert(
+            coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+            "Expected initializer value, got %s", coefToken->FullInfo().c_str()
+        );
         vecInits.insert(vecInits.begin(), buildCoef(coefToken, SymIR::I32));
         delete coefToken;
       }
     }
 
+    // Parse the variable name (at bottom of arg stack)
     const auto *varToken = popArg<SymSexpLexer::Token>();
     Assert(
         varToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-        "The 1st child (%s) of the parameter is not an identifier, while it should be the "
-        "type of the term",
-        varToken->FullInfo().c_str()
+        "The variable name (%s) of the local should be an identifier", varToken->FullInfo().c_str()
     );
+
+    // Check for volatile keyword
     bool isVolatile = false;
     if (const auto opKind = popOp(); opKind == SymSexpLexer::Token::TK_KW_VOL) {
       isVolatile = true;
     } else {
-      pushOp(opKind); // Push it back as this is a volatile parameter
+      pushOp(opKind); // Push it back as this is not a volatile local
     }
+
+    // Create the appropriate local variable type
     if (vecShape.empty()) {
       if (localType == SymIR::STRUCT) {
         funBd->SymStructLocal(varToken->ToStr(), structName, vecInits);

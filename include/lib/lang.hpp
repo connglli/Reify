@@ -104,8 +104,11 @@ namespace symir {
    * Context-Free Grammar:
    *
    * -----------------------------------------------
-   * Funct   -> 'function' Name Type (Type Var)+ Local* Block+
-   * Local   -> 'local' Var Coef Type
+   * Struct  -> 'struct' Name '(' Field+ ')'
+   * Field   -> '(' Name Type ')'
+   * Funct   -> 'function' Name Type (Param)+ Local* Block+
+   * Param   -> Type Var
+   * Local   -> Var Coef+ Type
    * Block   -> 'block' Label Stmt* Target?
    * ---
    * Target  -> Branch | Goto
@@ -125,7 +128,10 @@ namespace symir {
    * ---
    * Name    -> f1, f2, f3, v1, v2, ...
    * Label   -> BB1, BB2, BB3, ...
-   * Type    -> int | Name           // Scalar int or Struct type
+   * Type    -> IntType |            // IntType (i32)
+   *            Type[Coef] |         // Array type (Type[size])
+   *            Name                 // Struct type (Name)
+   * IntType -> i32                  // Base integer type
    * Coef    -> c1, c2, 0, 1, 2, ...
    * CondOp  -> >, <, ==             // Remove other ops as they are identical
    * ExprOp  -> +, -                 // Avoid all other ops to reduce SMT solver's stress
@@ -137,7 +143,7 @@ namespace symir {
    * -----------------------------------------------
    * (struct Point ((x i32) (y i32)))
    * (struct Rect ((tl Point) (br Point)))
-   * (fun f0 i32 ((par v0 [10] i32) (par v1 Rect))
+   * (fun f0 i32 ((par v0 i32[10]) (par v1 Rect))
    *   (loc v2 #100 i32)
    *   (bbl BB1
    *     (asn v0[#0] (eadd (mul #12 v1[tl][x]) (mul c4 v2)))
