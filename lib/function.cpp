@@ -116,7 +116,7 @@ void FunPlus::Generate(bool allowDeadCode) {
 
         // Recursive initialization helper
         std::function<void(std::string, const symir::StructDef *, std::vector<symir::Coef *> &)>
-            initStruct = [&](std::string prefix, const symir::StructDef *sd,
+            initStruct = [&](const std::string &prefix, const symir::StructDef *sd,
                              std::vector<symir::Coef *> &acc) {
               for (const auto &field: sd->GetFields()) {
                 std::string fName = prefix + "_" + field.name;
@@ -189,29 +189,27 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
   // Helper for recursive generation
   std::function<std::string(int)>
       generate =
-          [&](int depth
+          [&](const int depth
           ) -> std::
                 string {
-                  auto availStructs = funBd->GetStructs();
+                  const auto availStructs = funBd->GetStructs();
                   // Allow picking existing if available. If depth limit reached, MUST pick existing
                   // or avoid Struct.
-                  bool canPick = !availStructs.empty();
-                  bool mustPick = depth >= 2;
+                  const bool canPick = !availStructs.empty();
+                  const bool mustPick = depth >= 2;
 
                   // Probabilities
-                  bool pickExisting =
-                      canPick && (mustPick || (Random::Get().UniformReal()() < 0.3));
-
-                  if (pickExisting) {
-                    int idx = Random::Get().Uniform(0, (int) availStructs.size() - 1)();
+                  if (canPick && (mustPick || (Random::Get().UniformReal()() < 0.3))) {
+                    const int idx = Random::Get().Uniform(0, (int) availStructs.size() - 1)();
                     return availStructs[idx]->GetName();
-                  } else if (mustPick) {
+                  }
+                  if (mustPick) {
                     return ""; // Indicates fallback to I32 (or non-struct)
                   }
 
                   // Generate New Struct
                   std::vector<symir::StructDef::Field> fields;
-                  int numFields =
+                  const int numFields =
                       Random::Get().Uniform(1, GlobalOptions::Get().MaxNumStructFields)();
 
                   // Reduce array sizes to avoid OOM with nesting
@@ -221,7 +219,7 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
 
                   for (int j = 0; j < numFields; ++j) {
                     symir::StructDef::Field field;
-                    field.name = "f" + std::to_string(j);
+                    field.name = NameField(j);
 
                     float p = randProba();
                     bool fieldIsArray = false;
@@ -265,7 +263,8 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
                     fields.push_back(field);
                   }
 
-                  std::string structName = "S" + std::to_string(funBd->GetStructs().size());
+                  std::string structName =
+                      NameStruct(name, static_cast<int>(funBd->GetStructs().size()));
                   funBd->SymStruct(structName, fields);
                   return structName;
                 };
@@ -644,7 +643,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
 
   // Declare the function prototype
-  main << "extern " << symir::SymCxLower::GetFunPrototype(*fun) << ";" << std::endl << std::endl;
+  main << symir::SymCxLower::GetFunPrototype(*fun) << ";" << std::endl << std::endl;
 
   // Generate the main function
   main << "int main(int argc, char* argv[])" << std::endl;
@@ -657,47 +656,28 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
     const auto &fina = finalizations[i];
     const auto numParams = static_cast<int>(init.size());
 
-    // First, declare temporary variables for array/struct parameters
-    std::vector<std::string> argNames;
+    // Now generate the function call with proper arguments
+    main << "  " << StatelessChecksum::GetCheckChksumName() << "("
+         << StatelessChecksum::Compute(fina) << ", " << fun->GetName() << "(";
     for (int j = 0; j < numParams; j++) {
       const auto *param = params[j];
       const auto &arg = init[j];
 
       if (arg.IsVector()) {
-        // Array parameter - need a temporary variable
-        std::string tmpName = "tmp_" + std::to_string(i) + "_" + std::to_string(j);
-        argNames.push_back(tmpName);
-
-        // Get the array type from the parameter
-        const auto *vecParam = dynamic_cast<const symir::VecParam *>(param);
-        Assert(vecParam != nullptr, "Expected VecParam for array argument");
-
-        // Generate the array declaration with proper dimensions
-        main << "  ";
-        if (vecParam->GetBaseType() == symir::SymIR::STRUCT) {
-          main << "struct " << vecParam->GetStructName();
+        // Prepend type cast for compound literal
+        main << "(";
+        if (param->GetBaseType() == symir::SymIR::STRUCT) {
+          main << "struct " << param->GetStructName();
         } else {
-          main << symir::SymIR::GetTypeCName(vecParam->GetBaseType());
+          main << symir::SymIR::GetTypeCName(param->GetBaseType());
         }
-        main << " " << tmpName;
-        for (int dim: vecParam->GetVecShape()) {
+        for (int dim: param->GetVecShape()) {
           main << "[" << dim << "]";
         }
-        main << " = " << arg.ToCxStr() << ";" << std::endl;
-      } else if (arg.IsStruct()) {
-        // Struct parameter - can use compound literal directly in C99
-        argNames.push_back(arg.ToCxStr());
-      } else {
-        // Scalar parameter - pass directly
-        argNames.push_back(arg.ToCxStr());
+        main << ")";
       }
-    }
+      main << arg.ToCxStr();
 
-    // Now generate the function call with proper arguments
-    main << "  " << StatelessChecksum::GetCheckChksumName() << "("
-         << StatelessChecksum::Compute(fina) << ", " << fun->GetName() << "(";
-    for (int j = 0; j < numParams; j++) {
-      main << argNames[j];
       if (j != numParams - 1) {
         main << ", ";
       }

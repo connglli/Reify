@@ -28,13 +28,19 @@
 
 #include <string>
 
+static std::string NameStruct(const std::string &funName, const int index) {
+  return funName + "_S_" + std::to_string(index);
+}
+
+static std::string NameField(const int index) { return "f_" + std::to_string(index); }
+
 static std::string NameLabel(const int block) { return "BB" + std::to_string(block); }
 
 static std::string NameVar(const int index, const int version = -1) {
   if (version == -1) {
-    return "var_" + std::to_string(index);
+    return "v_" + std::to_string(index);
   } else {
-    return "var_" + std::to_string(index) + "_" + std::to_string(version);
+    return "v_" + std::to_string(index) + "_" + std::to_string(version);
   }
 }
 
