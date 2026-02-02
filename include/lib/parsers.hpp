@@ -159,7 +159,7 @@ namespace symir {
     std::string::size_type curCol = 0; // Current column position in the source code
   };
 
-  /// SymSexpParser is the AST parser for the SymIR in the S Expression form.
+  /// SymSexpParser is a simple recursive-descent LL parser for the SymIR in the S Expression form.
   class SymSexpParser {
 
   public:

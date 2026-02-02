@@ -171,15 +171,17 @@ namespace symir {
     if (p.IsVolatile()) {
       out << KW_VOL << " ";
     }
-    out << KW_PAR << " " << p.GetName();
+    out << KW_PAR << " " << p.GetName() << " ";
+    // Output type with array dimensions: Type[dim1][dim2]...
+    if (p.GetBaseType() == SymIR::STRUCT) {
+      out << p.GetStructName();
+    } else {
+      out << SymIR::GetTypeSName(p.GetBaseType());
+    }
     for (const auto &l: p.GetVecShape()) {
       out << "[" << l << "]";
     }
-    if (p.GetBaseType() == SymIR::STRUCT) {
-      out << " " << p.GetStructName() << ")";
-    } else {
-      out << " " << SymIR::GetTypeSName(p.GetBaseType()) << ")";
-    }
+    out << ")";
   }
 
   void SymSexpLower::Visit(const StructParam &p) {
@@ -203,20 +205,22 @@ namespace symir {
     if (l.IsVolatile()) {
       out << KW_VOL << " ";
     }
-    out << KW_LOC << " " << l.GetName();
-    for (auto len: l.GetVecShape()) {
-      out << "[" << len << "]";
-    }
-    out << " ";
+    out << KW_LOC << " " << l.GetName() << " ";
+    // Output init values first
     for (auto c: l.GetCoefs()) {
       c->Accept(*this);
       out << " ";
     }
+    // Then output type with array dimensions: Type[dim1][dim2]...
     if (l.GetBaseType() == SymIR::STRUCT) {
-      out << l.GetStructName() << ")" << std::endl;
+      out << l.GetStructName();
     } else {
-      out << SymIR::GetTypeSName(l.GetBaseType()) << ")" << std::endl;
+      out << SymIR::GetTypeSName(l.GetBaseType());
     }
+    for (auto len: l.GetVecShape()) {
+      out << "[" << len << "]";
+    }
+    out << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const StructLocal &l) {
@@ -234,12 +238,14 @@ namespace symir {
     for (size_t i = 0; i < s.GetFields().size(); ++i) {
       const auto &f = s.GetField(i);
       out << "(" << f.name << " ";
-      for (int d: f.shape)
-        out << "[" << d << "]";
+      // Output type first, then dimensions
       if (f.baseType == SymIR::STRUCT)
         out << f.structName;
       else
         out << SymIR::GetTypeSName(f.baseType);
+      // Then output dimensions
+      for (int d: f.shape)
+        out << "[" << d << "]";
       out << ")";
       if (i != s.GetFields().size() - 1) {
         out << " ";
