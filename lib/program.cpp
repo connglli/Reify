@@ -30,130 +30,11 @@
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 
-class StructRenamer : public symir::SymIRVisitor {
-public:
-  StructRenamer(const std::string &prefix) : prefix(prefix) {}
-
-  void Rename(symir::Funct &f) {
-    // Build map
-    std::vector<std::string> oldNames;
-    for (const auto &s: f.GetStructs()) {
-      oldNames.push_back(s->GetName());
-      oldToNew[s->GetName()] = prefix + "_" + s->GetName();
-    }
-    // Rename structs in Funct first
-    for (const auto &old: oldNames) {
-      f.RenameStruct(old, oldToNew[old]);
-    }
-    f.Accept(*this);
-  }
-
-  void RenameMapping(FunPlus::IniFinMap &mapping) {
-    for (auto &inits: mapping.first) {
-      for (auto &arg: inits) {
-        if (arg.IsStruct()) {
-          arg.SetStructName(getNewName(arg.GetStructName()));
-        }
-      }
-    }
-    for (auto &finas: mapping.second) {
-      for (auto &arg: finas) {
-        if (arg.IsStruct()) {
-          arg.SetStructName(getNewName(arg.GetStructName()));
-        }
-      }
-    }
-  }
-
-private:
-  std::string prefix;
-  std::map<std::string, std::string> oldToNew;
-
-  std::string getNewName(const std::string &oldName) {
-    if (oldToNew.count(oldName))
-      return oldToNew[oldName];
-    return oldName;
-  }
-
-  void Visit(const symir::VarUse &v) override {}
-
-  void Visit(const symir::Coef &c) override {}
-
-  void Visit(const symir::Term &t) override {}
-
-  void Visit(const symir::Expr &e) override {}
-
-  void Visit(const symir::Cond &c) override {}
-
-  void Visit(const symir::AssStmt &a) override {}
-
-  void Visit(const symir::RetStmt &r) override {}
-
-  void Visit(const symir::Branch &b) override {}
-
-  void Visit(const symir::Goto &g) override {}
-
-  void Visit(const symir::Block &b) override {
-    for (const auto &s: b.GetStmts()) {
-      s->Accept(*this);
-    }
-  }
-
-  void Visit(const symir::Funct &f) override {
-    for (auto &s: f.GetStructs()) {
-      s->Accept(*this);
-    }
-    for (auto &p: f.GetParams()) {
-      p->Accept(*this);
-    }
-    for (auto &l: f.GetLocals()) {
-      l->Accept(*this);
-    }
-  }
-
-  void Visit(const symir::ScaParam &p) override {}
-
-  void Visit(const symir::VecParam &p) override {
-    if (p.GetType() == symir::SymIR::STRUCT) {
-      symir::VecParam &mp = const_cast<symir::VecParam &>(p);
-      mp.SetStructName(getNewName(mp.GetStructName()));
-    }
-  }
-
-  void Visit(const symir::StructParam &p) override {
-    symir::StructParam &mp = const_cast<symir::StructParam &>(p);
-    mp.SetStructName(getNewName(mp.GetStructName()));
-  }
-
-  void Visit(const symir::ScaLocal &l) override {}
-
-  void Visit(const symir::VecLocal &l) override {
-    if (l.GetType() == symir::SymIR::STRUCT) {
-      symir::VecLocal &ml = const_cast<symir::VecLocal &>(l);
-      ml.SetStructName(getNewName(ml.GetStructName()));
-    }
-  }
-
-  void Visit(const symir::StructLocal &l) override {
-    symir::StructLocal &ml = const_cast<symir::StructLocal &>(l);
-    ml.SetStructName(getNewName(ml.GetStructName()));
-  }
-
-  void Visit(const symir::StructDef &s) override {
-    symir::StructDef &ms = const_cast<symir::StructDef &>(s);
-    // Name already renamed in Funct::RenameStruct
-    for (auto &f: ms.GetMutableFields()) {
-      if (f.type == symir::SymIR::STRUCT) {
-        f.structName = getNewName(f.structName);
-      }
-    }
-  }
-};
-
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
   // Parse all selected function files
   int idx = 0;
+  std::set<std::string> funNames;
   for (const auto &funPath: funPaths) {
     FunArts arts(funPath);
     fs::path sexpPath = arts.GetSexpPath();
@@ -163,14 +44,14 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
           sexpPath.c_str()
       );
     }
+    // Assume no function name and struct name conflicts across different files
     auto func = FunPlus::ParseFunSexpCode(sexpPath);
-    // Rename structs to avoid collision
-    StructRenamer renamer(func->GetName());
-    renamer.Rename(*func);
-
+    Assert(
+        !funNames.contains(func->GetName()), "Function name conflict: %s", func->GetName().c_str()
+    );
+    funNames.insert(func->GetName());
     functions.push_back(std::move(func));
     auto mapping = FunPlus::ParseMappingCode(arts.GetMapPath());
-    renamer.RenameMapping(mapping);
     mappings.push_back(std::move(mapping));
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
     idx++;
@@ -234,18 +115,19 @@ protected:
     if (succeeded) {
       return;
     }
-    symir::Coef *p = const_cast<symir::Coef *>(&c);
-    if (wasMutated(p)) {
+    auto *pc = const_cast<symir::Coef *>(&c);
+    if (wasMutated(pc)) {
       // If the coefficient is already replaced, we do not need to do anything
       return;
     }
     // Replace the coefficient with a call to the function
     Assert(
-        p->GetType() == symir::SymIR::I32,
+        pc->GetType() == symir::SymIR::I32,
         "Unsupported type %s for the coefficient with name \"%s\"",
-        symir::SymIR::GetTypeName(p->GetType()).c_str(), p->GetName().c_str()
+        symir::SymIR::GetTypeName(pc->GetType()).c_str(), pc->GetName().c_str()
     );
-    int coefVal = p->GetI32Value();
+
+    int coefVal = pc->GetI32Value();
     int chkVal = StatelessChecksum::Compute(*fina);
     std::ostringstream chkOss;
     chkOss << StatelessChecksum::GetCheckChksumName() << "(" << chkVal << ", " << guest->GetName()
@@ -253,7 +135,21 @@ protected:
 
     const auto &params = guest->GetParams();
     for (int i = 0; i < static_cast<int>(init->size()); ++i) {
-      chkOss << (*init)[i].ToCxStr();
+      const auto &p = params[i];
+      const auto &arg = (*init)[i];
+      if (arg.IsVector()) {
+        chkOss << "(";
+        if (p->GetBaseType() == symir::SymIR::STRUCT) {
+          chkOss << "struct " << p->GetStructName();
+        } else {
+          chkOss << symir::SymIR::GetTypeCName(p->GetBaseType());
+        }
+        for (int dim: p->GetVecShape()) {
+          chkOss << "[" << dim << "]";
+        }
+        chkOss << ")";
+      }
+      chkOss << arg.ToCxStr();
       if (i < static_cast<int>(init->size()) - 1) {
         chkOss << ", ";
       }
@@ -262,11 +158,11 @@ protected:
     // To avoid UBs, we'd use an upper type to save the result: long long here
     long long diff = static_cast<long long>(coefVal) - static_cast<long long>(chkVal);
     if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
-      p->SetValue("(" + chkOss.str() + " + " + std::to_string(diff) + ")");
+      pc->SetValue("(" + chkOss.str() + " + " + std::to_string(diff) + ")");
     } else {
-      p->SetValue("(int) ((long long)" + chkOss.str() + " + " + std::to_string(diff) + "L)");
+      pc->SetValue("(int) ((long long)" + chkOss.str() + " + " + std::to_string(diff) + "L)");
     }
-    markMutated(p);
+    markMutated(pc);
     succeeded = true;
   }
 
@@ -501,6 +397,20 @@ void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
 
   const auto &params = functions[0]->GetParams();
   for (size_t i = 0; i < init->size(); ++i) {
+    auto arg = (*init)[i];
+    if (arg.IsVector()) {
+      // Prepend type cast for compound literal
+      mainFile << "(";
+      if (params[i]->GetBaseType() == symir::SymIR::STRUCT) {
+        mainFile << "struct " << params[i]->GetStructName();
+      } else {
+        mainFile << symir::SymIR::GetTypeCName(params[i]->GetBaseType());
+      }
+      for (int dim: params[i]->GetVecShape()) {
+        mainFile << "[" << dim << "]";
+      }
+      mainFile << ")";
+    }
     mainFile << (*init)[i].ToCxStr();
     if (i != init->size() - 1) {
       mainFile << ", ";
