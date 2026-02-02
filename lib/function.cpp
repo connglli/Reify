@@ -663,20 +663,8 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
       const auto *param = params[j];
       const auto &arg = init[j];
 
-      if (arg.IsVector()) {
-        // Prepend type cast for compound literal
-        main << "(";
-        if (param->GetBaseType() == symir::SymIR::STRUCT) {
-          main << "struct " << param->GetStructName();
-        } else {
-          main << symir::SymIR::GetTypeCName(param->GetBaseType());
-        }
-        for (int dim: param->GetVecShape()) {
-          main << "[" << dim << "]";
-        }
-        main << ")";
-      }
-      main << arg.ToCxStr();
+      // Use the new type-safe GetTypeCastStr method
+      main << arg.GetTypeCastStr(param) << arg.ToCxStr();
 
       if (j != numParams - 1) {
         main << ", ";
