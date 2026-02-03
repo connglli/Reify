@@ -67,13 +67,6 @@ JAVA_HOME=""             # Path to the JDK installation directory
 # Options parsing
 #-=========================================
 
-check_deps() {
-  if ! command -v uuidgen >/dev/null 2>&1; then
-    myloge "Error: uuidgen not found on PATH; please install uuid-runtime"
-    exit 1
-  fi
-}
-
 show_usage() {
   echo "Usage: $0 --nproc <num_proc> --niter <fuzz_iter> --output <work_dir> --java-home <JAVA_HOME>"
   echo ""
@@ -85,7 +78,6 @@ show_usage() {
   echo "  --help        Show this help message"
 }
 
-check_deps
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -212,7 +204,7 @@ fuzz_worker() {
     # Allow early exit if stop was requested before iteration starts
     [[ $stop_evt -ne 0 ]] && break
 
-    uuid=$(uuidgen)
+    uuid=$(head /dev/urandom | tr -dc '0-9A-Z' | head -c 6)
     uid=${uuid//-/_}
     fid="${uid}_${sno}"
     clazz="Class_${fid}"
