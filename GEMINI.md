@@ -42,7 +42,7 @@ Technical details of the two stages and the IR are presented in [./DOCS.md](./DO
 │   ├── ctrlflow.cpp             # Modeling and generating a CFG and its EPs
 │   ├── function.cpp             # Modeling and generating a leaf function
 │   ├── program.cpp              # Modeling and generating a whole progra
-│   ├── ubfexec.cpp              # Solving a SymIR program following an EP
+│   ├── symexec.cpp              # Symbolically executing a SymIR program following an EP
 │   ├── ubfree.cpp               # Collecting UB-free constraints
 │   ├── ubinject.cpp             # Injecting UB into unreachable basic blocks
 │   ├── random.cpp
