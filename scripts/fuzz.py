@@ -145,6 +145,8 @@ def generate_function(
       cmd += shlex.split(opts.extra)
     cmd += ["-o", str(opts.outdir), "-n", str(opts.sno), opts.uuid]
     cmdline.check_out(cmd, timeout=timeout)
+    with arts.get_func_file().open("a") as fout:
+      fout.write(f"\n\n// Fgen Options: {' '.join(cmd)}")
     result = arts, None
     if not configs.FunArts.is_test_dir(arts.get_test_dir()):
       result = (
@@ -227,6 +229,8 @@ def generate_programs(
         shutil.rmtree(test_dir, ignore_errors=True)
         continue  # Not a valid program test dir
       arts.append(configs.ProgArts.from_test_dir(test_dir, gen_dir=opts.indir))
+      with arts[-1].get_main_file().open("a") as fout:
+        fout.write(f"\n\n// Pgen Options: {' '.join(cmd)}")
     if arts:
       return arts, None
     else:
@@ -489,8 +493,6 @@ class Worker:
       return False  # No functions are generated
     self.log(f"Generated function: {arts.get_test_dir()}")
     self.log(f"Testing the compiler with the generated function: {arts.get_test_dir()}")
-    with arts.get_main_file().open("a") as fout:
-      fout.write(f"\n\n// Fgen Options: {json.dumps(opts.to_dict())}")
     binary = arts.get_test_dir() / "main.out"
     self.test(arts.get_test_dir(), binary=binary, timeout=test_tmo)
     return True  # Generated and tested
@@ -506,8 +508,6 @@ class Worker:
     self.log("Testing the compiler with the generated programs")
     for index, arts in enumerate(all_arts):
       self.log(f"{index}: Testing the compiler with the generated program: {arts.get_test_dir()}")
-      with arts.get_main_file().open("a") as fout:
-        fout.write(f"\n\n// Pgen Options: {json.dumps(opts.to_dict())}")
       binary = arts.get_test_dir() / "main.out"
       self.test(arts.get_test_dir(), binary=binary, timeout=test_tmo)
 
