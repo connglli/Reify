@@ -23,6 +23,7 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+import os
 import random
 import time
 from argparse import ArgumentParser
@@ -135,6 +136,12 @@ if __name__ == "__main__":
 
   args = parser.parse_args()
 
+  # Set default Bitwuzla threads if not specified
+  if "--Xbitwuzla-threads" in (args.extra or ""):
+    extra_opts = args.extra
+  else:
+    extra_opts = (args.extra or "") + f" --Xbitwuzla-threads {os.cpu_count()}"
+
   outdir = Path(args.output).resolve().absolute()
   run_gen_loop(
     FuncGenOptions(
@@ -148,8 +155,8 @@ if __name__ == "__main__":
       sexp=not args.disable_sexp,
       allops=not args.disable_allops,
       injubs=not args.disable_injubs,
-      seed=args.seed,  # We save it as the initial seed
-      extra=args.extra,
+      seed=args.seed,
+      extra=extra_opts,
     ),
     limit=args.limit,
     check=args.check,

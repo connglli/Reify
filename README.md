@@ -43,7 +43,7 @@ The output directory (given by the `--output` option) includes multiple sub-dire
 **Or use the following command to generate an individual leaf function**:
 
 ```bash
-timeout 3s ./build/bin/rysmith -A -U -m -S --output generated --sno 0 $(uuidgen)
+timeout 3s ./build/bin/rysmith -A -U -m -S --output generated --Xbitwuzla-threads 4 --sno 0 $(uuidgen)
 ```
 
 Note that generating leaf functions may
