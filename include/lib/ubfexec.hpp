@@ -27,6 +27,7 @@
 #define REIFY_UBFEXEC_HPP
 
 #include <bitwuzla/cpp/bitwuzla.h>
+#include <cstddef>
 #include "lib/function.hpp"
 #include "lib/ubfree.hpp"
 
@@ -110,6 +111,9 @@ private:
 
   // Bitwuzla solver for solving constraints
   std::unique_ptr<bitwuzla::Bitwuzla> solver;
+
+  // Number of constraints already asserted into `solver`.
+  size_t numAssertedConstraints = 0;
 
   // The value of each input parameter at the entry of the function.
   std::vector<std::vector<ArgPlus<int>>> inits{};
