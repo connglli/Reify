@@ -109,12 +109,12 @@ if __name__ == "__main__":
     "--disable-allops",
     action="store_true",
     default=False,
-    help="enadisableble using all kinds of term and expression operators",
+    help="disable using all kinds of term and expression operators",
   )
   parser.add_argument(
     "--disable-injubs",
     action="store_true",
-    default=True,
+    default=False,
     help="disable using all kinds of term and expression operators",
   )
   parser.add_argument(
