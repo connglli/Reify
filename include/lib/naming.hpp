@@ -29,39 +29,33 @@
 #include <string>
 
 static std::string NameStruct(const std::string &funName, const int index) {
-  return funName + "_S_" + std::to_string(index);
+  return funName + "_S" + std::to_string(index);
 }
 
-static std::string NameField(const int index) { return "f_" + std::to_string(index); }
+static std::string NameField(const int index) { return "f" + std::to_string(index); }
 
 static std::string NameLabel(const int block) { return "BB" + std::to_string(block); }
 
-static std::string NameVar(const int index, const int version = -1) {
-  if (version == -1) {
-    return "v_" + std::to_string(index);
-  } else {
-    return "v_" + std::to_string(index) + "_" + std::to_string(version);
-  }
-}
+static std::string NameVar(const int index) { return "v" + std::to_string(index); }
 
 static std::string NameCoef(const int block, const int stmt, const int which) {
-  return "a_" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which);
+  return "a" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which);
 }
 
 static std::string NameConst(const int block, const int stmt) {
-  return "a_" + std::to_string(block) + "_" + std::to_string(stmt);
+  return "a" + std::to_string(block) + "_" + std::to_string(stmt);
 }
 
 static std::string NameCondCoef(const int block, const int stmt, const int which) {
-  return "b_" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which);
+  return "b" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which);
 }
 
 static std::string NameCondConst(const int block, const int stmt) {
-  return "b_" + std::to_string(block) + "_" + std::to_string(stmt);
+  return "b" + std::to_string(block) + "_" + std::to_string(stmt);
 }
 
 static std::string NameAccess(const int block, const int stmt, const int which, const int dim) {
-  return "i_" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which) +
+  return "i" + std::to_string(block) + "_" + std::to_string(stmt) + "_" + std::to_string(which) +
          "_" + std::to_string(dim);
 }
 

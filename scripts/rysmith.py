@@ -25,7 +25,6 @@
 
 import random
 import time
-import uuid
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -33,7 +32,7 @@ from configs import (
   DEFAULT_OUTPUT_DIR,
   FunArts,
 )
-from fuzz import FGEN_SUGGESTED_CONFIGS, FuncGenOptions, generate_function
+from fuzz import FGEN_SUGGESTED_CONFIGS, FuncGenOptions, generate_function, next_uuid
 from ubchk import check_func_ubs
 
 
@@ -140,7 +139,7 @@ if __name__ == "__main__":
   run_gen_loop(
     FuncGenOptions(
       bin="./build/bin/rysmith",
-      uuid=str(uuid.uuid4()),
+      uuid=next_uuid(),
       sno=0,
       outdir=outdir,
       config=FGEN_SUGGESTED_CONFIGS[0],

@@ -42,7 +42,9 @@ from queue import Empty as QueueIsEmpty
 from subprocess import PIPE, STDOUT, CalledProcessError, TimeoutExpired
 from threading import Thread
 from typing import List, Optional, Tuple
-from uuid import uuid4 as uuidgen
+
+# Sample a 8-char strin
+keywords = "0123456789abcdef"
 
 import cmdline
 import configs
@@ -254,7 +256,8 @@ def rand_int(a: int = 0, b=MAX_I32) -> int:
 
 
 def next_uuid():
-  return str(uuidgen()).replace("-", "_")
+  keywords = "0123456789abcdefghijklmnopqrstuvwxyz"
+  return "".join(random.choices(keywords, k=6))
 
 
 def log(
