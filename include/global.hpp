@@ -66,8 +66,6 @@ struct GlobalOptions {
   // The maximum, recursive depth of a struct
   int MaxStructDepth = 2;
 
-  // These are our anti-UB (mostly just checking for overflow and underflow) checks
-  bool EnableSafetyChecks = true;
   // I don't want all coefficients to be 0, so this constraint takes care of that
   bool EnableInterestCoefs = true;
   // If true, we allow all operations in the terms and expressions

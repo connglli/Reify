@@ -25,9 +25,26 @@
 
 #include "lib/ubfree.hpp"
 
+#include <cstdint>
+#include <cstring>
+#include <limits>
+
 #include "lib/samputils.hpp"
 
 namespace {
+  int32_t BvValueToI32(const bitwuzla::Term &t) {
+    Assert(t.is_value(), "Expected a BV value term");
+    std::string binaryStr = t.value<std::string>(2);
+    if (binaryStr.empty()) {
+      return 0;
+    }
+    uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+    uint32_t u32 = static_cast<uint32_t>(unsigned_val);
+    int32_t s32 = 0;
+    std::memcpy(&s32, &u32, sizeof(int32_t));
+    return s32;
+  }
+
   void IterateStructElements(
       const symir::Funct &fun, const symir::StructDef *sDef,
       const std::function<void(std::string)> &callback, std::string prefix = ""
@@ -75,6 +92,59 @@ namespace {
     return flat;
   }
 } // namespace
+
+void UBSan::addConstraint(const bitwuzla::Term &c) {
+  ++addCalls_;
+  if (c.is_true()) {
+    ++skippedTrue_;
+    return;
+  }
+  const uint64_t id = c.id();
+  if (constraintIds.contains(id)) {
+    ++deduped_;
+    return;
+  }
+  constraintIds.insert(id);
+  constraints.push_back(c);
+}
+
+void UBSan::ensureInRange(const bitwuzla::Term &t) {
+  ++ensureInRangeCalls_;
+  if (t.is_value()) {
+    return;
+  }
+
+  // If bounds cover the full signed 32-bit range, these constraints are tautologies.
+  if (GlobalOptions::Get().LowerBound == std::numeric_limits<int32_t>::min() &&
+      GlobalOptions::Get().UpperBound == std::numeric_limits<int32_t>::max()) {
+    return;
+  }
+
+  const uint64_t id = t.id();
+  if (boundedIds.contains(id)) {
+    ++boundedAlready_;
+    return;
+  }
+  boundedIds.insert(id);
+
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
+  addConstraint(tm->mk_term(bitwuzla::Kind::BV_SGE, {t, lowerBound}));
+  addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {t, upperBound}));
+}
+
+UBSan::Stats UBSan::GetStats() const {
+  Stats s;
+  s.assertedConstraints = constraints.size();
+  s.uniqueConstraintIds = constraintIds.size();
+  s.uniqueBoundedIds = boundedIds.size();
+  s.addCalls = addCalls_;
+  s.skippedTrue = skippedTrue_;
+  s.deduped = deduped_;
+  s.ensureInRangeCalls = ensureInRangeCalls_;
+  s.boundedAlready = boundedAlready_;
+  return s;
+}
 
 void UBSan::Optimize() {
   // Note: Bitwuzla performs simplification automatically during solving.
@@ -237,7 +307,7 @@ void UBSan::MakeInitInteresting() {
       }
     }
   }
-  constraints.push_back(AtMostKZeroes(*tm, params, static_cast<int>(params.size()) / 2));
+  addConstraint(AtMostKZeroes(*tm, params, static_cast<int>(params.size()) / 2));
 }
 
 void UBSan::MakeInitWithRandomValue() {
@@ -249,20 +319,18 @@ void UBSan::MakeInitWithRandomValue() {
         const auto *sDef = fun.GetStruct(param->GetStructName());
         IterateStructElements(fun, sDef, [&](std::string elName) {
           auto val = tm->mk_bv_value_int64(bvSort, rand());
-          constraints.push_back(
+          addConstraint(
               tm->mk_term(bitwuzla::Kind::EQUAL, {CreateStructFieldExpr(param, elName, 0), val})
           );
         });
       } else {
         auto val = tm->mk_bv_value_int64(bvSort, rand());
-        constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {CreateScaExpr(param, 0), val}));
+        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {CreateScaExpr(param, 0), val}));
       }
     } else {
       for (int i = 0; i < param->GetVecNumEls(); i++) {
         auto val = tm->mk_bv_value_int64(bvSort, rand());
-        constraints.push_back(
-            tm->mk_term(bitwuzla::Kind::EQUAL, {CreateVecElExpr(param, i, 0), val})
-        );
+        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {CreateVecElExpr(param, i, 0), val}));
       }
     }
   }
@@ -303,8 +371,7 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
       }
     }
   }
-  constraints.push_back(AtMostKZeroes(*tm, params, std::min(3, static_cast<int>(params.size()) / 2))
-  );
+  addConstraint(AtMostKZeroes(*tm, params, std::min(3, static_cast<int>(params.size()) / 2)));
 }
 
 void UBSan::Visit(const symir::VarUse &v) {
@@ -340,20 +407,21 @@ void UBSan::Visit(const symir::VarUse &v) {
       auto dimLenTerm = tm->mk_bv_value_int64(bvSort, dimLen);
       auto zero = tm->mk_bv_zero(bvSort);
 
-      constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {idxExpr, zero}));
-      constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLT, {idxExpr, dimLenTerm}));
-
       // Concretize
       int elLoc = 0;
       if (idxExpr.is_value()) {
-        elLoc = std::stoll(idxExpr.value<std::string>(2), nullptr, 2);
-        if (elLoc < 0 || elLoc >= dimLen) {
-          elLoc = Random::Get().Uniform(0, dimLen - 1)();
+        const int32_t idxVal = BvValueToI32(idxExpr);
+        if (idxVal < 0 || idxVal >= dimLen) {
+          // Constant out-of-bounds access is UB; fail fast.
+          addConstraint(tm->mk_false());
+          elLoc = 0;
+        } else {
+          elLoc = idxVal;
         }
       } else {
         elLoc = Random::Get().Uniform(0, dimLen - 1)();
         auto elLocTerm = tm->mk_bv_value_int64(bvSort, elLoc);
-        constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {idxExpr, elLocTerm}));
+        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {idxExpr, elLocTerm}));
       }
 
       pendingArrayShape.push_back(dimLen);
@@ -378,19 +446,20 @@ void UBSan::Visit(const symir::VarUse &v) {
       auto numFieldsTerm = tm->mk_bv_value_int64(bvSort, numFields);
       auto zero = tm->mk_bv_zero(bvSort);
 
-      constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {idxExpr, zero}));
-      constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLT, {idxExpr, numFieldsTerm}));
-
       int fIdx = 0;
       if (idxExpr.is_value()) {
-        fIdx = std::stoll(idxExpr.value<std::string>(2), nullptr, 2);
-        if (fIdx < 0 || fIdx >= numFields) {
-          fIdx = Random::Get().Uniform(0, numFields - 1)();
+        const int32_t idxVal = BvValueToI32(idxExpr);
+        if (idxVal < 0 || idxVal >= numFields) {
+          // Constant out-of-bounds field access is invalid; fail fast.
+          addConstraint(tm->mk_false());
+          fIdx = 0;
+        } else {
+          fIdx = idxVal;
         }
       } else {
         fIdx = Random::Get().Uniform(0, numFields - 1)();
         auto fIdxTerm = tm->mk_bv_value_int64(bvSort, fIdx);
-        constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {idxExpr, fIdxTerm}));
+        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {idxExpr, fIdxTerm}));
       }
 
       const auto &field = sDef->GetField(fIdx);
@@ -413,10 +482,7 @@ void UBSan::Visit(const symir::VarUse &v) {
   }
 
   auto finalExpr = CreateVersionedExpr(varDef, suffix);
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {finalExpr, lowerBound}));
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {finalExpr, upperBound}));
+  ensureInRange(finalExpr);
 
   pushExpression(finalExpr);
   pushSuffix(suffix);
@@ -425,10 +491,7 @@ void UBSan::Visit(const symir::VarUse &v) {
 void UBSan::Visit(const symir::Coef &c) {
   Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
   auto coefExpr = CreateCoefExpr(c);
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {coefExpr, lowerBound}));
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {coefExpr, upperBound}));
+  ensureInRange(coefExpr);
   pushExpression(coefExpr);
 }
 
@@ -449,38 +512,38 @@ void UBSan::Visit(const symir::Term &t) {
   switch (t.GetOp()) {
     case symir::Term::Op::OP_ADD:
       // Prevent signed addition overflow
-      constraints.push_back(tm->mk_term(
+      addConstraint(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {coefExpr, varExpr})}
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_ADD, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_SUB:
       // Prevent signed subtraction overflow
-      constraints.push_back(tm->mk_term(
+      addConstraint(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {coefExpr, varExpr})}
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SUB, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_MUL:
       // Prevent signed multiplication overflow
-      constraints.push_back(tm->mk_term(
+      addConstraint(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {coefExpr, varExpr})}
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_MUL, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_DIV:
-      constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
+      addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
       // Prevent signed division overflow (INT_MIN / -1)
-      constraints.push_back(tm->mk_term(
+      addConstraint(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_REM:
-      constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
+      addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
       // Note: Remainder doesn't have overflow (same as division overflow would be INT_MIN % -1)
       // But we'll add the constraint anyway for consistency
-      constraints.push_back(tm->mk_term(
+      addConstraint(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr});
@@ -491,11 +554,6 @@ void UBSan::Visit(const symir::Term &t) {
     default:
       Panic("Cannot reacher here");
   }
-
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {termExpr, lowerBound}));
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {termExpr, upperBound}));
 
   pushExpression(termExpr);
 }
@@ -514,14 +572,14 @@ void UBSan::Visit(const symir::Expr &e) {
     switch (e.GetOp()) {
       case symir::Expr::Op::OP_ADD:
         // Prevent signed addition overflow
-        constraints.push_back(tm->mk_term(
+        addConstraint(tm->mk_term(
             bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {result, termExpr})}
         ));
         result = tm->mk_term(bitwuzla::Kind::BV_ADD, {result, termExpr});
         break;
       case symir::Expr::Op::OP_SUB:
         // Prevent signed subtraction overflow
-        constraints.push_back(tm->mk_term(
+        addConstraint(tm->mk_term(
             bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {result, termExpr})}
         ));
         result = tm->mk_term(bitwuzla::Kind::BV_SUB, {result, termExpr});
@@ -529,10 +587,6 @@ void UBSan::Visit(const symir::Expr &e) {
       default:
         Panic("Cannot reacher here");
     }
-    auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-    auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {result, lowerBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {result, upperBound}));
   }
   if (enableInterestCoefs) {
     makeCoefsInteresting(coefs);
@@ -569,7 +623,7 @@ void UBSan::Visit(const symir::AssStmt &a) {
 
   newVerExpr = CreateVersionedExpr(a.GetVar()->GetDef(), suffix, -2);
 
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {newVerExpr, exprExpr}));
+  addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {newVerExpr, exprExpr}));
 
   // TODO: This is an ugly support for enabling value numbering. Try make this a separate visitor.
   // TODO: Also considering numbering the value of a term or an expression, besides a variable.
@@ -614,7 +668,7 @@ void UBSan::Visit(const symir::AssStmt &a) {
       return;
 
     auto otherVarExpr = CreateScaExpr(otherVar);
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {newVerExpr, otherVarExpr}));
+    addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {newVerExpr, otherVarExpr}));
     Log::Get().Out() << "Value numbering enforced: " << ourName << "(version=" << versions[ourName]
                      << ") == " << otherName << "(version=" << versions[otherName] << ")"
                      << std::endl;
@@ -633,9 +687,9 @@ void UBSan::Visit(const symir::Branch &b) {
   }
 
   if (b.GetTrueTarget() == nextBbl) {
-    constraints.push_back(condExpr);
+    addConstraint(condExpr);
   } else if (b.GetFalseTarget() == nextBbl) {
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::NOT, {condExpr}));
+    addConstraint(tm->mk_term(bitwuzla::Kind::NOT, {condExpr}));
   } else {
     Panic(
         "The branch (true: \"%s\", false: \"%s\") does not have targets called \"%s\"",
@@ -650,21 +704,15 @@ void UBSan::Visit(const symir::ScaParam &p) {
   auto varExpr = CreateScaExpr(&p, 0);
   versions[p.GetName()] = 0;
   verbbls[p.GetName()] = "___entry_bbl";
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
+  ensureInRange(varExpr);
 }
 
 void UBSan::Visit(const symir::VecParam &p) {
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   for (int e = 0; e < p.GetVecNumEls(); e++) {
     auto elExpr = CreateVecElExpr(&p, e, 0);
     auto elName = GetVecElName(&p, e);
     versions[elName] = 0;
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {elExpr, upperBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {elExpr, lowerBound}));
+    ensureInRange(elExpr);
   }
 }
 
@@ -674,15 +722,12 @@ void UBSan::Visit(const symir::StructParam &p) {
       sDef != nullptr, "Struct definition %s not found for param %s", p.GetStructName().c_str(),
       p.GetName().c_str()
   );
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   IterateStructElements(fun, sDef, [&](std::string elName) {
     auto fieldExpr = CreateStructFieldExpr(&p, elName, 0);
     std::string fullFieldName = GetStructFieldName(&p, elName);
     versions[fullFieldName] = 0;
     verbbls[fullFieldName] = "___entry_bbl";
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {fieldExpr, upperBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {fieldExpr, lowerBound}));
+    ensureInRange(fieldExpr);
   });
 }
 
@@ -692,27 +737,21 @@ void UBSan::Visit(const symir::ScaLocal &l) {
   auto varExpr = CreateScaExpr(l.GetDefinition(), 0);
   versions[l.GetName()] = 0;
   verbbls[l.GetName()] = "___entry_bbl";
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
-  constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {varExpr, coefExpr}));
+  ensureInRange(varExpr);
+  addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {varExpr, coefExpr}));
 }
 
 void UBSan::Visit(const symir::VecLocal &l) {
   int numEls = l.GetVecNumEls();
   const auto &inits = l.GetCoefs();
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   for (int i = 0; i < numEls; i++) {
     inits[i]->Accept(*this);
     auto coefExpr = popExpression();
     auto elName = GetVecElName(l.GetDefinition(), i);
     auto elExpr = CreateVecElExpr(l.GetDefinition(), i, 0);
     versions[elName] = 0;
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {elExpr, upperBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {elExpr, lowerBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {elExpr, coefExpr}));
+    ensureInRange(elExpr);
+    addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {elExpr, coefExpr}));
   }
   if (enableInterestCoefs) {
     makeCoefsInteresting(inits);
@@ -722,8 +761,6 @@ void UBSan::Visit(const symir::VecLocal &l) {
 void UBSan::Visit(const symir::StructLocal &l) {
   const auto *sDef = fun.GetStruct(l.GetStructName());
   const auto &inits = l.GetCoefs();
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
 
   size_t initIdx = 0;
   IterateStructElements(fun, sDef, [&](std::string elName) {
@@ -736,9 +773,8 @@ void UBSan::Visit(const symir::StructLocal &l) {
     versions[fullFieldName] = 0;
     verbbls[fullFieldName] = "___entry_bbl";
 
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {fieldExpr, upperBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {fieldExpr, lowerBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {fieldExpr, coefExpr}));
+    ensureInRange(fieldExpr);
+    addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {fieldExpr, coefExpr}));
     initIdx++;
   });
 
@@ -798,5 +834,5 @@ void UBSan::makeCoefsInteresting(const std::vector<symir::Coef *> &coefs) {
   }
   // Allow at most 1 zero coefficient to prevent all-zero expressions
   // (which can cause division by zero or infinite loops)
-  constraints.push_back(AtMostKZeroes(*tm, exprs, std::min(1, static_cast<int>(coefs.size()) / 3)));
+  addConstraint(AtMostKZeroes(*tm, exprs, std::min(1, static_cast<int>(coefs.size()) / 3)));
 }
