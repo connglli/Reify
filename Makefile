@@ -150,7 +150,7 @@ RYLINK_EXTRA ?=
 
 testrylink: rylink
 	$(PY3) scripts/retouch.py $(RY_DIR)  # cleanup
-	$(BIN_DIR)/rylink --input $(RY_DIR) --limit $(RY_LIMIT) --seed $(RY_SEED) $(RYLINK_EXTRA) --debug $(shell uuidgen)
+	$(BIN_DIR)/rylink --input $(RY_DIR) --limit $(RY_LIMIT) --seed $(RY_SEED) $(RYLINK_EXTRA) --debug $(shell head /dev/urandom | tr -dc '0-9a-z' | head -c 6)
 	$(PY3) scripts/ubchk.py $(RY_DIR)
 
 
