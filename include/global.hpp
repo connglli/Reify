@@ -144,6 +144,15 @@ struct GlobalOptions {
   int FunctionDepth = 5;
 
   ////////////////////////////////////////////////////////////
+  ////// Solver Parameters
+  ////////////////////////////////////////////////////////////
+
+  // Number of threads to use for the Bitwuzla SMT solver
+  // Default is 1 (single-threaded). Higher values can improve performance
+  // on multi-core systems but may increase memory usage.
+  uint64_t BitwuzlaNumThreads = 1;
+
+  ////////////////////////////////////////////////////////////
   ////// Helper Functions
   ////////////////////////////////////////////////////////////
 
@@ -179,6 +188,8 @@ struct GlobalOptions {
       ("Xsample-bg-proba", "Probability of sampling a base graph from the given graph database", cxxopts::value<double>())
       ("Xenable-lvn-gvn", "Forcing some values to be the equivalent to give compilers opportunity to perform LVN/GVN", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xlvn-gvn-proba", "Probability of forcing some values to be the equivalent as some others", cxxopts::value<double>())
+      // Solver options
+      ("Xbitwuzla-threads", "Number of threads for the Bitwuzla SMT solver (default: 1)", cxxopts::value<uint64_t>())
       ;
     // clang-format on
   }
@@ -390,6 +401,16 @@ struct GlobalOptions {
         std::cerr << "Error: The probability for sampling a base graph from a graph database "
                   << "(--Xsample-bg-proba) cannot be be larger than 1. It should be within "
                      "0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("Xbitwuzla-threads")) {
+      BitwuzlaNumThreads = args["Xbitwuzla-threads"].as<uint64_t>();
+      if (BitwuzlaNumThreads < 1) {
+        std::cerr << "Error: The number of Bitwuzla threads (--Xbitwuzla-threads) must be at "
+                     "least 1."
                   << std::endl;
         exit(1);
       }
