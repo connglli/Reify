@@ -41,7 +41,7 @@ Technical details of the two stages and the IR are presented in [./DOCS.md](./DO
 │   ├── graph.cpp                # Modeling and generating a graph
 │   ├── ctrlflow.cpp             # Modeling and generating a CFG and its EPs
 │   ├── function.cpp             # Modeling and generating a leaf function
-│   ├── program.cpp              # Modeling and generating a whole progra
+│   ├── program.cpp              # Modeling and generating a whole program
 │   ├── symexec.cpp              # Symbolically executing a SymIR program following an EP
 │   ├── ubfree.cpp               # Collecting UB-free constraints
 │   ├── ubinject.cpp             # Injecting UB into unreachable basic blocks
@@ -52,6 +52,7 @@ Technical details of the two stages and the IR are presented in [./DOCS.md](./DO
 │   ├── logger.cpp
 │   └── third/                   # Third-party dependencies
 ├── src/
+│   ├── symircc.cpp              # CLI entry to compile a SymIR program into a C program
 │   ├── rysmith.cpp              # CLI entry to generate a leaf function
 │   └── rylink.cpp               # CLI entry to generate a set of whole programs
 ├── scripts/
