@@ -42,7 +42,7 @@ struct ProgGenOpts {
   bool debug;
 
   static ProgGenOpts Parse(int argc, char **argv) {
-    cxxopts::Options options("pgen");
+    cxxopts::Options options("rylink", "rylink: Reify for whole program generation\n");
     // clang-format off
     options.add_options()
       ("uuid", "An UUID identifier", cxxopts::value<std::string>())

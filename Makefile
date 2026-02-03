@@ -76,7 +76,7 @@ CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter
 LDFLAGS  := $(DBGFLAGS) $(shell pkg-config --libs bitwuzla) -lpthread -lz
 
 # Dependency files produced alongside object files.
-DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/func_gen.d $(OBJ_DIR)/prog_gen.d $(OBJ_DIR)/symircc.d
+DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/rysmith.d $(OBJ_DIR)/rylink.d $(OBJ_DIR)/symircc.d
 -include $(DEP_FILES)
 
 
@@ -84,7 +84,7 @@ DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/func_gen.d $(OBJ_DIR)/prog_gen.d $(OBJ_
 ## Building Targets
 ########################################################################
 
-.PHONY: clean all lib fgen pgen symircc bins test testprogs testfuncs genfuncs genprogs
+.PHONY: clean all lib rysmith rylink symircc bins testrylink testrysmith
 
 all: lib bins
 
@@ -107,11 +107,11 @@ $(LIB_OBJ_DIR)/chksum.o: $(LIB_DIR)/chksum.cpp
 
 lib: $(LIB_OBJ)
 
-$(BIN_DIR)/fgen: $(LIB_OBJ) $(OBJ_DIR)/func_gen.o
+$(BIN_DIR)/rysmith: $(LIB_OBJ) $(OBJ_DIR)/rysmith.o
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-$(BIN_DIR)/pgen: $(LIB_OBJ) $(OBJ_DIR)/prog_gen.o
+$(BIN_DIR)/rylink: $(LIB_OBJ) $(OBJ_DIR)/rylink.o
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
@@ -119,52 +119,39 @@ $(BIN_DIR)/symircc: $(LIB_OBJ) $(OBJ_DIR)/symircc.o
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
-fgen: $(BIN_DIR)/fgen
+rysmith: $(BIN_DIR)/rysmith
 
-pgen: $(BIN_DIR)/pgen
+rylink: $(BIN_DIR)/rylink
 
 symircc: $(BIN_DIR)/symircc
 
-bins: fgen pgen symircc
+bins: rysmith rylink symircc
 
 
 ########################################################################
 ## Generation Targets
 ########################################################################
 
-GEN_SEED ?= -1
+RY_SEED  ?= -1
+RY_LIMIT ?= 1000000
+RY_DIR   ?= generated
 
-## Function Generation
+## rysmith: Leaf Function Generation
 
-FGEN_OUT_DIR  ?= generated
-FGEN_LIMIT    ?= 1000000
-FGEN_SEXP_OPT := $(if $(FGEN_GEN_SEXP),--sexp,)
-FGEN_AOPS_OPT := $(if $(FGEN_ALL_OPS),--allops,)
-FGEN_UBIJ_OPT := $(if $(FGEN_INJ_UBS),--injubs,)
-FGEN_EXT_OPTS  := $(if $(FGEN_EXT_OPTS),--extra="$(FGEN_EXT_OPTS)",)
+RYSMITH_EXTRA := $(if $(RYSMITH_EXTRA),--extra="$(RYSMITH_EXTRA)",)
 
-genfuncs: fgen
-	@mkdir -p $(FGEN_OUT_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS)
+testrysmith: rysmith
+	@mkdir -p $(RY_DIR)
+	$(PY3) scripts/rysmith.py --output $(RY_DIR) --seed $(RY_SEED) --limit $(RY_LIMIT) $(RYSMITH_EXTRA) --check
 
-testfuncs: fgen
-	@mkdir -p $(FGEN_OUT_DIR)
-	$(PY3) scripts/fgen.py --output $(FGEN_OUT_DIR) --seed $(GEN_SEED) --limit $(FGEN_LIMIT) $(FGEN_SEXP_OPT) $(FGEN_AOPS_OPT) $(FGEN_UBIJ_OPT) $(FGEN_EXT_OPTS) --check
+## rylink: Whole Program Generation
 
-## Program Generation
+RYLINK_EXTRA ?=
 
-PGEN_IN_DIR    ?= $(FGEN_OUT_DIR)
-PGEN_LIMIT     ?= 100000
-PGEN_EX_OPTS   ?=
-
-genprogs: pgen
-	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
-	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) $(shell uuidgen)
-
-testprogs: pgen
-	$(PY3) scripts/retouch.py $(PGEN_IN_DIR)  # cleanup
-	$(BIN_DIR)/pgen --input $(PGEN_IN_DIR) --limit $(PGEN_LIMIT) --seed $(GEN_SEED) $(PGEN_EX_OPTS) --debug $(shell uuidgen)
-	$(PY3) scripts/ubchk.py $(PGEN_IN_DIR)
+testrylink: rylink
+	$(PY3) scripts/retouch.py $(RY_DIR)  # cleanup
+	$(BIN_DIR)/rylink --input $(RY_DIR) --limit $(RY_LIMIT) --seed $(RY_SEED) $(RYLINK_EXTRA) --debug $(shell uuidgen)
+	$(PY3) scripts/ubchk.py $(RY_DIR)
 
 
 ########################################################################
