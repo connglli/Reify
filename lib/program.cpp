@@ -64,18 +64,12 @@ public:
     Assert(host != nullptr, "The host function is given a nullptr");
     for (auto &sym: host->GetSymbols()) {
       // TODO: Check to ensure all symbols are Coef
-      if (auto *coef = dynamic_cast<symir::Coef *>(sym)) {
-        if (coef->IsSolved()) {
-          symbols[coef] = false;
-        } else {
-          // Ignore unsolved symbols (they might be in unreached code or injected ones?)
-          // Or fail? Original code asserted IsSolved.
-          // If we inject UBs, some symbols might be solved late?
-          // But CoefRepl runs after function generation where all reachable symbols should be
-          // solved. Unsolved symbols might be unreached. Original: Assert(sym->IsSolved(), ...);
-          // Let's keep it but skip if not Coef.
-        }
-      }
+      Assert(
+          sym->IsSolved(),
+          "The symbol \"%s\" in the host function is not solved, cannot replace it",
+          sym->GetName().c_str()
+      );
+      symbols[dynamic_cast<symir::Coef *>(sym)] = false;
     }
   }
 

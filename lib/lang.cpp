@@ -199,14 +199,14 @@ namespace symir {
   SymIRBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID> &termIds) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     ExprID eid = numCreatedExprs++;
-    std::vector<std::unique_ptr<Term>> terms_;
+    std::vector<std::unique_ptr<Term>> terms;
     for (const auto tid: termIds) {
       auto it = createdTerms.find(tid);
       Assert(it != createdTerms.end(), "Term with ID \"%lu\" does not exist", tid);
-      terms_.push_back(std::move(it->second));
+      terms.push_back(std::move(it->second));
       createdTerms.erase(it);
     }
-    createdExprs[eid] = std::make_unique<Expr>(op, std::move(terms_));
+    createdExprs[eid] = std::make_unique<Expr>(op, std::move(terms));
     return eid;
   }
 
