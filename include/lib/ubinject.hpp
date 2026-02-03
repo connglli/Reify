@@ -26,23 +26,24 @@
 #ifndef REIFY_UBINJECT_HPP
 #define REIFY_UBINJECT_HPP
 
+#include <bitwuzla/cpp/bitwuzla.h>
+#include <memory>
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
-#include "z3++.h"
 
 /// IntUBInject injects int-related undefined behaviors (UBs) into a given block of a given program.
 /// It leverages bitvec theory to collect constraints.
 class IntUBInject : protected symir::SymIRVisitor {
 public:
-  IntUBInject() :
-      ctx(std::make_unique<z3::context>()), solver(std::make_unique<z3::solver>(*ctx)),
-      constraints(std::make_unique<z3::expr_vector>(*ctx)) {}
+  IntUBInject() : tm(std::make_unique<bitwuzla::TermManager>()), solver(nullptr) {
+    bvSort = tm->mk_bv_sort(33); // 33-bit for overflow detection
+  }
 
   // Get the collected constraints that ensures the execution to be UB-free over integer arithmetic
-  [[nodiscard]] const z3::expr_vector &GetConstraints() const { return *constraints; }
+  [[nodiscard]] const std::vector<bitwuzla::Term> &GetConstraints() const { return constraints; }
 
-  // Get the Z3 context of us for collecting constraints
-  [[nodiscard]] z3::context &GetContext() { return *ctx; }
+  // Get the Bitwuzla term manager for collecting constraints
+  [[nodiscard]] bitwuzla::TermManager &GetTermManager() { return *tm; }
 
   // Inject undefined behavior into the given block of the given function
   // Return a new function with the injected UBs if successful, otherwise return nullptr.
@@ -55,24 +56,23 @@ public:
 
   // Reset the visitor to its initial state
   virtual void Reset() {
-    solver = nullptr;      // Delete the old solver
-    constraints = nullptr; // Delete the old constraints
+    solver = nullptr; // Delete the old solver
+    constraints.clear();
     ubConstraints.clear();
-    ctx = std::make_unique<z3::context>();
-    solver = std::make_unique<z3::solver>(*ctx);
-    constraints = std::make_unique<z3::expr_vector>(*ctx);
     Assert(
         exprStack.empty(),
         "The expression stack is not empty when resetting the UB injector: %zu elements left",
         exprStack.size()
     );
     versions.clear();
+    varTerms.clear();
+    coefTerms.clear();
   }
 
   // Create a versioned variable expression for the given variable
   // When version==-1, the current version in the version table is used
   // When version==-2, the version table is updated and the new version is used
-  z3::expr CreateScaExpr(const symir::VarDef *var, int version = -1);
+  bitwuzla::Term CreateScaExpr(const symir::VarDef *var, int version = -1);
 
   // Get the name of the loc-th element of the vector variable
   std::string GetVecElName(const symir::VarDef *var, int loc) const;
@@ -80,7 +80,7 @@ public:
   // Create a versioned variable expression for the loc-th element of the vector variable
   // When version==-1, the current version in the version table is used
   // When version==-2, the version in the version table is incremented and the new version is used
-  z3::expr CreateVecElExpr(const symir::VarDef *var, int loc, int version = -1);
+  bitwuzla::Term CreateVecElExpr(const symir::VarDef *var, int loc, int version = -1);
 
   /// Return the name of the field of the struct variable
   std::string GetStructFieldName(const symir::VarDef *var, const std::string &field) const;
@@ -88,18 +88,18 @@ public:
   // Create a versioned variable expression for the field of the struct variable
   // When version==-1, the current version in the version table is used
   // When version==-2, the version in the version table is incremented and the new version is used
-  z3::expr
+  bitwuzla::Term
   CreateStructFieldExpr(const symir::VarDef *var, const std::string &field, int version = -1);
 
   // Create a coefficient expression for the given name
-  z3::expr CreateCoefExpr(const symir::Coef &coef);
+  bitwuzla::Term CreateCoefExpr(const symir::Coef &coef);
 
 protected:
   // Push an expression to the expression stack
-  void pushExpression(z3::expr expr) { exprStack.push(std::move(expr)); }
+  void pushExpression(bitwuzla::Term expr) { exprStack.push(std::move(expr)); }
 
   // Pop an expression from the expression stack
-  z3::expr popExpression() {
+  bitwuzla::Term popExpression() {
     auto e = exprStack.top();
     exprStack.pop();
     return e;
@@ -126,14 +126,11 @@ protected:
   void Visit(const symir::Funct &f) override;
 
 private:
-  z3::expr mapBitVecExprToIntExpr(const z3::expr &bv);
   void ensureValidInitsForUses(const symir::Block *b);
   void extractAndInitializeUses(
-      const z3::model &model, const symir::Block *b, symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blkBd
+      const symir::Block *b, symir::FunctBuilder *funBd, symir::BlockBuilder *blkBd
   );
-  void
-  extractSymbolsFromModel(const z3::model &model, const symir::Funct *f, const symir::Block *b);
+  void extractSymbolsFromModel(const symir::Funct *f, const symir::Block *b);
 
   static std::string nextCoefNameForBlock(const std::string &label) {
     static int counter = 0;
@@ -141,15 +138,19 @@ private:
   }
 
 private:
-  std::unique_ptr<z3::context> ctx;   // The context of our constraint collecting
-  std::unique_ptr<z3::solver> solver; // The solver for checking the constraints
+  std::unique_ptr<bitwuzla::TermManager> tm;  // The term manager for constraint collecting
+  std::unique_ptr<bitwuzla::Bitwuzla> solver; // The solver for checking the constraints
+  bitwuzla::Sort bvSort;                      // 33-bit bitvector sort for overflow detection
 
-  std::unique_ptr<z3::expr_vector> constraints; // The constraints generated by this visitor
-  std::vector<z3::expr> ubConstraints{};        // The UB-specific constraints that ensure UBs
+  std::vector<bitwuzla::Term> constraints;     // The constraints generated by this visitor
+  std::vector<bitwuzla::Term> ubConstraints{}; // The UB-specific constraints that ensure UBs
 
   // Context used in collecting UB-free constraints
-  std::stack<z3::expr> exprStack{};      // The expression stack for evaluating the SymIR program
-  std::map<std::string, int> versions{}; // The SSA version table for each variable
+  std::stack<bitwuzla::Term> exprStack{}; // The expression stack for evaluating the SymIR program
+  std::map<std::string, int> versions{};  // The SSA version table for each variable
+  // Bitwuzla does not intern/unify constants by name, so we must cache Terms.
+  std::map<std::string, bitwuzla::Term> varTerms{};
+  std::map<std::string, bitwuzla::Term> coefTerms{};
   const symir::Funct *currentFun = nullptr;
 };
 

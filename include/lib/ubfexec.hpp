@@ -26,9 +26,9 @@
 #ifndef REIFY_UBFEXEC_HPP
 #define REIFY_UBFEXEC_HPP
 
+#include <bitwuzla/cpp/bitwuzla.h>
 #include "lib/function.hpp"
 #include "lib/ubfree.hpp"
-#include "z3++.h"
 
 class FunPlus;
 
@@ -86,10 +86,10 @@ private:
 
   // Function to extract all symbols from the model, so that we can instantiate
   // all the symbols that the solver successfully found an interpretation for
-  void extractSymbolsFromModel(z3::model &model);
+  void extractSymbolsFromModel();
 
   /// Extract the solved value of the parameters from the model for the given version
-  std::vector<ArgPlus<int>> extractParamsFromModel(z3::model &model, int version);
+  std::vector<ArgPlus<int>> extractParamsFromModel(int version);
 
   // Insert undefined behaviors into unexecuted basic blocks
   void insertUBsIntoUnexecutedBbls();
@@ -107,6 +107,9 @@ private:
 
   // Constraints collector for signed overflow
   std::unique_ptr<UBSan> ubSan; // TODO: Add more UB types in the future
+
+  // Bitwuzla solver for solving constraints
+  std::unique_ptr<bitwuzla::Bitwuzla> solver;
 
   // The value of each input parameter at the entry of the function.
   std::vector<std::vector<ArgPlus<int>>> inits{};
