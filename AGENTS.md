@@ -1,4 +1,4 @@
-# Reify: Gemini Guideline
+# Reify: Agent Guideline
 
 + Knowledge Background: Optimizing Compilers, Program Generation, SMT theories
 + Implementation Language: C++ 20 (source: ./src)
