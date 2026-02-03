@@ -27,18 +27,35 @@
 #define REIFY_SAMPUTILS_HPP
 
 #include <algorithm>
+#include <bitwuzla/cpp/bitwuzla.h>
+#include <ranges>
 #include <vector>
-#include <z3++.h>
 
+#include "lib/dbgutils.hpp"
 #include "lib/random.hpp"
 
-static z3::expr AtMostKZeroes(z3::context &ctx, const std::vector<z3::expr> &vec, int k) {
-  z3::expr_vector zero_constraints(ctx);
+static bitwuzla::Term
+AtMostKZeroes(bitwuzla::TermManager &tm, const std::vector<bitwuzla::Term> &vec, int k) {
+  auto bvSort = vec[0].sort();
+  auto zero = tm.mk_bv_zero(bvSort);
+  auto one = tm.mk_bv_one(bvSort);
+
+  std::vector<bitwuzla::Term> zero_constraints;
   for (const auto &expr: vec) {
-    zero_constraints.push_back(z3::ite(expr == 0, ctx.int_val(1), ctx.int_val(0)));
+    // If expr == 0, add 1, else add 0
+    auto is_zero = tm.mk_term(bitwuzla::Kind::EQUAL, {expr, zero});
+    zero_constraints.push_back(tm.mk_term(bitwuzla::Kind::ITE, {is_zero, one, zero}));
   }
-  z3::expr sum_zeros = sum(zero_constraints);
-  return sum_zeros <= k;
+
+  // Sum all the constraints
+  bitwuzla::Term sum_zeros = zero_constraints[0];
+  for (size_t i = 1; i < zero_constraints.size(); i++) {
+    sum_zeros = tm.mk_term(bitwuzla::Kind::BV_ADD, {sum_zeros, zero_constraints[i]});
+  }
+
+  // sum_zeros <= k
+  auto k_val = tm.mk_bv_value_int64(bvSort, k);
+  return tm.mk_term(bitwuzla::Kind::BV_SLE, {sum_zeros, k_val});
 }
 
 static std::vector<int> SampleKDistinct(int n, int k) {

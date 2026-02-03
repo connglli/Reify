@@ -25,11 +25,12 @@
 
 #include "lib/ubinject.hpp"
 
+#include <cstring>
 #include <memory>
 #include "global.hpp"
-#include "lib/z3utils.hpp"
+#include "lib/bvutils.hpp"
 
-z3::expr IntUBInject::CreateScaExpr(const symir::VarDef *var, int version) {
+bitwuzla::Term IntUBInject::CreateScaExpr(const symir::VarDef *var, int version) {
   Assert(var != nullptr, "Cannot create a variable expression for a nullptr variable");
   const auto &varName = var->GetName();
   Assert(
@@ -48,7 +49,14 @@ z3::expr IntUBInject::CreateScaExpr(const symir::VarDef *var, int version) {
     version = ++versions[varName];
   }
   // We used 33-bit bitvectors since we're overflowing 32-bit integers
-  return ctx->bv_const((varName + "_v" + std::to_string(version)).c_str(), 33);
+  const std::string fullName = varName + "_v" + std::to_string(version);
+  auto it = varTerms.find(fullName);
+  if (it != varTerms.end()) {
+    return it->second;
+  }
+  auto term = tm->mk_const(bvSort, fullName);
+  varTerms.emplace(fullName, term);
+  return term;
 }
 
 std::string IntUBInject::GetVecElName(const symir::VarDef *var, int loc) const {
@@ -64,7 +72,7 @@ std::string IntUBInject::GetVecElName(const symir::VarDef *var, int loc) const {
   return varName + "_el" + std::to_string(loc);
 }
 
-z3::expr IntUBInject::CreateVecElExpr(const symir::VarDef *var, int loc, int version) {
+bitwuzla::Term IntUBInject::CreateVecElExpr(const symir::VarDef *var, int loc, int version) {
   Assert(var != nullptr, "Cannot create a variable expression for a nullptr array variable");
   Assert(
       var->IsVector(), "Cannot create a vector element expression for a scalar variable. "
@@ -76,7 +84,14 @@ z3::expr IntUBInject::CreateVecElExpr(const symir::VarDef *var, int loc, int ver
   } else if (version == -2) {
     version = ++versions[eleName];
   }
-  return ctx->bv_const((eleName + "_v" + std::to_string(version)).c_str(), 33);
+  const std::string fullName = eleName + "_v" + std::to_string(version);
+  auto it = varTerms.find(fullName);
+  if (it != varTerms.end()) {
+    return it->second;
+  }
+  auto term = tm->mk_const(bvSort, fullName);
+  varTerms.emplace(fullName, term);
+  return term;
 }
 
 std::string
@@ -84,7 +99,7 @@ IntUBInject::GetStructFieldName(const symir::VarDef *var, const std::string &fie
   return var->GetName() + "_" + field;
 }
 
-z3::expr IntUBInject::CreateStructFieldExpr(
+bitwuzla::Term IntUBInject::CreateStructFieldExpr(
     const symir::VarDef *var, const std::string &field, int version
 ) {
   std::string name = GetStructFieldName(var, field);
@@ -93,10 +108,17 @@ z3::expr IntUBInject::CreateStructFieldExpr(
   } else if (version == -2) {
     version = ++versions[name];
   }
-  return ctx->bv_const((name + "_v" + std::to_string(version)).c_str(), 33);
+  const std::string fullName = name + "_v" + std::to_string(version);
+  auto it = varTerms.find(fullName);
+  if (it != varTerms.end()) {
+    return it->second;
+  }
+  auto term = tm->mk_const(bvSort, fullName);
+  varTerms.emplace(fullName, term);
+  return term;
 }
 
-z3::expr IntUBInject::CreateCoefExpr(const symir::Coef &coef) {
+bitwuzla::Term IntUBInject::CreateCoefExpr(const symir::Coef &coef) {
   Assert(
       coef.GetType() == symir::SymIR::I32,
       "Coefficient %s is of type %s, however only 32-bit integer coefficient are supported for "
@@ -108,9 +130,16 @@ z3::expr IntUBInject::CreateCoefExpr(const symir::Coef &coef) {
   // out the value for.
   // We used 33-bit bitvectors since we're overflowing 32-bit integers
   if (coef.IsSolved()) {
-    return ctx->bv_val(coef.GetTypedValue<int>(), 33);
+    return tm->mk_bv_value_int64(bvSort, coef.GetTypedValue<int>());
   } else {
-    return ctx->bv_const(coef.GetName().c_str(), 33);
+    const std::string &name = coef.GetName();
+    auto it = coefTerms.find(name);
+    if (it != coefTerms.end()) {
+      return it->second;
+    }
+    auto term = tm->mk_const(bvSort, name);
+    coefTerms.emplace(name, term);
+    return term;
   }
 }
 
@@ -122,17 +151,24 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
 
   Reset();
 
+  // Create a new solver instance with model production enabled
+  bitwuzla::Options opts;
+  opts.set(bitwuzla::Option::PRODUCE_MODELS, true);
+  solver = std::make_unique<bitwuzla::Bitwuzla>(*tm, opts);
+
   // Collect constraints that'll introduce int-related UBs
   ensureValidInitsForUses(b);
   b->Accept(*this);
   Log::Get().Out() << "Collected constraints:" << std::endl;
-  for (const auto &c: *constraints) {
+  for (const auto &c: constraints) {
     Log::Get().Out() << c << std::endl;
   }
 
   // Check if we can find such a solution
-  solver->add(*constraints);
-  if (solver->check() != z3::sat) {
+  for (const auto &c: constraints) {
+    solver->assert_formula(c);
+  }
+  if (solver->check_sat() != bitwuzla::Result::SAT) {
     Log::Get().Out() << "UNSAT" << std::endl;
     currentFun = nullptr;
     return nullptr;
@@ -140,7 +176,6 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
   Log::Get().Out() << "SAT" << std::endl;
 
   // Insert assignments to the used variables
-  z3::model model = solver->get_model();
   // clang-format off
   auto nf = symir::FunctCopier(
     f,
@@ -153,14 +188,14 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
           << "Adding initializations to ensure undefined behaviors" << std::endl;
       // We need the old block b since we are at the starting point of the new block
       // which has no statements and therefore no uses/definitions can be found.
-      this->extractAndInitializeUses(model, b, fbd, bbd);
+      this->extractAndInitializeUses(b, fbd, bbd);
     },
     nullptr,
     nullptr
   ).Copy();
   // clang-format on
   // Now we need to extract the symbols (solved coefficients) from our model
-  extractSymbolsFromModel(model, nf.get(), nf->FindBlock(b->GetLabel()));
+  extractSymbolsFromModel(nf.get(), nf->FindBlock(b->GetLabel()));
 
   Log::Get().CloseSection();
   currentFun = nullptr;
@@ -191,7 +226,9 @@ void IntUBInject::Visit(const symir::VarUse &v) {
     for (int d = 0; d < v.GetVecNumDims(); d++) {
       access[d]->Accept(*this);
       auto coefExpr = popExpression();
-      constraints->push_back(coefExpr == v.GetVecDimLen(d) - 1);
+      constraints.push_back(tm->mk_term(
+          bitwuzla::Kind::EQUAL, {coefExpr, tm->mk_bv_value_int64(bvSort, v.GetVecDimLen(d) - 1)}
+      ));
     }
     auto elExpr = CreateVecElExpr(v.GetDef(), v.GetVecNumEls() - 1);
     // We're not going to restrict the value of any element
@@ -206,10 +243,14 @@ void IntUBInject::Visit(const symir::Coef &c) {
     // For the generated program, we'd like it as seemly "normal" as possible so that
     // both developers and compilers treat it as a "normal" program at a first galance.
     // So, let's make the coefficient to be in a range that is not too weird.
-    constraints->push_back(coefExpr >= GlobalOptions::Get().LowerCoefBound);
-    constraints->push_back(coefExpr <= GlobalOptions::Get().UpperCoefBound);
-    // We create a bv2int map so that it's easy for us to extract the coefficient
-    constraints->push_back(mapBitVecExprToIntExpr(coefExpr) == z3::bv2int(coefExpr, true));
+    constraints.push_back(tm->mk_term(
+        bitwuzla::Kind::BV_SGE,
+        {coefExpr, tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerCoefBound)}
+    ));
+    constraints.push_back(tm->mk_term(
+        bitwuzla::Kind::BV_SLE,
+        {coefExpr, tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperCoefBound)}
+    ));
   }
   pushExpression(coefExpr);
 }
@@ -217,7 +258,7 @@ void IntUBInject::Visit(const symir::Coef &c) {
 void IntUBInject::Visit(const symir::Term &t) {
   t.GetCoef()->Accept(*this);
   const auto coefExpr = popExpression();
-  z3::expr varExpr = ctx->bv_val(0, 33);
+  bitwuzla::Term varExpr = tm->mk_bv_value_int64(bvSort, 0);
   if (t.GetVar() != nullptr) {
     t.GetVar()->Accept(*this);
     varExpr = popExpression();
@@ -228,25 +269,29 @@ void IntUBInject::Visit(const symir::Term &t) {
       break;
 
     case symir::Term::OP_ADD:
-      pushExpression(coefExpr + varExpr);
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_ADD, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_SUB:
-      pushExpression(coefExpr - varExpr);
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SUB, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_MUL:
-      pushExpression(coefExpr * varExpr);
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_MUL, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_DIV:
-      constraints->push_back(varExpr != 0); // We disallow division by zero
-      pushExpression(z3::cxx_bvdiv(coefExpr, varExpr));
+      constraints.push_back(
+          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
+      ); // We disallow division by zero
+      pushExpression(bvutils::cxx_bvsdiv(*tm, coefExpr, varExpr));
       break;
 
     case symir::Term::OP_REM:
-      constraints->push_back(varExpr != 0); // We disallow division by zero
-      pushExpression(z3::cxx_bvrem(coefExpr, varExpr));
+      constraints.push_back(
+          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
+      ); // We disallow division by zero
+      pushExpression(bvutils::cxx_bvsrem(*tm, coefExpr, varExpr));
       break;
 
     default:
@@ -256,21 +301,21 @@ void IntUBInject::Visit(const symir::Term &t) {
 }
 
 void IntUBInject::Visit(const symir::Expr &e) {
-  std::vector<z3::expr> exprs;
+  std::vector<bitwuzla::Term> exprs;
   for (const auto t: e.GetTerms()) {
     t->Accept(*this);
     exprs.push_back(popExpression());
   }
-  z3::expr result = exprs.back();
+  bitwuzla::Term result = exprs.back();
   exprs.pop_back();
   for (int i = static_cast<int>(exprs.size()) - 1; i >= 0; --i) {
     switch (e.GetOp()) {
       case symir::Expr::OP_ADD:
-        result = result + exprs[i];
+        result = tm->mk_term(bitwuzla::Kind::BV_ADD, {result, exprs[i]});
         break;
 
       case symir::Expr::OP_SUB:
-        result = result - exprs[i];
+        result = tm->mk_term(bitwuzla::Kind::BV_SUB, {result, exprs[i]});
         break;
 
       default:
@@ -284,20 +329,24 @@ void IntUBInject::Visit(const symir::Expr &e) {
 void IntUBInject::Visit(const symir::Cond &c) {
   c.GetExpr()->Accept(*this);
   const auto expr = popExpression();
-  ubConstraints.push_back(
-      expr > GlobalOptions::Get().UpperBound || expr < GlobalOptions::Get().LowerBound
+  bitwuzla::Term upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
+  bitwuzla::Term lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  bitwuzla::Term overflowHigh = tm->mk_term(bitwuzla::Kind::BV_SGT, {expr, upperBound});
+  bitwuzla::Term overflowLow = tm->mk_term(bitwuzla::Kind::BV_SLT, {expr, lowerBound});
+  ubConstraints.push_back(tm->mk_term(bitwuzla::Kind::OR, {overflowHigh, overflowLow})
   ); // Inserts signed overflow
   switch (c.GetOp()) {
     case symir::Cond::OP_EQZ:
-      pushExpression(expr == 0);
+      pushExpression(tm->mk_term(bitwuzla::Kind::EQUAL, {expr, tm->mk_bv_value_int64(bvSort, 0)}));
       break;
 
     case symir::Cond::OP_GTZ:
-      pushExpression(expr != 0);
+      pushExpression(tm->mk_term(bitwuzla::Kind::DISTINCT, {expr, tm->mk_bv_value_int64(bvSort, 0)})
+      );
       break;
 
     case symir::Cond::OP_LTZ:
-      pushExpression(expr < 0);
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SLT, {expr, tm->mk_bv_value_int64(bvSort, 0)}));
       break;
 
     default:
@@ -308,8 +357,11 @@ void IntUBInject::Visit(const symir::Cond &c) {
 void IntUBInject::Visit(const symir::AssStmt &a) {
   a.GetExpr()->Accept(*this);
   const auto expr = popExpression();
-  ubConstraints.push_back(
-      expr > GlobalOptions::Get().UpperBound || expr < GlobalOptions::Get().LowerBound
+  bitwuzla::Term upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
+  bitwuzla::Term lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  bitwuzla::Term overflowHigh = tm->mk_term(bitwuzla::Kind::BV_SGT, {expr, upperBound});
+  bitwuzla::Term overflowLow = tm->mk_term(bitwuzla::Kind::BV_SLT, {expr, lowerBound});
+  ubConstraints.push_back(tm->mk_term(bitwuzla::Kind::OR, {overflowHigh, overflowLow})
   ); // Inserts signed overflow
   if (a.GetVar()->IsScalar()) {
     if (a.GetVar()->GetDef()->GetType() == symir::SymIR::STRUCT) {
@@ -319,15 +371,15 @@ void IntUBInject::Visit(const symir::AssStmt &a) {
       const auto *sDef = currentFun->GetStruct(a.GetVar()->GetDef()->GetStructName());
       std::string fieldName = sDef->GetField(idx).name;
       auto varNewExpr = CreateStructFieldExpr(a.GetVar()->GetDef(), fieldName, -2);
-      constraints->push_back(varNewExpr == expr);
+      constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {varNewExpr, expr}));
     } else {
       auto varNewExpr = CreateScaExpr(a.GetVar()->GetDef(), -2);
-      constraints->push_back(varNewExpr == expr);
+      constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {varNewExpr, expr}));
     }
   } else {
     // We only access the very last element. See Visit(const symir::VarUse &v).
     auto elNewExpr = CreateVecElExpr(a.GetVar()->GetDef(), a.GetVar()->GetVecNumEls() - 1, -2);
-    constraints->push_back(elNewExpr == expr);
+    constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {elNewExpr, expr}));
   }
 }
 
@@ -381,35 +433,31 @@ void IntUBInject::Visit(const symir::Block &b) {
       b.GetLabel().c_str()
   );
   // As long as one of the UB constraints is true, we have an UB.
-  z3::expr ubc = ctx->bool_val(false);
+  bitwuzla::Term ubc = tm->mk_false();
   for (auto &c: ubConstraints) {
-    ubc = ubc || c;
+    ubc = tm->mk_term(bitwuzla::Kind::OR, {ubc, c});
   }
-  constraints->push_back(ubc);
+  constraints.push_back(ubc);
 }
 
 void IntUBInject::Visit(const symir::Funct &f) {
   Panic("Cannot reach here: We only inject UBs into basic blocks, not functions");
 }
 
-z3::expr IntUBInject::mapBitVecExprToIntExpr(const z3::expr &bv) {
-  return ctx->int_const((std::string(bv.decl().name().str()) + "_dec").c_str());
-}
-
 void IntUBInject::ensureValidInitsForUses(const symir::Block *b) {
   for (const auto uv: b->GetUses()) {
-    z3::expr varExpr{*ctx};
+    bitwuzla::Term varExpr = tm->mk_bv_value_int64(bvSort, 0);
     if (uv->IsScalar()) {
       if (uv->GetDef()->GetType() == symir::SymIR::STRUCT) {
         const auto *sDef = currentFun->GetStruct(uv->GetDef()->GetStructName());
         for (const auto &field: sDef->GetFields()) {
           varExpr = CreateStructFieldExpr(uv->GetDef(), field.name, 0);
-          constraints->push_back(
-              varExpr >= GlobalOptions::Get().LowerBound &&
-              varExpr <= GlobalOptions::Get().UpperBound
-          );
-          z3::expr varAsInt = mapBitVecExprToIntExpr(varExpr);
-          constraints->push_back(varAsInt == z3::bv2int(varExpr, true));
+          bitwuzla::Term upperBound =
+              tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
+          bitwuzla::Term lowerBound =
+              tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+          constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
+          constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
         }
         continue;
       } else {
@@ -419,22 +467,20 @@ void IntUBInject::ensureValidInitsForUses(const symir::Block *b) {
       // We only access the very last element. See Visit(const symir::VarUse &v).
       varExpr = CreateVecElExpr(uv->GetDef(), uv->GetVecNumEls() - 1, 0);
     }
-    constraints->push_back(varExpr <= GlobalOptions::Get().UpperBound);
-    constraints->push_back(varExpr >= GlobalOptions::Get().LowerBound);
-    // We create a bv2int map so that it's easy for us to extract the coefficient
-    z3::expr varAsInt = mapBitVecExprToIntExpr(varExpr);
-    constraints->push_back(varAsInt == z3::bv2int(varExpr, true));
+    bitwuzla::Term upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
+    bitwuzla::Term lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
+    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
   }
 }
 
 void IntUBInject::extractAndInitializeUses(
-    const z3::model &model, const symir::Block *b, symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blkBd
+    const symir::Block *b, symir::FunctBuilder *funBd, symir::BlockBuilder *blkBd
 ) {
   for (const auto *uv: b->GetUses()) {
     const auto *nuvd = funBd->FindVar(uv->GetName());
     std::string varName;
-    z3::func_decl varInitExpr{*ctx};
+    bitwuzla::Term varInitExpr = tm->mk_bv_value_int64(bvSort, 0);
     if (uv->IsScalar()) {
       if (nuvd->GetType() == symir::SymIR::STRUCT) {
         const auto access = uv->GetAccess();
@@ -443,30 +489,37 @@ void IntUBInject::extractAndInitializeUses(
         const auto *sDef = currentFun->GetStruct(nuvd->GetStructName());
         std::string fieldName = sDef->GetField(idx).name;
         varName = GetStructFieldName(nuvd, fieldName);
-        varInitExpr = mapBitVecExprToIntExpr(CreateStructFieldExpr(nuvd, fieldName, 0)).decl();
+        varInitExpr = CreateStructFieldExpr(nuvd, fieldName, 0);
       } else {
         varName = uv->GetName();
-        varInitExpr = mapBitVecExprToIntExpr(CreateScaExpr(nuvd, 0)).decl();
+        varInitExpr = CreateScaExpr(nuvd, 0);
       }
     } else {
       // We only access the very last element. See Visit(const symir::VarUse &v).
       varName = GetVecElName(nuvd, uv->GetVecNumEls() - 1);
-      varInitExpr = mapBitVecExprToIntExpr(CreateVecElExpr(nuvd, uv->GetVecNumEls() - 1, 0)).decl();
+      varInitExpr = CreateVecElExpr(nuvd, uv->GetVecNumEls() - 1, 0);
     }
-    // Every use has to be solved
-    Assert(
-        model.has_interp(varInitExpr),
-        "We didn't find the initial value of the used variable %s to introduce int-related "
-        "undefined behaviors",
-        varName.c_str()
-    );
-    z3::expr varInitConst = model.get_const_interp(varInitExpr);
-    Assert(varInitConst.is_numeral(), "Value %s is not a numeral", varName.c_str());
-    int varInitVal;
-    Assert(
-        varInitConst.is_numeral_i(varInitVal),
-        "Failed to obtain the valInitVal of variable %s from the model", varName.c_str()
-    );
+    // Every use has to be solved - get value from the solver
+    bitwuzla::Term varValue = solver->get_value(varInitExpr);
+    std::string binaryStr = varValue.value<std::string>(2);
+    // Convert binary string to signed integer (33-bit)
+    int32_t varInitVal = 0;
+    if (!binaryStr.empty()) {
+      // For 33-bit values, check the MSB and convert appropriately
+      // Parse as unsigned 64-bit first
+      uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+      // Check if the 33rd bit (sign bit) is set
+      if (unsigned_val & (1ULL << 32)) {
+        // Negative number - sign extend to 32-bit by masking to lower 32 bits
+        // The value already wraps around to the 32-bit signed range
+        uint32_t u32 = static_cast<uint32_t>(unsigned_val & 0xFFFFFFFF);
+        std::memcpy(&varInitVal, &u32, sizeof(int32_t));
+      } else {
+        // Positive number - just take lower 32 bits
+        uint32_t u32 = static_cast<uint32_t>(unsigned_val & 0xFFFFFFFF);
+        std::memcpy(&varInitVal, &u32, sizeof(int32_t));
+      }
+    }
     Log::Get().Out() << "Let variable: var=" << varName << ", value=" << varInitVal << std::endl;
     // Insert an assignment to the variable with its initial value like: uv <- 0* uv +
     // initial_value
@@ -559,27 +612,34 @@ void IntUBInject::extractAndInitializeUses(
   }
 }
 
-void IntUBInject::extractSymbolsFromModel(
-    const z3::model &model, const symir::Funct *f, const symir::Block *b
-) {
+void IntUBInject::extractSymbolsFromModel(const symir::Funct *f, const symir::Block *b) {
   for (auto symbol: f->GetSymbols()) {
     if (symbol->IsSolved()) {
       continue;
     }
     const auto symName = symbol->GetName().c_str();
     // Currently, we only support coefficients
-    const auto symKey =
-        mapBitVecExprToIntExpr(CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol))).decl();
-    if (!model.has_interp(symKey)) {
-      continue; // The symbols don't belong to this basic block
+    const auto symKey = CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol));
+
+    // Get the value from the solver
+    bitwuzla::Term symValue = solver->get_value(symKey);
+    std::string binaryStr = symValue.value<std::string>(2);
+    // Convert binary string to signed integer (33-bit)
+    int32_t symVal = 0;
+    if (!binaryStr.empty()) {
+      // For 33-bit values, check the MSB and convert appropriately
+      uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+      // Check if the 33rd bit (sign bit) is set
+      if (unsigned_val & (1ULL << 32)) {
+        // Negative number - take lower 32 bits and reinterpret as signed
+        uint32_t u32 = static_cast<uint32_t>(unsigned_val & 0xFFFFFFFF);
+        std::memcpy(&symVal, &u32, sizeof(int32_t));
+      } else {
+        // Positive number - just take lower 32 bits
+        uint32_t u32 = static_cast<uint32_t>(unsigned_val & 0xFFFFFFFF);
+        std::memcpy(&symVal, &u32, sizeof(int32_t));
+      }
     }
-    z3::expr symConst = model.get_const_interp(symKey);
-    Assert(symConst.is_numeral(), "Symbol %s is not a numeral", symName);
-    int symVal;
-    Assert(
-        symConst.is_numeral_i(symVal), "Failed to obtain the symVal of symbol %s from the model",
-        symName
-    );
     symbol->SetValue(std::to_string(symVal));
     Log::Get().Out() << "Let symbol: sym=" << symName << ", value=" << symVal << std::endl;
   }
