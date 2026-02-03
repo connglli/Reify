@@ -248,10 +248,9 @@ struct GlobalOptions {
         exit(1);
       }
       if (VolatileVariableProba > 1) {
-        std::cerr
-            << "Error: The probability for declaring a variable as volatile "
-            << "(--Xvolatile-var-proba) cannot be be larger than 1. It should be within 0 to 1."
-            << std::endl;
+        std::cerr << "Error: The probability for declaring a variable as volatile "
+                  << "(--Xvolatile-var-proba) cannot be larger than 1. It should be within 0 to 1."
+                  << std::endl;
         exit(1);
       }
     }
@@ -269,7 +268,7 @@ struct GlobalOptions {
       }
       if (ArrayVariableProba > 1) {
         std::cerr << "Error: The probability for declaring a variable as an array "
-                  << "(--Xarray-var-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << "(--Xarray-var-proba) cannot be larger than 1. It should be within 0 to 1."
                   << std::endl;
         exit(1);
       }
@@ -288,7 +287,7 @@ struct GlobalOptions {
       }
       if (StructVariableProba > 1) {
         std::cerr << "Error: The probability for declaring a variable as a struct "
-                  << "(--Xstruct-var-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << "(--Xstruct-var-proba) cannot be larger than 1. It should be within 0 to 1."
                   << std::endl;
         exit(1);
       }
@@ -363,7 +362,7 @@ struct GlobalOptions {
       }
       if (UBInjectionProba > 1) {
         std::cerr << "Error: The probability for selecting basic blocks to inject UBs "
-                  << "(--Xinject-ub-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << "(--Xinject-ub-proba) cannot be larger than 1. It should be within 0 to 1."
                   << std::endl;
         exit(1);
       }
@@ -382,7 +381,7 @@ struct GlobalOptions {
       }
       if (ValueNumberingProba > 1) {
         std::cerr << "Error: The probability for selecting some values to be equivalent "
-                  << "(--Xlvn-gvn-proba) cannot be be larger than 1. It should be within 0 to 1."
+                  << "(--Xlvn-gvn-proba) cannot be larger than 1. It should be within 0 to 1."
                   << std::endl;
         exit(1);
       }
@@ -399,7 +398,7 @@ struct GlobalOptions {
       }
       if (SampleBaseGraphProba > 1) {
         std::cerr << "Error: The probability for sampling a base graph from a graph database "
-                  << "(--Xsample-bg-proba) cannot be be larger than 1. It should be within "
+                  << "(--Xsample-bg-proba) cannot be larger than 1. It should be within "
                      "0 to 1."
                   << std::endl;
         exit(1);
