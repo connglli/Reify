@@ -42,14 +42,6 @@ struct GlobalOptions {
   int UpperBound = INT_MAX;
   // Lower bound for the results of expression and subexpression evaluation
   int LowerBound = INT_MIN;
-  // Lower bound for coefficients to make quadratic integer arithmetic more tractable for the solver
-  int LowerCoefBound = -1000;
-  // Upper bound for coefficients to make quadratic integer arithmetic more tractable for the solver
-  int UpperCoefBound = 1000;
-  // Lower bound for the initialisation of variables
-  int LowerInitBound = INT_MIN;
-  // Upper bound for the initialisation of variables
-  int UpperInitBound = INT_MAX;
 
   // The number of assignment statements in a basic block
   int NumAssignsPerBBL = 1;
@@ -203,21 +195,6 @@ struct GlobalOptions {
   }
 
   void HandleFuncArgs(const cxxopts::ParseResult &args) {
-    if (args.count("Xlower-coef-bound")) {
-      LowerCoefBound = args["Xlower-coef-bound"].as<int>();
-    }
-
-    if (args.count("Xupper-coef-bound")) {
-      UpperCoefBound = args["Xupper-coef-bound"].as<int>();
-    }
-
-    if (UpperCoefBound <= LowerCoefBound) {
-      std::cerr << "Error: The upper bound for coefficient (--upper-coef-bound) must be larger "
-                   "than the lower bound (--lower-coef-bound)."
-                << std::endl;
-      exit(1);
-    }
-
     if (args.count("Xnum-assigns-per-bbl")) {
       NumAssignsPerBBL = args["Xnum-assigns-per-bbl"].as<int>();
       if (NumAssignsPerBBL > 3) {
