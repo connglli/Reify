@@ -40,8 +40,8 @@ void FunPlus::Generate(bool allowDeadCode) {
   Log::Get().OpenSection("FunPlus: Generate Function " + name);
 
   auto randProba = Random::Get().UniformReal();
-  auto randArrayDim = Random::Get().Uniform(1, 2);
-  auto randArrayLen = Random::Get().Uniform(1, 3);
+  auto randArrayDim = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumArrayDims);
+  auto randArrayLen = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumElsPerArrayDim);
 
   // Generate the sketch of our control flow graph
   cfg.Generate(allowDeadCode);
@@ -207,8 +207,8 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
     const int numFields = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumStructFields)();
 
     // Reduce array sizes to avoid OOM with nesting
-    auto randArrayDim = Random::Get().Uniform(1, 2);
-    auto randArrayLen = Random::Get().Uniform(1, 2);
+    auto randArrayDim = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumArrayDims);
+    auto randArrayLen = Random::Get().Uniform(1, GlobalOptions::Get().MaxNumElsPerArrayDim);
     auto randProba = Random::Get().UniformReal();
 
     for (int j = 0; j < numFields; ++j) {
