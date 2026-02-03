@@ -425,9 +425,8 @@ void UBFreeExec::insertUBsIntoUnexecutedBbls() {
 
 void UBFreeExec::insertRandomValueIntoUnsolvedSymbols() {
   // For now, we just define all symbols in the function with a random value
-  const auto rand = Random::Get().Uniform(
-      GlobalOptions::Get().LowerCoefBound, GlobalOptions::Get().UpperCoefBound
-  );
+  const auto rand =
+      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
   for (const auto &sym: fun->GetSymbols()) {
     if (sym->IsSolved()) {
       continue; // If the symbol is already defined, we don't need to smash it

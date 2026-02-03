@@ -25,7 +25,6 @@
 
 #include "lib/ubfree.hpp"
 
-#include "lib/bvutils.hpp"
 #include "lib/samputils.hpp"
 
 namespace {
@@ -242,9 +241,8 @@ void UBSan::MakeInitInteresting() {
 }
 
 void UBSan::MakeInitWithRandomValue() {
-  auto rand = Random::Get().Uniform(
-      GlobalOptions::Get().LowerInitBound, GlobalOptions::Get().UpperInitBound
-  );
+  auto rand =
+      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
   for (auto param: fun.GetParams()) {
     if (param->IsScalar()) {
       if (param->GetType() == symir::SymIR::Type::STRUCT) {
@@ -427,8 +425,8 @@ void UBSan::Visit(const symir::VarUse &v) {
 void UBSan::Visit(const symir::Coef &c) {
   Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
   auto coefExpr = CreateCoefExpr(c);
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerCoefBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperCoefBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {coefExpr, lowerBound}));
   constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {coefExpr, upperBound}));
   pushExpression(coefExpr);
@@ -476,7 +474,7 @@ void UBSan::Visit(const symir::Term &t) {
       constraints.push_back(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
       ));
-      termExpr = bvutils::cxx_bvsdiv(*tm, coefExpr, varExpr);
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_REM:
       constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
@@ -485,7 +483,7 @@ void UBSan::Visit(const symir::Term &t) {
       constraints.push_back(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
       ));
-      termExpr = bvutils::cxx_bvsrem(*tm, coefExpr, varExpr);
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_CST:
       termExpr = coefExpr;
@@ -652,15 +650,15 @@ void UBSan::Visit(const symir::ScaParam &p) {
   auto varExpr = CreateScaExpr(&p, 0);
   versions[p.GetName()] = 0;
   verbbls[p.GetName()] = "___entry_bbl";
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerInitBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperInitBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
   constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
 }
 
 void UBSan::Visit(const symir::VecParam &p) {
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerInitBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperInitBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   for (int e = 0; e < p.GetVecNumEls(); e++) {
     auto elExpr = CreateVecElExpr(&p, e, 0);
     auto elName = GetVecElName(&p, e);
@@ -676,8 +674,8 @@ void UBSan::Visit(const symir::StructParam &p) {
       sDef != nullptr, "Struct definition %s not found for param %s", p.GetStructName().c_str(),
       p.GetName().c_str()
   );
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerInitBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperInitBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   IterateStructElements(fun, sDef, [&](std::string elName) {
     auto fieldExpr = CreateStructFieldExpr(&p, elName, 0);
     std::string fullFieldName = GetStructFieldName(&p, elName);
@@ -694,8 +692,8 @@ void UBSan::Visit(const symir::ScaLocal &l) {
   auto varExpr = CreateScaExpr(l.GetDefinition(), 0);
   versions[l.GetName()] = 0;
   verbbls[l.GetName()] = "___entry_bbl";
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerInitBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperInitBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
   constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
   constraints.push_back(tm->mk_term(bitwuzla::Kind::EQUAL, {varExpr, coefExpr}));
@@ -704,8 +702,8 @@ void UBSan::Visit(const symir::ScaLocal &l) {
 void UBSan::Visit(const symir::VecLocal &l) {
   int numEls = l.GetVecNumEls();
   const auto &inits = l.GetCoefs();
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerInitBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperInitBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
   for (int i = 0; i < numEls; i++) {
     inits[i]->Accept(*this);
     auto coefExpr = popExpression();
@@ -724,8 +722,8 @@ void UBSan::Visit(const symir::VecLocal &l) {
 void UBSan::Visit(const symir::StructLocal &l) {
   const auto *sDef = fun.GetStruct(l.GetStructName());
   const auto &inits = l.GetCoefs();
-  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerInitBound);
-  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperInitBound);
+  auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
 
   size_t initIdx = 0;
   IterateStructElements(fun, sDef, [&](std::string elName) {
