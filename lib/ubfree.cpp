@@ -146,147 +146,31 @@ UBSan::Stats UBSan::GetStats() const {
   return s;
 }
 
-void UBSan::Optimize() {
-  // Note: Bitwuzla performs simplification automatically during solving.
-  // We could use the simplify() method on the solver if needed, but
-  // for now we'll rely on Bitwuzla's built-in optimization.
-  // The constraints are already collected and will be simplified when solving.
-}
-
+// Override base class methods to track additional context (verbbls)
 bitwuzla::Term UBSan::CreateScaExpr(const symir::VarDef *var, int version) {
-  Assert(var != nullptr, "Cannot create a variable expression for a nullptr variable");
-  const auto &varName = var->GetName();
-  Assert(
-      var->IsScalar(),
-      "Cannot create a scalar expression for a vector (%s). Use the other overload instead.",
-      varName.c_str()
-  );
-  if (version == -1) {
-    version = versions[varName];
-  } else if (version == -2) {
-    version = ++versions[varName];
+  if (version == -2) {
+    const auto &varName = var->GetName();
     verbbls[varName] = currBbl;
   }
-
-  // Cache all terms (Bitwuzla does not intern/unify by name).
-  std::string fullName = varName + "_v" + std::to_string(version);
-
-  auto it = paramTerms.find(fullName);
-  if (it != paramTerms.end()) {
-    return it->second;
-  }
-  auto term = tm->mk_const(bvSort, fullName.c_str());
-  paramTerms[fullName] = term;
-  return term;
-}
-
-std::string UBSan::GetVecElName(const symir::VarDef *var, int loc) const {
-  const auto &varName = var->GetName();
-  Assert(
-      var->IsVector(), "The variable %s is not a vector, cannot get element name", varName.c_str()
-  );
-  const auto numEls = var->GetVecNumEls();
-  Assert(
-      loc < numEls, "The element index (%d) is out of bound (%d) for variable %s", loc, numEls,
-      varName.c_str()
-  );
-  return varName + "_el" + std::to_string(loc);
-}
-
-bitwuzla::Term UBSan::CreateVecElExpr(const symir::VarDef *var, int loc, int version) {
-  Assert(var != nullptr, "Cannot create a variable expression for a nullptr array variable");
-  Assert(
-      var->IsVector(),
-      "Cannot create a variable expression for a scalar variable (%s). Use the "
-      "other overload instead.",
-      var->GetName().c_str()
-  );
-  const auto elName = GetVecElName(var, loc);
-  if (version == -1) {
-    version = versions[elName];
-  } else if (version == -2) {
-    version = ++versions[elName];
-  }
-
-  // Cache all terms (Bitwuzla does not intern/unify by name).
-  std::string fullName = elName + "_v" + std::to_string(version);
-
-  auto it = paramTerms.find(fullName);
-  if (it != paramTerms.end()) {
-    return it->second;
-  }
-  auto term = tm->mk_const(bvSort, fullName.c_str());
-  paramTerms[fullName] = term;
-  return term;
-}
-
-std::string UBSan::GetStructFieldName(const symir::VarDef *var, const std::string &field) const {
-  return var->GetName() + "_" + field;
+  return UBVisitorBase::CreateScaExpr(var, version);
 }
 
 bitwuzla::Term
 UBSan::CreateStructFieldExpr(const symir::VarDef *var, const std::string &field, int version) {
-  std::string name = GetStructFieldName(var, field);
-  if (version == -1) {
-    version = versions[name];
-  } else if (version == -2) {
-    version = ++versions[name];
+  if (version == -2) {
+    std::string name = GetStructFieldName(var, field);
     verbbls[name] = currBbl;
   }
-
-  // Cache all terms (Bitwuzla does not intern/unify by name).
-  std::string fullName = name + "_v" + std::to_string(version);
-
-  auto it = paramTerms.find(fullName);
-  if (it != paramTerms.end()) {
-    return it->second;
-  }
-  auto term = tm->mk_const(bvSort, fullName.c_str());
-  paramTerms[fullName] = term;
-  return term;
+  return UBVisitorBase::CreateStructFieldExpr(var, field, version);
 }
 
 bitwuzla::Term
 UBSan::CreateVersionedExpr(const symir::VarDef *var, const std::string &suffix, int version) {
-  std::string name = var->GetName() + suffix;
-  if (version == -1) {
-    version = versions[name];
-  } else if (version == -2) {
-    version = ++versions[name];
+  if (version == -2) {
+    std::string name = var->GetName() + suffix;
     verbbls[name] = currBbl;
   }
-
-  // Cache all terms (Bitwuzla does not intern/unify by name).
-  // This is critical for parameter extraction from the model.
-  std::string fullName = name + "_v" + std::to_string(version);
-
-  auto it = paramTerms.find(fullName);
-  if (it != paramTerms.end()) {
-    return it->second;
-  }
-  auto term = tm->mk_const(bvSort, fullName.c_str());
-  paramTerms[fullName] = term;
-  return term;
-}
-
-bitwuzla::Term UBSan::CreateCoefExpr(const symir::Coef &coef) {
-  // If we've already extracted the value from the model, we use that value,
-  // otherwise it's an uninterpreted constant which the solver needs to figure
-  // out the value for
-  if (coef.IsSolved()) {
-    return tm->mk_bv_value_int64(bvSort, std::stoll(coef.GetValue()));
-  } else {
-    // Use cached term if it exists, otherwise create and cache it
-    const std::string &coefName = coef.GetName();
-    auto it = coefTerms.find(coefName);
-    if (it != coefTerms.end()) {
-      return it->second;
-    } else {
-      auto term = tm->mk_const(bvSort, coefName.c_str());
-      coefTerms[coefName] = term;
-      return term;
-    }
-  }
+  return UBVisitorBase::CreateVersionedExpr(var, suffix, version);
 }
 
 void UBSan::MakeInitInteresting() {
