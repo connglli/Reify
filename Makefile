@@ -12,9 +12,9 @@ $(error python3 not found! Please install it.)
 endif
 
 # Check if our dependencies are not installed
-FOUND_Z3 := $(if $(shell ldconfig -p | grep z3),y,n)
-ifeq ($(FOUND_Z3),n)
-$(error libz3.so not found! Please install it)
+FOUND_BITWUZLA := $(shell pkg-config --exists bitwuzla && echo y || echo n)
+ifeq ($(FOUND_BITWUZLA),n)
+$(error Bitwuzla not found! Please install it!)
 endif
 
 CSTD   := c17
@@ -69,7 +69,7 @@ OPTFLAGS := $(if $(DEBUG),-O0,-O2)
 
 CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CXXSTD} -frtti ${OPTFLAGS} -I$(INC_DIR)
 CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CSTD} ${OPTFLAGS} -I$(INC_DIR)
-LDFLAGS  := $(DBGFLAGS) -lz3 -lpthread -lz
+LDFLAGS  := $(DBGFLAGS) $(shell pkg-config --libs bitwuzla) -lpthread -lz
 
 
 ########################################################################

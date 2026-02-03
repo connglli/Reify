@@ -177,8 +177,6 @@ int main(int argc, char **argv) {
     Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
   }
 
-  z3::set_param("parallel.enable", true);
-
   // Generate the function code
   FunPlus fun(
       arts.GetFunName(), GlobalOptions::Get().NumVarsPerFun - GlobalOptions::Get().NumLocalsPerFun,
