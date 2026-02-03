@@ -40,6 +40,7 @@ std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, cons
   // Create a new solver instance with model production enabled
   bitwuzla::Options opts;
   opts.set(bitwuzla::Option::PRODUCE_MODELS, true);
+  opts.set(bitwuzla::Option::NTHREADS, GlobalOptions::Get().BitwuzlaNumThreads);
   solver = std::make_unique<bitwuzla::Bitwuzla>(*tm, opts);
 
   // Collect constraints that'll introduce int-related UBs
