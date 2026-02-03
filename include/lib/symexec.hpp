@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef REIFY_UBFEXEC_HPP
-#define REIFY_UBFEXEC_HPP
+#ifndef REIFY_SYMEXEC_HPP
+#define REIFY_SYMEXEC_HPP
 
 #include <bitwuzla/cpp/bitwuzla.h>
 #include <cstddef>
@@ -33,15 +33,15 @@
 
 class FunPlus;
 
-class UBFreeExec {
+class SymExec {
 public:
   static const int PassCounterBblId;
   static const std::string PassCounterBblLabel;
 
 public:
-  explicit UBFreeExec(const FunPlus &fun, const std::vector<int> &execution);
+  explicit SymExec(const FunPlus &fun, const std::vector<int> &execution);
 
-  ~UBFreeExec();
+  ~SymExec();
 
   // Get the function generator, i.e., owner of this execution
   [[nodiscard]] const FunPlus *GetOwner() const { return owner; }
@@ -122,4 +122,4 @@ private:
   std::vector<std::vector<ArgPlus<int>>> finas{};
 };
 
-#endif // REIFY_UBFEXEC_HPP
+#endif // REIFY_SYMEXEC_HPP

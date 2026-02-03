@@ -34,7 +34,7 @@
 #include "lib/logger.hpp"
 #include "lib/lowers.hpp"
 #include "lib/random.hpp"
-#include "lib/ubfexec.hpp"
+#include "lib/symexec.hpp"
 
 struct FunGenOpts {
   std::string uuid, sno;
@@ -191,14 +191,14 @@ int main(int argc, char **argv) {
 
   // Populate symbols through the the execution path
   // We keep trying unless when we succeeded
-  std::unique_ptr<UBFreeExec> exec = nullptr;
+  std::unique_ptr<SymExec> exec = nullptr;
   for (int tries = 0; tries < GlobalOptions::Get().MaxNumExecsPerFun; ++tries) {
     // Sample an execution path from the function
     std::vector<int> execPath = fun.SampleExec(
         GlobalOptions::Get().MaxNumExecStepsPerFun, GlobalOptions::Get().EnableConsistentExecs
     );
     // Try solving the execution following the path
-    exec = std::make_unique<UBFreeExec>(fun, execPath);
+    exec = std::make_unique<SymExec>(fun, execPath);
     int numSolved = exec->Solve(
         GlobalOptions::Get().NumInitsPerExec, GlobalOptions::Get().EnableInterestInits,
         GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs,

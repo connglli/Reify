@@ -36,9 +36,9 @@
 #include "lib/dbgutils.hpp"
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
-#include "lib/ubfexec.hpp"
+#include "lib/symexec.hpp"
 
-class UBFreeExec;
+class SymExec;
 
 /// FunPlus is a generator which populates the generates a function with
 /// random control flow, variables, and statements
@@ -99,21 +99,21 @@ public:
   std::vector<int> SampleExec(int execStep, bool consistent);
 
   // Generate the C code of the function for a given execution
-  [[nodiscard]] std::string GenerateFunCode(const UBFreeExec &exec) const;
+  [[nodiscard]] std::string GenerateFunCode(const SymExec &exec) const;
 
   // Generate the C main() code of the function for a given execution
-  [[nodiscard]] std::string GenerateMainCode(const UBFreeExec &exec, bool debug = false) const;
+  [[nodiscard]] std::string GenerateMainCode(const SymExec &exec, bool debug = false) const;
 
   // Generate the S Expression code of the function for a given execution
-  [[nodiscard]] std::string GenerateFunSexpCode(const UBFreeExec &exec) const;
+  [[nodiscard]] std::string GenerateFunSexpCode(const SymExec &exec) const;
 
   // Generate the Java code of the function for a given execution with or without main()
   [[nodiscard]] std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
-      const UBFreeExec &exec, const std::string &className, bool main = false, bool debug = false
+      const SymExec &exec, const std::string &className, bool main = false, bool debug = false
   ) const;
 
   // Generate the map of initialisation-finalisation for a given execution
-  [[nodiscard]] std::string GenerateMappingCode(const UBFreeExec &exec) const;
+  [[nodiscard]] std::string GenerateMappingCode(const SymExec &exec) const;
 
   // Parse the S Expression code of a function and return the Funct object
   [[nodiscard]] static std::unique_ptr<symir::Funct> ParseFunSexpCode(const std::string &funPath);

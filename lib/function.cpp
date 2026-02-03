@@ -452,7 +452,7 @@ public:
       symir::SymCxLower(os), fun(fun) {}
 
   void Visit(const symir::Branch &b) override {
-    if (curBbl != UBFreeExec::PassCounterBblLabel &&
+    if (curBbl != SymExec::PassCounterBblLabel &&
         fun.GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_LATCH) {
       decIndent();
       out << getIndent() << "} while (";
@@ -466,7 +466,7 @@ public:
 
   void Visit(const symir::Block &b) override {
     curBbl = b.GetLabel();
-    if (curBbl != UBFreeExec::PassCounterBblLabel) {
+    if (curBbl != SymExec::PassCounterBblLabel) {
       curBblId++;
       if (fun.GetCfg().GetBbl(curBblId).GetType() == BblSketch::Type::BLOCK_LOOP_HEAD) {
         out << getIndent() << "do {" << std::endl;
@@ -483,7 +483,7 @@ private:
   int curBblId = -1;
 };
 
-std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
+std::string FunPlus::GenerateFunCode(const SymExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
   const auto *fun = exec.GetFun();
   Assert(fun != nullptr, "Function is not generated yet!");
@@ -494,7 +494,7 @@ std::string FunPlus::GenerateFunCode(const UBFreeExec &exec) const {
   return oss.str();
 }
 
-std::string FunPlus::GenerateFunSexpCode(const UBFreeExec &exec) const {
+std::string FunPlus::GenerateFunSexpCode(const SymExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
   const auto *fun = exec.GetFun();
   Assert(fun != nullptr, "Function is not generated yet!");
@@ -544,7 +544,7 @@ void createArray(jnif::ClassFile &cls, jnif::Method &met, const ArgPlus<int> &va
 }
 
 std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
-    const UBFreeExec &exec, const std::string &className, bool main, bool debug
+    const SymExec &exec, const std::string &className, bool main, bool debug
 ) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
 
@@ -620,7 +620,7 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
   return lower.TakeJavaClass();
 }
 
-std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const {
+std::string FunPlus::GenerateMainCode(const SymExec &exec, bool debug) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
 
   const auto *fun = exec.GetFun();
@@ -674,7 +674,7 @@ std::string FunPlus::GenerateMainCode(const UBFreeExec &exec, bool debug) const 
   return main.str();
 }
 
-std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
+std::string FunPlus::GenerateMappingCode(const SymExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
   std::ostringstream mapping;
   for (size_t i = 0; i < exec.GetInits().size(); i++) {
