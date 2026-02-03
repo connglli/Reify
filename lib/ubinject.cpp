@@ -28,7 +28,6 @@
 #include <cstring>
 #include <memory>
 #include "global.hpp"
-#include "lib/bvutils.hpp"
 
 bitwuzla::Term IntUBInject::CreateScaExpr(const symir::VarDef *var, int version) {
   Assert(var != nullptr, "Cannot create a variable expression for a nullptr variable");
@@ -245,11 +244,11 @@ void IntUBInject::Visit(const symir::Coef &c) {
     // So, let's make the coefficient to be in a range that is not too weird.
     constraints.push_back(tm->mk_term(
         bitwuzla::Kind::BV_SGE,
-        {coefExpr, tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerCoefBound)}
+        {coefExpr, tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound)}
     ));
     constraints.push_back(tm->mk_term(
         bitwuzla::Kind::BV_SLE,
-        {coefExpr, tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperCoefBound)}
+        {coefExpr, tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound)}
     ));
   }
   pushExpression(coefExpr);
@@ -284,14 +283,14 @@ void IntUBInject::Visit(const symir::Term &t) {
       constraints.push_back(
           tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
       ); // We disallow division by zero
-      pushExpression(bvutils::cxx_bvsdiv(*tm, coefExpr, varExpr));
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_REM:
       constraints.push_back(
           tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
       ); // We disallow division by zero
-      pushExpression(bvutils::cxx_bvsrem(*tm, coefExpr, varExpr));
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr}));
       break;
 
     default:
