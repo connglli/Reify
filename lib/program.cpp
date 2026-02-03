@@ -40,7 +40,7 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     fs::path sexpPath = arts.GetSexpPath();
     if (!fs::exists(sexpPath)) {
       Panic(
-          "S Expression file not found for file: %s. Did you run fgen with --sexpression?",
+          "S Expression file not found for file: %s. Did you run rysmith with --sexpression?",
           sexpPath.c_str()
       );
     }

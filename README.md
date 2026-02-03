@@ -28,7 +28,7 @@ Reify is capable of generating *leaf functions* that does not call other functio
 **Use the following script to generate 512 leaf functions**:
 
 ```bash
-python scripts/fgen.py --allops --injubs --sexp --main --output generated --limit 512
+python scripts/rysmith.py --output generated --limit 512
 ```
 
 The output directory (given by the `--output` option) includes multiple sub-directories, each for an individual function:
@@ -43,7 +43,7 @@ The output directory (given by the `--output` option) includes multiple sub-dire
 **Or use the following command to generate an individual leaf function**:
 
 ```bash
-timeout 3s ./build/bin/fgen -A -U -m -S --output generated --sno 0 $(uuidgen)
+timeout 3s ./build/bin/rysmith -A -U -m -S --output generated --sno 0 $(uuidgen)
 ```
 
 Note that generating leaf functions may
@@ -68,7 +68,7 @@ python scripts/ggen.py -l /path/to/clang -L 512 -g csmith --csmith /path/to/csmi
 Finally integrate the generated CFG database into leaf function generation:
 
 ```bash
-python scripts/fgen.py ... --extra '--unstable-graphdb /path/to/csmith_db.jsonl' ...
+python scripts/rysmith.py ... --extra '--unstable-graphdb /path/to/csmith_db.jsonl' ...
 ```
 
 ### Whole Program Generation
@@ -76,7 +76,7 @@ python scripts/fgen.py ... --extra '--unstable-graphdb /path/to/csmith_db.jsonl'
 Use the following command to generate 512 whole programs based on a set of leaf functions previously generated (given by the `--input` option), in particular, their S expressions:
 
 ```bash
-./build/bin/pgen --input generated --limit 512 $(uuidgen)
+./build/bin/rylink --input generated --limit 512 $(uuidgen)
 ```
 
 The generated programs are placed in the `programs` subdirectory of `--input`. Each program has its own directory:
@@ -109,10 +109,10 @@ Use the following command to fuzz a Java virtual machine:
 ```
 
 This process adapted leaf function generation to generate Java bytecode.
-An individual Java class can also be generated via `--unstable-javaclass` into `build/bin/fgen`:
+An individual Java class can also be generated via `--unstable-javaclass` into `build/bin/rysmith`:
 
 ```bash
-timeout 3s ./build/bin/fgen ... --unstable-javaclass ...
+timeout 3s ./build/bin/rysmith ... --unstable-javaclass ...
 ```
 
 The generated Java class is placed inside the `javaclasses` subdirectory.

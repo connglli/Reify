@@ -81,7 +81,7 @@ FGEN_SUGGESTED_CONFIGS: List[FuncGenConfig] = [
 
 @dataclass
 class FuncGenOptions:
-  bin: str  # Path to the fgen executable
+  bin: str  # Path to the rysmith executable
   uuid: str  # Primary ID for the newly generated function
   sno: int  # Secondary ID for the newly generated function
   outdir: Path  # Directory to store the generated function files
@@ -146,7 +146,7 @@ def generate_function(
     cmd += ["-o", str(opts.outdir), "-n", str(opts.sno), opts.uuid]
     cmdline.check_out(cmd, timeout=timeout)
     with arts.get_func_file().open("a") as fout:
-      fout.write(f"\n\n// Fgen Options: {' '.join(cmd)}")
+      fout.write(f"\n\n// rysmith options: {' '.join(cmd)}")
     result = arts, None
     if not configs.FunArts.is_test_dir(arts.get_test_dir()):
       result = (
@@ -178,7 +178,7 @@ PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [ProgGenConfig(n) for n in range(3
 
 @dataclass
 class ProgGenOptions:
-  bin: str  # Path to the pgen executable
+  bin: str  # Path to the rylink executable
   uuid: str  # Primary ID for the newly generated program
   indir: Path  # Directory to read the input function files
   limit: int  # The maximum number of programs to generate (0 means unlimited)
@@ -438,7 +438,7 @@ class Worker:
 
   def run(self, ropts: WorkerRunOptions):
     fopts = FuncGenOptions(
-      bin="./build/bin/fgen",
+      bin="./build/bin/rysmith",
       uuid=next_uuid(),
       sno=0,
       outdir=self.wconf.wdir,
@@ -446,7 +446,7 @@ class Worker:
       extra="--Xinject-ub-proba 0.1",
     )
     popts = ProgGenOptions(
-      bin="./build/bin/pgen",
+      bin="./build/bin/rylink",
       uuid="<placeholder>",
       indir=self.wconf.wdir,
       limit=self.wconf.prog_limit,

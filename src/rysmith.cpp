@@ -46,7 +46,7 @@ struct FunGenOpts {
   bool verbose;
 
   static FunGenOpts Parse(int argc, char **argv) {
-    cxxopts::Options options("fgen");
+    cxxopts::Options options("rysmith", "rysmith: Reify for leaf function generation\n");
     // clang-format off
     options.add_options()
       ("uuid", "An UUID identifier as the primary identifier", cxxopts::value<std::string>())

@@ -77,7 +77,9 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
 
 
 if __name__ == "__main__":
-  parser = ArgumentParser("fgen", description="Tool for generating a set of functions")
+  parser = ArgumentParser(
+    "rysmith", description="Reify tool for generating a set of leaf functions"
+  )
 
   parser.add_argument(
     "--output",
@@ -98,22 +100,22 @@ if __name__ == "__main__":
     help="the seed for generation (negative for truly random)",
   )
   parser.add_argument(
-    "--sexp",
+    "--disable-sexp",
     action="store_true",
     default=False,
-    help="enable the generation of the S Expression",
+    help="disable the generation of the S Expression",
   )
   parser.add_argument(
-    "--allops",
+    "--disable-allops",
     action="store_true",
     default=False,
-    help="enable using all kinds of term and expression operators",
+    help="enadisableble using all kinds of term and expression operators",
   )
   parser.add_argument(
-    "--injubs",
+    "--disable-injubs",
     action="store_true",
-    default=False,
-    help="enable using all kinds of term and expression operators",
+    default=True,
+    help="disable using all kinds of term and expression operators",
   )
   parser.add_argument(
     "--check",
@@ -124,29 +126,29 @@ if __name__ == "__main__":
   parser.add_argument(
     "--timeout",
     type=int,
-    # Our experiences are that in the default settings of fgen, if a program cannot
+    # Our experiences are that in the default settings of rysmith, if a program cannot
     # be generated within 3 seconds, then it won't be generated even given 15 seconds.
     # Thus, using 3s significantly improves the throughput of us.
     default=3,
     help="timeout (in seconds) for generating a function",
   )
-  parser.add_argument("--extra", type=str, default=None, help="extra options passed to fgen")
+  parser.add_argument("--extra", type=str, default=None, help="extra options passed to rysmith")
 
   args = parser.parse_args()
 
   outdir = Path(args.output).resolve().absolute()
   run_gen_loop(
     FuncGenOptions(
-      bin="./build/bin/fgen",
+      bin="./build/bin/rysmith",
       uuid=str(uuid.uuid4()),
       sno=0,
       outdir=outdir,
       config=FGEN_SUGGESTED_CONFIGS[0],
       verbose=args.check,
       main=True,
-      sexp=args.sexp,
-      allops=args.allops,
-      injubs=args.injubs,
+      sexp=not args.disable_sexp,
+      allops=not args.disable_allops,
+      injubs=not args.disable_injubs,
       seed=args.seed,  # We save it as the initial seed
       extra=args.extra,
     ),

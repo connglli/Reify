@@ -45,16 +45,17 @@ Technical details of the two stages and the IR are presented in [./DOCS.md](./DO
 │   ├── symexec.cpp              # Symbolically executing a SymIR program following an EP
 │   ├── ubfree.cpp               # Collecting UB-free constraints
 │   ├── ubinject.cpp             # Injecting UB into unreachable basic blocks
+│   ├── ubbase.cpp
 │   ├── random.cpp
 │   ├── cchksum.c
 │   ├── chksum.cpp
 │   ├── logger.cpp
 │   └── third/                   # Third-party dependencies
 ├── src/
-│   ├── func_gen.cpp             # CLI entry to generate a leaf function
-│   └── prog_gen.cpp             # CLI entry to generate a set of whole programs
+│   ├── rysmith.cpp              # CLI entry to generate a leaf function
+│   └── rylink.cpp               # CLI entry to generate a set of whole programs
 ├── scripts/
-│   ├── fgen.py                  # Script to generate a set of leaf functions
+│   ├── rysmith.py               # Script to generate a set of leaf functions
 │   ├── fuzz.py                  # Script to fuzz GCC or LLVM
 │   ├── fuzz_jvm.sh              # Script to fuzzing HotSpot or OpenJ9
 │   └── ...
