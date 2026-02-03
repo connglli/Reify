@@ -25,6 +25,7 @@
 
 #include "lib/ubfexec.hpp"
 
+#include <cstring>
 #include <ranges>
 #include "global.hpp"
 #include "lib/logger.hpp"
@@ -233,27 +234,28 @@ bool UBFreeExec::solve(
   }
 
   // Solve the generated constraints and see if we succeeded
-  z3::solver solver(ubSan->GetContext());
-  solver.add(ubSan->GetConstraints());
-  if (solver.check() == z3::unknown) {
+  // Create a fresh solver for each solve attempt
+  bitwuzla::Options opts;
+  opts.set(bitwuzla::Option::PRODUCE_MODELS, true);
+  solver = std::make_unique<bitwuzla::Bitwuzla>(ubSan->GetTermManager(), opts);
+  const auto &constraints = ubSan->GetConstraints();
+  for (const auto &c: constraints) {
+    solver->assert_formula(c);
+  }
+  auto result = solver->check_sat();
+  if (result == bitwuzla::Result::UNKNOWN) {
     Log::Get().Out() << "UNKNOWN" << std::endl;
     return false;
   }
-  if (solver.check() == z3::unsat) {
+  if (result == bitwuzla::Result::UNSAT) {
     Log::Get().Out() << "UNSAT" << std::endl;
     return false;
   }
 
   Log::Get().Out() << "SAT" << std::endl;
 
-  z3::model model = solver.get_model();
-  Log::Get().Out() << "Execution model: " << std::endl;
-  Log::Get().Out() << "```" << std::endl;
-  Log::Get().Out() << model << std::endl;
-  Log::Get().Out() << "```" << std::endl;
-
   // Extract values for the resolved symbols to facilitate subsequent solving
-  extractSymbolsFromModel(model);
+  extractSymbolsFromModel();
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
   if (inits.empty()) {
@@ -267,73 +269,73 @@ bool UBFreeExec::solve(
     }
   }
   // Extract the initialisation and finalisation values from the model
-  inits.push_back(extractParamsFromModel(model, 0));
-  finas.push_back(extractParamsFromModel(model, -1));
+  inits.push_back(extractParamsFromModel(0));
+  finas.push_back(extractParamsFromModel(-1));
 
   return true;
 }
 
-void UBFreeExec::extractSymbolsFromModel(z3::model &model) {
+void UBFreeExec::extractSymbolsFromModel() {
   for (auto symbol: fun->GetSymbols()) {
     if (symbol->IsSolved()) {
       continue;
     }
     const auto symName = symbol->GetName().c_str();
     // Currently, we only support coefficients
-    const auto symKey = ubSan->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol)).decl();
-    if (model.has_interp(symKey)) {
-      z3::expr symConst = model.get_const_interp(symKey);
-      Assert(symConst.is_numeral(), "Symbol %s is not a numeral", symName);
-      int symVal;
-      Assert(
-          symConst.is_numeral_i(symVal), "Failed to obtain the symVal of symbol %s from the model",
-          symName
-      );
-      symbol->SetValue(std::to_string(symVal));
-      Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
-    } else {
-      // The symbol is never used by any basic blocks being executed
-      Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=<unresolved>" << std::endl;
+    const auto symKey = ubSan->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol));
+
+    bitwuzla::Term symValue = solver->get_value(symKey);
+    std::string binaryStr = symValue.value<std::string>(2);
+    // Convert binary string to signed integer (32-bit)
+    int32_t symVal = 0;
+    if (!binaryStr.empty()) {
+      // Parse as unsigned first, then reinterpret as signed
+      uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+      uint32_t u32 = static_cast<uint32_t>(unsigned_val);
+      std::memcpy(&symVal, &u32, sizeof(int32_t));
     }
+    symbol->SetValue(std::to_string(symVal));
+    Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
   }
 }
 
-std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, int version) {
+std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(int version) {
   Assert(version == 0 || version == -1, "Version must be 0 (init) or -1 (fina)");
   const auto verTag = version == 0 ? "initialization" : "finalization";
   std::vector<ArgPlus<int>> args;
 
   std::function<
-      void(const symir::VarDef *, symir::SymIR::Type, const std::string &, const std::vector<int> &, size_t, std::string, int, bool, ArgPlus<int> &, std::vector<z3::expr> &)>
+      void(const symir::VarDef *, symir::SymIR::Type, const std::string &, const std::vector<int> &, size_t, std::string, int, bool, ArgPlus<int> &, std::vector<bitwuzla::Term> &)>
       expand = [&](const symir::VarDef *var, symir::SymIR::Type type, const std::string &sName,
-                   const std::vector<int> &shape, size_t shapeIdx, std::string z3Suffix,
-                   int flatIdx, bool hasArray, ArgPlus<int> &arg, std::vector<z3::expr> &keys) {
+                   const std::vector<int> &shape, size_t shapeIdx, std::string termSuffix,
+                   int flatIdx, bool hasArray, ArgPlus<int> &arg,
+                   std::vector<bitwuzla::Term> &keys) {
         if (shapeIdx < shape.size()) {
           const int dimLen = shape[shapeIdx];
           for (int i = 0; i < dimLen; ++i) {
             const int nextFlat = flatIdx * dimLen + i;
-            expand(var, type, sName, shape, shapeIdx + 1, z3Suffix, nextFlat, true, arg[i], keys);
+            expand(var, type, sName, shape, shapeIdx + 1, termSuffix, nextFlat, true, arg[i], keys);
           }
           return;
         }
 
         if (hasArray) {
-          z3Suffix += "_el" + std::to_string(flatIdx);
+          termSuffix += "_el" + std::to_string(flatIdx);
         }
 
         if (type == symir::SymIR::Type::STRUCT) {
           const auto *sDef = fun->GetStruct(sName);
           for (int i = 0; i < (int) sDef->GetFields().size(); ++i) {
             const auto &field = sDef->GetField(i);
-            std::string nextZ3 = z3Suffix + "_" + field.name;
+            std::string nextTerm = termSuffix + "_" + field.name;
             expand(
-                var, field.baseType, field.structName, field.shape, 0, nextZ3, 0, false, arg[i],
+                var, field.baseType, field.structName, field.shape, 0, nextTerm, 0, false, arg[i],
                 keys
             );
           }
         } else {
           // Leaf
-          keys.push_back(ubSan->CreateVersionedExpr(var, z3Suffix, version));
+          keys.push_back(ubSan->CreateVersionedExpr(var, termSuffix, version));
         }
       };
 
@@ -371,7 +373,7 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
         param->GetVecShape(), 0
     ));
 
-    std::vector<z3::expr> paramKeys;
+    std::vector<bitwuzla::Term> paramKeys;
     expand(
         param, param->GetBaseType(),
         (param->GetBaseType() == symir::SymIR::Type::STRUCT ? param->GetStructName() : ""),
@@ -379,23 +381,20 @@ std::vector<ArgPlus<int>> UBFreeExec::extractParamsFromModel(z3::model &model, i
     );
 
     for (int i = 0; i < static_cast<int>(paramKeys.size()); i++) {
-      z3::expr &paramKey = paramKeys[i];
-      if (model.has_interp(paramKey.decl())) {
-        z3::expr paramConst = model.get_const_interp(paramKey.decl());
-        Assert(paramConst.is_numeral(), "Parameter %s is not a numeral", paramName);
-        int paramVal;
-        Assert(
-            paramConst.is_numeral_i(paramVal),
-            "Failed to obtain the value of parameter %s from the model", paramName
-        );
-        args.back().SetValue(i, paramVal);
-        Log::Get().Out() << "Extract " << verTag << ": param=" << paramName
-                         << ", value=" << paramVal << std::endl;
-      } else {
-        args.back().SetValue(i, GlobalOptions::Get().LowerBound);
-        Log::Get().Out() << "Extract " << verTag << ": param=" << paramName << ", value=<unused>"
-                         << std::endl;
+      bitwuzla::Term &paramKey = paramKeys[i];
+      bitwuzla::Term paramValue = solver->get_value(paramKey);
+      std::string binaryStr = paramValue.value<std::string>(2);
+      // Convert binary string to signed integer (32-bit)
+      int32_t paramVal = 0;
+      if (!binaryStr.empty()) {
+        // Parse as unsigned first, then reinterpret as signed
+        uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+        uint32_t u32 = static_cast<uint32_t>(unsigned_val);
+        std::memcpy(&paramVal, &u32, sizeof(int32_t));
       }
+      args.back().SetValue(i, paramVal);
+      Log::Get().Out() << "Extract " << verTag << ": param=" << paramName << ", value=" << paramVal
+                       << std::endl;
     }
   }
   return args;
