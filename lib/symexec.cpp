@@ -224,8 +224,6 @@ bool SymExec::solve(
 
   // We are solving the symbols for the first time; let's try simplifying the constraints
   if (inits.empty()) {
-    ubSan->Optimize();
-
     if (debug) {
       // Dump the optimized SMT queries for debugging
       Log::Get().Out() << "Optimized constraints: " << std::endl;
