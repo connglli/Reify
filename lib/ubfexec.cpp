@@ -34,6 +34,8 @@
 #include "lib/strutils.hpp"
 #include "lib/ubinject.hpp"
 
+#include <chrono>
+
 const int UBFreeExec::PassCounterBblId =
     2147483647; // A large number to avoid conflicts with real basic block IDs
 const std::string UBFreeExec::PassCounterBblLabel = NameLabel(UBFreeExec::PassCounterBblId);
@@ -234,15 +236,48 @@ bool UBFreeExec::solve(
   }
 
   // Solve the generated constraints and see if we succeeded
-  // Create a fresh solver for each solve attempt
-  bitwuzla::Options opts;
-  opts.set(bitwuzla::Option::PRODUCE_MODELS, true);
-  solver = std::make_unique<bitwuzla::Bitwuzla>(ubSan->GetTermManager(), opts);
-  const auto &constraints = ubSan->GetConstraints();
-  for (const auto &c: constraints) {
-    solver->assert_formula(c);
+  // Reuse one solver instance across initialization attempts to avoid
+  // re-asserting the same base constraints.
+  if (!solver || inits.size() <= 1) {
+    bitwuzla::Options opts;
+    opts.set(bitwuzla::Option::PRODUCE_MODELS, true);
+    solver = std::make_unique<bitwuzla::Bitwuzla>(ubSan->GetTermManager(), opts);
+    numAssertedConstraints = 0;
   }
+
+  const auto &constraints = ubSan->GetConstraints();
+
+  if (debug) {
+    const auto stats = ubSan->GetStats();
+    Log::Get().Out() << "Constraint stats: asserted=" << stats.assertedConstraints
+                     << " addCalls=" << stats.addCalls << " skippedTrue=" << stats.skippedTrue
+                     << " deduped=" << stats.deduped
+                     << " ensureInRangeCalls=" << stats.ensureInRangeCalls
+                     << " boundedAlready=" << stats.boundedAlready
+                     << " uniqueConstraintIds=" << stats.uniqueConstraintIds
+                     << " uniqueBoundedIds=" << stats.uniqueBoundedIds
+                     << " (solverAsserted=" << numAssertedConstraints << ")" << std::endl;
+  }
+
+  for (; numAssertedConstraints < constraints.size(); ++numAssertedConstraints) {
+    solver->assert_formula(constraints[numAssertedConstraints]);
+  }
+
+  const auto t0 = std::chrono::steady_clock::now();
   auto result = solver->check_sat();
+  const auto t1 = std::chrono::steady_clock::now();
+  if (debug) {
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    Log::Get().Out() << "Bitwuzla check_sat time: " << ms << "ms" << std::endl;
+
+    // One-line dump of Bitwuzla statistics.
+    const auto s = solver->statistics();
+    Log::Get().Out() << "Bitwuzla statistics:";
+    for (const auto &kv: s) {
+      Log::Get().Out() << " " << kv.first << "=" << kv.second;
+    }
+    Log::Get().Out() << std::endl;
+  }
   if (result == bitwuzla::Result::UNKNOWN) {
     Log::Get().Out() << "UNKNOWN" << std::endl;
     return false;

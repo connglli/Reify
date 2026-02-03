@@ -67,9 +67,17 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 DBGFLAGS := $(if $(DEBUG),-g,)
 OPTFLAGS := $(if $(DEBUG),-O0,-O2)
 
-CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CXXSTD} -frtti ${OPTFLAGS} -I$(INC_DIR)
-CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CSTD} ${OPTFLAGS} -I$(INC_DIR)
+# Generate and include header dependency files (.d) so incremental builds
+# rebuild objects when headers change.
+DEPFLAGS := -MMD -MP
+
+CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CXXSTD} -frtti ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
+CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CSTD} ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
 LDFLAGS  := $(DBGFLAGS) $(shell pkg-config --libs bitwuzla) -lpthread -lz
+
+# Dependency files produced alongside object files.
+DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/func_gen.d $(OBJ_DIR)/prog_gen.d $(OBJ_DIR)/symircc.d
+-include $(DEP_FILES)
 
 
 ########################################################################
