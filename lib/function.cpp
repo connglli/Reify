@@ -221,11 +221,10 @@ std::string FunPlus::pickOrGenerateStruct(symir::FunctBuilder *funBd) {
 
       if (p < 0.3 && GlobalOptions::Get().EnableArrayVars) { // Array I32
         fieldIsArray = true;
-      } else if (p < 0.45 && GlobalOptions::Get().EnableStructVars) { // Struct
+      } else if (p < 0.4 && GlobalOptions::Get().EnableStructVars) { // Struct
         fieldIsStruct = true;
-      } else if (p < 0.6 && GlobalOptions::Get().EnableArrayVars &&
-                 GlobalOptions::Get().EnableStructVars) { // Array
-        // Struct
+      } else if (p < 0.5 && GlobalOptions::Get().EnableArrayVars &&
+                 GlobalOptions::Get().EnableStructVars) { // Array Struct
         fieldIsArray = true;
         fieldIsStruct = true;
       } else { // Scalar I32

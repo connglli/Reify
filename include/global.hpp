@@ -60,7 +60,7 @@ struct GlobalOptions {
   // When enabled, some variables can be structs
   bool EnableStructVars = true;
   // The probability of generating a struct variable
-  double StructVariableProba = 0.2;
+  double StructVariableProba = 0.1;
   // The maximum number of fields for a struct
   int MaxNumStructFields = 3;
   // The maximum, recursive depth of a struct
