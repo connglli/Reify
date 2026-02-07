@@ -27,6 +27,7 @@ import datetime
 import enum
 import json
 import random
+import re
 import shlex
 import shutil
 import signal
@@ -483,7 +484,59 @@ def test_compiler(cc: str, test_dir: Path, out_file: Path, timeout: int) -> Test
     return TestRes(full_cmd, TestRes.Type.ETO, exitcode=EXITCODE_TIMEOUT, errmsg=str(e))
   if proc.returncode != 0:
     return TestRes(full_cmd, TestRes.Type.WRC, exitcode=proc.returncode, errmsg=proc.stdout)
-  return TestRes(full_cmd, TestRes.Type.SUC, exitcode=0, errmsg=None)
+  return TestRes(full_cmd, TestRes.Type.SUC, exitcode=0, errmsg=proc.stdout)
+
+
+def test_compiler_diffopt(cc: str, test_dir: Path, out_file: Path, timeout: int) -> TestRes:
+  """
+  Perform differential testing on the given compiler command `cc` with different optimization levels.
+  If the user specifies an optimization level, it compares it with the most different one (typically O0).
+  Otherwise, it compares -O0 vs -O3.
+  """
+  # Detect existing optimization flag in the compiler command
+  opt_match = re.search(r"-O([0123sz]|fast)", cc)
+  if opt_match:
+    opt_user = opt_match.group(0)
+    # If user provided -O0, compare with -O3; otherwise compare with -O0
+    opt_diff = {
+      "-O0": "-O3",
+      "-O1": "-O0",
+      "-O2": "-O0",
+      "-O3": "-O0",
+      "-Os": "-O3",
+      "-Oz": "-O3",
+      "-Ofast": "-O0",
+    }.get(opt_user, "-O0")
+    cc1, label1 = cc, opt_user
+    cc2, label2 = cc.replace(opt_user, opt_diff), opt_diff
+  else:
+    cc1, label1 = f"{cc} -O0", "-O0"
+    cc2, label2 = f"{cc} -O3", "-O3"
+
+  # Test with the first optimization level
+  res1 = test_compiler(cc1, test_dir, out_file.with_suffix(f".{label1[1:]}"), timeout)
+  if not res1.is_success():
+    return res1
+
+  # Test with the second optimization level
+  res2 = test_compiler(cc2, test_dir, out_file.with_suffix(f".{label2[1:]}"), timeout)
+  if not res2.is_success():
+    return res2
+
+  # Compare the results
+  if res1.exitcode != res2.exitcode or res1.errmsg != res2.errmsg:
+    return TestRes(
+      f"{res1.cmd}\n{res2.cmd}",
+      TestRes.Type.WRC,
+      exitcode=res2.exitcode,
+      errmsg=(
+        f"Differential testing failed: {label1} and {label2} produced different results\n"
+        f"[{label1}] exitcode={res1.exitcode}, output={res1.errmsg}\n"
+        f"[{label2}] exitcode={res2.exitcode}, output={res2.errmsg}"
+      ),
+    )
+
+  return TestRes(f"{res1.cmd}\n{res2.cmd}", TestRes.Type.SUC, exitcode=0, errmsg=res1.errmsg)
 
 
 # -==========================================================
@@ -497,6 +550,7 @@ class WorkerConf:
   wdir: Path  # Working directory for the worker
   switch_limit: int  # Number of functions before switching to program generation
   prog_limit: int  # Limit for the number of generated programs per switch
+  diff_opt: bool = False  # Whether to enable differential testing over optimization levels
   cflag_pool: Optional[List[str]] = None  # Pool of compiler flags for swarm testing
 
 
@@ -616,18 +670,29 @@ class Worker:
         ignore_errors=True,
       )
 
-  def test(self, test_dir: Path, *, binary: Path, timeout: int, extra_cc_opts: str = ""):
+  def test(self, test_dir: Path, *, binary: Path, timeout: int):
+    extra_cc_opts = ""
     if self.wconf.cflag_pool:
       num_flags = random.randint(1, 5)
       picked = random.sample(self.wconf.cflag_pool, min(num_flags, len(self.wconf.cflag_pool)))
-      extra_cc_opts = (extra_cc_opts + " " + " ".join(picked)).strip()
+      # Only add the picked flags that are not already in the compiler command
+      extra_cc_opts = " ".join([s for s in picked if s not in self.wconf.cc]).strip()
     self.log(f"Testing compiler: {self.wconf.cc} {extra_cc_opts}")
-    test_res = test_compiler(
-      f"{self.wconf.cc} {extra_cc_opts}",
-      test_dir=test_dir,
-      out_file=binary,
-      timeout=timeout,
-    )
+    if self.wconf.diff_opt:
+      self.log("Using differential testing over optimization levels")
+      test_res = test_compiler_diffopt(
+        f"{self.wconf.cc} {extra_cc_opts}",
+        test_dir=test_dir,
+        out_file=binary,
+        timeout=timeout,
+      )
+    else:
+      test_res = test_compiler(
+        f"{self.wconf.cc} {extra_cc_opts}",
+        test_dir=test_dir,
+        out_file=binary,
+        timeout=timeout,
+      )
     if test_res.is_internal_compiler_error():
       self.log(
         f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}",
@@ -719,6 +784,7 @@ def run_fuzz_main(
   ilimit: int,
   slimit: int,
   plimit: int,
+  diff_opt: bool = False,
   cflag_pool: Optional[List[str]] = None,
 ):
   class SignalInterrupt(Exception):
@@ -759,6 +825,7 @@ def run_fuzz_main(
           wdir=wdir,
           switch_limit=slimit,
           prog_limit=plimit,
+          diff_opt=diff_opt,
           cflag_pool=cflag_pool,
         ),
         "ropts": WorkerRunOptions(
@@ -840,9 +907,16 @@ def main():
     help="The maximum number of programs to generate per switch (default: 2500)",
   )
   parser.add_argument(
+    "--diff-opt",
+    action="store_true",
+    default=False,
+    help="Enable differential testing over different optimization levels (e.g., O0 vs O3)",
+  )
+  parser.add_argument(
     "--swarm-cflags",
     type=str,
     choices=["gcc", "clang"],
+    default=None,
     help="Enable swarm testing with a pool of compiler flags for the specified compiler type",
   )
   parser.add_argument(
@@ -961,6 +1035,7 @@ def main():
     plimit=prog_limit,
     outdir=outdir,
     cflag_pool=cflag_pool,
+    diff_opt=args.diff_opt,
   )
 
 
