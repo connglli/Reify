@@ -43,9 +43,6 @@ from subprocess import PIPE, STDOUT, CalledProcessError, TimeoutExpired
 from threading import Thread
 from typing import List, Optional, Tuple
 
-# Sample a 8-char strin
-keywords = "0123456789abcdef"
-
 import cmdline
 import configs
 
@@ -296,6 +293,96 @@ def mlog(msg, *, color: Optional[str] = None, end: str = "\n", flush: bool = Fal
 # -==========================================================
 
 
+GCC_CFLAGS_POOL = [
+  "-fno-strict-aliasing",
+  "-fstrict-aliasing",
+  "-fstrict-overflow",
+  "-fno-aggressive-loop-optimizations",
+  "-ftree-vectorize",
+  "-ftree-slp-vectorize",
+  "-funroll-loops",
+  "-fpeel-loops",
+  "-finline-limit=1000",
+  "-fno-builtin",
+  "-fno-common",
+  "-fipa-pta",
+  "-fdevirtualize-at-ltrans",
+  "-fsched-pressure",
+  "-fsched-spec-load",
+  "-fselective-scheduling",
+  "-fselective-scheduling2",
+  "-fsel-sched-pipelining",
+  "-fsel-sched-pipelining-outer-loops",
+  "-ftree-loop-distribution",
+  "-ftree-loop-distribute-patterns",
+  "-ftree-loop-im",
+  "-ftree-loop-ivcanon",
+  "-floop-nest-optimize",
+  "-floop-parallelize-all",
+  "-ftree-parallelize-loops=4",
+  "-fvect-cost-model=unlimited",
+  "-fsimd-cost-model=unlimited",
+  "-ffast-math",
+  "-fno-finite-math-only",
+  "-fno-trapping-math",
+  "-fno-signed-zeros",
+  "-fno-associative-math",
+  "-freciprocal-math",
+  "-fno-rounding-math",
+  "-fno-signaling-nans",
+  "-fcx-limited-range",
+  "-fcx-fortran-rules",
+  "-fipa-icf",
+  "-fno-plt",
+  "-fno-semantic-interposition",
+  "-fira-algorithm=priority",
+  "-fira-region=all",
+  "-fmodulo-sched",
+  "-fmodulo-sched-allow-regmoves",
+  "-fpartial-inlining",
+  "-fpredictive-commoning",
+  "-fsplit-loops",
+  "-fsplit-paths",
+  "-ftree-partial-pre",
+  "-funswitch-loops",
+  "-fversion-loops-for-strides",
+]
+
+CLANG_CFLAGS_POOL = [
+  "-fstrict-aliasing",
+  "-fno-strict-aliasing",
+  "-fvectorize",
+  "-fslp-vectorize",
+  "-funroll-loops",
+  "-fno-builtin",
+  "-fno-common",
+  "-ffast-math",
+  "-fno-trapping-math",
+  "-mllvm -force-vector-width=2",
+  "-mllvm -force-vector-width=4",
+  "-mllvm -force-vector-width=8",
+  "-mllvm -force-vector-interleave=2",
+  "-mllvm -enable-loop-distribute",
+  "-mllvm -enable-loop-versioning-licm",
+  "-mllvm -enable-load-pre",
+  "-mllvm -aggressive-instcombine",
+  "-mllvm -scalar-evolution-max-arith-depth=32",
+  "-mllvm -reassociate",
+  "-mllvm -enable-gvn-hoist",
+  "-mllvm -enable-gvn-sink",
+  "-mllvm -enable-loop-flatten",
+  "-mllvm -enable-interprocedural-devirtualization",
+  "-mllvm -enable-dfa-jump-threading",
+  "-mllvm -enable-loop-versioning",
+  "-mllvm -enable-cond-hoisting",
+  "-mllvm -enable-loop-simplifycfg-term-folding",
+  "-mllvm -enable-newgvn",
+  "-mllvm -enable-partial-inlining",
+  "-mllvm -enable-scalarizer",
+  "-mllvm -inline-threshold=500",
+]
+
+
 EXITCODE_TIMEOUT = 100001
 
 
@@ -410,6 +497,7 @@ class WorkerConf:
   wdir: Path  # Working directory for the worker
   switch_limit: int  # Number of functions before switching to program generation
   prog_limit: int  # Limit for the number of generated programs per switch
+  cflag_pool: Optional[List[str]] = None  # Pool of compiler flags for swarm testing
 
 
 @dataclass
@@ -529,6 +617,11 @@ class Worker:
       )
 
   def test(self, test_dir: Path, *, binary: Path, timeout: int, extra_cc_opts: str = ""):
+    if self.wconf.cflag_pool:
+      num_flags = random.randint(1, 5)
+      picked = random.sample(self.wconf.cflag_pool, min(num_flags, len(self.wconf.cflag_pool)))
+      extra_cc_opts = (extra_cc_opts + " " + " ".join(picked)).strip()
+    self.log(f"Testing compiler: {self.wconf.cc} {extra_cc_opts}")
     test_res = test_compiler(
       f"{self.wconf.cc} {extra_cc_opts}",
       test_dir=test_dir,
@@ -626,6 +719,7 @@ def run_fuzz_main(
   ilimit: int,
   slimit: int,
   plimit: int,
+  cflag_pool: Optional[List[str]] = None,
 ):
   class SignalInterrupt(Exception):
     def __init__(self, sig):
@@ -665,6 +759,7 @@ def run_fuzz_main(
           wdir=wdir,
           switch_limit=slimit,
           prog_limit=plimit,
+          cflag_pool=cflag_pool,
         ),
         "ropts": WorkerRunOptions(
           limit=ilimit // workers,
@@ -743,6 +838,12 @@ def main():
     type=int,
     default=2500,
     help="The maximum number of programs to generate per switch (default: 2500)",
+  )
+  parser.add_argument(
+    "--swarm-cflags",
+    type=str,
+    choices=["gcc", "clang"],
+    help="Enable swarm testing with a pool of compiler flags for the specified compiler type",
   )
   parser.add_argument(
     "compiler",
@@ -845,6 +946,12 @@ def main():
   # Save the command line arguments to a JSON file
   (outdir / "command.json").write_text(json.dumps({**vars(args), "seed": seed}, indent=2))
 
+  cflag_pool = None
+  if args.swarm_cflags == "gcc":
+    cflag_pool = GCC_CFLAGS_POOL
+  elif args.swarm_cflags == "clang":
+    cflag_pool = CLANG_CFLAGS_POOL
+
   # Start the fuzzing loop
   run_fuzz_main(
     compiler,
@@ -853,6 +960,7 @@ def main():
     slimit=switch_limit,
     plimit=prog_limit,
     outdir=outdir,
+    cflag_pool=cflag_pool,
   )
 
 
