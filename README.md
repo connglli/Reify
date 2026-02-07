@@ -4,7 +4,7 @@ Reify is a random program generator based on *semantic reification*.
 It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
 Using Reify, 59 bugs have been discovered and reported in GCC and LLVM.
 
-Currently, Reify supports only i32 and i32 arrays.
+Currently, Reify supports only i32, i32 arrays, and i32 structs.
 We are extending it to support additional primitive and aggregate types.
 We are also experimenting with generating Java bytecode and eBPF bytecode.
 Even in their early stages, these experimental attempts have already revealed one JIT compiler bug in OpenJ9 and two bugs in Linux's eBPF runtime.
