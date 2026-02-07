@@ -1,5 +1,4 @@
 C/C++:
-2. add a pool of common -f flags and pick them randomly
 4. support more conditions and bitwise ops
 5. use yingwei/ubi and yingwei/csmith
 6. pointers and memory
