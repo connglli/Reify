@@ -11,11 +11,16 @@ Even in their early stages, these experimental attempts have already revealed on
 
 ## 🚀 Quick Start
 
-Install dependencies and start fuzzing C compilers with a single command similar to:
+Prerequisites:
+
++ C++20 compatible compiler (GCC 10+ or Clang 10+)
++ Bitwuzla (install: https://github.com/bitwuzla/bitwuzla)
++ Python 3 (for running the test suite)
+
+Start fuzzing C compilers:
 
 ```bash
-apt install libz3-dev libz-dev && \
-make -j8 all && \
+make -j8 all
 python scripts/fuzz.py -j 8 'gcc -O3 -fno-tree-slsr -fno-tree-ch'
 ```
 
