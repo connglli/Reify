@@ -523,7 +523,7 @@ static std::filesystem::path GetProgramPath(
 }
 
 static std::string GetWasmNameForFunctionName(const std::string &functionName) {
-  return functionName.substr(std::string(FUNCTION_NAME_PREFIX).size() + 1) + ".wat";
+  return functionName + ".wat";
 }
 
 static std::filesystem::path GetWasmPath(
