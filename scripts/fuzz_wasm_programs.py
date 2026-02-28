@@ -39,7 +39,7 @@ BATCH_SIZE    = 2500
 UUID_PREFIX   = "sriya"
 VERBOSE       = False  # per-function OK/FAIL lines — turn on for debugging only
 SANITY_CHECK  = True   # print raw runtime output for 1 program per batch
-NUM_WORKERS   = 12     # parallel workers for program execution
+NUM_WORKERS   = 8     # parallel workers for program execution
 
 # ─── i32 sign correction ────────────────────────────────────────────────────────
 def to_i32(x):

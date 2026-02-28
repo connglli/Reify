@@ -8,6 +8,7 @@ BASE_DIR = os.path.dirname(SCRIPT_DIR)
 MAPPINGS_DIR = os.path.join(BASE_DIR, 'generated', 'mappings')
 WASM_DIR = os.path.join(BASE_DIR, 'generated', 'wasm')
 
+# This script runs fuzz tests on WebAssembly functions using the wasmtime engine.
 def run_fuzz_tests():
   engine = Engine()
   

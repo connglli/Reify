@@ -38,6 +38,7 @@ struct ProgGenOpts {
   std::string uuid;
   std::string input;
   int limits;
+  bool wasm;
   bool debug;
 
   static ProgGenOpts Parse(int argc, char **argv) {
@@ -48,6 +49,7 @@ struct ProgGenOpts {
       ("i,input", "The directory saving the seed functions and mappings", cxxopts::value<std::string>())
       ("l,limit", "The number of new programs to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("W,wasm", "Also generate a Wasm program identical to the generated program", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -104,11 +106,12 @@ struct ProgGenOpts {
       Random::Get().Seed(seed);
     }
 
+    const bool wasm = args["wasm"].as<bool>();
     const bool debug = args["debug"].as<bool>();
 
     GlobalOptions::Get().HandleProgArgs(args);
 
-    return {.uuid = uuid, .input = input, .limits = limit, .debug = debug};
+    return {.uuid = uuid, .input = input, .limits = limit, .wasm = wasm, .debug = debug};
   }
 };
 
@@ -118,9 +121,10 @@ int main(int argc, char *argv[]) {
   std::string progUuid = cliOpts.uuid;
 
   fs::path inputDir = cliOpts.input;
-  fs::path funsDir(GetFunctionsDir(inputDir));
+  fs::path funsDir(GetWasmDir(inputDir));
 
   int genLimit = cliOpts.limits;
+  bool wasm = cliOpts.wasm;
   bool enableDebug = cliOpts.debug;
   if (enableDebug) {
     Log::Get().SetCout();
@@ -171,9 +175,18 @@ int main(int argc, char *argv[]) {
 
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
-    prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + ".c"), enableDebug);
-    prog->GenerateCode(
+    // Generate Wasm code
+    if (wasm) {
+      // Make programs directory if doesn't exist yet
+      fs::create_directories(GetProgramsDir(inputDir));
+      prog->GenerateWasmCode(GetProgramsDir(inputDir) / (prog->GetName() + ".wat"), enableDebug);
+    }
+    // Generate C code
+    else {
+      prog->GenerateCode(GetProgramsDir(inputDir) / (prog->GetName() + ".c"), enableDebug);
+      prog->GenerateCode(
         GetProgramsDir(inputDir) / (prog->GetName() + "_static.c"), enableDebug, true
-    );
+      );
+    }
   }
 }

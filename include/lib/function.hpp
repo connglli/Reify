@@ -118,6 +118,9 @@ public:
   // Generate the map of initialisation-finalisation for a given execution
   [[nodiscard]] std::string GenerateMappingCode(const UBFreeExec &exec) const;
 
+  // Generate the execution path of the function for a given execution, which is a sequence of basic block labels
+  [[nodiscard]] std::string GenerateExecPathCode(const UBFreeExec &exec) const;
+
   // Parse the S Expression code of a function and return the Funct object
   [[nodiscard]] static std::unique_ptr<symir::Funct> ParseFunSexpCode(const std::string &funPath);
 

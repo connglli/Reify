@@ -298,6 +298,11 @@ int main(int argc, char **argv) {
   mappingFile << fun.GenerateMappingCode(*exec);
   mappingFile.close();
 
+  // Generate the execution path file for later use
+  std::filesystem::create_directories(GetExecPathDir(outputDirectory));
+  std::ofstream execPathFile = std::ofstream(GetExecPathPath(uuid, sno, outputDirectory));
+  execPathFile << fun.GenerateExecPathCode(*exec);
+
   // Generate an executable program if necessary
   if (mainfun) {
     std::filesystem::create_directories(GetProgramsDir(outputDirectory));

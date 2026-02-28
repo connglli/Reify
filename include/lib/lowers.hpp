@@ -128,10 +128,21 @@ namespace symir {
   /// An "SymIR -> Wasm" lower
   class SymWasmLower : public SymIRLower {
   public:
+    struct Config {
+      int ANON_DECL_PCT = 50;    // Chance that a variable is declared without a name (and later referred to by index)
+      int ANON_USAGE_PCT = 50;   // Chance that a variable use refers to a variable by index instead of by name
+      int HEAP_PCT = 20;         // Chance that a local variable is allocated on the heap and accessed via pointer instead of being a Wasm local
+      int SEXP_PCT = 50;         // Chance that a construct is emitted in s-expression-style rather than line-by-line style
+      int UNREACHABLE_PCT = 50;  // Chance that a block that is not on the execution path is emitted as an "unreachable" block
+      int FOLDING_PCT = 50;      // Chance that a local definition is folded (and anonymized) with a random amount of neighboring locals
+    };
     explicit SymWasmLower(std::ostream &out) : SymIRLower(out) {}
     void SymWasmLowerFunction(const Funct &f, const std::vector<std::string> execPath) {
       this->exec_path = execPath;
       Lower(f);
+    }
+    void SymWasmConfigure(Config cfg) {
+      config = cfg;
     }
 
   protected:
@@ -160,12 +171,16 @@ namespace symir {
     }
 
   protected:
-    bool force_sexp = false; // Whether current emission must be sexp style
-    std::vector<const Block *> blocks; // Blocks in order of appearance
-    std::vector<std::string> exec_path; // Execution path using block numbers
-    std::map<int, int> block_inds{}; // Map from block label nums to dispatch indices
-    std::map<const std::string, int> locals{}; // Map from variable names to local indices
-    std::set<std::string> is_anonymous; // If variable in this set, must use index to refer to
+    bool force_sexp = false;                    // Whether current emission must be sexp style
+    std::vector<const Block *> blocks;          // Blocks in order of appearance
+    std::vector<std::string> exec_path;         // Execution path using block numbers
+    std::map<int, int> block_inds{};            // Map from block label nums to dispatch indices
+    std::map<const std::string, int> locals{};  // Map from variable names to local indices
+    std::set<std::string> heap_locals;          // If variable in this set, must be allocated on heap and accessed via pointer
+    std::set<std::string> is_anonymous;         // If variable in this set, must use index to refer to
+
+  protected:
+    Config config;  // Configuration for randomization in Wasm lowering, which can be set by the user for testing different styles of Wasm code
 
   protected:
     inline static const std::string WASM_DISPATCHER = "dispatcher";

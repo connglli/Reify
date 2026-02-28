@@ -39,6 +39,17 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     fs::path mapPath = GetMappingPathForFunctionPath(funPath);
     mappings.push_back(FunPlus::ParseMappingCode(mapPath));
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
+
+    // Load exec path cache for this function
+    fs::path execPathPath = GetExecPathPathForFunctionPath(funPath);
+    std::ifstream execPathFile(execPathPath);
+    if (execPathFile.is_open()) {
+      nlohmann::json j;
+      execPathFile >> j;
+      std::string funcName = functions.back()->GetName();
+      std::vector<std::string> path = j.get<std::vector<std::string>>();
+      exec_path_cache[funcName] = path;
+    }
   }
 }
 
@@ -60,11 +71,12 @@ public:
   [[nodiscard]] int GetNumCoefs() const { return static_cast<int>(symbols.size()); }
 
   bool ReplaceFirstCoef(
-      const symir::Funct *guest, const std::vector<ArgPlus<int>> *init,
+      const symir::Funct *guest, int guest_idx, const std::vector<ArgPlus<int>> *init,
       const std::vector<ArgPlus<int>> *fina
   ) {
     this->succeeded = false;
     this->guest = guest;
+    this->guest_idx = guest_idx;
     this->init = init;
     this->fina = fina;
     this->host->Accept(*this);
@@ -104,22 +116,53 @@ protected:
         "Unsupported type %s for the coefficient with name \"%s\"",
         symir::SymIR::GetTypeName(p->GetType()).c_str(), p->GetName().c_str()
     );
+
     int coefVal = p->GetI32Value();
-    int chkVal = StatelessChecksum::Compute(*fina);
-    std::ostringstream chkOss;
-    chkOss << StatelessChecksum::GetCheckChksumName() << "(" << chkVal << ", " << guest->GetName()
-           << "(";
-    for (int i = 0; i < static_cast<int>(init->size()) - 1; ++i) {
-      chkOss << (*init)[i].ToCxStr() << ", ";
+
+    // Always use sexp-style for compatibility with all function placements
+    std::ostringstream callOss;
+
+    // 
+    callOss << "(i32.add ";
+
+    // NOTE: Wasm functions return all values, so we need to drop all but one
+    // Build the call with nested drops for the excess return values
+    for (int i = 1; i < static_cast<int>(fina->size()); ++i) {
+      callOss << "(drop ";
     }
-    chkOss << (*init)[init->size() - 1].ToCxStr() << "))";
-    // To avoid UBs, we'd use an upper type to save the result: long long here
-    long long diff = static_cast<long long>(coefVal) - static_cast<long long>(chkVal);
-    if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
-      p->SetValue("(" + chkOss.str() + " + " + std::to_string(diff) + ")");
-    } else {
-      p->SetValue("(int) ((long long)" + chkOss.str() + " + " + std::to_string(diff) + "L)");
+
+    bool use_indirect = rand() % 2 == 0;
+
+    // regular call
+    if (!use_indirect) {
+      callOss << "(call $" << guest->GetName();
     }
+    // indirect call
+    else {
+      callOss << "(call_indirect (type $sig" << guest->NumParams() << ")";
+    }
+
+    // actual call with arguments
+    for (int i = 0; i < static_cast<int>(init->size()); ++i) {
+      callOss << " (i32.const " << (*init)[i].ToCxStr() << ")";
+    }
+
+    // guest funxtion index in table for indirect call
+    if (use_indirect) {
+      callOss << " (i32.const " << guest_idx << ")";
+    }
+    callOss << ")";
+
+    // close the drops
+    for (int i = 1; i < static_cast<int>(fina->size()); ++i) {
+      callOss << ")";
+    }
+
+    // finally, add the difference to reach the desired coef value
+    // IDEA: could we just sub its value and then add the final coef value?
+    callOss << " (i32.const " << (coefVal - (*fina)[0].GetValue()) << "))";
+
+    p->SetValue(callOss.str()); // this replaces the actual coef val with the STRING call
     markMutated(p);
     succeeded = true;
   }
@@ -259,6 +302,7 @@ private:
   // The result of the replacement for the guest function
   bool succeeded = false;
   const symir::Funct *guest = nullptr;
+  int guest_idx = -1;
   const std::vector<ArgPlus<int>> *init = nullptr;
   const std::vector<ArgPlus<int>> *fina = nullptr;
 };
@@ -292,7 +336,7 @@ void ProgPlus::Generate() const {
       int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
-      if (repl.ReplaceFirstCoef(guest, init, fina)) {
+      if (repl.ReplaceFirstCoef(guest, GetFunctionIdx(guest), init, fina)) {
         Log::Get().Out() << "[" << sno << "]   var#" << k << " -> func#" << j << ": "
                          << guest->GetName() << std::endl;
       }
@@ -342,5 +386,50 @@ void ProgPlus::GenerateCode(const fs::path &file, bool debug, bool staticModifie
   oss << ")));" << std::endl;
   oss << "    return 0;" << std::endl;
   oss << "}" << std::endl;
+  oss.close();
+}
+
+void ProgPlus::GenerateWasmCode(const fs::path &file, bool debug, bool staticModifier) const {
+  std::ofstream oss(file);
+  
+  oss << "(module" << std::endl;
+  // Heap memory
+  oss << "  (memory $mem 16)" << std::endl;
+  oss << "  (global $heap_ptr (mut i32) (i32.const 0))" << std::endl << std::endl;
+
+  oss << "  (func $alloc (param $size i32) (result i32)" << std::endl;
+  oss << "    (local $ptr i32)" << std::endl;
+  oss << "    (local.set $ptr (global.get $heap_ptr))" << std::endl;
+  oss << "    (global.set $heap_ptr (i32.add (global.get $heap_ptr) (local.get $size)))" << std::endl;
+  oss << "    (local.get $ptr)" << std::endl;
+  oss << "  )" << std::endl << std::endl;
+
+  int func_size = functions.size();
+
+  // Function type definitions
+  // TODO: Must loop through all functions to generate the exact types needed
+  oss << "  (type $sig6 (func (param i32 i32 i32 i32 i32 i32) (result i32 i32 i32 i32 i32 i32)))" << std::endl;
+  oss << "  (type $sig7 (func (param i32 i32 i32 i32 i32 i32 i32) (result i32 i32 i32 i32 i32 i32 i32)))" << std::endl;
+  oss << "  (type $sig8 (func (param i32 i32 i32 i32 i32 i32 i32 i32) (result i32 i32 i32 i32 i32 i32 i32 i32)))" << std::endl;
+  oss << std::endl;
+
+  // Function pointer tables
+  oss << "  (table $func_table " << func_size << " " << func_size << " funcref)" << std::endl;
+  oss << "  (elem $func_table (i32.const 0)" << std::endl;
+  for (int i = 0; i < func_size; i++) {
+    oss << "    $" << functions[i]->GetName() << std::endl;
+  }
+  oss << "  )" << std::endl << std::endl;
+  
+  // Generate all functions
+  for (int i = static_cast<int>(functions.size()) - 1; i >= 0; --i) {
+    symir::SymWasmLower lower(oss);
+    std::vector<std::string> execPath;
+    execPath = exec_path_cache.contains(functions[i]->GetName()) ? exec_path_cache.at(functions[i]->GetName()) : std::vector<std::string>{};
+    lower.SymWasmLowerFunction(*functions[i], execPath);
+    oss << std::endl;
+  }
+
+  oss << ")" << std::endl;
   oss.close();
 }

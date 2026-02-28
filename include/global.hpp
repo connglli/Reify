@@ -452,6 +452,10 @@ static std::filesystem::path GetMappingsDir(const std::filesystem::path &output)
   return output / "mappings";
 }
 
+static std::filesystem::path GetExecPathDir(const std::filesystem::path &output) {
+  return output / "path";
+}
+
 static std::filesystem::path GetLoggingsDir(const std::filesystem::path &output) {
   return output / "loggings";
 }
@@ -510,6 +514,22 @@ static std::filesystem::path
 GetMappingPathForFunctionPath(const std::filesystem::path &functionPath) {
   return GetMappingsDir(functionPath.parent_path().parent_path()) /
          GetMappingNameForFunctionName(functionPath.stem());
+}
+
+static std::string GetExecPathForFunctionName(const std::string &functionName) {
+  return functionName + ".jsonl";
+}
+
+static std::filesystem::path GetExecPathPath(
+    const std::string &uuid, const std::string &sno, const std::filesystem::path &output
+) {
+  return GetExecPathDir(output) / GetExecPathForFunctionName(GetFunctionName(uuid, sno));
+}
+
+static std::filesystem::path
+GetExecPathPathForFunctionPath(const std::filesystem::path &functionPath) {
+  return GetExecPathDir(functionPath.parent_path().parent_path()) /
+         GetExecPathForFunctionName(functionPath.stem());
 }
 
 static std::string GetProgramNameForFunctionName(const std::string &functionName) {

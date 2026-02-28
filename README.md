@@ -6,7 +6,7 @@ Using Reify, 59 bugs have been discovered and reported in GCC and LLVM.
 
 Currently, Reify supports only i32 and i32 arrays.
 We are extending it to support additional primitive and aggregate types.
-We are also experimenting with generating Java bytecode and eBPF bytecode.
+We are also experimenting with generating Java bytecode, eBPF bytecode, and WebAssembly.
 Even in their early stages, these experimental attempts have already revealed one JIT compiler bug in OpenJ9 and two bugs in Linux's eBPF runtime.
 
 ## 🚀 Quick Start

@@ -43,6 +43,19 @@ public:
 
   void Generate() const;
   void GenerateCode(const fs::path &file, bool debug = false, bool staticModifier = false) const;
+  void GenerateWasmCode(const fs::path &file, bool debug = false, bool staticModifier = false) const;
+
+  int GetFunctionIdx(symir::Funct *fun) const {
+    auto it = std::find_if(functions.begin(), functions.end(),
+      [fun](const auto& uptr) { return uptr.get() == fun; });
+
+    // Not found
+    if (it == functions.end()) {
+      return -1;
+    }
+
+    return static_cast<int>(std::distance(functions.begin(), it));
+  }
 
 private:
   bool replaceFirstCoef(
@@ -54,6 +67,7 @@ private:
   std::string uuid, sno;
   std::vector<std::unique_ptr<symir::Funct>> functions{};
   std::vector<FunPlus::IniFinMap> mappings{};
+  std::map<std::string, std::vector<std::string>> exec_path_cache;
 };
 
 #endif // REIFY_PROGRAM_HPP

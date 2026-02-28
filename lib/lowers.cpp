@@ -356,21 +356,43 @@ namespace symir {
   }
 
   void SymWasmLower::Visit(const VarUse &v) {
-    // option 1: get by name
-    std::string var_name = v.GetName();
-    bool use_index = is_anonymous.count(var_name) || (rand() % 2 == 0);
-    // option 2: get by index (0-based, first params, then locals)
-    std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    if (v.IsVector()) {
+      Panic("Vector variable use is not supported in Wasm lowering");
+      return;
+    }
 
-    if (use_sexp) out << "(";
-    out << "local.get " << var_id;
-    if (use_sexp) out << ")";
+    // Option 1: refer by name
+    std::string var_name = v.GetName();
+    bool use_index = is_anonymous.count(var_name) || (rand() % 100 < config.ANON_USAGE_PCT);
+    // Option 2: refer by index (0-based, first params, then locals)
+    std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
+
+    // Handle heap variable access
+    if (heap_locals.count(var_name)) {
+      if (use_sexp) {
+        out << "(i32.load (local.get " << var_id << "))";
+      } else {
+        out << "local.get " << var_id << std::endl; indent();
+        out << "i32.load";
+      }
+    }
+    // Handle stack variable access (default)
+    else {
+      if (use_sexp) out << "(";
+      out << "local.get " << var_id;
+      if (use_sexp) out << ")";
+    }
   }
 
   void SymWasmLower::Visit(const Coef &c) {
-    // must be solved to emit value
     Assert(c.IsSolved(), "The coefficient has not been solved, cannot lower to Wasm");
+
+    // Emit value directly if it has been replaced by a call
+    if (c.GetValue().find("(i32") == 0) {  // TODO: improve check for whether value is a call or not
+      out << c.GetValue();
+      return;
+    }
     
     std::string type;
     switch (c.GetType()) {
@@ -380,15 +402,11 @@ namespace symir {
 
     // TODO: will currently only work for i32
     int32_t value = c.GetI32Value();
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
-    // option 1: c
     if (use_sexp) out << "(";
     out << type << ".const " << value;
     if (use_sexp) out << ")";
-
-    // option 2: ((c + R) - R)  // TODO: make this also vary between sexp/stackbased
-    // note: should keep simple in order to replace with function call?
   }
 
   void SymWasmLower::Visit(const Term &t) { 
@@ -397,7 +415,6 @@ namespace symir {
     }
 
     if (t.GetOp() == Term::Op::OP_CST) {
-      // just coef
       t.GetCoef()->Accept(*this);
       return;
     }
@@ -412,7 +429,7 @@ namespace symir {
       default: Panic("Unsupported operation");
     }
 
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
     if (use_sexp) {
       bool old_force = force_sexp;
@@ -450,7 +467,7 @@ namespace symir {
     
     const auto& terms = e.GetTerms();
     if (terms.empty()) {
-      // using 0 as a default  // TODO: will this ever occur? should maybe error instead?
+      // Using 0 as a default
       out << (force_sexp ? "(i32.const 0)" : "i32.const 0");
       return;
     }
@@ -467,19 +484,18 @@ namespace symir {
       default: Panic("Unsupported expression operation");
     }
 
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
     if (use_sexp) {
       bool old_force = force_sexp;
       force_sexp = true; 
 
-      // for left-assoc, have to emit (op (op (op 1 2) 3) 4)
+      // For left-associativity, have to emit (op (op (op 1 2) 3) 4)
       for (size_t i = 0; i < terms.size() - 1; ++i) {
         out << "(" << op << " ";
       }
       
-      terms[0]->Accept(*this); // first/core term
-      
+      terms[0]->Accept(*this);  // First/core term
       for (size_t i = 1; i < terms.size(); ++i) {
         out << " ";
         terms[i]->Accept(*this);
@@ -488,7 +504,7 @@ namespace symir {
 
       force_sexp = old_force;
     } else {
-      // stackbased is naturally left-assoc in order
+      // Stack-based is naturally left-associative in order
       terms[0]->Accept(*this);
       for (size_t i = 1; i < terms.size(); ++i) {
         out << std::endl; indent();
@@ -504,7 +520,7 @@ namespace symir {
       Panic("Unsupported condition type");
     }
 
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
     Cond::Op op = c.GetOp();
 
     if (use_sexp) {
@@ -516,7 +532,7 @@ namespace symir {
         c.GetExpr()->Accept(*this);
         out << ")";
       } else {
-        // represent gtz and ltz by comparing with 0 (pushed const)
+        // Represent gtz and ltz by comparing with 0 (manually-pushed const)
         std::string op_str = (op == Cond::Op::OP_GTZ) ? "i32.gt_s" : "i32.lt_s";
         out << "(" << op_str << " ";
         c.GetExpr()->Accept(*this);
@@ -531,7 +547,7 @@ namespace symir {
       if (op == Cond::Op::OP_EQZ) {
         out << "i32.eqz";
       } else {
-        // represent gtz and ltz by comparing with 0 (pushed const)
+        // Represent gtz and ltz by comparing with 0 (manually-pushed const)
         out << "i32.const 0";
         out << std::endl; indent();
         out << ((op == Cond::Op::OP_GTZ) ? "i32.gt_s" : "i32.lt_s");
@@ -541,34 +557,57 @@ namespace symir {
 
   void SymWasmLower::Visit(const AssStmt &e) {
     std::string var_name = e.GetVar()->GetName();
-    bool use_index = is_anonymous.count(var_name) || (rand() % 2 == 0);
+    bool use_index = is_anonymous.count(var_name) || (rand() % 100 < config.ANON_USAGE_PCT);
     std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
     
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
-    if (use_sexp) {
-      bool old_force = force_sexp;
-      force_sexp = true;
+    // Handle heap variable assignment
+    if (heap_locals.count(var_name)) {
+       if (use_sexp) {
+        bool old_force = force_sexp;
+        force_sexp = true;
 
-      out << "(local.set " << var_id << " ";
-      e.GetExpr()->Accept(*this);
-      out << ")";
+        out << "(i32.store (local.get " << var_id << ") ";
+        e.GetExpr()->Accept(*this);
+        out << ")";
 
-      force_sexp = old_force;
+        force_sexp = old_force;
+      } else {
+        out << "local.get " << var_id << std::endl; indent();
+        e.GetExpr()->Accept(*this);
+        out << std::endl; indent();
+        out << "i32.store";
+      }
+    // Handle stack variable assignment (default)
     } else {
-      e.GetExpr()->Accept(*this);
-      out << std::endl; indent();
-      out << "local.set " << var_id;
+      if (use_sexp) {
+        bool old_force = force_sexp;
+        force_sexp = true;
+
+        out << "(local.set " << var_id << " ";
+        e.GetExpr()->Accept(*this);
+        out << ")";
+
+        force_sexp = old_force;
+      } else {
+        e.GetExpr()->Accept(*this);
+        out << std::endl; indent();
+        out << "local.set " << var_id;
+      }
     }
   }
 
-  // note: returning all vars with multi-return
+  // NOTE: Returning all Vars with multi-return
   void SymWasmLower::Visit(const RetStmt &r) {
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
     if (use_sexp) {
       bool old_force = force_sexp;
       force_sexp = true;
+
+      // Restore heap
+      out << "(global.set $heap_ptr (local.get $saved_heap)) ";
 
       out << "(return";
       for (auto &v : r.GetVars()) {
@@ -583,6 +622,11 @@ namespace symir {
         v->Accept(*this);
         out << std::endl; indent();
       }
+
+      // Restore heap
+      out << "local.get $saved_heap" << std::endl; indent();
+      out << "global.set $heap_ptr" << std::endl; indent();
+    
       out << "return";
     }
   }
@@ -590,7 +634,7 @@ namespace symir {
   void SymWasmLower::Visit(const Branch &b) {
     int true_id = block_inds[std::stoi(b.GetTrueTarget().substr(2))];
     int false_id = block_inds[std::stoi(b.GetFalseTarget().substr(2))];
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
     std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
     
     if (use_sexp) {
@@ -606,7 +650,6 @@ namespace symir {
       
       force_sexp = old_force;
     } else {
-      // cond, if, true_block, else, false_block, end, set next_block
       b.GetCond()->Accept(*this); 
       out << std::endl; indent();
 
@@ -626,8 +669,8 @@ namespace symir {
       out << "local.set " << next_block_id;
     }
 
-    // randomize again for br
-    use_sexp = force_sexp || (rand() % 2 == 0);
+    // Randomize again for br statement, which is independent
+    use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
     out << std::endl; indent();
     if (use_sexp) out << "(";
@@ -637,7 +680,7 @@ namespace symir {
 
   void SymWasmLower::Visit(const Goto &g) {
     int target_id = block_inds[std::stoi(g.GetTarget().substr(2))];
-    bool use_sexp = force_sexp || (rand() % 2 == 0);
+    bool use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
     std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
 
     if (use_sexp) {
@@ -650,8 +693,8 @@ namespace symir {
       out << "local.set " << next_block_id;
     }
 
-    // randomize again for br
-    use_sexp = force_sexp || (rand() % 2 == 0);
+    // Randomize again for br statement, which is independent
+    use_sexp = force_sexp || (rand() % 100 < config.SEXP_PCT);
 
     out << std::endl; indent();
     if (use_sexp) out << "(";
@@ -659,7 +702,7 @@ namespace symir {
     if (use_sexp) out << ")";
   }
 
-  // unused
+  // NOTE: Unused
   void SymWasmLower::Visit(const ScaParam &p) {
     out << "(param $" << p.GetName() << " ";
       switch (p.GetType()) {
@@ -669,12 +712,13 @@ namespace symir {
     out << ")";
   }
 
-  // unused
+  // NOTE: Unused
   void SymWasmLower::Visit(const VecParam &p) {
-    out << "(param $" << p.GetName() << " v128)";
+    // Would be an i32 representing array "address" in heap
+    // Would be a v128 if SIMD is supported in the future
   }
 
-  // unused
+  // NOTE: Unused
   void SymWasmLower::Visit(const ScaLocal &l) {
     out << "(local $" << l.GetName() << " ";
       switch (l.GetType()) {
@@ -684,15 +728,16 @@ namespace symir {
     out << ")";
   }
 
-  // unused
+  // NOTE: Unused
   void SymWasmLower::Visit(const VecLocal &l) {
-    out << "(local $" << l.GetName() << " v128)";
+    // Would be an i32 representing array "address" in heap
+    // Would be a v128 if SIMD is supported in the future
   }
 
   void SymWasmLower::Visit(const Block &b) {
     std::string label = b.GetLabel();
-    bool gen_unreachable = std::find(exec_path.begin(), exec_path.end(), label) == exec_path.end() && (rand() % 2 == 0);
-    
+    bool gen_unreachable = exec_path.size() != 0 && std::find(exec_path.begin(), exec_path.end(), label) == exec_path.end() && (rand() % 100 < config.UNREACHABLE_PCT);
+
     if (gen_unreachable) {
       indent();
       if (force_sexp) out << "(";
@@ -700,7 +745,6 @@ namespace symir {
       if (force_sexp) out << ")";
       out << std::endl;
     } else {
-      // visit all instrs inside the block
       for (const auto &s: b.GetStmts()) {
         indent();
         s->Accept(*this);
@@ -710,14 +754,14 @@ namespace symir {
   }
 
   void SymWasmLower::Visit(const Funct &f) {
-    incIndent();  // should by default be 1
+    incIndent();
     
-    // initialize blocks and order
+    // Initialize blocks and order
     for (const auto &b : f.GetBlocks()) {
       blocks.push_back(b);
     }
 
-    // initialize in-scope-variable name : idx map
+    // Initialize mapping from in-scope-variable name to index
     int idx = 0;
     for (const auto &p : f.GetParams()) {
       locals[p->GetName()] = idx++;
@@ -729,31 +773,31 @@ namespace symir {
 
     indent(); out << "(func $" << f.GetName() << " ";
 
-    // loop directly here instead of visiting to allow folding/anonymization
+    // Loop through and emit params directly instead of visiting to allow folding/anonymization
     const auto& params = f.GetParams();
     size_t i = 0;
     while (i < params.size()) {
-      // how many params are left
+      // How many params are left
       int remaining = params.size() - i;
-      // can only fold if there are 2+ remaining
+      // Can only fold if there are 2+ remaining
       bool can_group = (remaining >= 2);
-      bool group = can_group && (rand() % 2 == 0);
+      bool group = can_group && (rand() % 100 < config.FOLDING_PCT);
 
       if (group) {
         out << "(param";
-        // random group size between 2 and 'remaining'
+        // Random group size between 2 and 'remaining'
         int group_size = (rand() % (remaining - 1)) + 2; 
         for (int j = 0; j < group_size; ++j) {
           out << " " << getWasmType(params[i]->GetType());
-          // update is_anonymous
+          // Update is_anonymous
           is_anonymous.insert(params[i]->GetName());
           i++;
         }
         out << ") ";
       } else {
-        // named, ungrouped/single
+        // Named, ungrouped/single
         out << "(param $" << params[i]->GetName() << " " << getWasmType(params[i]->GetType()) << ") ";
-        // update is_anonymous
+        // Update is_anonymous
         is_anonymous.erase(params[i]->GetName());
         i++;
       }
@@ -762,9 +806,9 @@ namespace symir {
     out << "(result";
     switch (f.GetRetType()) {
       case SymIR::Type::I32:
-        // just return all params final state  // TODO: will need to modify with v128 addition
+        // Return all variables with multi-value return (avoids checksum usage)
         for (size_t i = 0; i < f.GetParams().size(); i++) {
-          out << " i32";
+          out << " i32";  // TODO: Would need to modify with v128 addition
         }
         break;
       default: Panic("Unsupported return type %s in method %s", SymIR::GetTypeName(f.GetRetType()).c_str(), f.GetName().c_str());
@@ -774,39 +818,37 @@ namespace symir {
 
     incIndent(); indent();
 
-    // can just shuffle block order, since doesn't affect dispatcher pattern
-    // IDEA: toggling force_sexp from the beginning can enable 'pretty print'
+    // Shuffle block order, as it doesn't affect dispatcher pattern
+    // NOTE: Toggling force_sexp from the beginning can enable 'pretty print'
     if (!force_sexp) {
       std::random_device rd;
       std::mt19937 r(rd());
       std::shuffle(blocks.begin(), blocks.end(), r);
     }
 
-    // initialize block_inds
+    // Initialize block_inds
     for (size_t i = 0; i < blocks.size(); i++) {
       block_inds[std::stoi(blocks[i]->GetLabel().substr(2))] = i;
     }
 
-    // emit next_block, no folding but possible anonymization
-    if (rand() % 2 == 0) {
-      // anon
-      out << "(local i32)" << std::endl;
+    // Emit next_block indicator variable (no folding, but possible anonymization)
+    if (rand() % 100 < config.ANON_DECL_PCT) {
+      out << "(local i32)" << std::endl;  // Anonymous
       indent();
       is_anonymous.insert(WASM_NEXT_BLOCK);
     } else {
-      // named
-      out << "(local $" << WASM_NEXT_BLOCK << " i32)" << std::endl;
+      out << "(local $" << WASM_NEXT_BLOCK << " i32)" << std::endl;  // Named
       indent();
       is_anonymous.erase(WASM_NEXT_BLOCK);
     }
 
-    // loop directly here instead of visiting to allow folding/anonymization
+    // Loop through and emit locals directly instead of visiting to allow folding/anonymization
     i = 0;
     const auto& ir_locals = f.GetLocals();
     while (i < ir_locals.size()) {
       int remaining = ir_locals.size() - i;
       bool can_group = (remaining >= 2);
-      bool group = can_group && (rand() % 2 == 0);
+      bool group = can_group && (rand() % 100 < config.FOLDING_PCT);
 
       if (group) {
         out << "(local";
@@ -825,33 +867,54 @@ namespace symir {
       }
     }
 
+    out << "(local $saved_heap i32)" << std::endl;
+    indent();
+
     if (block_inds[0] != 0) {
       out << std::endl; indent();
-      // set nextblock to bb0idx if not 0
+      // Initialize next_block variable to the first block's index (since we will jump to it immediately), using either named or anonymous reference
       std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
       out << "(local.set " << next_block_id << " (i32.const " << block_inds[0] << "))" << std::endl;
       indent();
     }
-    // init values of locals (have to actually just set them separately as they are auto init to 0)
+
+    out << "(local.set $saved_heap (global.get $heap_ptr))" << std::endl;
+    indent();
+
+    // Initialize locals with setters
+    // TODO: Support vector locals
     for (const auto &l : f.GetLocals()) {
       if (auto sca = dynamic_cast<const ScaLocal*>(l)) {
+        std::string var_name = l->GetName();
+        bool use_index = is_anonymous.count(var_name) || (rand() % 100 < config.ANON_USAGE_PCT);
+        std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
         int coef = sca->GetCoef()->GetI32Value();
-        if (coef != 0) {
-          // TODO: create an equivalent assn stmt and visit?
-          std::string var_name = l->GetName();
-          bool use_index = is_anonymous.count(var_name) || (rand() % 2 == 0);
-          std::string var_id = use_index ? std::to_string(locals[var_name]) : ("$" + var_name);
-          out << "(local.set " << var_id << " (i32.const " << coef << "))" << std::endl;
+
+        // Initialize heap-allocated locals
+        bool use_heap = (rand() % 100 < config.HEAP_PCT);
+        if (use_heap) {
+          heap_locals.insert(var_name);
+
+          out << "(local.set " << var_id << " (call $alloc (i32.const 4)))" << std::endl;
+          indent();
+
+          out << "(i32.store (local.get " << var_id << ") (i32.const " << coef << "))" << std::endl;
           indent();
         }
+        // Initialize stack-allocated locals (default)
+        else {
+          if (coef != 0) {  // Wasm locals are initialized to 0 by default, so only need to emit if not 0
+            out << "(local.set " << var_id << " (i32.const " << coef << "))" << std::endl;
+            indent();
+          }
+        }
       }
-      // TODO: veclocal
     }
 
     if (!blocks.empty()) {
       out << std::endl;
 
-      // dispatcher header
+      // Dispatcher header
       indent();
       out << "(loop $" << WASM_DISPATCHER << std::endl;;
       incIndent(); indent();
@@ -861,10 +924,10 @@ namespace symir {
       }
       out << std::endl;
 
-      // dispatcher body
+      // Dispatcher body
       incIndent(); indent();
       std::string next_block_id = is_anonymous.count(WASM_NEXT_BLOCK) ? std::to_string(locals[WASM_NEXT_BLOCK]) : ("$" + WASM_NEXT_BLOCK);
-      if (force_sexp || rand() % 2 == 0) {
+      if (force_sexp || rand() % 100 < config.SEXP_PCT) {
         out << "(br_table";
         for (const auto &b : blocks) {
           out << " $" << b->GetLabel();
@@ -882,7 +945,7 @@ namespace symir {
         decIndent();
       }
 
-      // block bodies
+      // Block bodies
       for (const auto &b : blocks) {
         indent();
         out << ")" << std::endl;
@@ -893,20 +956,24 @@ namespace symir {
       }
     }
 
-    // dispatcher close paren
+    // Dispatcher close paren
     decIndent(); indent();
     out << ")" << std::endl;
+
+    indent();
+    out << "(global.set $heap_ptr (local.get $saved_heap))" << std::endl;
+
     indent();
     out << "(return";
     for (size_t i = 0; i < f.GetParams().size(); i++) {
-      out << " (i32.const 0)";  // required return after all blocks, just using 0 as default
+      out << " (i32.const 0)";  // Required return after all blocks, using 0 as default
     }
 
     out << ")" << std::endl;
     decIndent(); indent();
     out << ")" << std::endl;
 
-    // (export "function_name" (func $function_name))
+    // Export function
     out << std::endl; indent();
     out << "(export \"" << f.GetName() << "\" (func $" << f.GetName() << "))" << std::endl;
   }
