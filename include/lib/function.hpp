@@ -109,6 +109,7 @@ public:
 
   // Generate the Wasm code of the function for a given execution
   [[nodiscard]] std::string GenerateWasmCode(const UBFreeExec &exec) const;
+  [[nodiscard]] std::string GenerateWasmCode(const UBFreeExec &exec, int wasm_anon_decl_pct, int wasm_anon_usage_pct, int wasm_sexp_pct, int wasm_unreachable_pct, int wasm_folding_pct) const;
 
   // Generate the Java code of the function for a given execution with or without main()
   [[nodiscard]] std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(

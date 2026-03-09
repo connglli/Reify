@@ -500,6 +500,34 @@ std::string FunPlus::GenerateWasmCode(const UBFreeExec &exec) const {
   return oss.str();
 }
 
+std::string FunPlus::GenerateWasmCode(const UBFreeExec &exec, int wasm_anon_decl_pct, int wasm_anon_usage_pct, int wasm_sexp_pct, int wasm_unreachable_pct, int wasm_folding_pct) const {
+  Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
+  const auto *fun = exec.GetFun();
+  Assert(fun != nullptr, "Function is not generated yet!");
+
+  std::ostringstream oss;
+  oss << ";;";
+  for (std::string block : exec.GetExecutionByLabels()) {
+    oss << " " << block;
+  }
+  oss << std::endl << std::endl;
+  oss << "(module" << std::endl;
+  oss << "  (memory $mem 16)" << std::endl;
+  oss << "  (global $heap_ptr (mut i32) (i32.const 0))" << std::endl << std::endl;
+
+  oss << "  (func $alloc (param $size i32) (result i32)" << std::endl;
+  oss << "    (local $ptr i32)" << std::endl;
+  oss << "    (local.set $ptr (global.get $heap_ptr))" << std::endl;
+  oss << "    (global.set $heap_ptr (i32.add (global.get $heap_ptr) (local.get $size)))" << std::endl;
+  oss << "    (local.get $ptr)" << std::endl;
+  oss << "  )" << std::endl << std::endl;
+  symir::SymWasmLower lower(oss);
+  lower.SymWasmConfigure(wasm_anon_decl_pct, wasm_anon_usage_pct, 50, wasm_sexp_pct, wasm_unreachable_pct, wasm_folding_pct);
+  lower.SymWasmLowerFunction(*exec.GetFun(), exec.GetExecutionByLabels());
+  oss << ")" << std::endl;
+  return oss.str();
+}
+
 std::string FunPlus::GenerateMappingCode(const UBFreeExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
   std::ostringstream mapping;

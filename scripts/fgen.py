@@ -61,6 +61,8 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
     f"sexp={fopts.sexp}, main={fopts.main}, wasm={fopts.wasm}, allops={fopts.allops}, injubs={fopts.injubs}, "
     f"check={check}, crealdb={crealdb}, timeout={timeout}s, "
     f"extra={repr(fopts.extra) if fopts.extra else '<NONE>'}"
+    f", wasm_sexp_pct={fopts.wasm_sexp_pct}%, wasm_unreachable_pct={fopts.wasm_unreachable_pct}%, "
+    f"wasm_folding_pct={fopts.wasm_folding_pct}%, wasm_anon_decl_pct={fopts.wasm_anon_decl_pct}%, wasm_anon_usage_pct={fopts.wasm_anon_usage_pct}%"
   )
   fopts.sno = 0
   while limit == 0 or fopts.sno < limit:
@@ -164,6 +166,37 @@ if __name__ == "__main__":
     default=False,
     help="build a Creal compatible function database from the generated functions",
   )
+  parser.add_argument(
+    "--wasm_sexp_pct",
+    type=int,
+    default=50,
+    help="configure the chance that a construct is emitted in s-expression-style rather than line-by-line style",
+  )
+  parser.add_argument(
+    "--wasm_unreachable_pct",
+    type=int,
+    default=50,
+    help="configure the chance that a block that is not on the execution path is emitted as an unreachable block",
+  )
+  parser.add_argument(
+    "--wasm_folding_pct",
+    type=int,
+    default=50,
+    help="configure the chance that a local definition is folded (and anonymized) with a random amount of neighboring locals",
+  )
+  parser.add_argument(
+    "--wasm_anon_decl_pct",
+    type=int,
+    default=50,
+    help="configure the chance that a variable is declared without a name (and later referred to by index)",
+  )
+  parser.add_argument(
+    "--wasm_anon_usage_pct",
+    type=int,
+    default=50,
+    help="configure the chance that a variable use refers to a variable by index instead of by name",
+  )
+  
 
   args = parser.parse_args()
 
@@ -183,6 +216,11 @@ if __name__ == "__main__":
       injubs=args.injubs,
       seed=args.seed,  # We save it as the initial seed
       extra=args.extra,
+      wasm_sexp_pct=args.wasm_sexp_pct,
+      wasm_unreachable_pct=args.wasm_unreachable_pct,
+      wasm_folding_pct=args.wasm_folding_pct,
+      wasm_anon_decl_pct=args.wasm_anon_decl_pct,
+      wasm_anon_usage_pct=args.wasm_anon_usage_pct,
     ),
     limit=args.limit,
     check=args.check,

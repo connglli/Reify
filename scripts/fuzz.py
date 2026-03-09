@@ -94,6 +94,11 @@ class FuncGenOptions:
   injubs: bool = True  # Whether to inject undefined behaviors for those unexecuted blocks
   seed: Optional[int] = None  # Seed for the random number generator (None means no seed)
   extra: Optional[str] = None  # Extra options to control the function generation process
+  wasm_sexp_pct: int = 50  # Configure the chance that a construct is emitted in s-expression-style rather than line-by-line style
+  wasm_unreachable_pct: int = 50  # Configure the chance that a block that is not on the execution path is emitted as an unreachable block
+  wasm_folding_pct: int = 50  # Configure the chance that a local definition is folded (and anonymized) with a random amount of neighboring locals
+  wasm_anon_decl_pct: int = 50  # Configure the chance that a variable is declared without a name (and later referred to by index)
+  wasm_anon_usage_pct: int = 50  # Configure the chance that a variable use refers to a variable by index instead of by name
 
   def to_dict(self) -> dict:
     return {

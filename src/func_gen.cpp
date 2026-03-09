@@ -86,6 +86,11 @@ struct FunGenOpts {
   bool wasm;
   bool javaclass;
   bool verbose;
+  int wasm_sexp_pct;
+  int wasm_unreachable_pct;
+  int wasm_folding_pct;
+  int wasm_anon_decl_pct;
+  int wasm_anon_usage_pct;
 
   static FunGenOpts Parse(int argc, char **argv) {
     cxxopts::Options options("fgen");
@@ -101,7 +106,13 @@ struct FunGenOpts {
       ("W,wasm", "Also generate a Wasm program identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
-      ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
+      ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("wasm_sexp_pct", "Configure the chance that a construct is emitted in s-expression-style rather than line-by-line style", cxxopts::value<int>()->default_value("50"))
+      ("wasm_unreachable_pct", "Configure the chance that a block that is not on the execution path is emitted as an unreachable block", cxxopts::value<int>()->default_value("50"))
+      ("wasm_folding_pct", "Configure the chance that a local definition is folded (and anonymized) with a random amount of neighboring locals", cxxopts::value<int>()->default_value("50"))
+      ("wasm_anon_decl_pct", "Configure the chance that a variable is declared without a name (and later referred to by index)", cxxopts::value<int>()->default_value("50"))
+      ("wasm_anon_usage_pct", "Configure the chance that a variable use refers to a variable by index instead of by name", cxxopts::value<int>()->default_value("50"));
+
     options.parse_positional("uuid");
     options.positional_help("UUID");
     GlobalOptions::AddFuncOpts(options);
@@ -190,6 +201,12 @@ struct FunGenOpts {
 
     const bool verbose = args["verbose"].as<bool>();
 
+    const int wasm_sexp_pct        = args["wasm_sexp_pct"].as<int>();
+    const int wasm_unreachable_pct = args["wasm_unreachable_pct"].as<int>();
+    const int wasm_folding_pct     = args["wasm_folding_pct"].as<int>();
+    const int wasm_anon_decl_pct   = args["wasm_anon_decl_pct"].as<int>();
+    const int wasm_anon_usage_pct  = args["wasm_anon_usage_pct"].as<int>();
+
     return {
         .uuid = uuid,
         .sno = sno,
@@ -199,7 +216,12 @@ struct FunGenOpts {
         .sexpression = sexpression,
         .wasm = wasm,
         .javaclass = javaclass,
-        .verbose = verbose
+        .verbose = verbose,
+        .wasm_sexp_pct = wasm_sexp_pct,
+        .wasm_unreachable_pct = wasm_unreachable_pct,
+        .wasm_folding_pct = wasm_folding_pct,
+        .wasm_anon_decl_pct = wasm_anon_decl_pct,
+        .wasm_anon_usage_pct = wasm_anon_usage_pct
     };
   }
 };
@@ -215,6 +237,11 @@ int main(int argc, char **argv) {
   bool wasm = cliOpts.wasm;
   bool javaclass = cliOpts.javaclass;
   bool verbose = cliOpts.verbose;
+  int wasm_sexp_pct = cliOpts.wasm_sexp_pct;
+  int wasm_unreachable_pct = cliOpts.wasm_unreachable_pct;
+  int wasm_folding_pct = cliOpts.wasm_folding_pct;
+  int wasm_anon_decl_pct = cliOpts.wasm_anon_decl_pct;
+  int wasm_anon_usage_pct = cliOpts.wasm_anon_usage_pct;
 
   std::filesystem::path outputDirectory = cliOpts.output;
   std::filesystem::create_directories(outputDirectory);
@@ -315,7 +342,7 @@ int main(int argc, char **argv) {
 
   // Generate a Wasm program if necessary
   if (wasm) {
-    std::string wasmCode = fun.GenerateWasmCode(*exec);
+    std::string wasmCode = fun.GenerateWasmCode(*exec, wasm_anon_decl_pct, wasm_anon_usage_pct, wasm_sexp_pct, wasm_unreachable_pct, wasm_folding_pct);
     std::filesystem::create_directories(GetWasmDir(outputDirectory));
     std::ofstream wasmFile = std::ofstream(GetWasmPath(uuid, sno, outputDirectory));
     wasmFile << wasmCode << std::endl;

@@ -136,13 +136,18 @@ namespace symir {
       int UNREACHABLE_PCT = 50;  // Chance that a block that is not on the execution path is emitted as an "unreachable" block
       int FOLDING_PCT = 50;      // Chance that a local definition is folded (and anonymized) with a random amount of neighboring locals
     };
-    explicit SymWasmLower(std::ostream &out) : SymIRLower(out) {}
+    explicit SymWasmLower(std::ostream &out) : SymIRLower(out) { config = Config(); }
     void SymWasmLowerFunction(const Funct &f, const std::vector<std::string> execPath) {
       this->exec_path = execPath;
       Lower(f);
     }
-    void SymWasmConfigure(Config cfg) {
-      config = cfg;
+    void SymWasmConfigure(int anonDeclPct, int anonUsagePct, int heapPct, int sexpPct, int unreachablePct, int foldingPct) {
+      config.ANON_DECL_PCT = anonDeclPct;
+      config.ANON_USAGE_PCT = anonUsagePct;
+      config.HEAP_PCT = heapPct;
+      config.SEXP_PCT = sexpPct;
+      config.UNREACHABLE_PCT = unreachablePct;
+      config.FOLDING_PCT = foldingPct;
     }
 
   protected:
