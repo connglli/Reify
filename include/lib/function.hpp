@@ -102,15 +102,14 @@ public:
   [[nodiscard]] std::string GenerateFunCode(const SymExec &exec) const;
 
   // Generate the C main() code of the function for a given execution
-  [[nodiscard]] std::string GenerateMainCode(const SymExec &exec, bool debug = false) const;
+  [[nodiscard]] std::string GenerateMainCode(const SymExec &exec) const;
 
   // Generate the S Expression code of the function for a given execution
   [[nodiscard]] std::string GenerateFunSexpCode(const SymExec &exec) const;
 
   // Generate the Java code of the function for a given execution with or without main()
-  [[nodiscard]] std::unique_ptr<jnif::ClassFile> GenerateFunJavaCode(
-      const SymExec &exec, const std::string &className, bool main = false, bool debug = false
-  ) const;
+  [[nodiscard]] std::unique_ptr<jnif::ClassFile>
+  GenerateFunJavaCode(const SymExec &exec, const std::string &className, bool main = false) const;
 
   // Generate the map of initialisation-finalisation for a given execution
   [[nodiscard]] std::string GenerateMappingCode(const SymExec &exec) const;

@@ -173,6 +173,6 @@ int main(int argc, char *argv[]) {
 
     ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
     fs::create_directories(arts.GetTestDir());
-    prog->GenerateCode(arts, enableDebug);
+    prog->GenerateCode(arts);
   }
 }

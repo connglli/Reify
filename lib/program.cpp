@@ -325,7 +325,7 @@ void ProgPlus::Generate() const {
   }
 }
 
-void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
+void ProgPlus::GenerateCode(const ProgArts &arts) const {
   // Generate the checksum code
   std::ofstream chksumFile(arts.GetChksumPath());
   chksumFile << StatelessChecksum::GetRawCode() << std::endl;
@@ -335,7 +335,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts, bool debug) const {
   std::ofstream protoFile(arts.GetProtoPath());
   protoFile << "#ifndef PROTOTYPES_H" << std::endl;
   protoFile << "#define PROTOTYPES_H" << std::endl << std::endl;
-  protoFile << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
+  protoFile << StatelessChecksum::GetCheckChksumCode(/*debug=*/true) << std::endl;
   protoFile << "extern " << StatelessChecksum::GetCrc32InitPrototype() << ";" << std::endl;
   protoFile << "extern " << StatelessChecksum::GetComputePrototype() << ";" << std::endl;
   for (const auto &fun: functions) {

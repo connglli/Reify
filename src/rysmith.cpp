@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
   // Generate an executable program if necessary
   if (mainfun) {
     std::ofstream programFile = std::ofstream(arts.GetMainPath());
-    programFile << fun.GenerateMainCode(*exec, /*debug=*/verbose) << std::endl;
+    programFile << fun.GenerateMainCode(*exec) << std::endl;
     programFile.close();
   }
 
@@ -252,7 +252,7 @@ int main(int argc, char **argv) {
               << std::endl;
     Log::Get().OpenSection("Java Class Generation");
     // TODO: Copy the checksum classes to the output directory if they are not already there
-    auto javaClass = fun.GenerateFunJavaCode(*exec, arts.GetJavaClsName(), mainfun, verbose);
+    auto javaClass = fun.GenerateFunJavaCode(*exec, arts.GetJavaClsName(), mainfun);
     Log::Get().CloseSection();
     jnif::stream::OClassFileStream ofs(arts.GetJavaClsPath().c_str(), javaClass.get());
   }
