@@ -542,9 +542,8 @@ void createArray(jnif::ClassFile &cls, jnif::Method &met, const ArgPlus<int> &va
   createArray(0, 0);
 }
 
-std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
-    const SymExec &exec, const std::string &className, bool main, bool debug
-) const {
+std::unique_ptr<jnif::ClassFile>
+FunPlus::GenerateFunJavaCode(const SymExec &exec, const std::string &className, bool main) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
 
   const auto *fun = exec.GetFun();
@@ -598,11 +597,7 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
       }
     }
     mainMethod->instList().addInvoke(jnif::Opcode::invokestatic, methodRef);
-    if (debug) {
-      mainMethod->instList().addZero(jnif::Opcode::iconst_1);
-    } else {
-      mainMethod->instList().addZero(jnif::Opcode::iconst_0);
-    }
+    mainMethod->instList().addZero(jnif::Opcode::iconst_1); // Set the debug flag
     mainMethod->instList().addInvoke(jnif::Opcode::invokestatic, checkMethodRef);
   }
 
@@ -619,7 +614,7 @@ std::unique_ptr<jnif::ClassFile> FunPlus::GenerateFunJavaCode(
   return lower.TakeJavaClass();
 }
 
-std::string FunPlus::GenerateMainCode(const SymExec &exec, bool debug) const {
+std::string FunPlus::GenerateMainCode(const SymExec &exec) const {
   Assert(exec.GetOwner() == this, "The execution does not belong to this function!");
 
   const auto *fun = exec.GetFun();
@@ -635,7 +630,7 @@ std::string FunPlus::GenerateMainCode(const SymExec &exec, bool debug) const {
 
   // Generate the checksum code
   main << StatelessChecksum::GetRawCode() << std::endl;
-  main << StatelessChecksum::GetCheckChksumCode(debug) << std::endl;
+  main << StatelessChecksum::GetCheckChksumCode(/*debug=*/true) << std::endl;
 
   // Declare the function prototype
   main << symir::SymCxLower::GetFunPrototype(*fun) << ";" << std::endl << std::endl;
