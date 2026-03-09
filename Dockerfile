@@ -20,12 +20,30 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     libgmp-dev \
     libmpfr6 \
     libmpfr-dev \
+    file \
+    flex \
+    bison \
+    curl \
+    gcc-multilib \
+    g++-multilib \
     tmux \
     vim \
   && apt autoremove -y && apt clean -y \
   && rm -rf /var/lib/apt/lists/* \
-  && git clone --depth 1 https://github.com/bitwuzla/bitwuzla.git /tmp/bitwuzla \
-  && cd /tmp/bitwuzla && ./configure.py && ninja -C build install && cd /reify \
-  && rm -rf /tmp/bitwuzla
+  # Install GCC
+  && chmod +x /reify/install-gcc.sh \
+  && /reify/install-gcc.sh \
+  # Install Bitwuzla
+  && chmod +x /reify/install-bitwuzla.sh \
+  && /reify/install-bitwuzla.sh \
+  # Cleanup
+  && rm -rf /reify/.git \
+  && rm -rf /reify/.gitignore \
+  && rm -rf /reify/.vscode \
+  && rm -rf /reify/AGENTS.md \
+  && rm -rf /reify/TODO \
+  && rm -rf /reify/build-pldi26ae-image.sh \
+  && rm -rf /reify/install-gcc.sh \
+  && rm -rf /reify/install-bitwuzla.sh
 
 ENTRYPOINT ["bash"]

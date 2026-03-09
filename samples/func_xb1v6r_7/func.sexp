@@ -1,0 +1,105 @@
+(struct func_xb1v6r_7_S0 ((f0 i32) (f1 i32[2]) (f2 i32)))
+(fun func_xb1v6r_7 i32 ((par v0 i32) (par v1 func_xb1v6r_7_S0) (par v2 i32) (par v3 i32) (par v4 i32) (par v5 i32[1]))
+  (loc v6 #-1 i32)
+  (loc v7 #-1 i32)
+  (bbl BB0 
+    (asn v3 (eadd (div #-1 v3) (add #-1 v1[f2]) (cst #-1)))
+    (asn v4 (eadd (rem #-1 v6) (rem #-1 v7) (cst #-1)))
+    (goto BB11)
+  )
+  (bbl BB1 
+    (asn v5[#0] (eadd (rem #0 v4) (mul #0 v0) (cst #0)))
+    (asn v3 (eadd (div #0 v4) (mul #0 v3) (cst #0)))
+    (brh BB2 BB8 (ltz (esub (add #0 v5[#0]) (rem #0 v3) (div #0 v7) (cst #0))))
+  )
+  (bbl BB2 
+    (asn v1[f2] (eadd (div #0 v2) (div #0 v3) (cst #0)))
+    (asn v3 (eadd (rem #0 v0) (rem #0 v7) (cst #0)))
+    (brh BB1 BB8 (eqz (eadd (div #0 v1[f1][#1]) (rem #0 v3) (sub #0 v4) (cst #0))))
+  )
+  (bbl BB3 
+    (asn v1[f0] (eadd (mul #0 v1[f0]) (cst #-2147483648)))
+    (asn v5[#0] (eadd (mul #0 v5[#0]) (cst #-1)))
+    (asn v6 (eadd (mul #0 v6) (cst #-2147483648)))
+    (asn v0 (eadd (mul #0 v0) (cst #-1)))
+    (asn v4 (esub (mul #0 v1[f0]) (rem #0 v5[#0]) (cst #0)))
+    (asn v7 (eadd (sub #0 v6) (rem #0 v0) (cst #0)))
+    (brh BB2 BB6 (gtz (eadd (add #0 v4) (sub #0 v7) (rem #0 v3) (cst #0))))
+  )
+  (bbl BB4 
+    (asn v3 (esub (add #-1 v5[#0]) (rem #-1 v2) (cst #-1)))
+    (asn v2 (esub (div #-1 v0) (div #-1 v7) (cst #-1)))
+    (brh BB2 BB6 (gtz (eadd (add #-1 v3) (add #-1 v2) (sub #-1 v6) (cst #-1))))
+  )
+  (bbl BB5 
+    (asn v2 (esub (rem #0 v1[f2]) (mul #0 v6) (cst #0)))
+    (asn v4 (eadd (sub #0 v4) (sub #0 v7) (cst #0)))
+    (brh BB3 BB9 (gtz (eadd (rem #0 v2) (add #0 v4) (div #0 v6) (cst #0))))
+  )
+  (bbl BB6 
+    (asn v3 (eadd (add #-1 v1[f2]) (rem #-1 v3) (cst #-1)))
+    (asn v6 (eadd (mul #-1 v3) (add #-1 v6) (cst #-2)))
+    (brh BB7 BB9 (eqz (eadd (add #-1 v3) (mul #-1 v6) (mul #-1 v1[f2]) (cst #2))))
+  )
+  (bbl BB7 
+    (asn v2 (esub (rem #-1 v3) (sub #0 v4) (cst #-1)))
+    (asn v0 (eadd (div #-1 v6) (add #-1 v5[#0]) (cst #-1)))
+    (goto BB18)
+  )
+  (bbl BB8 
+    (asn v4 (esub (div #0 v5[#0]) (add #0 v0) (cst #0)))
+    (asn v0 (eadd (mul #0 v5[#0]) (rem #0 v7) (cst #0)))
+    (goto BB5)
+  )
+  (bbl BB9 
+    (asn v2 (eadd (rem #0 v0) (rem #0 v2) (cst #0)))
+    (asn v3 (esub (div #0 v7) (div #0 v2) (cst #0)))
+    (brh BB2 BB12 (gtz (eadd (add #0 v2) (add #0 v3) (add #0 v1[f2]) (cst #0))))
+  )
+  (bbl BB10 
+    (asn v4 (esub (rem #0 v7) (add #0 v3) (cst #0)))
+    (asn v1[f2] (eadd (sub #0 v3) (mul #0 v0) (cst #0)))
+    (brh BB4 BB17 (gtz (eadd (div #0 v4) (rem #0 v1[f0]) (add #0 v0) (cst #0))))
+  )
+  (bbl BB11 
+    (asn v0 (eadd (div #-1 v1[f0]) (sub #-1 v3) (cst #-1)))
+    (asn v1[f2] (esub (div #-1 v2) (sub #2 v5[#0]) (cst #-1)))
+    (brh BB4 BB10 (eqz (esub (sub #-1 v0) (mul #-1 v1[f0]) (add #-1 v7) (cst #-1))))
+  )
+  (bbl BB12 
+    (asn v0 (eadd (div #0 v2) (sub #0 v5[#0]) (cst #0)))
+    (asn v3 (eadd (rem #0 v2) (div #0 v1[f2]) (cst #0)))
+    (goto BB14)
+  )
+  (bbl BB13 
+    (asn v4 (esub (div #0 v5[#0]) (sub #0 v1[f1][#1]) (cst #0)))
+    (asn v1[f1][#1] (esub (rem #0 v2) (div #0 v7) (cst #0)))
+    (goto BB15)
+  )
+  (bbl BB14 
+    (asn v3 (esub (add #0 v4) (sub #0 v0) (cst #0)))
+    (asn v4 (esub (mul #0 v3) (mul #0 v0) (cst #0)))
+    (goto BB13)
+  )
+  (bbl BB15 
+    (asn v2 (esub (mul #0 v0) (rem #0 v4) (cst #0)))
+    (asn v6 (eadd (sub #0 v4) (sub #0 v2) (cst #0)))
+    (brh BB12 BB16 (gtz (eadd (mul #0 v2) (sub #0 v6) (add #0 v0) (cst #0))))
+  )
+  (bbl BB16 
+    (asn v2 (esub (sub #0 v6) (sub #0 v3) (cst #0)))
+    (asn v0 (eadd (add #0 v0) (rem #0 v2) (cst #0)))
+    (brh BB9 BB17 (eqz (eadd (add #0 v2) (add #0 v0) (mul #0 v3) (cst #0))))
+  )
+  (bbl BB17 
+    (asn v5[#0] (esub (sub #0 v0) (div #0 v3) (cst #0)))
+    (asn v1[f0] (eadd (div #0 v5[#0]) (mul #0 v0) (cst #0)))
+    (goto BB9)
+  )
+  (bbl BB18 
+    (asn v4 (eadd (div #-1 v4) (div #-1 v5[#0]) (cst #-1)))
+    (asn v3 (esub (add #-1 v4) (rem #-1 v0) (cst #2)))
+    (ret)
+  )
+)
+
