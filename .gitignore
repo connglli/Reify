@@ -5,3 +5,4 @@ generated*/
 .vscode
 venv
 fuzzout*/
+reify_pldi26ae_dockerimage.tar
