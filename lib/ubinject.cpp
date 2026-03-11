@@ -28,6 +28,7 @@
 #include <cstring>
 #include <memory>
 #include "global.hpp"
+#include "lib/samputils.hpp"
 
 std::unique_ptr<symir::Funct> IntUBInject::InjectUBs(const symir::Funct *f, const symir::Block *b) {
   Assert(b != nullptr, "The basic block to inject UBs is a nullptr");
@@ -189,7 +190,9 @@ void IntUBInject::Visit(const symir::Term &t) {
 
 void IntUBInject::Visit(const symir::Expr &e) {
   std::vector<bitwuzla::Term> exprs;
+  std::vector<symir::Coef *> coefs;
   for (const auto t: e.GetTerms()) {
+    coefs.push_back(t->GetCoef());
     t->Accept(*this);
     exprs.push_back(popExpression());
   }
@@ -210,6 +213,7 @@ void IntUBInject::Visit(const symir::Expr &e) {
         break;
     }
   }
+  makeCoefsInteresting(coefs);
   pushExpression(result);
 }
 
@@ -504,7 +508,12 @@ void IntUBInject::extractSymbolsFromModel(const symir::Funct *f, const symir::Bl
     if (symbol->IsSolved()) {
       continue;
     }
-    const auto symName = symbol->GetName().c_str();
+
+    const auto symName = symbol->GetName();
+    if (!IsCoefManaged(*dynamic_cast<symir::Coef *>(symbol))) {
+      continue;
+    }
+
     // Currently, we only support coefficients
     const auto symKey = CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol));
 
@@ -530,4 +539,12 @@ void IntUBInject::extractSymbolsFromModel(const symir::Funct *f, const symir::Bl
     symbol->SetValue(std::to_string(symVal));
     Log::Get().Out() << "Let symbol: sym=" << symName << ", value=" << symVal << std::endl;
   }
+}
+
+void IntUBInject::makeCoefsInteresting(const std::vector<symir::Coef *> &coefs) {
+  std::vector<bitwuzla::Term> exprs;
+  for (auto c: coefs) {
+    exprs.push_back(CreateCoefExpr(*c));
+  }
+  constraints.push_back(AtMostKZeroes(*tm, exprs, static_cast<int>(coefs.size()) / 2));
 }
