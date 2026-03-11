@@ -63,7 +63,7 @@ public:
   explicit CoefRepl(symir::Funct *const host) : host(host) {
     Assert(host != nullptr, "The host function is given a nullptr");
     for (auto &sym: host->GetSymbols()) {
-      // TODO: Check to ensure all symbols are Coef
+      // Check to ensure all symbols are Coef
       Assert(
           sym->IsSolved(),
           "The symbol \"%s\" in the host function is not solved, cannot replace it",
@@ -295,11 +295,11 @@ void ProgPlus::Generate() const {
     CoefRepl repl(host);
     int numRepCoeffs = repl.GetNumCoefs();
 
-    Log::Get().Out() << "[" << sno << "] Replacing function" << ": index=" << i
+    Log::Get().Out() << "[" << sno << "] Replacing function: index=" << i
                      << ", name=" << host->GetName() << ", num_replaceable=" << numRepCoeffs
                      << std::endl;
 
-    // Sample a function from i + 1 to the end
+    // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
     auto randU = Random::Get().UniformReal();
 
