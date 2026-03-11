@@ -1,0 +1,988 @@
+----FunPlus: Generate Function func_0g6z1t_52------------------------------------------------
+------GraphPlus::Generate----------------------------------------------
+Randomly generating a graph with 15 nodes
+------CfgSketch::GenerateReduLoop----------------------------------------------
+--------GraphPlus::Generate--------------------------------------------
+Randomly generating a graph with 4 nodes
+Removing cycles from the generated graph
+Started replacing bimpo #12 (successors=[1, 13]) with a reducible loop of size=5
+Updated 2 bimpos' indices by +4 if it is behind #12 in our unflattened CFG
+Updated 4 bimpos' successors by +4 if it is behind #12 in our flattened CFG
+Updated the successors of the loop's latch to [12, 16]
+Updated the successors of the loop's exit to [1, 17]
+Constructed the basic blocks of the newly inserted loop
+Inserted all the loop's basic blocks into the flattened CFG
+------CfgSketch: Unflattened CFG Sketch----------------------------------------------
+Bimpo: type=0, id=0, size=1, start=0
+Bimpo: type=0, id=1, size=1, start=1
+Bimpo: type=0, id=2, size=1, start=2
+Bimpo: type=0, id=3, size=1, start=3
+Bimpo: type=0, id=4, size=1, start=4
+Bimpo: type=0, id=5, size=1, start=5
+Bimpo: type=0, id=6, size=1, start=6
+Bimpo: type=0, id=7, size=1, start=7
+Bimpo: type=0, id=8, size=1, start=8
+Bimpo: type=0, id=9, size=1, start=9
+Bimpo: type=0, id=10, size=1, start=10
+Bimpo: type=0, id=11, size=1, start=11
+Bimpo: type=1, id=12, size=5, start=12
+Bimpo: type=0, id=13, size=1, start=17
+Bimpo: type=0, id=14, size=1, start=18
+------CfgSketch: Flattened CFG Sketch----------------------------------------------
+Block: 0 -> [1, 11]
+Block: 1 -> [8, 9]
+Block: 2 -> [5, 7]
+Block: 3 -> [5, 18]
+Block: 4 -> [6, 12]
+Block: 5 -> [11, 12]
+Block: 6 -> [2, 8]
+Block: 7 -> [10, 18]
+Block: 8 -> [11]
+Block: 9 -> [7]
+Block: 10 -> [1, 4]
+Block: 11 -> [9, 18]
+Block: 12 -> [13]
+Block: 13 -> [14, 15]
+Block: 14 -> [15]
+Block: 15 -> [12, 16]
+Block: 16 -> [1, 17]
+Block: 17 -> [3]
+Block: 18 -> []
+------FunPlus: Generate Block #0----------------------------------------------
+Generate assignment: 7 <- 7, 2
+Generate assignment: 1 <- 6, 5
+Generate conditional: 7, 1, 2
+------FunPlus: Generate Block #1----------------------------------------------
+Generate assignment: 5 <- 4, 6
+Generate assignment: 3 <- 3, 1
+Generate conditional: 5, 3, 2
+------FunPlus: Generate Block #2----------------------------------------------
+Generate assignment: 3 <- 3, 2
+Generate assignment: 5 <- 0, 7
+Generate conditional: 3, 5, 7
+------FunPlus: Generate Block #3----------------------------------------------
+Generate assignment: 1 <- 1, 6
+Generate assignment: 0 <- 1, 5
+Generate conditional: 1, 0, 3
+------FunPlus: Generate Block #4----------------------------------------------
+Generate assignment: 3 <- 4, 5
+Generate assignment: 2 <- 0, 7
+Generate conditional: 3, 2, 4
+------FunPlus: Generate Block #5----------------------------------------------
+Generate assignment: 6 <- 4, 2
+Generate assignment: 2 <- 0, 1
+Generate conditional: 6, 2, 4
+------FunPlus: Generate Block #6----------------------------------------------
+Generate assignment: 0 <- 7, 4
+Generate assignment: 4 <- 3, 2
+Generate conditional: 0, 4, 5
+------FunPlus: Generate Block #7----------------------------------------------
+Generate assignment: 4 <- 2, 0
+Generate assignment: 2 <- 1, 7
+Generate conditional: 4, 2, 5
+------FunPlus: Generate Block #8----------------------------------------------
+Generate assignment: 5 <- 5, 0
+Generate assignment: 2 <- 0, 7
+------FunPlus: Generate Block #9----------------------------------------------
+Generate assignment: 0 <- 6, 0
+Generate assignment: 4 <- 6, 5
+------FunPlus: Generate Block #10----------------------------------------------
+Generate assignment: 1 <- 7, 4
+Generate assignment: 0 <- 3, 6
+Generate conditional: 1, 0, 5
+------FunPlus: Generate Block #11----------------------------------------------
+Generate assignment: 1 <- 4, 7
+Generate assignment: 3 <- 7, 4
+Generate conditional: 1, 3, 0
+------FunPlus: Generate Block #12----------------------------------------------
+Generate assignment: 2 <- 4, 6
+Generate assignment: 5 <- 0, 4
+------FunPlus: Generate Block #13----------------------------------------------
+Generate assignment: 6 <- 1, 7
+Generate assignment: 1 <- 7, 5
+Generate conditional: 6, 1, 3
+------FunPlus: Generate Block #14----------------------------------------------
+Generate assignment: 4 <- 6, 3
+Generate assignment: 0 <- 6, 3
+------FunPlus: Generate Block #15----------------------------------------------
+Generate assignment: 6 <- 6, 1
+Generate assignment: 5 <- 7, 0
+Generate conditional: 6, 5, 3
+------FunPlus: Generate Block #16----------------------------------------------
+Generate assignment: 3 <- 5, 7
+Generate assignment: 7 <- 6, 4
+Generate conditional: 3, 7, 0
+------FunPlus: Generate Block #17----------------------------------------------
+Generate assignment: 4 <- 5, 6
+Generate assignment: 0 <- 5, 4
+------FunPlus: Generate Block #18----------------------------------------------
+Generate assignment: 1 <- 1, 3
+Generate assignment: 6 <- 5, 6
+----SymExec: Solve------------------------------------------------
+Execution Path: 0->1->9->7->18
+------SymExec: Iteration 0----------------------------------------------
+Generating or re-generating UB-free constraints
+Initial constraints: 
+```
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= v0_f0_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= v0_f0_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f0_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000111)
+```
+Final constraints: 
+```
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= v0_f0_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= v0_f0_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f0_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000111)
+(= v6_v0 init_var6)
+(= v7_v0 init_var7)
+(not (bvsmulo a0_0_1 v7_v0))
+(distinct v2_el5_v0 #b00000000000000000000000000000000)
+(not (bvsdivo a0_0_2 v2_el5_v0))
+(not (bvsaddo (bvmul a0_0_1 v7_v0) (bvsdiv a0_0_2 v2_el5_v0)))
+(not (bvsaddo (bvadd (bvmul a0_0_1 v7_v0) (bvsdiv a0_0_2 v2_el5_v0)) a0_0))
+(bvsle (bvadd (bvadd (ite (= a0_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a0_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a0_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v7_v1 (bvadd (bvadd (bvmul a0_0_1 v7_v0) (bvsdiv a0_0_2 v2_el5_v0)) a0_0))
+(not (bvssubo a0_1_1 v6_v0))
+(not (bvsaddo a0_1_2 v5_v0))
+(not (bvsaddo (bvsub a0_1_1 v6_v0) (bvadd a0_1_2 v5_v0)))
+(not (bvsaddo (bvadd (bvsub a0_1_1 v6_v0) (bvadd a0_1_2 v5_v0)) a0_1))
+(bvsle (bvadd (bvadd (ite (= a0_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a0_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v1_v1 (bvadd (bvadd (bvsub a0_1_1 v6_v0) (bvadd a0_1_2 v5_v0)) a0_1))
+(distinct v7_v1 #b00000000000000000000000000000000)
+(not (bvsdivo b0_2_1 v7_v1))
+(not (bvsaddo b0_2_2 v1_v1))
+(not (bvssubo (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)))
+(not (bvsdivo b0_2_3 v2_el5_v0))
+(not (bvssubo (bvsub (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)) (bvsrem b0_2_3 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)) (bvsrem b0_2_3 v2_el5_v0)) b0_2))
+(bvsle (bvadd (bvadd (bvadd (ite (= b0_2_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= b0_2_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b0_2_3 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010)
+(= (bvsub (bvsub (bvsub (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)) (bvsrem b0_2_3 v2_el5_v0)) b0_2) #b00000000000000000000000000000000)
+(not (bvsmulo a1_0_1 v4_v0))
+(not (bvssubo a1_0_2 v6_v0))
+(not (bvssubo (bvmul a1_0_1 v4_v0) (bvsub a1_0_2 v6_v0)))
+(not (bvssubo (bvsub (bvmul a1_0_1 v4_v0) (bvsub a1_0_2 v6_v0)) a1_0))
+(bvsle (bvadd (bvadd (ite (= a1_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a1_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a1_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v5_v1 (bvsub (bvsub (bvmul a1_0_1 v4_v0) (bvsub a1_0_2 v6_v0)) a1_0))
+(distinct v3_v0 #b00000000000000000000000000000000)
+(not (bvsdivo a1_1_1 v3_v0))
+(not (bvsmulo a1_1_2 v1_v1))
+(not (bvssubo (bvsrem a1_1_1 v3_v0) (bvmul a1_1_2 v1_v1)))
+(not (bvssubo (bvsub (bvsrem a1_1_1 v3_v0) (bvmul a1_1_2 v1_v1)) a1_1))
+(bvsle (bvadd (bvadd (ite (= a1_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a1_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v3_v1 (bvsub (bvsub (bvsrem a1_1_1 v3_v0) (bvmul a1_1_2 v1_v1)) a1_1))
+(distinct v5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo b1_2_1 v5_v1))
+(not (bvsaddo b1_2_2 v3_v1))
+(not (bvssubo (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)))
+(not (bvsmulo b1_2_3 v2_el5_v0))
+(not (bvssubo (bvsub (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)) (bvmul b1_2_3 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)) (bvmul b1_2_3 v2_el5_v0)) b1_2))
+(bvsle (bvadd (bvadd (bvadd (ite (= b1_2_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= b1_2_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b1_2_3 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010)
+(not (= (bvsub (bvsub (bvsub (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)) (bvmul b1_2_3 v2_el5_v0)) b1_2) #b00000000000000000000000000000000))
+(not (bvssubo a9_0_1 v6_v0))
+(distinct v0_f2_v0 #b00000000000000000000000000000000)
+(not (bvsdivo a9_0_2 v0_f2_v0))
+(not (bvsaddo (bvsub a9_0_1 v6_v0) (bvsrem a9_0_2 v0_f2_v0)))
+(not (bvsaddo (bvadd (bvsub a9_0_1 v6_v0) (bvsrem a9_0_2 v0_f2_v0)) a9_0))
+(bvsle (bvadd (bvadd (ite (= a9_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a9_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a9_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v0_f1_v1 (bvadd (bvadd (bvsub a9_0_1 v6_v0) (bvsrem a9_0_2 v0_f2_v0)) a9_0))
+(not (bvsaddo a9_1_1 v6_v0))
+(not (bvsdivo a9_1_2 v5_v1))
+(not (bvsaddo (bvadd a9_1_1 v6_v0) (bvsrem a9_1_2 v5_v1)))
+(not (bvsaddo (bvadd (bvadd a9_1_1 v6_v0) (bvsrem a9_1_2 v5_v1)) a9_1))
+(bvsle (bvadd (bvadd (ite (= a9_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a9_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a9_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v4_v1 (bvadd (bvadd (bvadd a9_1_1 v6_v0) (bvsrem a9_1_2 v5_v1)) a9_1))
+(not (bvsdivo a7_0_1 v2_el5_v0))
+(not (bvssubo a7_0_2 v0_f1_v1))
+(not (bvsaddo (bvsdiv a7_0_1 v2_el5_v0) (bvsub a7_0_2 v0_f1_v1)))
+(not (bvsaddo (bvadd (bvsdiv a7_0_1 v2_el5_v0) (bvsub a7_0_2 v0_f1_v1)) a7_0))
+(bvsle (bvadd (bvadd (ite (= a7_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a7_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a7_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v4_v2 (bvadd (bvadd (bvsdiv a7_0_1 v2_el5_v0) (bvsub a7_0_2 v0_f1_v1)) a7_0))
+(distinct v1_v1 #b00000000000000000000000000000000)
+(not (bvsdivo a7_1_1 v1_v1))
+(not (bvsdivo a7_1_2 v7_v1))
+(not (bvsaddo (bvsrem a7_1_1 v1_v1) (bvsdiv a7_1_2 v7_v1)))
+(not (bvsaddo (bvadd (bvsrem a7_1_1 v1_v1) (bvsdiv a7_1_2 v7_v1)) a7_1))
+(bvsle (bvadd (bvadd (ite (= a7_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a7_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a7_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v2_el5_v1 (bvadd (bvadd (bvsrem a7_1_1 v1_v1) (bvsdiv a7_1_2 v7_v1)) a7_1))
+(not (bvsaddo b7_2_1 v4_v2))
+(distinct v2_el5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo b7_2_2 v2_el5_v1))
+(not (bvsaddo (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)))
+(not (bvssubo b7_2_3 v5_v1))
+(not (bvsaddo (bvadd (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)) (bvsub b7_2_3 v5_v1)))
+(not (bvsaddo (bvadd (bvadd (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)) (bvsub b7_2_3 v5_v1)) b7_2))
+(bvsle (bvadd (bvadd (bvadd (ite (= b7_2_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= b7_2_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b7_2_3 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b7_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010)
+(not (= (bvadd (bvadd (bvadd (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)) (bvsub b7_2_3 v5_v1)) b7_2) #b00000000000000000000000000000000))
+(not (bvsaddo a18_0_1 v1_v1))
+(not (bvsaddo a18_0_2 v3_v1))
+(not (bvssubo (bvadd a18_0_1 v1_v1) (bvadd a18_0_2 v3_v1)))
+(not (bvssubo (bvsub (bvadd a18_0_1 v1_v1) (bvadd a18_0_2 v3_v1)) a18_0))
+(bvsle (bvadd (bvadd (ite (= a18_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a18_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a18_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v1_v2 (bvsub (bvsub (bvadd a18_0_1 v1_v1) (bvadd a18_0_2 v3_v1)) a18_0))
+(not (bvsdivo a18_1_1 v5_v1))
+(not (bvsmulo a18_1_2 v6_v0))
+(not (bvssubo (bvsdiv a18_1_1 v5_v1) (bvmul a18_1_2 v6_v0)))
+(not (bvssubo (bvsub (bvsdiv a18_1_1 v5_v1) (bvmul a18_1_2 v6_v0)) a18_1))
+(bvsle (bvadd (bvadd (ite (= a18_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a18_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a18_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v6_v1 (bvsub (bvsub (bvsdiv a18_1_1 v5_v1) (bvmul a18_1_2 v6_v0)) a18_1))
+```
+Optimized constraints: 
+```
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= v0_f0_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= v0_f0_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f0_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000111)
+(= v6_v0 init_var6)
+(= v7_v0 init_var7)
+(not (bvsmulo a0_0_1 v7_v0))
+(distinct v2_el5_v0 #b00000000000000000000000000000000)
+(not (bvsdivo a0_0_2 v2_el5_v0))
+(not (bvsaddo (bvmul a0_0_1 v7_v0) (bvsdiv a0_0_2 v2_el5_v0)))
+(not (bvsaddo (bvadd (bvmul a0_0_1 v7_v0) (bvsdiv a0_0_2 v2_el5_v0)) a0_0))
+(bvsle (bvadd (bvadd (ite (= a0_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a0_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a0_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v7_v1 (bvadd (bvadd (bvmul a0_0_1 v7_v0) (bvsdiv a0_0_2 v2_el5_v0)) a0_0))
+(not (bvssubo a0_1_1 v6_v0))
+(not (bvsaddo a0_1_2 v5_v0))
+(not (bvsaddo (bvsub a0_1_1 v6_v0) (bvadd a0_1_2 v5_v0)))
+(not (bvsaddo (bvadd (bvsub a0_1_1 v6_v0) (bvadd a0_1_2 v5_v0)) a0_1))
+(bvsle (bvadd (bvadd (ite (= a0_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a0_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v1_v1 (bvadd (bvadd (bvsub a0_1_1 v6_v0) (bvadd a0_1_2 v5_v0)) a0_1))
+(distinct v7_v1 #b00000000000000000000000000000000)
+(not (bvsdivo b0_2_1 v7_v1))
+(not (bvsaddo b0_2_2 v1_v1))
+(not (bvssubo (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)))
+(not (bvsdivo b0_2_3 v2_el5_v0))
+(not (bvssubo (bvsub (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)) (bvsrem b0_2_3 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)) (bvsrem b0_2_3 v2_el5_v0)) b0_2))
+(bvsle (bvadd (bvadd (bvadd (ite (= b0_2_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= b0_2_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b0_2_3 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010)
+(= (bvsub (bvsub (bvsub (bvsrem b0_2_1 v7_v1) (bvadd b0_2_2 v1_v1)) (bvsrem b0_2_3 v2_el5_v0)) b0_2) #b00000000000000000000000000000000)
+(not (bvsmulo a1_0_1 v4_v0))
+(not (bvssubo a1_0_2 v6_v0))
+(not (bvssubo (bvmul a1_0_1 v4_v0) (bvsub a1_0_2 v6_v0)))
+(not (bvssubo (bvsub (bvmul a1_0_1 v4_v0) (bvsub a1_0_2 v6_v0)) a1_0))
+(bvsle (bvadd (bvadd (ite (= a1_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a1_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a1_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v5_v1 (bvsub (bvsub (bvmul a1_0_1 v4_v0) (bvsub a1_0_2 v6_v0)) a1_0))
+(distinct v3_v0 #b00000000000000000000000000000000)
+(not (bvsdivo a1_1_1 v3_v0))
+(not (bvsmulo a1_1_2 v1_v1))
+(not (bvssubo (bvsrem a1_1_1 v3_v0) (bvmul a1_1_2 v1_v1)))
+(not (bvssubo (bvsub (bvsrem a1_1_1 v3_v0) (bvmul a1_1_2 v1_v1)) a1_1))
+(bvsle (bvadd (bvadd (ite (= a1_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a1_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v3_v1 (bvsub (bvsub (bvsrem a1_1_1 v3_v0) (bvmul a1_1_2 v1_v1)) a1_1))
+(distinct v5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo b1_2_1 v5_v1))
+(not (bvsaddo b1_2_2 v3_v1))
+(not (bvssubo (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)))
+(not (bvsmulo b1_2_3 v2_el5_v0))
+(not (bvssubo (bvsub (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)) (bvmul b1_2_3 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)) (bvmul b1_2_3 v2_el5_v0)) b1_2))
+(bvsle (bvadd (bvadd (bvadd (ite (= b1_2_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= b1_2_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b1_2_3 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010)
+(not (= (bvsub (bvsub (bvsub (bvsrem b1_2_1 v5_v1) (bvadd b1_2_2 v3_v1)) (bvmul b1_2_3 v2_el5_v0)) b1_2) #b00000000000000000000000000000000))
+(not (bvssubo a9_0_1 v6_v0))
+(distinct v0_f2_v0 #b00000000000000000000000000000000)
+(not (bvsdivo a9_0_2 v0_f2_v0))
+(not (bvsaddo (bvsub a9_0_1 v6_v0) (bvsrem a9_0_2 v0_f2_v0)))
+(not (bvsaddo (bvadd (bvsub a9_0_1 v6_v0) (bvsrem a9_0_2 v0_f2_v0)) a9_0))
+(bvsle (bvadd (bvadd (ite (= a9_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a9_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a9_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v0_f1_v1 (bvadd (bvadd (bvsub a9_0_1 v6_v0) (bvsrem a9_0_2 v0_f2_v0)) a9_0))
+(not (bvsaddo a9_1_1 v6_v0))
+(not (bvsdivo a9_1_2 v5_v1))
+(not (bvsaddo (bvadd a9_1_1 v6_v0) (bvsrem a9_1_2 v5_v1)))
+(not (bvsaddo (bvadd (bvadd a9_1_1 v6_v0) (bvsrem a9_1_2 v5_v1)) a9_1))
+(bvsle (bvadd (bvadd (ite (= a9_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a9_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a9_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v4_v1 (bvadd (bvadd (bvadd a9_1_1 v6_v0) (bvsrem a9_1_2 v5_v1)) a9_1))
+(not (bvsdivo a7_0_1 v2_el5_v0))
+(not (bvssubo a7_0_2 v0_f1_v1))
+(not (bvsaddo (bvsdiv a7_0_1 v2_el5_v0) (bvsub a7_0_2 v0_f1_v1)))
+(not (bvsaddo (bvadd (bvsdiv a7_0_1 v2_el5_v0) (bvsub a7_0_2 v0_f1_v1)) a7_0))
+(bvsle (bvadd (bvadd (ite (= a7_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a7_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a7_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v4_v2 (bvadd (bvadd (bvsdiv a7_0_1 v2_el5_v0) (bvsub a7_0_2 v0_f1_v1)) a7_0))
+(distinct v1_v1 #b00000000000000000000000000000000)
+(not (bvsdivo a7_1_1 v1_v1))
+(not (bvsdivo a7_1_2 v7_v1))
+(not (bvsaddo (bvsrem a7_1_1 v1_v1) (bvsdiv a7_1_2 v7_v1)))
+(not (bvsaddo (bvadd (bvsrem a7_1_1 v1_v1) (bvsdiv a7_1_2 v7_v1)) a7_1))
+(bvsle (bvadd (bvadd (ite (= a7_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a7_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a7_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v2_el5_v1 (bvadd (bvadd (bvsrem a7_1_1 v1_v1) (bvsdiv a7_1_2 v7_v1)) a7_1))
+(not (bvsaddo b7_2_1 v4_v2))
+(distinct v2_el5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo b7_2_2 v2_el5_v1))
+(not (bvsaddo (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)))
+(not (bvssubo b7_2_3 v5_v1))
+(not (bvsaddo (bvadd (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)) (bvsub b7_2_3 v5_v1)))
+(not (bvsaddo (bvadd (bvadd (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)) (bvsub b7_2_3 v5_v1)) b7_2))
+(bvsle (bvadd (bvadd (bvadd (ite (= b7_2_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= b7_2_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b7_2_3 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= b7_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010)
+(not (= (bvadd (bvadd (bvadd (bvadd b7_2_1 v4_v2) (bvsrem b7_2_2 v2_el5_v1)) (bvsub b7_2_3 v5_v1)) b7_2) #b00000000000000000000000000000000))
+(not (bvsaddo a18_0_1 v1_v1))
+(not (bvsaddo a18_0_2 v3_v1))
+(not (bvssubo (bvadd a18_0_1 v1_v1) (bvadd a18_0_2 v3_v1)))
+(not (bvssubo (bvsub (bvadd a18_0_1 v1_v1) (bvadd a18_0_2 v3_v1)) a18_0))
+(bvsle (bvadd (bvadd (ite (= a18_0_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a18_0_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a18_0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v1_v2 (bvsub (bvsub (bvadd a18_0_1 v1_v1) (bvadd a18_0_2 v3_v1)) a18_0))
+(not (bvsdivo a18_1_1 v5_v1))
+(not (bvsmulo a18_1_2 v6_v0))
+(not (bvssubo (bvsdiv a18_1_1 v5_v1) (bvmul a18_1_2 v6_v0)))
+(not (bvssubo (bvsub (bvsdiv a18_1_1 v5_v1) (bvmul a18_1_2 v6_v0)) a18_1))
+(bvsle (bvadd (bvadd (ite (= a18_1_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= a18_1_2 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= a18_1 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001)
+(= v6_v1 (bvsub (bvsub (bvsdiv a18_1_1 v5_v1) (bvmul a18_1_2 v6_v0)) a18_1))
+```
+Constraint stats: asserted=94 addCalls=99 skippedTrue=0 deduped=5 ensureInRangeCalls=121 boundedAlready=0 uniqueConstraintIds=94 uniqueBoundedIds=0 (solverAsserted=0)
+Bitwuzla check_sat time: 302ms
+Bitwuzla statistics: preprocess::contradicting_ands::num_substs=0 preprocess::contradicting_ands::time_apply=0ms preprocess::elim_extract::num_elim=0 preprocess::elim_extract::time_apply=0ms preprocess::elim_lambda::time_apply=0ms preprocess::elim_udiv::num_eliminated=0 preprocess::elim_udiv::time_apply=0ms preprocess::embedded_constraints::num_substs=3 preprocess::embedded_constraints::time_apply=1ms preprocess::flatten_and::num_assertions=237 preprocess::flatten_and::num_flattened=191 preprocess::flatten_and::time_apply=0ms preprocess::lambda::num_elim=0 preprocess::normalize::num_common_normalizations=18 preprocess::normalize::num_normalizations=174 preprocess::normalize::num_normalized_assertions=0 preprocess::normalize::num_pass1=0 preprocess::normalize::num_pass2=0 preprocess::normalize::time_adder_chains=4ms preprocess::normalize::time_apply=90ms preprocess::normalize::time_compute_occs=1ms preprocess::normalize::time_normalize_add=0ms preprocess::normalize::time_normalize_mul=0ms preprocess::normalize::time_score=78ms preprocess::rewrite::time_apply=5ms preprocess::skeleton_preproc::cnf::clauses=805 preprocess::skeleton_preproc::cnf::lits=1509 preprocess::skeleton_preproc::new_assertions=0 preprocess::skeleton_preproc::resets=1 preprocess::skeleton_preproc::time_apply=1ms preprocess::skeleton_preproc::time_encode=1ms preprocess::skeleton_preproc::time_fixed=0ms preprocess::skeleton_preproc::time_sat=0ms preprocess::uninterpreted::num_substs=0 preprocess::uninterpreted::time_apply=0ms preprocess::varsubst::normalize_bv_ineq::num_slt=0 preprocess::varsubst::normalize_bv_ineq::num_ult=0 preprocess::varsubst::normalize_eq::num_bv_concat=0 preprocess::varsubst::normalize_eq::num_gauss_elim=13 preprocess::varsubst::normalize_eq::num_linear_eq=13 preprocess::varsubst::num_substs=13 preprocess::varsubst::time_apply=3ms preprocess::varsubst::time_direct_cycle_check=0ms preprocess::varsubst::time_find_substitution=0ms preprocess::varsubst::time_find_vars=0ms preprocess::varsubst::time_register=0ms preprocess::varsubst::time_remove_cycles=0ms preprocess::varsubst::time_substitute=1ms preprocessor::num_iterations=2 preprocessor::time_preprocess=103ms preprocessor::time_process=0ms rewriter::(normalize)::num_evals=0 rewriter::(normalize)::num_rewrites=651 rewriter::(normalize)::rewrite::AND_SPECIAL_CONST=2 rewriter::(normalize)::rewrite::BV_ADD_EVAL=1 rewriter::(normalize)::rewrite::BV_ADD_SPECIAL_CONST=58 rewriter::(normalize)::rewrite::BV_EXTRACT_EVAL=1 rewriter::(normalize)::rewrite::BV_MUL_EVAL=7 rewriter::(normalize)::rewrite::BV_MUL_NEG=1 rewriter::(normalize)::rewrite::BV_MUL_ONES=25 rewriter::(normalize)::rewrite::BV_NEG_ELIM=26 rewriter::(normalize)::rewrite::BV_NOT_BV_NOT=80 rewriter::(normalize)::rewrite::EQUAL_EVAL=2 rewriter::(normalize)::rewrite::NORMALIZE_COMM=447 rewriter::(normalize)::rewrite::NOT_EVAL=1 rewriter::eval::BV_MUL_EVAL=2 rewriter::eval::BV_NEG_EVAL=2 rewriter::eval::BV_SHL_EVAL=2 rewriter::eval::EQUAL_EVAL=3 rewriter::eval::IMPLIES_EVAL=1 rewriter::num_evals=10 rewriter::num_rewrites=2627 rewriter::rewrite::BV_ADD_EVAL=2 rewriter::rewrite::BV_ADD_ITE2=57 rewriter::rewrite::BV_ADD_SPECIAL_CONST=58 rewriter::rewrite::BV_EXTRACT_ADD_MUL=11 rewriter::rewrite::BV_EXTRACT_EVAL=1 rewriter::rewrite::BV_EXTRACT_FULL=10 rewriter::rewrite::BV_MUL_ONE=11 rewriter::rewrite::BV_MUL_POW2=11 rewriter::rewrite::BV_NEG_ELIM=74 rewriter::rewrite::BV_NOT_BV_NOT=459 rewriter::rewrite::BV_NOT_EVAL=2 rewriter::rewrite::BV_OR_ELIM=295 rewriter::rewrite::BV_SADDO_ELIM=22 rewriter::rewrite::BV_SDIVO_ELIM=12 rewriter::rewrite::BV_SDIV_ELIM=4 rewriter::rewrite::BV_SHL_CONST=11 rewriter::rewrite::BV_SHL_SPECIAL_CONST=5 rewriter::rewrite::BV_SIGN_EXTEND_ELIM=20 rewriter::rewrite::BV_SLE_ELIM=14 rewriter::rewrite::BV_SMULO_ELIM=5 rewriter::rewrite::BV_SREM_ELIM=8 rewriter::rewrite::BV_SSUBO_ELIM=19 rewriter::rewrite::BV_SUB_ELIM=30 rewriter::rewrite::DISTINCT_ELIM=7 rewriter::rewrite::EQUAL_BV_SUB=19 rewriter::rewrite::EQUAL_CONST_BV_NOT=155 rewriter::rewrite::EQUAL_SPECIAL_CONST=10 rewriter::rewrite::EQUAL_TRUE=8 rewriter::rewrite::IMPLIES_ELIM=5 rewriter::rewrite::ITE_EVAL=2 rewriter::rewrite::NORMALIZE_COMM=1111 rewriter::rewrite::NOT_EQUAL_BV1_BOOL=87 rewriter::rewrite::NOT_NOT=41 rewriter::rewrite::OR_ELIM=41 solver::abstract::lemmas::MUL_NEG_POW2=5 solver::abstract::num_checks=2 solver::abstract::terms::BV_MUL=5 solver::abstract::terms::total=5 solver::abstract::time_check=3ms solver::array::equalities=0 solver::array::num_checks=0 solver::array::propagations=0 solver::array::propagations_down=0 solver::array::propagations_up=0 solver::array::selects=0 solver::array::time_check=0ms solver::bv::bitblast::aig::num_ands=152218 solver::bv::bitblast::aig::num_consts=2021 solver::bv::bitblast::aig::num_shared=23762 solver::bv::bitblast::aig::time_bitblast=26ms solver::bv::bitblast::cnf::num_clauses=387047 solver::bv::bitblast::cnf::num_literals=937671 solver::bv::bitblast::cnf::num_vars=126312 solver::bv::bitblast::cnf::time_encode=139ms solver::bv::bitblast::sat::time_solve=26ms solver::bv::num_assertions=283 solver::bv::num_checks=2 solver::bv::time_check=165ms solver::engine::lemmas::abstr=5 solver::engine::lemmas::array=0 solver::engine::lemmas::fp=0 solver::engine::lemmas::fun=0 solver::engine::lemmas::quant=0 solver::engine::lemmas::total=5 solver::engine::time_register_term=0ms solver::engine::time_solve=198ms solver::fun::num_checks=1 solver::fun::time_check=0ms solver::quant::mbqi_checks=0 solver::quant::num_lemma_iterations=0 solver::quant::num_lemmas=0 solver::quant::time_check=0ms solver::quant::time_mbqi=0ms solver::quant::time_process=0ms solving_context::max_memory=112746496 solving_context::time_ensure_model=0ms solving_context::time_solve=302ms
+SAT
+Extract symbols: sym=init_var6, value=-1
+Extract symbols: sym=init_var7, value=-1
+Extract symbols: sym=a0_0_1, value=-1
+Extract symbols: sym=a0_0_2, value=-1
+Extract symbols: sym=a0_0, value=-1
+Extract symbols: sym=a0_1_1, value=-1
+Extract symbols: sym=a0_1_2, value=-1
+Extract symbols: sym=a0_1, value=-1
+Extract symbols: sym=b0_2_1, value=-1
+Extract symbols: sym=b0_2_2, value=-1
+Extract symbols: sym=b0_2_3, value=-1
+Extract symbols: sym=b0_2, value=4
+Extract symbols: sym=a1_0_1, value=-1
+Extract symbols: sym=a1_0_2, value=2
+Extract symbols: sym=a1_0, value=-1
+Extract symbols: sym=a1_1_1, value=-1
+Extract symbols: sym=a1_1_2, value=-1
+Extract symbols: sym=a1_1, value=-2
+Extract symbols: sym=b1_2_1, value=-1
+Extract symbols: sym=b1_2_2, value=-1
+Extract symbols: sym=b1_2_3, value=-1
+Extract symbols: sym=b1_2, value=-1
+Extract symbols: sym=a2_0_1, value=<unresolved>
+Extract symbols: sym=a2_0_2, value=<unresolved>
+Extract symbols: sym=a2_0, value=<unresolved>
+Extract symbols: sym=a2_1_1, value=<unresolved>
+Extract symbols: sym=a2_1_2, value=<unresolved>
+Extract symbols: sym=a2_1, value=<unresolved>
+Extract symbols: sym=b2_2_1, value=<unresolved>
+Extract symbols: sym=b2_2_2, value=<unresolved>
+Extract symbols: sym=b2_2_3, value=<unresolved>
+Extract symbols: sym=b2_2, value=<unresolved>
+Extract symbols: sym=a3_0_1, value=<unresolved>
+Extract symbols: sym=a3_0_2, value=<unresolved>
+Extract symbols: sym=a3_0, value=<unresolved>
+Extract symbols: sym=a3_1_1, value=<unresolved>
+Extract symbols: sym=a3_1_2, value=<unresolved>
+Extract symbols: sym=a3_1, value=<unresolved>
+Extract symbols: sym=b3_2_1, value=<unresolved>
+Extract symbols: sym=b3_2_2, value=<unresolved>
+Extract symbols: sym=b3_2_3, value=<unresolved>
+Extract symbols: sym=b3_2, value=<unresolved>
+Extract symbols: sym=a4_0_1, value=<unresolved>
+Extract symbols: sym=a4_0_2, value=<unresolved>
+Extract symbols: sym=a4_0, value=<unresolved>
+Extract symbols: sym=a4_1_1, value=<unresolved>
+Extract symbols: sym=a4_1_2, value=<unresolved>
+Extract symbols: sym=a4_1, value=<unresolved>
+Extract symbols: sym=b4_2_1, value=<unresolved>
+Extract symbols: sym=b4_2_2, value=<unresolved>
+Extract symbols: sym=b4_2_3, value=<unresolved>
+Extract symbols: sym=b4_2, value=<unresolved>
+Extract symbols: sym=a5_0_1, value=<unresolved>
+Extract symbols: sym=a5_0_2, value=<unresolved>
+Extract symbols: sym=a5_0, value=<unresolved>
+Extract symbols: sym=a5_1_1, value=<unresolved>
+Extract symbols: sym=a5_1_2, value=<unresolved>
+Extract symbols: sym=a5_1, value=<unresolved>
+Extract symbols: sym=b5_2_1, value=<unresolved>
+Extract symbols: sym=b5_2_2, value=<unresolved>
+Extract symbols: sym=b5_2_3, value=<unresolved>
+Extract symbols: sym=b5_2, value=<unresolved>
+Extract symbols: sym=a6_0_1, value=<unresolved>
+Extract symbols: sym=a6_0_2, value=<unresolved>
+Extract symbols: sym=a6_0, value=<unresolved>
+Extract symbols: sym=a6_1_1, value=<unresolved>
+Extract symbols: sym=a6_1_2, value=<unresolved>
+Extract symbols: sym=a6_1, value=<unresolved>
+Extract symbols: sym=b6_2_1, value=<unresolved>
+Extract symbols: sym=b6_2_2, value=<unresolved>
+Extract symbols: sym=b6_2_3, value=<unresolved>
+Extract symbols: sym=b6_2, value=<unresolved>
+Extract symbols: sym=a7_0_1, value=-1
+Extract symbols: sym=a7_0_2, value=-1
+Extract symbols: sym=a7_0, value=-1
+Extract symbols: sym=a7_1_1, value=-1
+Extract symbols: sym=a7_1_2, value=-1
+Extract symbols: sym=a7_1, value=-1
+Extract symbols: sym=b7_2_1, value=-1
+Extract symbols: sym=b7_2_2, value=-1
+Extract symbols: sym=b7_2_3, value=-1
+Extract symbols: sym=b7_2, value=-1
+Extract symbols: sym=a8_0_1, value=<unresolved>
+Extract symbols: sym=a8_0_2, value=<unresolved>
+Extract symbols: sym=a8_0, value=<unresolved>
+Extract symbols: sym=a8_1_1, value=<unresolved>
+Extract symbols: sym=a8_1_2, value=<unresolved>
+Extract symbols: sym=a8_1, value=<unresolved>
+Extract symbols: sym=a9_0_1, value=-1
+Extract symbols: sym=a9_0_2, value=-1
+Extract symbols: sym=a9_0, value=-1
+Extract symbols: sym=a9_1_1, value=-1
+Extract symbols: sym=a9_1_2, value=-1
+Extract symbols: sym=a9_1, value=-1
+Extract symbols: sym=a10_0_1, value=<unresolved>
+Extract symbols: sym=a10_0_2, value=<unresolved>
+Extract symbols: sym=a10_0, value=<unresolved>
+Extract symbols: sym=a10_1_1, value=<unresolved>
+Extract symbols: sym=a10_1_2, value=<unresolved>
+Extract symbols: sym=a10_1, value=<unresolved>
+Extract symbols: sym=b10_2_1, value=<unresolved>
+Extract symbols: sym=b10_2_2, value=<unresolved>
+Extract symbols: sym=b10_2_3, value=<unresolved>
+Extract symbols: sym=b10_2, value=<unresolved>
+Extract symbols: sym=a11_0_1, value=<unresolved>
+Extract symbols: sym=a11_0_2, value=<unresolved>
+Extract symbols: sym=a11_0, value=<unresolved>
+Extract symbols: sym=a11_1_1, value=<unresolved>
+Extract symbols: sym=a11_1_2, value=<unresolved>
+Extract symbols: sym=a11_1, value=<unresolved>
+Extract symbols: sym=b11_2_1, value=<unresolved>
+Extract symbols: sym=b11_2_2, value=<unresolved>
+Extract symbols: sym=b11_2_3, value=<unresolved>
+Extract symbols: sym=b11_2, value=<unresolved>
+Extract symbols: sym=a12_0_1, value=<unresolved>
+Extract symbols: sym=a12_0_2, value=<unresolved>
+Extract symbols: sym=a12_0, value=<unresolved>
+Extract symbols: sym=a12_1_1, value=<unresolved>
+Extract symbols: sym=a12_1_2, value=<unresolved>
+Extract symbols: sym=a12_1, value=<unresolved>
+Extract symbols: sym=a13_0_1, value=<unresolved>
+Extract symbols: sym=a13_0_2, value=<unresolved>
+Extract symbols: sym=a13_0, value=<unresolved>
+Extract symbols: sym=a13_1_1, value=<unresolved>
+Extract symbols: sym=a13_1_2, value=<unresolved>
+Extract symbols: sym=a13_1, value=<unresolved>
+Extract symbols: sym=b13_2_1, value=<unresolved>
+Extract symbols: sym=b13_2_2, value=<unresolved>
+Extract symbols: sym=b13_2_3, value=<unresolved>
+Extract symbols: sym=b13_2, value=<unresolved>
+Extract symbols: sym=a14_0_1, value=<unresolved>
+Extract symbols: sym=a14_0_2, value=<unresolved>
+Extract symbols: sym=a14_0, value=<unresolved>
+Extract symbols: sym=a14_1_1, value=<unresolved>
+Extract symbols: sym=a14_1_2, value=<unresolved>
+Extract symbols: sym=a14_1, value=<unresolved>
+Extract symbols: sym=a15_0_1, value=<unresolved>
+Extract symbols: sym=a15_0_2, value=<unresolved>
+Extract symbols: sym=a15_0, value=<unresolved>
+Extract symbols: sym=a15_1_1, value=<unresolved>
+Extract symbols: sym=a15_1_2, value=<unresolved>
+Extract symbols: sym=a15_1, value=<unresolved>
+Extract symbols: sym=b15_2_1, value=<unresolved>
+Extract symbols: sym=b15_2_2, value=<unresolved>
+Extract symbols: sym=b15_2_3, value=<unresolved>
+Extract symbols: sym=b15_2, value=<unresolved>
+Extract symbols: sym=a16_0_1, value=<unresolved>
+Extract symbols: sym=a16_0_2, value=<unresolved>
+Extract symbols: sym=a16_0, value=<unresolved>
+Extract symbols: sym=a16_1_1, value=<unresolved>
+Extract symbols: sym=a16_1_2, value=<unresolved>
+Extract symbols: sym=a16_1, value=<unresolved>
+Extract symbols: sym=b16_2_1, value=<unresolved>
+Extract symbols: sym=b16_2_2, value=<unresolved>
+Extract symbols: sym=b16_2_3, value=<unresolved>
+Extract symbols: sym=b16_2, value=<unresolved>
+Extract symbols: sym=a17_0_1, value=<unresolved>
+Extract symbols: sym=a17_0_2, value=<unresolved>
+Extract symbols: sym=a17_0, value=<unresolved>
+Extract symbols: sym=a17_1_1, value=<unresolved>
+Extract symbols: sym=a17_1_2, value=<unresolved>
+Extract symbols: sym=a17_1, value=<unresolved>
+Extract symbols: sym=a18_0_1, value=-1
+Extract symbols: sym=a18_0_2, value=-1
+Extract symbols: sym=a18_0, value=-1
+Extract symbols: sym=a18_1_1, value=-1
+Extract symbols: sym=a18_1_2, value=-1
+Extract symbols: sym=a18_1, value=1
+--------IntUBInject: Inject Int UBs to Block BB3--------------------------------------------
+Collected constraints:
+(bvsle v1_v0 #b001111111111111111111111111111111)
+(bvsge v1_v0 #b110000000000000000000000000000000)
+(bvsle v6_v0 #b001111111111111111111111111111111)
+(bvsge v6_v0 #b110000000000000000000000000000000)
+(bvsle v5_v0 #b001111111111111111111111111111111)
+(bvsge v5_v0 #b110000000000000000000000000000000)
+(bvsge a3_0_1 #b110000000000000000000000000000000)
+(bvsle a3_0_1 #b001111111111111111111111111111111)
+(bvsge a3_0_2 #b110000000000000000000000000000000)
+(bvsle a3_0_2 #b001111111111111111111111111111111)
+(bvsge a3_0 #b110000000000000000000000000000000)
+(bvsle a3_0 #b001111111111111111111111111111111)
+(bvsle (bvadd (bvadd (ite (= a3_0_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000) (ite (= a3_0_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= a3_0 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) #b000000000000000000000000000000001)
+(= v1_v1 (bvsub (bvsub a3_0 (bvadd a3_0_2 v6_v0)) (bvadd a3_0_1 v1_v0)))
+(bvsge a3_1_1 #b110000000000000000000000000000000)
+(bvsle a3_1_1 #b001111111111111111111111111111111)
+(distinct v1_v1 #b000000000000000000000000000000000)
+(bvsge a3_1_2 #b110000000000000000000000000000000)
+(bvsle a3_1_2 #b001111111111111111111111111111111)
+(distinct v5_v0 #b000000000000000000000000000000000)
+(bvsge a3_1 #b110000000000000000000000000000000)
+(bvsle a3_1 #b001111111111111111111111111111111)
+(bvsle (bvadd (bvadd (ite (= a3_1_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000) (ite (= a3_1_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= a3_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) #b000000000000000000000000000000001)
+(= v0_f1_v1 (bvsub (bvsub a3_1 (bvsrem a3_1_2 v5_v0)) (bvsrem a3_1_1 v1_v1)))
+(bvsge b3_2_1 #b110000000000000000000000000000000)
+(bvsle b3_2_1 #b001111111111111111111111111111111)
+(distinct v1_v1 #b000000000000000000000000000000000)
+(bvsge b3_2_2 #b110000000000000000000000000000000)
+(bvsle b3_2_2 #b001111111111111111111111111111111)
+(distinct v0_f0_v0 #b000000000000000000000000000000000)
+(bvsge b3_2_3 #b110000000000000000000000000000000)
+(bvsle b3_2_3 #b001111111111111111111111111111111)
+(bvsge b3_2 #b110000000000000000000000000000000)
+(bvsle b3_2 #b001111111111111111111111111111111)
+(bvsle (bvadd (bvadd (bvadd (ite (= b3_2_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000) (ite (= b3_2_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= b3_2_3 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= b3_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) #b000000000000000000000000000000010)
+(let ((_let0 (bvsub (bvsub a3_0 (bvadd a3_0_2 v6_v0)) (bvadd a3_0_1 v1_v0)))) (let ((_let1 (bvsub (bvsub a3_1 (bvsrem a3_1_2 v5_v0)) (bvsrem a3_1_1 v1_v1)))) (let ((_let2 (bvsub (bvsub (bvsub b3_2 (bvmul b3_2_3 v3_v0)) (bvsrem b3_2_2 v0_f0_v0)) (bvsrem b3_2_1 v1_v1)))) (or (or (or false (or (bvsgt _let0 #b001111111111111111111111111111111) (bvslt _let0 #b110000000000000000000000000000000))) (or (bvsgt _let1 #b001111111111111111111111111111111) (bvslt _let1 #b110000000000000000000000000000000))) (or (bvsgt _let2 #b001111111111111111111111111111111) (bvslt _let2 #b110000000000000000000000000000000))))))
+SAT
+Adding initializations to ensure undefined behaviors
+Let variable: var=v1, value=-3
+Let variable: var=v6, value=0
+Let variable: var=v5, value=1
+Let symbol: sym=a3_0_1, value=1
+Let symbol: sym=a3_0_2, value=1
+Let symbol: sym=a3_0, value=0
+Let symbol: sym=a3_1_1, value=1
+Let symbol: sym=a3_1_2, value=1
+Let symbol: sym=a3_1, value=0
+Let symbol: sym=b3_2_1, value=0
+Let symbol: sym=b3_2_2, value=-1
+Let symbol: sym=b3_2_3, value=1
+Let symbol: sym=b3_2, value=0
+--------IntUBInject: Inject Int UBs to Block BB5--------------------------------------------
+Collected constraints:
+(bvsle v4_v0 #b001111111111111111111111111111111)
+(bvsge v4_v0 #b110000000000000000000000000000000)
+(bvsle v2_el5_v0 #b001111111111111111111111111111111)
+(bvsge v2_el5_v0 #b110000000000000000000000000000000)
+(bvsge v0_f0_v0 #b110000000000000000000000000000000)
+(bvsle v0_f0_v0 #b001111111111111111111111111111111)
+(bvsge v0_f1_v0 #b110000000000000000000000000000000)
+(bvsle v0_f1_v0 #b001111111111111111111111111111111)
+(bvsge v0_f2_v0 #b110000000000000000000000000000000)
+(bvsle v0_f2_v0 #b001111111111111111111111111111111)
+(bvsle v1_v0 #b001111111111111111111111111111111)
+(bvsge v1_v0 #b110000000000000000000000000000000)
+(bvsge a5_0_1 #b110000000000000000000000000000000)
+(bvsle a5_0_1 #b001111111111111111111111111111111)
+(distinct v4_v0 #b000000000000000000000000000000000)
+(bvsge a5_0_2 #b110000000000000000000000000000000)
+(bvsle a5_0_2 #b001111111111111111111111111111111)
+(= #b000000000000000000000000000000000 #b000000000000000000000000000000000)
+(= #b000000000000000000000000000000010 #b000000000000000000000000000000010)
+(= #b000000000000000000000000000000001 #b000000000000000000000000000000001)
+(distinct v2_el5_v0 #b000000000000000000000000000000000)
+(bvsge a5_0 #b110000000000000000000000000000000)
+(bvsle a5_0 #b001111111111111111111111111111111)
+(bvsle (bvadd (bvadd (ite (= a5_0_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000) (ite (= a5_0_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= a5_0 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) #b000000000000000000000000000000001)
+(= v6_v1 (bvadd (bvadd a5_0 (bvsdiv a5_0_2 v2_el5_v0)) (bvsdiv a5_0_1 v4_v0)))
+(bvsge a5_1_1 #b110000000000000000000000000000000)
+(bvsle a5_1_1 #b001111111111111111111111111111111)
+(bvsge a5_1_2 #b110000000000000000000000000000000)
+(bvsle a5_1_2 #b001111111111111111111111111111111)
+(bvsge a5_1 #b110000000000000000000000000000000)
+(bvsle a5_1 #b001111111111111111111111111111111)
+(bvsle (bvadd (bvadd (ite (= a5_1_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000) (ite (= a5_1_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= a5_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) #b000000000000000000000000000000001)
+(= v2_el5_v1 (bvsub (bvsub a5_1 (bvsub a5_1_2 v1_v0)) (bvsub a5_1_1 v0_f2_v0)))
+(bvsge b5_2_1 #b110000000000000000000000000000000)
+(bvsle b5_2_1 #b001111111111111111111111111111111)
+(bvsge b5_2_2 #b110000000000000000000000000000000)
+(bvsle b5_2_2 #b001111111111111111111111111111111)
+(= #b000000000000000000000000000000000 #b000000000000000000000000000000000)
+(= #b000000000000000000000000000000010 #b000000000000000000000000000000010)
+(= #b000000000000000000000000000000001 #b000000000000000000000000000000001)
+(bvsge b5_2_3 #b110000000000000000000000000000000)
+(bvsle b5_2_3 #b001111111111111111111111111111111)
+(distinct v4_v0 #b000000000000000000000000000000000)
+(bvsge b5_2 #b110000000000000000000000000000000)
+(bvsle b5_2 #b001111111111111111111111111111111)
+(bvsle (bvadd (bvadd (bvadd (ite (= b5_2_1 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000) (ite (= b5_2_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= b5_2_3 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) (ite (= b5_2 #b000000000000000000000000000000000) #b000000000000000000000000000000001 #b000000000000000000000000000000000)) #b000000000000000000000000000000010)
+(let ((_let0 (bvadd (bvadd a5_0 (bvsdiv a5_0_2 v2_el5_v0)) (bvsdiv a5_0_1 v4_v0)))) (let ((_let1 (bvsub (bvsub a5_1 (bvsub a5_1_2 v1_v0)) (bvsub a5_1_1 v0_f2_v0)))) (let ((_let2 (bvsub (bvsub (bvsub b5_2 (bvsdiv b5_2_3 v4_v0)) (bvadd b5_2_2 v2_el5_v1)) (bvadd b5_2_1 v6_v1)))) (or (or (or false (or (bvsgt _let0 #b001111111111111111111111111111111) (bvslt _let0 #b110000000000000000000000000000000))) (or (bvsgt _let1 #b001111111111111111111111111111111) (bvslt _let1 #b110000000000000000000000000000000))) (or (bvsgt _let2 #b001111111111111111111111111111111) (bvslt _let2 #b110000000000000000000000000000000))))))
+SAT
+Adding initializations to ensure undefined behaviors
+Let variable: var=v4, value=1
+Let variable: var=v2_el5, value=1
+Let variable: var=v0_f2, value=-1610612735
+Let variable: var=v1, value=-1610612735
+Let symbol: sym=a5_0_1, value=1
+Let symbol: sym=a5_0_2, value=1
+Let symbol: sym=a5_0, value=2147483646
+Let symbol: sym=a5_1_1, value=1
+Let symbol: sym=a5_1_2, value=1
+Let symbol: sym=a5_1, value=-1073741828
+Let symbol: sym=b5_2_1, value=-2147483648
+Let symbol: sym=b5_2_2, value=-2147483644
+Let symbol: sym=b5_2_3, value=1
+Let symbol: sym=b5_2, value=2147483647
+Define symbols: sym=a2_0_1, val=-1537960651 (for unexecuted basic blocks)
+Define symbols: sym=a2_0_2, val=68549832 (for unexecuted basic blocks)
+Define symbols: sym=a2_0, val=-2101343473 (for unexecuted basic blocks)
+Define symbols: sym=a2_1_1, val=-576141162 (for unexecuted basic blocks)
+Define symbols: sym=a2_1_2, val=-1436608889 (for unexecuted basic blocks)
+Define symbols: sym=a2_1, val=1050689789 (for unexecuted basic blocks)
+Define symbols: sym=b2_2_1, val=717248042 (for unexecuted basic blocks)
+Define symbols: sym=b2_2_2, val=382137002 (for unexecuted basic blocks)
+Define symbols: sym=b2_2_3, val=-303787040 (for unexecuted basic blocks)
+Define symbols: sym=b2_2, val=2035840054 (for unexecuted basic blocks)
+Define symbols: sym=a4_0_1, val=-1221858440 (for unexecuted basic blocks)
+Define symbols: sym=a4_0_2, val=1372282002 (for unexecuted basic blocks)
+Define symbols: sym=a4_0, val=1586218180 (for unexecuted basic blocks)
+Define symbols: sym=a4_1_1, val=1130447284 (for unexecuted basic blocks)
+Define symbols: sym=a4_1_2, val=1607469932 (for unexecuted basic blocks)
+Define symbols: sym=a4_1, val=-1655524349 (for unexecuted basic blocks)
+Define symbols: sym=b4_2_1, val=-2125386044 (for unexecuted basic blocks)
+Define symbols: sym=b4_2_2, val=1409016547 (for unexecuted basic blocks)
+Define symbols: sym=b4_2_3, val=-1559220467 (for unexecuted basic blocks)
+Define symbols: sym=b4_2, val=782065101 (for unexecuted basic blocks)
+Define symbols: sym=a6_0_1, val=1171671657 (for unexecuted basic blocks)
+Define symbols: sym=a6_0_2, val=-826536777 (for unexecuted basic blocks)
+Define symbols: sym=a6_0, val=1075156811 (for unexecuted basic blocks)
+Define symbols: sym=a6_1_1, val=2018506341 (for unexecuted basic blocks)
+Define symbols: sym=a6_1_2, val=1840673092 (for unexecuted basic blocks)
+Define symbols: sym=a6_1, val=1707631528 (for unexecuted basic blocks)
+Define symbols: sym=b6_2_1, val=-1629425636 (for unexecuted basic blocks)
+Define symbols: sym=b6_2_2, val=1370134144 (for unexecuted basic blocks)
+Define symbols: sym=b6_2_3, val=1958441778 (for unexecuted basic blocks)
+Define symbols: sym=b6_2, val=188206690 (for unexecuted basic blocks)
+Define symbols: sym=a8_0_1, val=511003024 (for unexecuted basic blocks)
+Define symbols: sym=a8_0_2, val=1068122706 (for unexecuted basic blocks)
+Define symbols: sym=a8_0, val=1520631263 (for unexecuted basic blocks)
+Define symbols: sym=a8_1_1, val=1938456829 (for unexecuted basic blocks)
+Define symbols: sym=a8_1_2, val=-1845578652 (for unexecuted basic blocks)
+Define symbols: sym=a8_1, val=-1468116013 (for unexecuted basic blocks)
+Define symbols: sym=a10_0_1, val=1413365972 (for unexecuted basic blocks)
+Define symbols: sym=a10_0_2, val=-770717158 (for unexecuted basic blocks)
+Define symbols: sym=a10_0, val=-1387420447 (for unexecuted basic blocks)
+Define symbols: sym=a10_1_1, val=-980676467 (for unexecuted basic blocks)
+Define symbols: sym=a10_1_2, val=-1767605842 (for unexecuted basic blocks)
+Define symbols: sym=a10_1, val=1562061551 (for unexecuted basic blocks)
+Define symbols: sym=b10_2_1, val=-1581068257 (for unexecuted basic blocks)
+Define symbols: sym=b10_2_2, val=81403170 (for unexecuted basic blocks)
+Define symbols: sym=b10_2_3, val=322340106 (for unexecuted basic blocks)
+Define symbols: sym=b10_2, val=-158759728 (for unexecuted basic blocks)
+Define symbols: sym=a11_0_1, val=-1034040674 (for unexecuted basic blocks)
+Define symbols: sym=a11_0_2, val=-1440994423 (for unexecuted basic blocks)
+Define symbols: sym=a11_0, val=-1640282115 (for unexecuted basic blocks)
+Define symbols: sym=a11_1_1, val=-36477398 (for unexecuted basic blocks)
+Define symbols: sym=a11_1_2, val=1603208248 (for unexecuted basic blocks)
+Define symbols: sym=a11_1, val=466662547 (for unexecuted basic blocks)
+Define symbols: sym=b11_2_1, val=588205291 (for unexecuted basic blocks)
+Define symbols: sym=b11_2_2, val=-858311157 (for unexecuted basic blocks)
+Define symbols: sym=b11_2_3, val=-1002725249 (for unexecuted basic blocks)
+Define symbols: sym=b11_2, val=-274806113 (for unexecuted basic blocks)
+Define symbols: sym=a12_0_1, val=-1936363510 (for unexecuted basic blocks)
+Define symbols: sym=a12_0_2, val=-1240935507 (for unexecuted basic blocks)
+Define symbols: sym=a12_0, val=-952546222 (for unexecuted basic blocks)
+Define symbols: sym=a12_1_1, val=-101631011 (for unexecuted basic blocks)
+Define symbols: sym=a12_1_2, val=1483294765 (for unexecuted basic blocks)
+Define symbols: sym=a12_1, val=462303761 (for unexecuted basic blocks)
+Define symbols: sym=a13_0_1, val=-1046718632 (for unexecuted basic blocks)
+Define symbols: sym=a13_0_2, val=-650884393 (for unexecuted basic blocks)
+Define symbols: sym=a13_0, val=323754419 (for unexecuted basic blocks)
+Define symbols: sym=a13_1_1, val=919806449 (for unexecuted basic blocks)
+Define symbols: sym=a13_1_2, val=1714246035 (for unexecuted basic blocks)
+Define symbols: sym=a13_1, val=-482072385 (for unexecuted basic blocks)
+Define symbols: sym=b13_2_1, val=-1538850162 (for unexecuted basic blocks)
+Define symbols: sym=b13_2_2, val=1988677646 (for unexecuted basic blocks)
+Define symbols: sym=b13_2_3, val=-1065991587 (for unexecuted basic blocks)
+Define symbols: sym=b13_2, val=-3902354 (for unexecuted basic blocks)
+Define symbols: sym=a14_0_1, val=-512106846 (for unexecuted basic blocks)
+Define symbols: sym=a14_0_2, val=730432031 (for unexecuted basic blocks)
+Define symbols: sym=a14_0, val=-730858008 (for unexecuted basic blocks)
+Define symbols: sym=a14_1_1, val=-1652400120 (for unexecuted basic blocks)
+Define symbols: sym=a14_1_2, val=181749809 (for unexecuted basic blocks)
+Define symbols: sym=a14_1, val=752976078 (for unexecuted basic blocks)
+Define symbols: sym=a15_0_1, val=-1638493553 (for unexecuted basic blocks)
+Define symbols: sym=a15_0_2, val=380496083 (for unexecuted basic blocks)
+Define symbols: sym=a15_0, val=2134461746 (for unexecuted basic blocks)
+Define symbols: sym=a15_1_1, val=2032008684 (for unexecuted basic blocks)
+Define symbols: sym=a15_1_2, val=2083454030 (for unexecuted basic blocks)
+Define symbols: sym=a15_1, val=-1277625178 (for unexecuted basic blocks)
+Define symbols: sym=b15_2_1, val=1282472164 (for unexecuted basic blocks)
+Define symbols: sym=b15_2_2, val=977809981 (for unexecuted basic blocks)
+Define symbols: sym=b15_2_3, val=-1145820178 (for unexecuted basic blocks)
+Define symbols: sym=b15_2, val=65799079 (for unexecuted basic blocks)
+Define symbols: sym=a16_0_1, val=-203088133 (for unexecuted basic blocks)
+Define symbols: sym=a16_0_2, val=-575223205 (for unexecuted basic blocks)
+Define symbols: sym=a16_0, val=-915758075 (for unexecuted basic blocks)
+Define symbols: sym=a16_1_1, val=-2024939023 (for unexecuted basic blocks)
+Define symbols: sym=a16_1_2, val=980018694 (for unexecuted basic blocks)
+Define symbols: sym=a16_1, val=-1634271474 (for unexecuted basic blocks)
+Define symbols: sym=b16_2_1, val=-827622833 (for unexecuted basic blocks)
+Define symbols: sym=b16_2_2, val=2054764602 (for unexecuted basic blocks)
+Define symbols: sym=b16_2_3, val=204322680 (for unexecuted basic blocks)
+Define symbols: sym=b16_2, val=1784630172 (for unexecuted basic blocks)
+Define symbols: sym=a17_0_1, val=-2103339325 (for unexecuted basic blocks)
+Define symbols: sym=a17_0_2, val=-1496418740 (for unexecuted basic blocks)
+Define symbols: sym=a17_0, val=-1384521208 (for unexecuted basic blocks)
+Define symbols: sym=a17_1_1, val=1709549712 (for unexecuted basic blocks)
+Define symbols: sym=a17_1_2, val=-762610325 (for unexecuted basic blocks)
+Define symbols: sym=a17_1, val=1582330976 (for unexecuted basic blocks)
+Extract initialization: param=v0, value=-1
+Extract initialization: param=v0, value=-1
+Extract initialization: param=v0, value=-1
+Extract initialization: param=v0, value=-1
+Extract initialization: param=v0, value=-1
+Extract initialization: param=v1, value=-1
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v3, value=-1
+Extract initialization: param=v4, value=-1
+Extract initialization: param=v5, value=-1
+Extract finalization: param=v0, value=-1
+Extract finalization: param=v0, value=-1
+Extract finalization: param=v0, value=-1
+Extract finalization: param=v0, value=-1
+Extract finalization: param=v0, value=-1
+Extract finalization: param=v1, value=-1
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-3
+Extract finalization: param=v3, value=-1
+Extract finalization: param=v4, value=0
+Extract finalization: param=v5, value=-1
+------SymExec: Iteration 1----------------------------------------------
+Generating or re-generating UB-free constraints
+Initial constraints: 
+```
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= v0_f0_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= v0_f0_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f0_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000111)
+```
+Final constraints: 
+```
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= v0_f0_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= v0_f0_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f0_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000111)
+(= v6_v0 #b11111111111111111111111111111111)
+(= v7_v0 #b11111111111111111111111111111111)
+(not (bvsmulo #b11111111111111111111111111111111 v7_v0))
+(distinct v2_el5_v0 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v2_el5_v0))
+(not (bvsaddo (bvmul #b11111111111111111111111111111111 v7_v0) (bvsdiv #b11111111111111111111111111111111 v2_el5_v0)))
+(not (bvsaddo (bvadd (bvmul #b11111111111111111111111111111111 v7_v0) (bvsdiv #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 _let0) _let0) #b00000000000000000000000000000001))
+(= v7_v1 (bvadd (bvadd (bvmul #b11111111111111111111111111111111 v7_v0) (bvsdiv #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111))
+(not (bvssubo #b11111111111111111111111111111111 v6_v0))
+(not (bvsaddo #b11111111111111111111111111111111 v5_v0))
+(not (bvsaddo (bvsub #b11111111111111111111111111111111 v6_v0) (bvadd #b11111111111111111111111111111111 v5_v0)))
+(not (bvsaddo (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvadd #b11111111111111111111111111111111 v5_v0)) #b11111111111111111111111111111111))
+(= v1_v1 (bvadd (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvadd #b11111111111111111111111111111111 v5_v0)) #b11111111111111111111111111111111))
+(distinct v7_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v7_v1))
+(not (bvsaddo #b11111111111111111111111111111111 v1_v1))
+(not (bvssubo (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)))
+(not (bvssubo (bvsub (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)) (bvsrem #b11111111111111111111111111111111 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)) (bvsrem #b11111111111111111111111111111111 v2_el5_v0)) #b00000000000000000000000000000100))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd (bvadd _let0 _let0) _let0) (ite (= #b00000000000000000000000000000100 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010))
+(= (bvsub (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)) (bvsrem #b11111111111111111111111111111111 v2_el5_v0)) #b00000000000000000000000000000100) #b00000000000000000000000000000000)
+(not (bvsmulo #b11111111111111111111111111111111 v4_v0))
+(not (bvssubo #b00000000000000000000000000000010 v6_v0))
+(not (bvssubo (bvmul #b11111111111111111111111111111111 v4_v0) (bvsub #b00000000000000000000000000000010 v6_v0)))
+(not (bvssubo (bvsub (bvmul #b11111111111111111111111111111111 v4_v0) (bvsub #b00000000000000000000000000000010 v6_v0)) #b11111111111111111111111111111111))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 (ite (= #b00000000000000000000000000000010 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) _let0) #b00000000000000000000000000000001))
+(= v5_v1 (bvsub (bvsub (bvmul #b11111111111111111111111111111111 v4_v0) (bvsub #b00000000000000000000000000000010 v6_v0)) #b11111111111111111111111111111111))
+(distinct v3_v0 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v3_v0))
+(not (bvsmulo #b11111111111111111111111111111111 v1_v1))
+(not (bvssubo (bvsrem #b11111111111111111111111111111111 v3_v0) (bvmul #b11111111111111111111111111111111 v1_v1)))
+(not (bvssubo (bvsub (bvsrem #b11111111111111111111111111111111 v3_v0) (bvmul #b11111111111111111111111111111111 v1_v1)) #b11111111111111111111111111111110))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 _let0) (ite (= #b11111111111111111111111111111110 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001))
+(= v3_v1 (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v3_v0) (bvmul #b11111111111111111111111111111111 v1_v1)) #b11111111111111111111111111111110))
+(distinct v5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v5_v1))
+(not (bvsaddo #b11111111111111111111111111111111 v3_v1))
+(not (bvssubo (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)))
+(not (bvsmulo #b11111111111111111111111111111111 v2_el5_v0))
+(not (bvssubo (bvsub (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) (bvmul #b11111111111111111111111111111111 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) (bvmul #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd (bvadd _let0 _let0) _let0) _let0) #b00000000000000000000000000000010))
+(not (= (bvsub (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) (bvmul #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111) #b00000000000000000000000000000000))
+(distinct v0_f2_v0 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v0_f2_v0))
+(not (bvsaddo (bvsub #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v0_f2_v0)))
+(not (bvsaddo (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v0_f2_v0)) #b11111111111111111111111111111111))
+(= v0_f1_v1 (bvadd (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v0_f2_v0)) #b11111111111111111111111111111111))
+(not (bvsaddo #b11111111111111111111111111111111 v6_v0))
+(not (bvsaddo (bvadd #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v5_v1)))
+(not (bvsaddo (bvadd (bvadd #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111))
+(= v4_v1 (bvadd (bvadd (bvadd #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111))
+(not (bvssubo #b11111111111111111111111111111111 v0_f1_v1))
+(not (bvsaddo (bvsdiv #b11111111111111111111111111111111 v2_el5_v0) (bvsub #b11111111111111111111111111111111 v0_f1_v1)))
+(not (bvsaddo (bvadd (bvsdiv #b11111111111111111111111111111111 v2_el5_v0) (bvsub #b11111111111111111111111111111111 v0_f1_v1)) #b11111111111111111111111111111111))
+(= v4_v2 (bvadd (bvadd (bvsdiv #b11111111111111111111111111111111 v2_el5_v0) (bvsub #b11111111111111111111111111111111 v0_f1_v1)) #b11111111111111111111111111111111))
+(distinct v1_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v1_v1))
+(not (bvsaddo (bvsrem #b11111111111111111111111111111111 v1_v1) (bvsdiv #b11111111111111111111111111111111 v7_v1)))
+(not (bvsaddo (bvadd (bvsrem #b11111111111111111111111111111111 v1_v1) (bvsdiv #b11111111111111111111111111111111 v7_v1)) #b11111111111111111111111111111111))
+(= v2_el5_v1 (bvadd (bvadd (bvsrem #b11111111111111111111111111111111 v1_v1) (bvsdiv #b11111111111111111111111111111111 v7_v1)) #b11111111111111111111111111111111))
+(not (bvsaddo #b11111111111111111111111111111111 v4_v2))
+(distinct v2_el5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v2_el5_v1))
+(not (bvsaddo (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)))
+(not (bvssubo #b11111111111111111111111111111111 v5_v1))
+(not (bvsaddo (bvadd (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)) (bvsub #b11111111111111111111111111111111 v5_v1)))
+(not (bvsaddo (bvadd (bvadd (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)) (bvsub #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111))
+(not (= (bvadd (bvadd (bvadd (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)) (bvsub #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111) #b00000000000000000000000000000000))
+(not (bvssubo (bvadd #b11111111111111111111111111111111 v1_v1) (bvadd #b11111111111111111111111111111111 v3_v1)))
+(not (bvssubo (bvsub (bvadd #b11111111111111111111111111111111 v1_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) #b11111111111111111111111111111111))
+(= v1_v2 (bvsub (bvsub (bvadd #b11111111111111111111111111111111 v1_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) #b11111111111111111111111111111111))
+(not (bvsmulo #b11111111111111111111111111111111 v6_v0))
+(not (bvssubo (bvsdiv #b11111111111111111111111111111111 v5_v1) (bvmul #b11111111111111111111111111111111 v6_v0)))
+(not (bvssubo (bvsub (bvsdiv #b11111111111111111111111111111111 v5_v1) (bvmul #b11111111111111111111111111111111 v6_v0)) #b00000000000000000000000000000001))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 _let0) (ite (= #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001))
+(= v6_v1 (bvsub (bvsub (bvsdiv #b11111111111111111111111111111111 v5_v1) (bvmul #b11111111111111111111111111111111 v6_v0)) #b00000000000000000000000000000001))
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= (ite (distinct v0_f0_el0_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= (ite (distinct v0_f0_el1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f0_el2_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f2_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el0_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el2_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el3_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el4_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el5_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v3_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v4_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v5_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000011)
+```
+Constraint stats: asserted=80 addCalls=100 skippedTrue=0 deduped=20 ensureInRangeCalls=121 boundedAlready=0 uniqueConstraintIds=80 uniqueBoundedIds=0 (solverAsserted=0)
+Bitwuzla check_sat time: 130ms
+Bitwuzla statistics: preprocess::contradicting_ands::num_substs=0 preprocess::contradicting_ands::time_apply=0ms preprocess::elim_extract::num_elim=0 preprocess::elim_extract::time_apply=0ms preprocess::elim_lambda::time_apply=0ms preprocess::elim_udiv::num_eliminated=0 preprocess::elim_udiv::time_apply=0ms preprocess::embedded_constraints::num_substs=3 preprocess::embedded_constraints::time_apply=0ms preprocess::flatten_and::num_assertions=32 preprocess::flatten_and::num_flattened=16 preprocess::flatten_and::time_apply=0ms preprocess::lambda::num_elim=0 preprocess::normalize::num_common_normalizations=0 preprocess::normalize::num_normalizations=60 preprocess::normalize::num_normalized_assertions=0 preprocess::normalize::num_pass1=0 preprocess::normalize::num_pass2=0 preprocess::normalize::time_adder_chains=1ms preprocess::normalize::time_apply=12ms preprocess::normalize::time_compute_occs=0ms preprocess::normalize::time_normalize_add=0ms preprocess::normalize::time_normalize_mul=0ms preprocess::normalize::time_score=9ms preprocess::rewrite::time_apply=1ms preprocess::skeleton_preproc::cnf::clauses=251 preprocess::skeleton_preproc::cnf::lits=507 preprocess::skeleton_preproc::new_assertions=0 preprocess::skeleton_preproc::resets=1 preprocess::skeleton_preproc::time_apply=1ms preprocess::skeleton_preproc::time_encode=0ms preprocess::skeleton_preproc::time_fixed=0ms preprocess::skeleton_preproc::time_sat=0ms preprocess::uninterpreted::num_substs=0 preprocess::uninterpreted::time_apply=0ms preprocess::varsubst::normalize_bv_ineq::num_slt=0 preprocess::varsubst::normalize_bv_ineq::num_ult=0 preprocess::varsubst::normalize_eq::num_bv_concat=0 preprocess::varsubst::normalize_eq::num_gauss_elim=0 preprocess::varsubst::normalize_eq::num_linear_eq=0 preprocess::varsubst::num_substs=12 preprocess::varsubst::time_apply=1ms preprocess::varsubst::time_direct_cycle_check=0ms preprocess::varsubst::time_find_substitution=0ms preprocess::varsubst::time_find_vars=0ms preprocess::varsubst::time_register=0ms preprocess::varsubst::time_remove_cycles=0ms preprocess::varsubst::time_substitute=0ms preprocessor::num_iterations=2 preprocessor::time_preprocess=17ms preprocessor::time_process=0ms rewriter::(normalize)::num_evals=0 rewriter::(normalize)::num_rewrites=264 rewriter::(normalize)::rewrite::BV_ADD_CONST=8 rewriter::(normalize)::rewrite::BV_ADD_EVAL=7 rewriter::(normalize)::rewrite::BV_ADD_SPECIAL_CONST=22 rewriter::(normalize)::rewrite::BV_MUL_EVAL=2 rewriter::(normalize)::rewrite::BV_MUL_ONES=13 rewriter::(normalize)::rewrite::BV_NEG_ELIM=13 rewriter::(normalize)::rewrite::BV_NOT_BV_NOT=27 rewriter::(normalize)::rewrite::EQUAL_BV_SUB=1 rewriter::(normalize)::rewrite::NORMALIZE_COMM=171 rewriter::num_evals=0 rewriter::num_rewrites=1516 rewriter::rewrite::AND_EVAL=2 rewriter::rewrite::AND_SPECIAL_CONST=127 rewriter::rewrite::BV_ADD_CONST=20 rewriter::rewrite::BV_ADD_EVAL=18 rewriter::rewrite::BV_ADD_ITE2=30 rewriter::rewrite::BV_ADD_SPECIAL_CONST=40 rewriter::rewrite::BV_AND_EVAL=1 rewriter::rewrite::BV_AND_SPECIAL_CONST=155 rewriter::rewrite::BV_CONCAT_EVAL=2 rewriter::rewrite::BV_EXTRACT_ADD_MUL=4 rewriter::rewrite::BV_EXTRACT_EVAL=41 rewriter::rewrite::BV_EXTRACT_FULL=5 rewriter::rewrite::BV_MUL_ONES=10 rewriter::rewrite::BV_MUL_POW2=4 rewriter::rewrite::BV_NEG_ELIM=41 rewriter::rewrite::BV_NOT_BV_NEG=5 rewriter::rewrite::BV_NOT_BV_NOT=76 rewriter::rewrite::BV_NOT_EVAL=8 rewriter::rewrite::BV_OR_ELIM=6 rewriter::rewrite::BV_SADDO_ELIM=20 rewriter::rewrite::BV_SDIVO_ELIM=7 rewriter::rewrite::BV_SDIV_ELIM=3 rewriter::rewrite::BV_SHL_CONST=4 rewriter::rewrite::BV_SIGN_EXTEND_ELIM=12 rewriter::rewrite::BV_SLE_ELIM=4 rewriter::rewrite::BV_SLT_EVAL=2 rewriter::rewrite::BV_SMULO_ELIM=5 rewriter::rewrite::BV_SREM_ELIM=7 rewriter::rewrite::BV_SSUBO_ELIM=18 rewriter::rewrite::BV_SUB_ELIM=18 rewriter::rewrite::BV_XOR_EVAL=1 rewriter::rewrite::BV_XOR_SPECIAL_CONST=3 rewriter::rewrite::DISTINCT_ELIM=22 rewriter::rewrite::EQUAL_BV_SUB=1 rewriter::rewrite::EQUAL_CONST_BV_ADD=6 rewriter::rewrite::EQUAL_CONST_BV_NOT=4 rewriter::rewrite::EQUAL_EVAL=12 rewriter::rewrite::EQUAL_ITE_SAME=15 rewriter::rewrite::EQUAL_SPECIAL_CONST=5 rewriter::rewrite::EQUAL_TRUE=10 rewriter::rewrite::ITE_EVAL=13 rewriter::rewrite::NORMALIZE_COMM=585 rewriter::rewrite::NOT_EQUAL_BV1_BOOL=37 rewriter::rewrite::NOT_EVAL=1 rewriter::rewrite::NOT_NOT=53 rewriter::rewrite::OR_ELIM=53 solver::abstract::num_checks=1 solver::abstract::terms::total=0 solver::abstract::time_check=0ms solver::array::equalities=0 solver::array::num_checks=0 solver::array::propagations=0 solver::array::propagations_down=0 solver::array::propagations_up=0 solver::array::selects=0 solver::array::time_check=0ms solver::bv::bitblast::aig::num_ands=69193 solver::bv::bitblast::aig::num_consts=480 solver::bv::bitblast::aig::num_shared=46343 solver::bv::bitblast::aig::time_bitblast=12ms solver::bv::bitblast::cnf::num_clauses=167669 solver::bv::bitblast::cnf::num_literals=410090 solver::bv::bitblast::cnf::num_vars=53928 solver::bv::bitblast::cnf::time_encode=53ms solver::bv::bitblast::sat::time_solve=46ms solver::bv::num_assertions=60 solver::bv::num_checks=1 solver::bv::time_check=100ms solver::engine::lemmas::abstr=0 solver::engine::lemmas::array=0 solver::engine::lemmas::fp=0 solver::engine::lemmas::fun=0 solver::engine::lemmas::quant=0 solver::engine::lemmas::total=0 solver::engine::time_register_term=0ms solver::engine::time_solve=113ms solver::fun::num_checks=1 solver::fun::time_check=0ms solver::quant::mbqi_checks=0 solver::quant::num_lemma_iterations=0 solver::quant::num_lemmas=0 solver::quant::time_check=0ms solver::quant::time_mbqi=0ms solver::quant::time_process=0ms solving_context::max_memory=116678656 solving_context::time_ensure_model=0ms solving_context::time_solve=130ms
+SAT
+Extract initialization: param=v0, value=-2
+Extract initialization: param=v0, value=-2
+Extract initialization: param=v0, value=-2
+Extract initialization: param=v0, value=-2
+Extract initialization: param=v0, value=1
+Extract initialization: param=v1, value=-2
+Extract initialization: param=v2, value=-2
+Extract initialization: param=v2, value=-2
+Extract initialization: param=v2, value=-2
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-2
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v3, value=-234881024
+Extract initialization: param=v4, value=-3
+Extract initialization: param=v5, value=-1
+Extract finalization: param=v0, value=-2
+Extract finalization: param=v0, value=-2
+Extract finalization: param=v0, value=-2
+Extract finalization: param=v0, value=-1
+Extract finalization: param=v0, value=1
+Extract finalization: param=v1, value=0
+Extract finalization: param=v2, value=-2
+Extract finalization: param=v2, value=-2
+Extract finalization: param=v2, value=-2
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-2
+Extract finalization: param=v2, value=-3
+Extract finalization: param=v3, value=-2
+Extract finalization: param=v4, value=0
+Extract finalization: param=v5, value=1
+------SymExec: Iteration 2----------------------------------------------
+Final constraints: 
+```
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= v0_f0_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= v0_f0_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f0_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v0_f2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el0_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el1_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el2_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v2_el5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v3_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v4_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= v5_v0 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000111)
+(= v6_v0 #b11111111111111111111111111111111)
+(= v7_v0 #b11111111111111111111111111111111)
+(not (bvsmulo #b11111111111111111111111111111111 v7_v0))
+(distinct v2_el5_v0 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v2_el5_v0))
+(not (bvsaddo (bvmul #b11111111111111111111111111111111 v7_v0) (bvsdiv #b11111111111111111111111111111111 v2_el5_v0)))
+(not (bvsaddo (bvadd (bvmul #b11111111111111111111111111111111 v7_v0) (bvsdiv #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 _let0) _let0) #b00000000000000000000000000000001))
+(= v7_v1 (bvadd (bvadd (bvmul #b11111111111111111111111111111111 v7_v0) (bvsdiv #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111))
+(not (bvssubo #b11111111111111111111111111111111 v6_v0))
+(not (bvsaddo #b11111111111111111111111111111111 v5_v0))
+(not (bvsaddo (bvsub #b11111111111111111111111111111111 v6_v0) (bvadd #b11111111111111111111111111111111 v5_v0)))
+(not (bvsaddo (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvadd #b11111111111111111111111111111111 v5_v0)) #b11111111111111111111111111111111))
+(= v1_v1 (bvadd (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvadd #b11111111111111111111111111111111 v5_v0)) #b11111111111111111111111111111111))
+(distinct v7_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v7_v1))
+(not (bvsaddo #b11111111111111111111111111111111 v1_v1))
+(not (bvssubo (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)))
+(not (bvssubo (bvsub (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)) (bvsrem #b11111111111111111111111111111111 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)) (bvsrem #b11111111111111111111111111111111 v2_el5_v0)) #b00000000000000000000000000000100))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd (bvadd _let0 _let0) _let0) (ite (= #b00000000000000000000000000000100 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000010))
+(= (bvsub (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v7_v1) (bvadd #b11111111111111111111111111111111 v1_v1)) (bvsrem #b11111111111111111111111111111111 v2_el5_v0)) #b00000000000000000000000000000100) #b00000000000000000000000000000000)
+(not (bvsmulo #b11111111111111111111111111111111 v4_v0))
+(not (bvssubo #b00000000000000000000000000000010 v6_v0))
+(not (bvssubo (bvmul #b11111111111111111111111111111111 v4_v0) (bvsub #b00000000000000000000000000000010 v6_v0)))
+(not (bvssubo (bvsub (bvmul #b11111111111111111111111111111111 v4_v0) (bvsub #b00000000000000000000000000000010 v6_v0)) #b11111111111111111111111111111111))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 (ite (= #b00000000000000000000000000000010 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) _let0) #b00000000000000000000000000000001))
+(= v5_v1 (bvsub (bvsub (bvmul #b11111111111111111111111111111111 v4_v0) (bvsub #b00000000000000000000000000000010 v6_v0)) #b11111111111111111111111111111111))
+(distinct v3_v0 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v3_v0))
+(not (bvsmulo #b11111111111111111111111111111111 v1_v1))
+(not (bvssubo (bvsrem #b11111111111111111111111111111111 v3_v0) (bvmul #b11111111111111111111111111111111 v1_v1)))
+(not (bvssubo (bvsub (bvsrem #b11111111111111111111111111111111 v3_v0) (bvmul #b11111111111111111111111111111111 v1_v1)) #b11111111111111111111111111111110))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 _let0) (ite (= #b11111111111111111111111111111110 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001))
+(= v3_v1 (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v3_v0) (bvmul #b11111111111111111111111111111111 v1_v1)) #b11111111111111111111111111111110))
+(distinct v5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v5_v1))
+(not (bvsaddo #b11111111111111111111111111111111 v3_v1))
+(not (bvssubo (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)))
+(not (bvsmulo #b11111111111111111111111111111111 v2_el5_v0))
+(not (bvssubo (bvsub (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) (bvmul #b11111111111111111111111111111111 v2_el5_v0)))
+(not (bvssubo (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) (bvmul #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd (bvadd _let0 _let0) _let0) _let0) #b00000000000000000000000000000010))
+(not (= (bvsub (bvsub (bvsub (bvsrem #b11111111111111111111111111111111 v5_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) (bvmul #b11111111111111111111111111111111 v2_el5_v0)) #b11111111111111111111111111111111) #b00000000000000000000000000000000))
+(distinct v0_f2_v0 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v0_f2_v0))
+(not (bvsaddo (bvsub #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v0_f2_v0)))
+(not (bvsaddo (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v0_f2_v0)) #b11111111111111111111111111111111))
+(= v0_f1_v1 (bvadd (bvadd (bvsub #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v0_f2_v0)) #b11111111111111111111111111111111))
+(not (bvsaddo #b11111111111111111111111111111111 v6_v0))
+(not (bvsaddo (bvadd #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v5_v1)))
+(not (bvsaddo (bvadd (bvadd #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111))
+(= v4_v1 (bvadd (bvadd (bvadd #b11111111111111111111111111111111 v6_v0) (bvsrem #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111))
+(not (bvssubo #b11111111111111111111111111111111 v0_f1_v1))
+(not (bvsaddo (bvsdiv #b11111111111111111111111111111111 v2_el5_v0) (bvsub #b11111111111111111111111111111111 v0_f1_v1)))
+(not (bvsaddo (bvadd (bvsdiv #b11111111111111111111111111111111 v2_el5_v0) (bvsub #b11111111111111111111111111111111 v0_f1_v1)) #b11111111111111111111111111111111))
+(= v4_v2 (bvadd (bvadd (bvsdiv #b11111111111111111111111111111111 v2_el5_v0) (bvsub #b11111111111111111111111111111111 v0_f1_v1)) #b11111111111111111111111111111111))
+(distinct v1_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v1_v1))
+(not (bvsaddo (bvsrem #b11111111111111111111111111111111 v1_v1) (bvsdiv #b11111111111111111111111111111111 v7_v1)))
+(not (bvsaddo (bvadd (bvsrem #b11111111111111111111111111111111 v1_v1) (bvsdiv #b11111111111111111111111111111111 v7_v1)) #b11111111111111111111111111111111))
+(= v2_el5_v1 (bvadd (bvadd (bvsrem #b11111111111111111111111111111111 v1_v1) (bvsdiv #b11111111111111111111111111111111 v7_v1)) #b11111111111111111111111111111111))
+(not (bvsaddo #b11111111111111111111111111111111 v4_v2))
+(distinct v2_el5_v1 #b00000000000000000000000000000000)
+(not (bvsdivo #b11111111111111111111111111111111 v2_el5_v1))
+(not (bvsaddo (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)))
+(not (bvssubo #b11111111111111111111111111111111 v5_v1))
+(not (bvsaddo (bvadd (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)) (bvsub #b11111111111111111111111111111111 v5_v1)))
+(not (bvsaddo (bvadd (bvadd (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)) (bvsub #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111))
+(not (= (bvadd (bvadd (bvadd (bvadd #b11111111111111111111111111111111 v4_v2) (bvsrem #b11111111111111111111111111111111 v2_el5_v1)) (bvsub #b11111111111111111111111111111111 v5_v1)) #b11111111111111111111111111111111) #b00000000000000000000000000000000))
+(not (bvssubo (bvadd #b11111111111111111111111111111111 v1_v1) (bvadd #b11111111111111111111111111111111 v3_v1)))
+(not (bvssubo (bvsub (bvadd #b11111111111111111111111111111111 v1_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) #b11111111111111111111111111111111))
+(= v1_v2 (bvsub (bvsub (bvadd #b11111111111111111111111111111111 v1_v1) (bvadd #b11111111111111111111111111111111 v3_v1)) #b11111111111111111111111111111111))
+(not (bvsmulo #b11111111111111111111111111111111 v6_v0))
+(not (bvssubo (bvsdiv #b11111111111111111111111111111111 v5_v1) (bvmul #b11111111111111111111111111111111 v6_v0)))
+(not (bvssubo (bvsub (bvsdiv #b11111111111111111111111111111111 v5_v1) (bvmul #b11111111111111111111111111111111 v6_v0)) #b00000000000000000000000000000001))
+(let ((_let0 (ite (= #b11111111111111111111111111111111 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000))) (bvsle (bvadd (bvadd _let0 _let0) (ite (= #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000001))
+(= v6_v1 (bvsub (bvsub (bvsdiv #b11111111111111111111111111111111 v5_v1) (bvmul #b11111111111111111111111111111111 v6_v0)) #b00000000000000000000000000000001))
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= (ite (distinct v0_f0_el0_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= (ite (distinct v0_f0_el1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f0_el2_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f2_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el0_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el1_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el2_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el3_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el4_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el5_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v3_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v4_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v5_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000011)
+(bvsle (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (bvadd (ite (= (ite (distinct v0_f0_el0_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) (ite (= (ite (distinct v0_f0_el1_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f0_el2_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f1_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v0_f2_v0 #b00000000000000000000000000000001) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v1_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el0_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el1_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el2_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el3_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el4_v0 #b11111111111111111111111111111110) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v2_el5_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v3_v0 #b11110010000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v4_v0 #b11111111111111111111111111111101) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) (ite (= (ite (distinct v5_v0 #b11111111111111111111111111111111) #b00000000000000000000000000000001 #b00000000000000000000000000000000) #b00000000000000000000000000000000) #b00000000000000000000000000000001 #b00000000000000000000000000000000)) #b00000000000000000000000000000011)
+```
+Constraint stats: asserted=81 addCalls=101 skippedTrue=0 deduped=20 ensureInRangeCalls=121 boundedAlready=0 uniqueConstraintIds=81 uniqueBoundedIds=0 (solverAsserted=80)
+Bitwuzla check_sat time: 65ms
+Bitwuzla statistics: preprocess::contradicting_ands::num_substs=0 preprocess::contradicting_ands::time_apply=0ms preprocess::elim_extract::num_elim=0 preprocess::elim_extract::time_apply=0ms preprocess::elim_lambda::time_apply=0ms preprocess::elim_udiv::num_eliminated=0 preprocess::elim_udiv::time_apply=0ms preprocess::embedded_constraints::num_substs=3 preprocess::embedded_constraints::time_apply=0ms preprocess::flatten_and::num_assertions=32 preprocess::flatten_and::num_flattened=16 preprocess::flatten_and::time_apply=0ms preprocess::lambda::num_elim=0 preprocess::normalize::num_common_normalizations=0 preprocess::normalize::num_normalizations=60 preprocess::normalize::num_normalized_assertions=0 preprocess::normalize::num_pass1=0 preprocess::normalize::num_pass2=0 preprocess::normalize::time_adder_chains=1ms preprocess::normalize::time_apply=12ms preprocess::normalize::time_compute_occs=0ms preprocess::normalize::time_normalize_add=0ms preprocess::normalize::time_normalize_mul=0ms preprocess::normalize::time_score=9ms preprocess::rewrite::time_apply=1ms preprocess::skeleton_preproc::cnf::clauses=251 preprocess::skeleton_preproc::cnf::lits=507 preprocess::skeleton_preproc::new_assertions=0 preprocess::skeleton_preproc::resets=1 preprocess::skeleton_preproc::time_apply=1ms preprocess::skeleton_preproc::time_encode=0ms preprocess::skeleton_preproc::time_fixed=0ms preprocess::skeleton_preproc::time_sat=0ms preprocess::uninterpreted::num_substs=0 preprocess::uninterpreted::time_apply=0ms preprocess::varsubst::normalize_bv_ineq::num_slt=0 preprocess::varsubst::normalize_bv_ineq::num_ult=0 preprocess::varsubst::normalize_eq::num_bv_concat=0 preprocess::varsubst::normalize_eq::num_gauss_elim=0 preprocess::varsubst::normalize_eq::num_linear_eq=0 preprocess::varsubst::num_substs=12 preprocess::varsubst::time_apply=1ms preprocess::varsubst::time_direct_cycle_check=0ms preprocess::varsubst::time_find_substitution=0ms preprocess::varsubst::time_find_vars=0ms preprocess::varsubst::time_register=0ms preprocess::varsubst::time_remove_cycles=0ms preprocess::varsubst::time_substitute=0ms preprocessor::num_iterations=3 preprocessor::time_preprocess=17ms preprocessor::time_process=0ms rewriter::(normalize)::num_evals=0 rewriter::(normalize)::num_rewrites=264 rewriter::(normalize)::rewrite::BV_ADD_CONST=8 rewriter::(normalize)::rewrite::BV_ADD_EVAL=7 rewriter::(normalize)::rewrite::BV_ADD_SPECIAL_CONST=22 rewriter::(normalize)::rewrite::BV_MUL_EVAL=2 rewriter::(normalize)::rewrite::BV_MUL_ONES=13 rewriter::(normalize)::rewrite::BV_NEG_ELIM=13 rewriter::(normalize)::rewrite::BV_NOT_BV_NOT=27 rewriter::(normalize)::rewrite::EQUAL_BV_SUB=1 rewriter::(normalize)::rewrite::NORMALIZE_COMM=171 rewriter::num_evals=0 rewriter::num_rewrites=1708 rewriter::rewrite::AND_EVAL=2 rewriter::rewrite::AND_SPECIAL_CONST=142 rewriter::rewrite::BV_ADD_CONST=28 rewriter::rewrite::BV_ADD_EVAL=30 rewriter::rewrite::BV_ADD_ITE2=45 rewriter::rewrite::BV_ADD_SPECIAL_CONST=59 rewriter::rewrite::BV_AND_EVAL=1 rewriter::rewrite::BV_AND_SPECIAL_CONST=155 rewriter::rewrite::BV_CONCAT_EVAL=2 rewriter::rewrite::BV_EXTRACT_ADD_MUL=4 rewriter::rewrite::BV_EXTRACT_EVAL=41 rewriter::rewrite::BV_EXTRACT_FULL=5 rewriter::rewrite::BV_MUL_ONES=10 rewriter::rewrite::BV_MUL_POW2=4 rewriter::rewrite::BV_NEG_ELIM=41 rewriter::rewrite::BV_NOT_BV_NEG=6 rewriter::rewrite::BV_NOT_BV_NOT=76 rewriter::rewrite::BV_NOT_EVAL=10 rewriter::rewrite::BV_OR_ELIM=6 rewriter::rewrite::BV_SADDO_ELIM=20 rewriter::rewrite::BV_SDIVO_ELIM=7 rewriter::rewrite::BV_SDIV_ELIM=3 rewriter::rewrite::BV_SHL_CONST=4 rewriter::rewrite::BV_SIGN_EXTEND_ELIM=12 rewriter::rewrite::BV_SLE_ELIM=5 rewriter::rewrite::BV_SLT_EVAL=2 rewriter::rewrite::BV_SMULO_ELIM=5 rewriter::rewrite::BV_SREM_ELIM=7 rewriter::rewrite::BV_SSUBO_ELIM=18 rewriter::rewrite::BV_SUB_ELIM=18 rewriter::rewrite::BV_XOR_EVAL=1 rewriter::rewrite::BV_XOR_SPECIAL_CONST=3 rewriter::rewrite::DISTINCT_ELIM=37 rewriter::rewrite::EQUAL_BV_SUB=1 rewriter::rewrite::EQUAL_CONST_BV_ADD=6 rewriter::rewrite::EQUAL_CONST_BV_NOT=4 rewriter::rewrite::EQUAL_EVAL=13 rewriter::rewrite::EQUAL_ITE_SAME=30 rewriter::rewrite::EQUAL_SPECIAL_CONST=5 rewriter::rewrite::EQUAL_TRUE=10 rewriter::rewrite::ITE_EVAL=13 rewriter::rewrite::NORMALIZE_COMM=642 rewriter::rewrite::NOT_EQUAL_BV1_BOOL=37 rewriter::rewrite::NOT_EVAL=2 rewriter::rewrite::NOT_NOT=68 rewriter::rewrite::OR_ELIM=68 solver::abstract::num_checks=2 solver::abstract::terms::total=0 solver::abstract::time_check=0ms solver::array::equalities=0 solver::array::num_checks=0 solver::array::propagations=0 solver::array::propagations_down=0 solver::array::propagations_up=0 solver::array::selects=0 solver::array::time_check=0ms solver::bv::bitblast::aig::num_ands=69847 solver::bv::bitblast::aig::num_consts=480 solver::bv::bitblast::aig::num_shared=46675 solver::bv::bitblast::aig::time_bitblast=12ms solver::bv::bitblast::cnf::num_clauses=169105 solver::bv::bitblast::cnf::num_literals=413625 solver::bv::bitblast::cnf::num_vars=54368 solver::bv::bitblast::cnf::time_encode=54ms solver::bv::bitblast::sat::time_solve=110ms solver::bv::num_assertions=61 solver::bv::num_checks=2 solver::bv::time_check=164ms solver::engine::lemmas::abstr=0 solver::engine::lemmas::array=0 solver::engine::lemmas::fp=0 solver::engine::lemmas::fun=0 solver::engine::lemmas::quant=0 solver::engine::lemmas::total=0 solver::engine::time_register_term=0ms solver::engine::time_solve=178ms solver::fun::num_checks=2 solver::fun::time_check=0ms solver::quant::mbqi_checks=0 solver::quant::num_lemma_iterations=0 solver::quant::num_lemmas=0 solver::quant::time_check=0ms solver::quant::time_mbqi=0ms solver::quant::time_process=0ms solving_context::max_memory=116678656 solving_context::time_ensure_model=0ms solving_context::time_solve=195ms
+SAT
+Extract initialization: param=v0, value=-3
+Extract initialization: param=v0, value=-3
+Extract initialization: param=v0, value=-3
+Extract initialization: param=v0, value=-3
+Extract initialization: param=v0, value=1073741825
+Extract initialization: param=v1, value=-3
+Extract initialization: param=v2, value=-3
+Extract initialization: param=v2, value=-3
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v2, value=-2
+Extract initialization: param=v2, value=-3
+Extract initialization: param=v2, value=-1
+Extract initialization: param=v3, value=-234881023
+Extract initialization: param=v4, value=-4
+Extract initialization: param=v5, value=-1
+Extract finalization: param=v0, value=-3
+Extract finalization: param=v0, value=-3
+Extract finalization: param=v0, value=-3
+Extract finalization: param=v0, value=-2
+Extract finalization: param=v0, value=1073741825
+Extract finalization: param=v1, value=0
+Extract finalization: param=v2, value=-3
+Extract finalization: param=v2, value=-3
+Extract finalization: param=v2, value=-1
+Extract finalization: param=v2, value=-2
+Extract finalization: param=v2, value=-3
+Extract finalization: param=v2, value=-3
+Extract finalization: param=v3, value=-2
+Extract finalization: param=v4, value=1
+Extract finalization: param=v5, value=2

@@ -1,0 +1,85 @@
+(struct func_0g6z1t_138_S0 ((f0 i32)))
+(fun func_0g6z1t_138 i32 ((par v0 i32) (par v1 i32) (par v2 i32[3]) (par v3 i32) (par v4 i32) (par v5 i32[1]))
+  (loc v6 #-1 i32)
+  (loc v7 #-1 func_0g6z1t_138_S0)
+  (bbl BB0 
+    (asn v5[#0] (eadd (rem #-1 v7[f0]) (sub #-1 v6) (cst #-1)))
+    (asn v7[f0] (eadd (add #-1 v4) (div #-1 v6) (cst #-1)))
+    (brh BB4 BB13 (ltz (eadd (mul #-1 v5[#0]) (rem #-1 v7[f0]) (add #-1 v4) (cst #2147483647))))
+  )
+  (bbl BB1 
+    (asn v7[f0] (eadd (mul #-159740169 v7[f0]) (div #-1880810013 v4) (cst #-597810231)))
+    (asn v0 (esub (sub #1413727092 v0) (add #1166954689 v4) (cst #-347083252)))
+    (brh BB5 BB14 (gtz (esub (rem #-1930686593 v7[f0]) (div #601305874 v0) (rem #1025788450 v3) (cst #-45534280))))
+  )
+  (bbl BB2 
+    (asn v5[#0] (esub (sub #-1223803661 v0) (add #-1044934969 v3) (cst #239672570)))
+    (asn v6 (esub (sub #1611411183 v5[#0]) (add #-596526828 v0) (cst #-1605595270)))
+    (brh BB5 BB7 (gtz (eadd (div #-1237452095 v5[#0]) (rem #-675585988 v6) (add #1057384664 v0) (cst #-368588133))))
+  )
+  (bbl BB3 
+    (asn v2[#2] (esub (rem #1676313495 v6) (sub #877233062 v0) (cst #-1183829716)))
+    (asn v0 (esub (rem #-480863795 v4) (mul #360176130 v0) (cst #1013589053)))
+    (brh BB1 BB2 (gtz (esub (mul #1418930220 v2[#2]) (mul #1980045661 v0) (sub #-200674528 v3) (cst #372711092))))
+  )
+  (bbl BB4 
+    (asn v7[f0] (eadd (rem #-138677274 v6) (sub #2018361995 v0) (cst #-1040738128)))
+    (asn v0 (eadd (rem #796874640 v6) (mul #50613297 v5[#0]) (cst #-498045451)))
+    (brh BB1 BB2 (ltz (esub (sub #-942176204 v7[f0]) (div #845727011 v0) (add #-2124644330 v4) (cst #510676007))))
+  )
+  (bbl BB5 
+    (asn v3 (esub (div #1285782341 v6) (rem #369263534 v7[f0]) (cst #-1123824707)))
+    (asn v5[#0] (esub (sub #51669021 v2[#2]) (add #1324840651 v3) (cst #1220451236)))
+    (brh BB1 BB6 (eqz (esub (mul #203059057 v3) (rem #2107621933 v5[#0]) (sub #-996901553 v7[f0]) (cst #1507957751))))
+  )
+  (bbl BB6 
+    (asn v2[#2] (esub (sub #-1936770509 v2[#2]) (rem #1102188275 v4) (cst #-1136953676)))
+    (asn v3 (esub (sub #1522367469 v4) (div #-1033693728 v1) (cst #-384951314)))
+    (brh BB8 BB9 (ltz (eadd (rem #755022585 v2[#2]) (sub #-132896665 v3) (rem #-56281173 v4) (cst #1278235746))))
+  )
+  (bbl BB7 
+    (asn v5[#0] (esub (rem #1890707675 v7[f0]) (mul #-1188481006 v2[#2]) (cst #1408552321)))
+    (asn v2[#2] (esub (add #731860972 v2[#2]) (mul #-653545237 v1) (cst #-1545368978)))
+    (brh BB9 BB12 (eqz (esub (div #2020147400 v5[#0]) (add #-1348303680 v2[#2]) (div #-870909081 v6) (cst #-1533950689))))
+  )
+  (bbl BB8 
+    (asn v1 (eadd (add #-1 v1) (add #-1 v6) (cst #-1)))
+    (asn v5[#0] (eadd (rem #-1 v5[#0]) (sub #-1 v1) (cst #-1)))
+    (brh BB9 BB12 (gtz (eadd (mul #-1 v1) (sub #-1 v5[#0]) (add #-1 v6) (cst #-1))))
+  )
+  (bbl BB9 
+    (asn v5[#0] (esub (sub #-1186913355 v6) (div #1091649883 v0) (cst #-686097312)))
+    (asn v4 (esub (div #-263323038 v6) (add #1107805361 v0) (cst #372029507)))
+    (goto BB11)
+  )
+  (bbl BB10 
+    (asn v7[f0] (esub (rem #-1 v6) (add #-1 v5[#0]) (cst #-1)))
+    (asn v4 (eadd (sub #-1 v6) (rem #-1 v4) (cst #-1)))
+    (brh BB3 BB14 (gtz (esub (mul #-1 v7[f0]) (rem #-1 v4) (add #-1 v2[#2]) (cst #2147483647))))
+  )
+  (bbl BB11 
+    (asn v6 (eadd (mul #0 v6) (cst #1)))
+    (asn v5[#0] (eadd (mul #0 v5[#0]) (cst #1)))
+    (asn v5[#0] (eadd (mul #0 v5[#0]) (cst #1)))
+    (asn v1 (eadd (mul #0 v1) (cst #-2147483648)))
+    (asn v4 (esub (rem #1 v6) (div #1 v5[#0]) (cst #-2147483647)))
+    (asn v3 (eadd (sub #-2 v5[#0]) (add #1 v1) (cst #2)))
+    (brh BB8 BB9 (eqz (eadd (mul #1 v4) (rem #1 v3) (mul #0 v2[#2]) (cst #-2))))
+  )
+  (bbl BB12 
+    (asn v5[#0] (esub (rem #-1 v4) (rem #-1 v3) (cst #-3)))
+    (asn v7[f0] (esub (add #-1 v2[#2]) (add #-1 v3) (cst #-1)))
+    (goto BB10)
+  )
+  (bbl BB13 
+    (asn v5[#0] (esub (div #-1 v1) (div #-1 v7[f0]) (cst #2)))
+    (asn v3 (esub (sub #-4 v7[f0]) (sub #-1 v6) (cst #-1)))
+    (goto BB8)
+  )
+  (bbl BB14 
+    (asn v6 (esub (add #-1 v1) (sub #-1 v2[#2]) (cst #-7)))
+    (asn v3 (esub (add #-1 v1) (rem #-1 v3) (cst #-5)))
+    (ret)
+  )
+)
+
