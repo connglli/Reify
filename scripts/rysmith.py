@@ -50,9 +50,6 @@ def generate(opts: FuncGenOptions, *, timeout: int):
 def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int):
   if fopts.seed >= 0:
     random.seed(fopts.seed)
-    next_seed = lambda: random.randint(0, 2147483647)
-  else:
-    next_seed = lambda: None
   print(
     f"UUID={fopts.uuid}, output={fopts.outdir}, "
     f"limit={limit if limit != 0 else '<INF>'}, "
@@ -64,7 +61,7 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
   fopts.sno = 0
   while limit == 0 or fopts.sno < limit:
     print(f"[{fopts.sno}]: Generate ...", end=" ", flush=True)
-    fopts.seed = next_seed()
+    fopts.seed = random.randint(0, 2147483647)
     succ, elapsed = generate(fopts, timeout=timeout)
     if succ:
       print(f"SUCC (time={elapsed}s)")
