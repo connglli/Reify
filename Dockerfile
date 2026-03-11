@@ -31,11 +31,11 @@ RUN export DEBIAN_FRONTEND=noninteractive \
   && apt autoremove -y && apt clean -y \
   && rm -rf /var/lib/apt/lists/* \
   # Install GCC
-  && chmod +x /reify/eval_scripts/install-gcc.sh \
-  && /reify/eval_scripts/install-gcc.sh \
+  && chmod +x /reify/install/install-gcc.sh \
+  && /reify/install/install-gcc.sh \
   # Install Bitwuzla
-  && chmod +x /reify/eval_scripts/install-bitwuzla.sh \
-  && /reify/eval_scripts/install-bitwuzla.sh \
+  && chmod +x /reify/install/install-bitwuzla.sh \
+  && /reify/install/install-bitwuzla.sh \
   # Cleanup
   && rm -rf /reify/.git \
   && rm -rf /reify/.gitignore \
