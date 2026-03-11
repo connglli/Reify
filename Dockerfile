@@ -31,19 +31,14 @@ RUN export DEBIAN_FRONTEND=noninteractive \
   && apt autoremove -y && apt clean -y \
   && rm -rf /var/lib/apt/lists/* \
   # Install GCC
-  && chmod +x /reify/install-gcc.sh \
-  && /reify/install-gcc.sh \
+  && chmod +x /reify/eval_scripts/install-gcc.sh \
+  && /reify/eval_scripts/install-gcc.sh \
   # Install Bitwuzla
-  && chmod +x /reify/install-bitwuzla.sh \
-  && /reify/install-bitwuzla.sh \
+  && chmod +x /reify/eval_scripts/install-bitwuzla.sh \
+  && /reify/eval_scripts/install-bitwuzla.sh \
   # Cleanup
   && rm -rf /reify/.git \
   && rm -rf /reify/.gitignore \
-  && rm -rf /reify/.vscode \
-  && rm -rf /reify/AGENTS.md \
-  && rm -rf /reify/TODO \
-  && rm -rf /reify/build-pldi26ae-image.sh \
-  && rm -rf /reify/install-gcc.sh \
-  && rm -rf /reify/install-bitwuzla.sh
+  && rm -rf /reify/.vscode
 
 ENTRYPOINT ["bash"]
