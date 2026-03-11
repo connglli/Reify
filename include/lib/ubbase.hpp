@@ -72,6 +72,11 @@ protected:
   // Create a coefficient expression for the given name
   bitwuzla::Term CreateCoefExpr(const symir::Coef &coef);
 
+  // Check if a coef is managed by our term manager
+  bool IsCoefManaged(const symir::Coef &coef) {
+    return coefTerms.find(coef.GetName()) != coefTerms.end();
+  }
+
   // Push an expression to the expression stack
   void pushExpression(bitwuzla::Term expr) { exprStack.push(std::move(expr)); }
 

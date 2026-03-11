@@ -77,6 +77,7 @@ public:
   using UBVisitorBase::CreateVecElExpr;
   using UBVisitorBase::GetStructFieldName;
   using UBVisitorBase::GetVecElName;
+  using UBVisitorBase::IsCoefManaged;
 
 protected:
   // Expose base class push/pop expression methods
@@ -114,6 +115,8 @@ private:
     static int counter = 0;
     return "__intubinj_blk" + label + "_coefval" + std::to_string(counter++);
   }
+
+  void makeCoefsInteresting(const std::vector<symir::Coef *> &coefs);
 
 private:
   std::unique_ptr<bitwuzla::Bitwuzla> solver; // The solver for checking the constraints

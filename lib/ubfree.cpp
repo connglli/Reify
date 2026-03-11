@@ -716,7 +716,5 @@ void UBSan::makeCoefsInteresting(const std::vector<symir::Coef *> &coefs) {
   for (auto c: coefs) {
     exprs.push_back(CreateCoefExpr(*c));
   }
-  // Allow at most 1 zero coefficient to prevent all-zero expressions
-  // (which can cause division by zero or infinite loops)
-  addConstraint(AtMostKZeroes(*tm, exprs, std::min(1, static_cast<int>(coefs.size()) / 3)));
+  addConstraint(AtMostKZeroes(*tm, exprs, static_cast<int>(coefs.size()) / 2));
 }

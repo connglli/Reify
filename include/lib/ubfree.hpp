@@ -108,6 +108,7 @@ public:
   using UBVisitorBase::CreateVersionedExpr;
   using UBVisitorBase::GetStructFieldName;
   using UBVisitorBase::GetVecElName;
+  using UBVisitorBase::IsCoefManaged;
 
   // Generate constraints for making the initialization interesting
   void MakeInitInteresting();

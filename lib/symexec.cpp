@@ -303,8 +303,14 @@ bool SymExec::solve(
     }
   }
   // Extract the initialisation and finalisation values from the model
-  inits.push_back(extractParamsFromModel(0));
-  finas.push_back(extractParamsFromModel(-1));
+  auto randDefaultArgs =
+      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
+  std::vector<int> defaultArgs;
+  for (size_t i = 0; i < fun->GetParams().size(); i++) {
+    defaultArgs.push_back(randDefaultArgs());
+  }
+  inits.push_back(extractParamsFromModel(0, defaultArgs));
+  finas.push_back(extractParamsFromModel(-1, defaultArgs));
 
   return true;
 }
@@ -314,26 +320,31 @@ void SymExec::extractSymbolsFromModel() {
     if (symbol->IsSolved()) {
       continue;
     }
-    const auto symName = symbol->GetName().c_str();
+
+    const auto symName = symbol->GetName();
+    if (!ubSan->IsCoefManaged(*dynamic_cast<symir::Coef *>(symbol))) {
+      Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=<unresolved>" << std::endl;
+      continue;
+    }
+
     // Currently, we only support coefficients
     const auto symKey = ubSan->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol));
-
     bitwuzla::Term symValue = solver->get_value(symKey);
     std::string binaryStr = symValue.value<std::string>(2);
     // Convert binary string to signed integer (32-bit)
+    Assert(!binaryStr.empty(), "The symbol value of symbol %s is empty", symName.c_str());
     int32_t symVal = 0;
-    if (!binaryStr.empty()) {
-      // Parse as unsigned first, then reinterpret as signed
-      uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
-      uint32_t u32 = static_cast<uint32_t>(unsigned_val);
-      std::memcpy(&symVal, &u32, sizeof(int32_t));
-    }
+    // Parse as unsigned first, then reinterpret as signed
+    uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+    uint32_t u32 = static_cast<uint32_t>(unsigned_val);
+    std::memcpy(&symVal, &u32, sizeof(int32_t));
     symbol->SetValue(std::to_string(symVal));
     Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
   }
 }
 
-std::vector<ArgPlus<int>> SymExec::extractParamsFromModel(int version) {
+std::vector<ArgPlus<int>>
+SymExec::extractParamsFromModel(int version, const std::vector<int> &defaults) {
   Assert(version == 0 || version == -1, "Version must be 0 (init) or -1 (fina)");
   const auto verTag = version == 0 ? "initialization" : "finalization";
   std::vector<ArgPlus<int>> args;
@@ -399,7 +410,9 @@ std::vector<ArgPlus<int>> SymExec::extractParamsFromModel(int version) {
     }
   };
 
+  int index = -1;
   for (auto param: fun->GetParams()) {
+    index += 1;
     const auto paramName = param->GetName().c_str();
     args.push_back(createSchema(
         param->GetBaseType(),
@@ -419,7 +432,7 @@ std::vector<ArgPlus<int>> SymExec::extractParamsFromModel(int version) {
       bitwuzla::Term paramValue = solver->get_value(paramKey);
       std::string binaryStr = paramValue.value<std::string>(2);
       // Convert binary string to signed integer (32-bit)
-      int32_t paramVal = 0;
+      int32_t paramVal = defaults[index];
       if (!binaryStr.empty()) {
         // Parse as unsigned first, then reinterpret as signed
         uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);

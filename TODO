@@ -1,5 +1,4 @@
 C/C++:
-1. there're too many 0s, 1s, -1s, and MIN/MAX as coefficients
 2. the path sampling often leads to path with only 1 loop iteration.
 4. support more conditions and bitwise ops
 5. use yingwei/ubi and yingwei/csmith

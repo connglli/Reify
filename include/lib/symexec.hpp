@@ -90,7 +90,7 @@ private:
   void extractSymbolsFromModel();
 
   /// Extract the solved value of the parameters from the model for the given version
-  std::vector<ArgPlus<int>> extractParamsFromModel(int version);
+  std::vector<ArgPlus<int>> extractParamsFromModel(int version, const std::vector<int> &defaults);
 
   // Insert undefined behaviors into unexecuted basic blocks
   void insertUBsIntoUnexecutedBbls();
