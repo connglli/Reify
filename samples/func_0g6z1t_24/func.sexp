@@ -1,0 +1,108 @@
+(fun func_0g6z1t_24 i32 ((par v0 i32[2]) (par v1 i32) (par v2 i32) (par v3 i32) (par v4 i32) (par v5 i32[3][1]))
+  (loc v6 #-42 i32)
+  (loc v7 #-1 i32)
+  (bbl BB0 
+    (asn v0[#1] (esub (sub #939524096 v7) (add #-134217684 v6) (cst #-256)))
+    (asn v3 (esub (rem #-830472188 v2) (sub #8388863 v0[#1]) (cst #-1006632960)))
+    (goto BB2)
+  )
+  (bbl BB1 
+    (asn v5[#2][#0] (esub (mul #-1588007141 v0[#1]) (div #712642251 v7) (cst #-1522824122)))
+    (asn v4 (eadd (div #679631831 v4) (sub #739017065 v7) (cst #902325339)))
+    (brh BB10 BB12 (ltz (eadd (add #-1205136781 v5[#2][#0]) (add #-2033086670 v4) (rem #-977472865 v1) (cst #1919683417))))
+  )
+  (bbl BB2 
+    (asn v0[#1] (esub (div #2046820339 v1) (add #1543503876 v5[#2][#0]) (cst #335544326)))
+    (asn v7 (eadd (rem #1409286144 v6) (sub #167045619 v0[#1]) (cst #726519)))
+    (brh BB9 BB10 (ltz (esub (div #-318767095 v0[#1]) (sub #2147483392 v7) (sub #-2147483392 v4) (cst #2147483392))))
+  )
+  (bbl BB3 
+    (asn v7 (esub (add #-1241513414 v3) (sub #1073741870 v1) (cst #-536870648)))
+    (asn v5[#2][#0] (esub (div #2147483137 v1) (sub #-1979711510 v0[#1]) (cst #-448)))
+    (brh BB10 BB18 (ltz (eadd (sub #-536870205 v7) (rem #-445 v5[#2][#0]) (add #1 v1) (cst #1))))
+  )
+  (bbl BB4 
+    (asn v4 (esub (add #885112094 v0[#1]) (sub #989308483 v1) (cst #726473434)))
+    (asn v1 (esub (add #-438014955 v5[#2][#0]) (add #-454126388 v7) (cst #-1364888076)))
+    (brh BB7 BB10 (eqz (eadd (sub #461854904 v4) (add #441344971 v1) (add #1955723377 v5[#2][#0]) (cst #1963148934))))
+  )
+  (bbl BB5 
+    (asn v6 (esub (sub #-1299368707 v0[#1]) (div #37271724 v7) (cst #-354079416)))
+    (asn v0[#1] (eadd (rem #717706537 v1) (mul #-1782230726 v4) (cst #-1685747381)))
+    (brh BB3 BB10 (gtz (esub (add #-1984349514 v6) (mul #-490742404 v0[#1]) (div #-1210722531 v2) (cst #1496626948))))
+  )
+  (bbl BB6 
+    (asn v4 (eadd (div #-561287308 v0[#1]) (add #480205699 v1) (cst #-1350345233)))
+    (asn v2 (eadd (div #-1776370266 v3) (rem #-1487368722 v5[#2][#0]) (cst #923446059)))
+    (brh BB5 BB7 (eqz (esub (sub #2030508149 v4) (div #-2079464885 v2) (mul #1914471940 v0[#1]) (cst #-913051675))))
+  )
+  (bbl BB7 
+    (asn v0[#1] (esub (div #1685836807 v6) (div #-2035824270 v4) (cst #-93797970)))
+    (asn v6 (esub (div #-29428612 v4) (mul #-533329172 v6) (cst #-885271240)))
+    (brh BB8 BB10 (gtz (esub (mul #1907512664 v0[#1]) (rem #-3457457 v6) (div #-7889920 v5[#2][#0]) (cst #-1017506203))))
+  )
+  (bbl BB8 
+    (asn v6 (esub (mul #-703593901 v7) (add #-478953937 v5[#2][#0]) (cst #-1542661178)))
+    (asn v0[#1] (eadd (sub #-1993176162 v7) (add #-1769313343 v2) (cst #-1205004413)))
+    (brh BB1 BB7 (ltz (eadd (sub #241335784 v6) (rem #1523164452 v0[#1]) (rem #1976912231 v7) (cst #-724921711))))
+  )
+  (bbl BB9 
+    (asn v1 (eadd (sub #5 v6) (div #-1207959462 v0[#1]) (cst #-41)))
+    (asn v4 (esub (mul #4070 v7) (div #1610612680 v1) (cst #-256)))
+    (brh BB3 BB17 (eqz (esub (div #3 v1) (rem #-3 v4) (mul #0 v0[#1]) (cst #0))))
+  )
+  (bbl BB10 
+    (asn v6 (eadd (mul #-154656808 v7) (div #-1998714564 v2) (cst #-1812845219)))
+    (asn v3 (esub (rem #1216024694 v7) (div #-1226940773 v6) (cst #1527906594)))
+    (brh BB2 BB9 (eqz (eadd (div #-490444688 v6) (sub #338403400 v3) (add #-642640077 v5[#2][#0]) (cst #348907935))))
+  )
+  (bbl BB11 
+    (asn v7 (esub (rem #-548445295 v0[#1]) (sub #-454774360 v2) (cst #1995977247)))
+    (asn v3 (esub (div #545223853 v0[#1]) (div #-1129427473 v7) (cst #-728355155)))
+    (brh BB17 BB18 (ltz (esub (mul #-1647483677 v7) (mul #1764183891 v3) (rem #823443540 v6) (cst #-1282866486))))
+  )
+  (bbl BB12 
+    (asn v2 (eadd (mul #0 v2) (cst #-1)))
+    (asn v0[#1] (eadd (mul #0 v0[#1]) (cst #0)))
+    (asn v1 (eadd (mul #0 v1) (cst #-2147483648)))
+    (asn v3 (eadd (mul #0 v3) (cst #2147483646)))
+    (asn v5[#2][#0] (esub (sub #-5 v2) (mul #1 v0[#1]) (cst #0)))
+    (asn v2 (esub (mul #1 v1) (add #1 v3) (cst #0)))
+    (brh BB14 BB15 (eqz (eadd (sub #-2147483645 v5[#2][#0]) (rem #1 v2) (mul #0 v4) (cst #0))))
+  )
+  (bbl BB13 
+    (asn v0[#1] (esub (mul #11679121 v2) (mul #269569713 v1) (cst #933528092)))
+    (asn v5[#2][#0] (eadd (add #-1656312194 v1) (sub #1132341718 v6) (cst #-199652248)))
+    (goto BB15)
+  )
+  (bbl BB14 
+    (asn v4 (esub (add #532256427 v3) (sub #-851833714 v1) (cst #-1246187902)))
+    (asn v5[#2][#0] (esub (sub #-1740429185 v3) (rem #1681618502 v6) (cst #-1153962983)))
+    (goto BB13)
+  )
+  (bbl BB15 
+    (asn v6 (eadd (mul #0 v6) (cst #1)))
+    (asn v2 (eadd (mul #0 v2) (cst #2)))
+    (asn v6 (eadd (mul #0 v6) (cst #1)))
+    (asn v7 (eadd (mul #0 v7) (cst #1)))
+    (asn v2 (eadd (rem #-1 v6) (sub #-2147483647 v2) (cst #0)))
+    (asn v3 (esub (sub #-1 v6) (div #1 v7) (cst #0)))
+    (brh BB12 BB16 (gtz (esub (sub #-1 v2) (rem #-1 v3) (rem #-1 v6) (cst #2))))
+  )
+  (bbl BB16 
+    (asn v3 (eadd (rem #-2132739247 v1) (mul #648899205 v7) (cst #-1947620803)))
+    (asn v5[#2][#0] (eadd (rem #208557611 v6) (div #1413049759 v5[#2][#0]) (cst #1820843838)))
+    (brh BB4 BB17 (eqz (esub (sub #-199965765 v3) (mul #1417121799 v5[#2][#0]) (mul #-869089954 v1) (cst #-724190567))))
+  )
+  (bbl BB17 
+    (asn v5[#2][#0] (eadd (rem #-1040636331 v7) (sub #460455009 v5[#2][#0]) (cst #988302931)))
+    (asn v2 (eadd (rem #81265012 v6) (rem #-652277560 v3) (cst #438438859)))
+    (goto BB6)
+  )
+  (bbl BB18 
+    (asn v0[#1] (esub (rem #-2147483648 v6) (add #0 v2) (cst #-256)))
+    (asn v6 (eadd (rem #1073741824 v1) (sub #1241513987 v3) (cst #0)))
+    (ret)
+  )
+)
+

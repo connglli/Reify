@@ -1,0 +1,87 @@
+(fun func_0g6z1t_61 i32 ((par v0 i32) (par v1 i32) (par v2 i32) (par v3 i32) (par v4 i32) (par v5 i32))
+  (loc v6 #-1 #-1 #-1 i32[3])
+  (loc v7 #0 i32)
+  (bbl BB0 
+    (asn v4 (esub (div #-1 v6[#2]) (rem #-268435397 v1) (cst #2)))
+    (asn v7 (eadd (sub #-1 v3) (add #-1 v4) (cst #-1)))
+    (goto BB9)
+  )
+  (bbl BB1 
+    (asn v0 (eadd (add #-1 v0) (mul #-1 v7) (cst #-1)))
+    (asn v1 (eadd (mul #313 v2) (sub #-506719807 v3) (cst #2147483647)))
+    (brh BB9 BB12 (ltz (eadd (rem #-1 v0) (div #-1 v1) (rem #-1 v3) (cst #2147483647))))
+  )
+  (bbl BB2 
+    (asn v7 (eadd (mul #-907154606 v5) (rem #1410616494 v6[#2]) (cst #-1883817713)))
+    (asn v3 (esub (sub #-1506251765 v6[#2]) (add #-486013545 v7) (cst #1271690439)))
+    (brh BB9 BB11 (ltz (esub (div #1491609906 v7) (div #105262065 v3) (div #-1859559382 v2) (cst #-1230543486))))
+  )
+  (bbl BB3 
+    (asn v2 (eadd (rem #-1550508655 v4) (sub #-1734254382 v2) (cst #138880640)))
+    (asn v0 (esub (div #-1196080967 v7) (mul #-545600976 v4) (cst #-973590732)))
+    (goto BB2)
+  )
+  (bbl BB4 
+    (asn v2 (eadd (mul #-1298759183 v1) (rem #-1260764898 v2) (cst #403511718)))
+    (asn v1 (esub (rem #1479158514 v6[#2]) (rem #458026296 v1) (cst #1007429378)))
+    (brh BB6 BB12 (gtz (eadd (div #-1134999610 v2) (div #43600149 v1) (mul #-1937261524 v4) (cst #1280073355))))
+  )
+  (bbl BB5 
+    (asn v4 (eadd (mul #0 v4) (cst #1)))
+    (asn v6[#2] (eadd (mul #0 v6[#2]) (cst #1)))
+    (asn v3 (eadd (mul #0 v3) (cst #1073741824)))
+    (asn v1 (esub (rem #1 v4) (div #1 v6[#2]) (cst #0)))
+    (asn v0 (esub (div #-2147483648 v1) (mul #1 v3) (cst #0)))
+    (goto BB14)
+  )
+  (bbl BB6 
+    (asn v5 (eadd (sub #1753311873 v6[#2]) (div #373050026 v5) (cst #2135140481)))
+    (asn v7 (esub (add #1909324321 v1) (add #-28346864 v6[#2]) (cst #483338084)))
+    (brh BB2 BB7 (gtz (eadd (div #-982947398 v5) (add #-1427406273 v7) (rem #523937952 v2) (cst #475407568))))
+  )
+  (bbl BB7 
+    (asn v2 (esub (mul #1477708121 v5) (add #-194898143 v7) (cst #-4340529)))
+    (asn v5 (esub (div #145534150 v2) (mul #513313044 v1) (cst #1187253169)))
+    (brh BB9 BB11 (ltz (esub (sub #1507862770 v2) (sub #-719801684 v5) (div #-1789317313 v6[#2]) (cst #-2091641973))))
+  )
+  (bbl BB8 
+    (asn v3 (esub (add #-1518989993 v0) (add #695305251 v4) (cst #-1773113401)))
+    (asn v7 (eadd (rem #-257252948 v6[#2]) (mul #-1051934172 v4) (cst #-818155937)))
+    (goto BB3)
+  )
+  (bbl BB9 
+    (asn v5 (esub (mul #-1 v1) (add #-1342308352 v7) (cst #-1065222080)))
+    (asn v6[#2] (esub (rem #-1073741826 v7) (mul #-1 v0) (cst #-1)))
+    (brh BB10 BB11 (gtz (esub (div #-1 v5) (add #1073741821 v6[#2]) (mul #-1 v7) (cst #-1))))
+  )
+  (bbl BB10 
+    (asn v0 (esub (div #268435397 v1) (mul #-1 v7) (cst #2147483645)))
+    (asn v2 (esub (sub #-33554430 v2) (add #1057488895 v6[#2]) (cst #-521045)))
+    (brh BB1 BB13 (ltz (eadd (add #-1 v0) (rem #-5242057 v2) (div #-1 v7) (cst #-1))))
+  )
+  (bbl BB11 
+    (asn v7 (eadd (mul #0 v7) (cst #-1879048192)))
+    (asn v0 (eadd (mul #0 v0) (cst #-1744830464)))
+    (asn v0 (eadd (mul #0 v0) (cst #-1744830464)))
+    (asn v6[#2] (eadd (mul #0 v6[#2]) (cst #2)))
+    (asn v4 (eadd (add #268435456 v7) (sub #1744830464 v0) (cst #-805306368)))
+    (asn v1 (eadd (sub #-1744830465 v0) (add #2147483646 v6[#2]) (cst #-2147483648)))
+    (brh BB6 BB12 (eqz (eadd (mul #-1 v4) (div #1610612737 v1) (div #-1073741824 v6[#2]) (cst #1073741824))))
+  )
+  (bbl BB12 
+    (asn v0 (esub (mul #-1 v5) (rem #-1 v4) (cst #8388609)))
+    (asn v6[#2] (esub (add #8388604 v5) (add #-1 v7) (cst #-2147483645)))
+    (brh BB11 BB13 (eqz (eadd (rem #-1 v0) (mul #-1 v6[#2]) (rem #-2013265921 v5) (cst #-1))))
+  )
+  (bbl BB13 
+    (asn v2 (eadd (sub #-1 v6[#2]) (add #-1 v0) (cst #1)))
+    (asn v7 (eadd (div #-1 v4) (add #-1 v0) (cst #2)))
+    (brh BB1 BB14 (gtz (eadd (div #-3 v2) (mul #-1 v7) (div #-1 v1) (cst #-2))))
+  )
+  (bbl BB14 
+    (asn v7 (eadd (rem #-1 v1) (div #-1 v5) (cst #-1)))
+    (asn v1 (esub (rem #-1 v0) (mul #2 v6[#2]) (cst #2147483647)))
+    (ret)
+  )
+)
+
