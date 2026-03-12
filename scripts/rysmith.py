@@ -95,7 +95,7 @@ if __name__ == "__main__":
   parser.add_argument(
     "--seed",
     type=int,
-    default=-1,
+    default=1773315633618043270,
     help="the seed for generation (negative for truly random)",
   )
   parser.add_argument(
@@ -111,16 +111,16 @@ if __name__ == "__main__":
     help="disable using all kinds of term and expression operators",
   )
   parser.add_argument(
-    "--disable-injubs",
+    "--enable-injubs",
     action="store_true",
     default=False,
-    help="disable injecting UBs into unexecuted basic blocks",
+    help="enable injecting UBs into unexecuted basic blocks",
   )
   parser.add_argument(
-    "--disable-shuffle",
+    "--enable-shuffle",
     action="store_true",
     default=False,
-    help="disable shuffling recommended configurations",
+    help="enable shuffling recommended configurations",
   )
   parser.add_argument(
     "--check",
@@ -131,21 +131,11 @@ if __name__ == "__main__":
   parser.add_argument(
     "--timeout",
     type=int,
-    # Our experiences are that in the default settings of rysmith, if a program cannot
-    # be generated within 3 seconds, then it won't be generated even given 15 seconds.
-    # Thus, using 3s significantly improves the throughput of us.
     default=3,
     help="timeout (in seconds) for generating a function",
   )
-  parser.add_argument("--extra", type=str, default=None, help="extra options passed to rysmith")
 
   args = parser.parse_args()
-
-  # Set default Bitwuzla threads if not specified
-  if "--Xbitwuzla-threads" in (args.extra or ""):
-    extra_opts = args.extra
-  else:
-    extra_opts = (args.extra or "") + f" --Xbitwuzla-threads {os.cpu_count()}"
 
   outdir = Path(args.output).resolve().absolute()
   run_gen_loop(
@@ -159,12 +149,12 @@ if __name__ == "__main__":
       main=True,
       sexp=not args.disable_sexp,
       allops=not args.disable_allops,
-      injubs=not args.disable_injubs,
+      injubs=args.enable_injubs,
       seed=args.seed if args.seed >= 0 else time.time_ns(),
-      extra=extra_opts,
+      extra=f'--Xbitwuzla-threads {os.cpu_count()} --Xdisable-struct-vars --Xarray-var-proba 0.01',
     ),
     limit=args.limit,
-    shuffle=not args.disable_shuffle,
+    shuffle=args.enable_shuffle,
     check=args.check,
     timeout=args.timeout,
   )

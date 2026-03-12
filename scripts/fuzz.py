@@ -66,6 +66,7 @@ FuncGenConfig = namedtuple(
 
 # List of suggested function generation configurations
 FGEN_SUGGESTED_CONFIGS: List[FuncGenConfig] = [
+  FuncGenConfig(10, 8, 1, 2, 4),
   FuncGenConfig(15, 8, 2, 2, 3),
   FuncGenConfig(15, 8, 2, 2, 4),
   FuncGenConfig(15, 8, 3, 2, 4),
