@@ -47,7 +47,7 @@ def generate(opts: FuncGenOptions, *, timeout: int):
   return True, ed_time - st_time
 
 
-def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int):
+def run_gen_loop(fopts: FuncGenOptions, *, limit: int, shuffle: bool, check: bool, timeout: int):
   assert fopts.seed >= 0, "No randomness seed is given for running the generation loop"
   random.seed(fopts.seed)
   print(
@@ -55,13 +55,15 @@ def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int
     f"limit={limit if limit != 0 else '<INF>'}, "
     f"seed={fopts.seed if fopts.seed >= 0 else '<RND>'}, "
     f"sexp={fopts.sexp}, main={fopts.main}, allops={fopts.allops}, injubs={fopts.injubs}, "
-    f"check={check}, timeout={timeout}s, "
+    f"shuffle={shuffle}, check={check}, timeout={timeout}s, "
     f"extra={"'" + fopts.extra + "'" if fopts.extra else '<NONE>'}"
   )
   fopts.sno = 0
   while limit == 0 or fopts.sno < limit:
     print(f"[{fopts.sno}]: Generate ...", end=" ", flush=True)
     fopts.seed = random.randint(0, 2147483647)
+    if shuffle:
+      fopts.config = random.choice(FGEN_SUGGESTED_CONFIGS)
     succ, elapsed = generate(fopts, timeout=timeout)
     if succ:
       print(f"SUCC (time={elapsed}s)")
@@ -115,6 +117,12 @@ if __name__ == "__main__":
     help="disable injecting UBs into unexecuted basic blocks",
   )
   parser.add_argument(
+    "--disable-shuffle",
+    action="store_true",
+    default=False,
+    help="disable shuffling recommended configurations",
+  )
+  parser.add_argument(
     "--check",
     action="store_true",
     default=False,
@@ -156,6 +164,7 @@ if __name__ == "__main__":
       extra=extra_opts,
     ),
     limit=args.limit,
+    shuffle=not args.disable_shuffle,
     check=args.check,
     timeout=args.timeout,
   )
