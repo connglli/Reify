@@ -154,9 +154,9 @@ def generate_function(
         "generation failed: generated tests are uin valid (missing files)",
       )
   except CalledProcessError as e:
-    result = None, (f"exit with {e.returncode}, message: {e.stdout or '<no output>'}")
+    result = None, (f"exitcode: {e.returncode}; message: {e.stdout or '<no output>'}")
   except TimeoutExpired:
-    result = None, f"generation timeout: exceeding {timeout}s"
+    result = None, f"timeout"
   except Exception as e:
     result = None, f"unexpected error: {e}"
   if result[0] is None:
