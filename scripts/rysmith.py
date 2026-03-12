@@ -112,7 +112,7 @@ if __name__ == "__main__":
     "--disable-injubs",
     action="store_true",
     default=False,
-    help="disable using all kinds of term and expression operators",
+    help="disable injecting UBs into unexecuted basic blocks",
   )
   parser.add_argument(
     "--check",
