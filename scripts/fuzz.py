@@ -26,6 +26,7 @@
 import datetime
 import enum
 import json
+import os
 import random
 import re
 import shlex
@@ -588,7 +589,7 @@ class Worker:
       sno=0,
       outdir=self.wconf.wdir,
       config=FGEN_SUGGESTED_CONFIGS[0],
-      extra="--Xinject-ub-proba 0.1",
+      extra=f"--Xinject-ub-proba 0.1 --Xenable-volatile-vars --Xvolatile-var-proba 0.01 --Xbitwuzla-threads {os.cpu_count()}",
     )
     popts = ProgGenOptions(
       bin="./build/bin/rylink",
@@ -596,7 +597,7 @@ class Worker:
       indir=self.wconf.wdir,
       limit=self.wconf.prog_limit,
       config=PGEN_SUGGESTED_CONFIGS[0],
-      extra="--Xreplace-proba 0.4",
+      extra="--Xreplace-proba 0.3",
     )
     start_msg = (
       f"Worker started successfully: workdir={self.wconf.wdir}, "
