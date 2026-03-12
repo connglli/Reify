@@ -42,14 +42,14 @@ def generate(opts: FuncGenOptions, *, timeout: int):
   arts, errmsg = generate_function(opts, timeout=timeout)
   ed_time = time.time()
   if arts is None:
-    print(f"GEN ERROR (.): {errmsg or '<no output>'}")
+    print(f"FAIL ({errmsg or '<no output>'})")
     return False, None
   return True, ed_time - st_time
 
 
 def run_gen_loop(fopts: FuncGenOptions, *, limit: int, check: bool, timeout: int):
-  if fopts.seed >= 0:
-    random.seed(fopts.seed)
+  assert fopts.seed >= 0, "No randomness seed is given for running the generation loop"
+  random.seed(fopts.seed)
   print(
     f"UUID={fopts.uuid}, output={fopts.outdir}, "
     f"limit={limit if limit != 0 else '<INF>'}, "
@@ -152,7 +152,7 @@ if __name__ == "__main__":
       sexp=not args.disable_sexp,
       allops=not args.disable_allops,
       injubs=not args.disable_injubs,
-      seed=args.seed,
+      seed=args.seed if args.seed >= 0 else time.time_ns(),
       extra=extra_opts,
     ),
     limit=args.limit,
