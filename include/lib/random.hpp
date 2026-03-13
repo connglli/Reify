@@ -51,6 +51,15 @@ public:
     };
   }
 
+  template<typename Int = int>
+  [[nodiscard]] std::function<Int()> Binomial(Int n, double p = 0.5) {
+    auto dist = std::binomial_distribution<Int>(n, p);
+    return [dist, this]() mutable -> Int {
+      Int x = dist(this->rng);
+      return x;
+    };
+  }
+
   template<typename Real = double>
   [[nodiscard]] std::function<Real()> UniformReal(Real min = 0., Real max = 1.) {
     auto dist = std::uniform_real_distribution<Real>(min, max);
