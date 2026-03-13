@@ -56,13 +56,20 @@ protected:
 	void markMutated(symir::Coef *c);
 };
 
-class LiteralFCallStrategy : FCallStrategy {
+class LiteralFCallStrategy : public FCallStrategy {
+public:
+	explicit LiteralFCallStrategy():
+		FCallStrategy() {};
 	std::vector<symir::Block *> generatePreamble() override;
 	std::vector<symir::Block *> generatePostamble() override;
 	std::string generateCall() override;
 };
 
-class RandomFCallEmbedder : FCallEmbedder {
+class RandomFCallEmbedder : public FCallEmbedder {
+public:
+	explicit RandomFCallEmbedder(symir::Funct *const host):
+		FCallEmbedder(host) {};
+private:
 	void Visit(const symir::VarUse &v) override;
 	void Visit(const symir::Coef &c) override;
 	void Visit(const symir::Term &t) override;
