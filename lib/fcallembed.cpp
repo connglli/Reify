@@ -1,5 +1,6 @@
 #include "lib/chksum.hpp"
 #include "lib/lang.hpp"
+#include <iostream>
 #include <sstream>
 #include <string>
 #include "lib/fcallembed.hpp"
@@ -42,6 +43,11 @@ bool FCallEmbedder::embedGuest(
 	const std::vector<ArgPlus<int>> *init,
 	const std::vector<ArgPlus<int>> *fina
 ) {
+	Assert(this->callGenStrategy, "No embedding strategy choosen");
+	Assert(guest, "No valid guest to embed");
+	Assert(init, "No valid init to embed");
+	Assert(fina, "No valid fina to embed");
+
 	this->callGenStrategy->initialize(guest, init, fina);
 	this->succeeded = false;
 	this->host->Accept(*this);
@@ -77,10 +83,9 @@ std::vector<symir::Block *> LiteralFCallStrategy::generatePostamble() {
 	return {};
 }
 std::string LiteralFCallStrategy::generateCall() {
-	Assert(
-		this->guest && this->init && this->fina && this->coefVal,
-		"FCallStrategy is not properly initialized"
-	);
+	Assert(this->guest, "guest is not initialized");
+	Assert(this->init, "init is not initialized");
+	Assert(this->fina, "fina is not initialized");
 
 	int32_t checksum = StatelessChecksum::Compute(*this->fina);
 	std::ostringstream fcall;
