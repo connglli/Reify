@@ -540,6 +540,38 @@ def test_compiler_diffopt(cc: str, test_dir: Path, out_file: Path, timeout: int)
   return TestRes(f"{res1.cmd}\n{res2.cmd}", TestRes.Type.SUC, exitcode=0, errmsg=res1.errmsg)
 
 
+def test_compiler_diffcc(
+  cc: str, ref_cc: str, test_dir: Path, out_file: Path, timeout: int
+) -> TestRes:
+  """
+  Perform differential testing between the compiler under test `cc` and a reference compiler `ref_cc`.
+  """
+  # Test with the compiler under test
+  res1 = test_compiler(cc, test_dir, out_file.with_suffix(".cc"), timeout)
+  if not res1.is_success():
+    return res1
+
+  # Test with the reference compiler
+  res2 = test_compiler(ref_cc, test_dir, out_file.with_suffix(".ref"), timeout)
+  if not res2.is_success():
+    return res2
+
+  # Compare the results
+  if res1.exitcode != res2.exitcode or res1.errmsg != res2.errmsg:
+    return TestRes(
+      f"{res1.cmd}\n{res2.cmd}",
+      TestRes.Type.WRC,
+      exitcode=res1.exitcode,
+      errmsg=(
+        f"Differential testing failed: compiler under test and reference compiler produced different results\n"
+        f"[CC ] exitcode={res1.exitcode}, output={res1.errmsg}\n"
+        f"[REF] exitcode={res2.exitcode}, output={res2.errmsg}"
+      ),
+    )
+
+  return TestRes(f"{res1.cmd}\n{res2.cmd}", TestRes.Type.SUC, exitcode=0, errmsg=res1.errmsg)
+
+
 # -==========================================================
 # Fuzzing worker to generate programs and test compilers
 # -==========================================================
@@ -551,6 +583,7 @@ class WorkerConf:
   wdir: Path  # Working directory for the worker
   switch_limit: int  # Number of functions before switching to program generation
   prog_limit: int  # Limit for the number of generated programs per switch
+  ref_cc: Optional[str] = None  # Reference compiler command for differential testing
   diff_opt: bool = False  # Whether to enable differential testing over optimization levels
   cflag_pool: Optional[List[str]] = None  # Pool of compiler flags for swarm testing
 
@@ -678,22 +711,21 @@ class Worker:
       picked = random.sample(self.wconf.cflag_pool, min(num_flags, len(self.wconf.cflag_pool)))
       # Only add the picked flags that are not already in the compiler command
       extra_cc_opts = " ".join([s for s in picked if s not in self.wconf.cc]).strip()
-    self.log(f"Testing compiler: {self.wconf.cc} {extra_cc_opts}")
-    if self.wconf.diff_opt:
-      self.log("Using differential testing over optimization levels")
-      test_res = test_compiler_diffopt(
-        f"{self.wconf.cc} {extra_cc_opts}",
-        test_dir=test_dir,
-        out_file=binary,
-        timeout=timeout,
-      )
+
+    cc = f"{self.wconf.cc} {extra_cc_opts}".strip()
+    self.log(f"Testing compiler: {cc}")
+
+    test_res = None
+    if not self.wconf.diff_opt and not self.wconf.ref_cc:
+      test_res = test_compiler(cc, test_dir, binary, timeout)
     else:
-      test_res = test_compiler(
-        f"{self.wconf.cc} {extra_cc_opts}",
-        test_dir=test_dir,
-        out_file=binary,
-        timeout=timeout,
-      )
+      if self.wconf.diff_opt:
+        self.log("+ Using differential testing over optimization levels")
+        test_res = test_compiler_diffopt(cc, test_dir, binary, timeout)
+      if (not test_res or test_res.is_success()) and self.wconf.ref_cc:
+        self.log("+ Using differential testing against reference compiler")
+        test_res = test_compiler_diffcc(cc, self.wconf.ref_cc, test_dir, binary, timeout)
+
     if test_res.is_internal_compiler_error():
       self.log(
         f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}",
@@ -710,7 +742,7 @@ class Worker:
       self.log(f"The generated program timed out (skip): {test_res.errmsg}")
       shutil.rmtree(test_dir, ignore_errors=True)
     elif test_res.is_success():
-      self.log("Compiler passed the test")
+      self.log("Compiler passed the test(s)")
     elif test_res.is_invalid_compiler_command():
       self.log(
         f"INVALID COMPILER COMMAND (exitcode={test_res.exitcode}): {test_res.errmsg}",
@@ -785,6 +817,7 @@ def run_fuzz_main(
   ilimit: int,
   slimit: int,
   plimit: int,
+  ref_cc: Optional[str] = None,
   diff_opt: bool = False,
   cflag_pool: Optional[List[str]] = None,
 ):
@@ -826,6 +859,7 @@ def run_fuzz_main(
           wdir=wdir,
           switch_limit=slimit,
           prog_limit=plimit,
+          ref_cc=ref_cc,
           diff_opt=diff_opt,
           cflag_pool=cflag_pool,
         ),
@@ -921,6 +955,12 @@ def main():
     help="Enable swarm testing with a pool of compiler flags for the specified compiler type",
   )
   parser.add_argument(
+    "--ref-compiler",
+    type=str,
+    default=None,
+    help="Reference compiler for differential testing (e.g., 'clang -O0')",
+  )
+  parser.add_argument(
     "compiler",
     type=str,
     help="Command to compile the C program (e.g., 'gcc -fsanitize=address -O0')",
@@ -1010,13 +1050,24 @@ def main():
   test_output = outdir / "a.out"
   mlog("Testing if the compiler command is valid ...")
   test_res = test_compiler(compiler, test_dir=outdir, out_file=test_output, timeout=1)
-  test_input.unlink()
   test_output.unlink(missing_ok=True)
   if not test_res.is_success():
     mlog(f"Invalid: {test_res.errmsg}", color="red")
     sys.exit(1)
   else:
     mlog("Valid")
+
+  ref_compiler = args.ref_compiler
+  if ref_compiler:
+    mlog("Testing if the reference compiler command is valid ...")
+    test_res = test_compiler(ref_compiler, test_dir=outdir, out_file=test_output, timeout=1)
+    test_output.unlink(missing_ok=True)
+    if not test_res.is_success():
+      mlog(f"Invalid reference compiler: {test_res.errmsg}", color="red")
+      sys.exit(1)
+    else:
+      mlog("Valid")
+  test_input.unlink()
 
   # Save the command line arguments to a JSON file
   (outdir / "command.json").write_text(json.dumps({**vars(args), "seed": seed}, indent=2))
@@ -1035,6 +1086,7 @@ def main():
     slimit=switch_limit,
     plimit=prog_limit,
     outdir=outdir,
+    ref_cc=ref_compiler,
     cflag_pool=cflag_pool,
     diff_opt=args.diff_opt,
   )
