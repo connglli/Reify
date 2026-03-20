@@ -233,6 +233,11 @@ int main(int argc, char **argv) {
     sexpressionFile.close();
   }
 
+  // Generate the VariableStateFile
+  std::ofstream varStateFile(arts.GetVarStatePath());
+  varStateFile << exec->getVarStateJson();
+  varStateFile.close();
+
   // Generate the initialization-finalization mapping
   std::ofstream mappingFile(arts.GetMapPath());
   mappingFile << fun.GenerateMappingCode(*exec);

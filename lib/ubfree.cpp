@@ -44,10 +44,12 @@ namespace {
     std::memcpy(&s32, &u32, sizeof(int32_t));
     return s32;
   }
+}
 
+namespace ubsan {
   void IterateStructElements(
       const symir::Funct &fun, const symir::StructDef *sDef,
-      const std::function<void(std::string)> &callback, std::string prefix = ""
+      const std::function<void(std::string)> &callback, std::string prefix
   ) {
     for (const auto &field: sDef->GetFields()) {
       int numEls = 1;
@@ -179,7 +181,7 @@ void UBSan::MakeInitInteresting() {
     if (param->IsScalar()) {
       if (param->GetType() == symir::SymIR::Type::STRUCT) {
         const auto *sDef = fun.GetStruct(param->GetStructName());
-        IterateStructElements(fun, sDef, [&](std::string elName) {
+        ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
           params.push_back(CreateStructFieldExpr(param, elName, 0));
         });
       } else {
@@ -201,7 +203,7 @@ void UBSan::MakeInitWithRandomValue() {
     if (param->IsScalar()) {
       if (param->GetType() == symir::SymIR::Type::STRUCT) {
         const auto *sDef = fun.GetStruct(param->GetStructName());
-        IterateStructElements(fun, sDef, [&](std::string elName) {
+        ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
           auto val = tm->mk_bv_value_int64(bvSort, rand());
           addConstraint(
               tm->mk_term(bitwuzla::Kind::EQUAL, {CreateStructFieldExpr(param, elName, 0), val})
@@ -223,6 +225,7 @@ void UBSan::MakeInitWithRandomValue() {
 void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
   const int K = GlobalOptions::Get().NumDiffInitVars;
 
+<<<<<<< HEAD
   if (K == 1) {
     // Optimization: at least one different initialization is enough.
     // We can use a simple OR constraint over DISTINCT terms, which is much faster.
@@ -245,6 +248,22 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
           auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue());
           diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
         }
+=======
+  for (int i = 0; i < fun.NumParams(); i++) {
+    const auto p = fun.GetParams()[i];
+    const auto &oldValue = init[i];
+    if (p->IsScalar()) {
+      if (p->GetType() == symir::SymIR::Type::STRUCT) {
+        const auto *sDef = fun.GetStruct(p->GetStructName());
+        int k = 0;
+        ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
+          bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
+          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
+          auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
+          params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
+          k++;
+        });
+>>>>>>> bb9e783 (VariableState: extract, and toJson implemented)
       } else {
         for (int j = 0; j < p->GetVecNumEls(); j++) {
           bitwuzla::Term newValue = CreateVecElExpr(p, j, 0);
@@ -360,7 +379,7 @@ void UBSan::Visit(const symir::VarUse &v) {
       currentShapeIdx++;
 
       if (currentShapeIdx == currShape.size()) {
-        const int flatLoc = FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
+        const int flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
         suffix += "_el" + std::to_string(flatLoc);
         pendingArrayShape.clear();
         pendingArrayIndices.clear();
@@ -654,7 +673,7 @@ void UBSan::Visit(const symir::StructParam &p) {
       sDef != nullptr, "Struct definition %s not found for param %s", p.GetStructName().c_str(),
       p.GetName().c_str()
   );
-  IterateStructElements(fun, sDef, [&](std::string elName) {
+  ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
     auto fieldExpr = CreateStructFieldExpr(&p, elName, 0);
     std::string fullFieldName = GetStructFieldName(&p, elName);
     versions[fullFieldName] = 0;
@@ -695,7 +714,7 @@ void UBSan::Visit(const symir::StructLocal &l) {
   const auto &inits = l.GetCoefs();
 
   size_t initIdx = 0;
-  IterateStructElements(fun, sDef, [&](std::string elName) {
+  ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
     Assert(initIdx < inits.size(), "Mismatch init size for struct local %s", l.GetName().c_str());
     inits[initIdx]->Accept(*this);
     auto coefExpr = popExpression();
