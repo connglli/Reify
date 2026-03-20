@@ -36,6 +36,7 @@
 #define FILENAME_FUNCTION_C "func.c"
 #define FILENAME_MAIN_C "main.c"
 #define FILENAME_MAPPING_JSONL "inout.jsonl"
+#define FILENAME_VARSTATE_JSONL "varstate.jsonl"
 #define FILENAME_SEXPRESSION "func.sexp"
 #define FILENAME_LOGGING "func.log"
 #define FILENAME_CHECKSUM_C "chksum.c"
@@ -98,6 +99,8 @@ struct FunArts {
   fs::path GetJavaClsPath() const { return GetTestDir() / (GetJavaClsName() + ".class"); }
 
   fs::path GetMapPath() const { return GetTestDir() / FILENAME_MAPPING_JSONL; }
+
+  fs::path GetVarStatePath() const { return GetTestDir() / FILENAME_VARSTATE_JSONL; }
 
   fs::path GetMainPath() const { return GetTestDir() / FILENAME_MAIN_C; }
 
