@@ -26,6 +26,7 @@
 #include "lib/symexec.hpp"
 
 #include <cstring>
+#include <optional>
 #include <ranges>
 #include "global.hpp"
 #include "lib/logger.hpp"
@@ -33,6 +34,7 @@
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
 #include "lib/ubinject.hpp"
+#include "lib/varstate.hpp"
 
 #include <chrono>
 
@@ -290,6 +292,9 @@ bool SymExec::solve(
 
   // Extract values for the resolved symbols to facilitate subsequent solving
   extractSymbolsFromModel();
+  VariableState varState = VariableState();
+  varState.extract(this);
+  this->varStateJson["solve_" + std::to_string(this->inits.size())] = varState.toJson();
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
   if (inits.empty()) {
@@ -315,6 +320,19 @@ bool SymExec::solve(
   return true;
 }
 
+std::optional<int32_t> SymExec::extractTermFromModel(bitwuzla::Term t) {
+  bitwuzla::Term symValue = solver->get_value(t);
+  std::string binaryStr = symValue.value<std::string>(2);
+  if (binaryStr.empty()) return {};
+  // Convert binary string to signed integer (32-bit)
+  int32_t symVal = 0;
+  // Parse as unsigned first, then reinterpret as signed
+  uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+  uint32_t u32 = static_cast<uint32_t>(unsigned_val);
+  std::memcpy(&symVal, &u32, sizeof(int32_t));
+  return symVal;
+}
+
 void SymExec::extractSymbolsFromModel() {
   for (auto symbol: fun->GetSymbols()) {
     if (symbol->IsSolved()) {
@@ -329,15 +347,10 @@ void SymExec::extractSymbolsFromModel() {
 
     // Currently, we only support coefficients
     const auto symKey = ubSan->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol));
-    bitwuzla::Term symValue = solver->get_value(symKey);
-    std::string binaryStr = symValue.value<std::string>(2);
-    // Convert binary string to signed integer (32-bit)
-    Assert(!binaryStr.empty(), "The symbol value of symbol %s is empty", symName.c_str());
-    int32_t symVal = 0;
-    // Parse as unsigned first, then reinterpret as signed
-    uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
-    uint32_t u32 = static_cast<uint32_t>(unsigned_val);
-    std::memcpy(&symVal, &u32, sizeof(int32_t));
+    std::optional<int32_t> symValOpt = extractTermFromModel(symKey);
+    Assert(symValOpt.has_value(), "The symbol value of symbol %s is empty", symName.c_str());
+    int32_t symVal = symValOpt.value();
+    
     symbol->SetValue(std::to_string(symVal));
     Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
   }
@@ -483,4 +496,8 @@ void SymExec::insertRandomValueIntoUnsolvedSymbols() {
     Log::Get().Out() << "Define symbols: sym=" << sym->GetName() << ", val=" << val
                      << " (for unexecuted basic blocks)" << std::endl;
   }
+}
+
+std::string SymExec::getVarStateJson() {
+  return this->varStateJson.dump() + "\n";
 }
