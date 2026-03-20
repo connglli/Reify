@@ -28,6 +28,7 @@
 
 #include <bitwuzla/cpp/bitwuzla.h>
 #include <cstddef>
+#include "json.hpp"
 #include "lib/function.hpp"
 #include "lib/ubfree.hpp"
 
@@ -80,6 +81,7 @@ public:
       bool debug = false
       // clang-format on
   );
+  std::string getVarStateJson();
 
 private:
   // Generate constraints, solve them, and instantiate resolved symbols.
@@ -96,6 +98,8 @@ private:
       // clang-format on
   );
 
+  std::optional<int> extractTermFromModel(bitwuzla::Term t);
+
   // Function to extract all symbols from the model, so that we can instantiate
   // all the symbols that the solver successfully found an interpretation for
   void extractSymbolsFromModel();
@@ -108,6 +112,7 @@ private:
 
   // Insert random values into unsolved symbols
   void insertRandomValueIntoUnsolvedSymbols();
+
 
 private:
   const FunPlus *owner;
@@ -134,6 +139,10 @@ private:
 
   // The value of each input parameter at the exit of the function.
   std::vector<std::vector<ArgPlus<int>>> finas{};
+
+  nlohmann::json varStateJson = nlohmann::json::object();
+
+  friend class VariableState;
 };
 
 #endif // REIFY_SYMEXEC_HPP

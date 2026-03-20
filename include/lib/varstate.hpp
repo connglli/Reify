@@ -1,0 +1,84 @@
+// MIT License
+//
+// Copyright (c) 2025
+//
+// Kavya Chopra (chopra.kavya04@gmail.com)
+// Cong Li (cong.li@inf.ethz.ch)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#ifndef REIFY_VARSTATE_HPP
+#define REIFY_VARSTATE_HPP
+
+#include "lib/lang.hpp"
+#include "lib/symexec.hpp"
+#include <bitwuzla/cpp/bitwuzla.h>
+
+class VariableState : symir::SymIRVisitor {
+public:
+  nlohmann::json toJson();
+  std::string fromJson();
+  std::vector<int> query(int blockIndex, int stmtIndex);
+  void extract(SymExec *symexec);
+
+private:
+  void pushTerm(bitwuzla::Term term) { this->termStack.push(std::move(term)); }
+  bitwuzla::Term popTerm() {
+    auto term = this->termStack.top();
+    this->termStack.pop();
+    return term;
+  }
+  struct blockState {
+    // first: Index, second: Label
+    std::pair<int, std::string> blockId;
+    // first: target variable, second: value
+    std::vector<std::pair<std::string, int>> assignments;
+  };
+  void Visit(const symir::VarUse &v) override;
+  void Visit(const symir::Coef &c) override;
+  void Visit(const symir::Term &t) override;
+  void Visit(const symir::Expr &e) override;
+  void Visit(const symir::Cond &c) override;
+  void Visit(const symir::AssStmt &a) override;
+  void Visit(const symir::RetStmt &r) override;
+  void Visit(const symir::Branch &b) override;
+  void Visit(const symir::Goto &g) override;
+  void Visit(const symir::ScaParam &p) override;
+  void Visit(const symir::VecParam &p) override;
+  void Visit(const symir::StructParam &p) override;
+  void Visit(const symir::ScaLocal &l) override;
+  void Visit(const symir::VecLocal &l) override;
+  void Visit(const symir::StructLocal &l) override;
+  void Visit(const symir::StructDef &s) override;
+  void Visit(const symir::Block &b) override;
+  void Visit(const symir::Funct &f) override;
+
+
+private:
+  std::map<std::string, std::vector<int>> init;
+  std::vector<blockState> executionState;
+  SymExec *symexec;
+  size_t currBlock;
+  size_t currAssignment;
+  std::map<std::string, int> versions{};  // The SSA version table for each variable
+  std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
+  const symir::VarDef *currAssignVarDef;
+};
+
+#endif // REIFY_VARSTATE_HPP
