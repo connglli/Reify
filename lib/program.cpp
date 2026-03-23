@@ -30,6 +30,7 @@
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 #include "lib/fcallembed.hpp"
+#include "lib/varstate.hpp"
 
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
@@ -51,9 +52,11 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
         !funNames.contains(func->GetName()), "Function name conflict: %s", func->GetName().c_str()
     );
     funNames.insert(func->GetName());
-    functions.push_back(std::move(func));
+    this->functions.push_back(std::move(func));
     auto mapping = FunPlus::ParseMappingCode(arts.GetMapPath());
-    mappings.push_back(std::move(mapping));
+    this->mappings.push_back(std::move(mapping));
+    this->varStates.push_back(varstate::allFromJsonFile(arts.GetVarStatePath()));
+
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
     idx++;
   }
