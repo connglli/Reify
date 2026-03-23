@@ -292,9 +292,12 @@ bool SymExec::solve(
 
   // Extract values for the resolved symbols to facilitate subsequent solving
   extractSymbolsFromModel();
+
+  // Extract the state of each variable along the exec path from the model
   VariableState varState = VariableState();
   varState.extract(this);
   this->varStateJson["solve_" + std::to_string(this->inits.size())] = varState.toJson();
+
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
   if (inits.empty()) {
