@@ -31,6 +31,7 @@
 #include <vector>
 #include "artifacts.hpp"
 #include "lib/function.hpp"
+#include "lib/varstate.hpp"
 
 namespace fs = std::filesystem;
 
@@ -55,6 +56,7 @@ private:
   std::string uuid, sno;
   std::vector<std::unique_ptr<symir::Funct>> functions{};
   std::vector<FunPlus::IniFinMap> mappings{};
+  std::vector<std::vector<VariableState>> varStates{};
 };
 
 #endif // REIFY_PROGRAM_HPP

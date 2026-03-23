@@ -28,13 +28,21 @@
 
 #include "lib/lang.hpp"
 #include "lib/symexec.hpp"
+#include "lib/ubfree.hpp"
 #include <bitwuzla/cpp/bitwuzla.h>
+
+class VariableState;
+
+namespace varstate {
+  std::vector<VariableState> allFromJsonFile(std::string filepath);
+  void print_state(size_t nr_variables, std::vector<int> states);
+}
 
 class VariableState : symir::SymIRVisitor {
 public:
   nlohmann::json toJson();
-  std::string fromJson();
-  std::vector<int> query(int blockIndex, int stmtIndex);
+  void fromJson(nlohmann::json json);
+  std::pair<size_t, std::vector<int32_t>> query(size_t blockIndex, size_t stmtIndex);
   void extract(SymExec *symexec);
 
 private:
@@ -47,8 +55,8 @@ private:
   struct blockState {
     // first: Index, second: Label
     std::pair<int, std::string> blockId;
-    // first: target variable, second: value
-    std::vector<std::pair<std::string, int>> assignments;
+    // every 2 ints are Variable index followed by target value
+    std::vector<std::pair<int, int>> assignments;
   };
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;
@@ -71,11 +79,13 @@ private:
 
 
 private:
-  std::map<std::string, std::vector<int>> init;
+  std::vector<int> init;
+  std::map<std::string, int> varNamesMap;
   std::vector<blockState> executionState;
+
+// Used only by extraction
   SymExec *symexec;
   size_t currBlock;
-  size_t currAssignment;
   std::map<std::string, int> versions{};  // The SSA version table for each variable
   std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
   const symir::VarDef *currAssignVarDef;
