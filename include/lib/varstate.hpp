@@ -35,7 +35,7 @@ class VariableState;
 
 namespace varstate {
   std::vector<VariableState> allFromJsonFile(std::string filepath);
-  void print_state(size_t nr_variables, std::vector<int> states);
+  void print32_t_state(size_t nr_variables, std::vector<int32_t> states);
 }
 
 class VariableState : symir::SymIRVisitor {
@@ -44,6 +44,10 @@ public:
   void fromJson(nlohmann::json json);
   std::pair<size_t, std::vector<int32_t>> query(size_t blockIndex, size_t stmtIndex);
   void extract(SymExec *symexec);
+  std::vector<int32_t> getPathBlocksIndices();
+  std::vector<std::string> getPathBlocksLabels();
+
+  std::map<size_t, std::string> GetVarMap() { return this->varNamesMap; }
 
 private:
   void pushTerm(bitwuzla::Term term) { this->termStack.push(std::move(term)); }
@@ -54,15 +58,17 @@ private:
   }
   struct blockState {
     // first: Index, second: Label
-    std::pair<int, std::string> blockId;
-    // every 2 ints are Variable index followed by target value
-    std::vector<std::pair<int, int>> assignments;
+    std::pair<int32_t, std::string> blockId;
+    // every 2 int32_ts are Variable index followed by target value
+    std::vector<std::pair<int32_t, int32_t>> assignments;
   };
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;
   void Visit(const symir::Term &t) override;
+  void Visit(const symir::ModExpr &e) override;
   void Visit(const symir::Expr &e) override;
   void Visit(const symir::Cond &c) override;
+  void Visit(const symir::ModAssStmt &a) override;
   void Visit(const symir::AssStmt &a) override;
   void Visit(const symir::RetStmt &r) override;
   void Visit(const symir::Branch &b) override;
@@ -70,6 +76,7 @@ private:
   void Visit(const symir::ScaParam &p) override;
   void Visit(const symir::VecParam &p) override;
   void Visit(const symir::StructParam &p) override;
+  void Visit(const symir::UnInitLocal &l) override;
   void Visit(const symir::ScaLocal &l) override;
   void Visit(const symir::VecLocal &l) override;
   void Visit(const symir::StructLocal &l) override;
@@ -79,14 +86,14 @@ private:
 
 
 private:
-  std::vector<int> init;
-  std::map<std::string, int> varNamesMap;
+  std::vector<int32_t> init;
+  std::map<size_t, std::string> varNamesMap;
   std::vector<blockState> executionState;
 
 // Used only by extraction
   SymExec *symexec;
   size_t currBlock;
-  std::map<std::string, int> versions{};  // The SSA version table for each variable
+  std::map<std::string, int32_t> versions{};  // The SSA version table for each variable
   std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
   const symir::VarDef *currAssignVarDef;
 };
