@@ -624,7 +624,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
       for (size_t i = 0; i < nrVariables; i++) {
         if (varMap.contains(i)) lastVarStartIndex = i;
         // select vars randomly TODO: Make probability global?
-        if (indices.size() > 0 && randDouble() <= 0.2) continue;
+        if (indices.size() > 0 && randDouble() > 0.3) continue;
         indices.push_back(i);
         const symir::VarDef *var = funBd->FindVar(varMap[lastVarStartIndex]);
         vars.push_back(var);
