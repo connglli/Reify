@@ -29,6 +29,7 @@
 #include <cstring>
 #include <limits>
 
+#include "lib/lang.hpp"
 #include "lib/samputils.hpp"
 
 namespace {
@@ -444,6 +445,10 @@ void UBSan::Visit(const symir::Term &t) {
   pushExpression(termExpr);
 }
 
+void UBSan::Visit(const symir::ModExpr &e) {
+  Panic("No ModAssStmt should exist during function creation");
+}
+
 void UBSan::Visit(const symir::Expr &e) {
   auto result = tm->mk_bv_zero(bvSort);
   std::vector<symir::Coef *> coefs;
@@ -498,6 +503,10 @@ void UBSan::Visit(const symir::Cond &c) {
     default:
       Panic("Cannot reacher here");
   }
+}
+
+void UBSan::Visit(const symir::ModAssStmt &a) {
+  Panic("No ModAssStmt should exist during function creation");
 }
 
 void UBSan::Visit(const symir::AssStmt &a) {
@@ -615,6 +624,10 @@ void UBSan::Visit(const symir::StructParam &p) {
     verbbls[fullFieldName] = "___entry_bbl";
     ensureInRange(fieldExpr);
   });
+}
+
+void UBSan::Visit(const symir::UnInitLocal &l) {
+  Panic("No UnInitLocal should exist during function creation");
 }
 
 void UBSan::Visit(const symir::ScaLocal &l) {

@@ -88,8 +88,10 @@ protected:
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;
   void Visit(const symir::Term &t) override;
+  void Visit(const symir::ModExpr &e) override;
   void Visit(const symir::Expr &e) override;
   void Visit(const symir::Cond &c) override;
+  void Visit(const symir::ModAssStmt &a) override;
   void Visit(const symir::AssStmt &a) override;
   void Visit(const symir::RetStmt &r) override;
   void Visit(const symir::Branch &b) override;
@@ -97,6 +99,7 @@ protected:
   void Visit(const symir::ScaParam &p) override;
   void Visit(const symir::VecParam &p) override;
   void Visit(const symir::StructParam &p) override;
+  void Visit(const symir::UnInitLocal &l) override;
   void Visit(const symir::ScaLocal &l) override;
   void Visit(const symir::VecLocal &l) override;
   void Visit(const symir::StructLocal &l) override;
