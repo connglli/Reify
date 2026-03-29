@@ -13,5 +13,5 @@ Java:
 
 Interprocedural Dataflow: 
 1. During linking use all init/fina mappings (Currently only uses first)
-2. During call/preamble generation allow for non scalars to be used as a Interpolation Target
-3. Modular arithmetic SymIR Classes currently cannot compile to Java
+3. Reuse arg_* variables when possible
+5. Modular arithmetic SymIR Classes currently cannot compile to Java

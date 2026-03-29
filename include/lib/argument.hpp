@@ -277,6 +277,7 @@ public:
 
   // Code generation
   [[nodiscard]] std::string ToCxStr() const;
+  [[nodiscard]] std::string ToCxStrWithReplaced(std::map<size_t, std::pair<std::string, int32_t> *> replacers, size_t offset = 0) const;
 
   [[nodiscard]] std::string GetTypeCastStr(const symir::VarDef *varDef) const {
     return type->GetTypeCastStr(varDef);
@@ -609,6 +610,44 @@ std::string ArgPlus<IntType>::ToCxStr() const {
     oss << "{";
     for (size_t i = 0; i < arr->elements.size(); i++) {
       oss << arr->elements[i].ToCxStr();
+      if (i != arr->elements.size() - 1)
+        oss << ", ";
+    }
+    oss << "}";
+  }
+  return oss.str();
+}
+
+template<typename IntType>
+std::string ArgPlus<IntType>::ToCxStrWithReplaced(std::map<size_t, std::pair<std::string, int32_t> *> replacers, size_t offset) const {
+  if (IsScalar()) {
+    if (replacers.contains(offset)) {
+      const auto& replacer = *replacers[offset];
+      return replacer.first + " + " + std::to_string(replacer.second);
+    } else {
+      return std::to_string(GetValue());
+    }
+  }
+
+  std::ostringstream oss;
+  if (IsStruct()) {
+    auto *str = static_cast<StructType<IntType> *>(type.get());
+    oss << "(struct " << str->structName << "){";
+    size_t newOffset = offset;
+    for (size_t i = 0; i < str->fieldNames.size(); ++i) {
+      oss << "." << str->fieldNames[i] << " = " << str->fields[i].ToCxStrWithReplaced(replacers, newOffset);
+      newOffset += str->fields[i].getSize();
+      if (i != str->fieldNames.size() - 1)
+        oss << ", ";
+    }
+    oss << "}";
+  } else {
+    auto *arr = static_cast<ArrayType<IntType> *>(type.get());
+    oss << "{";
+    size_t newOffset = offset;
+    for (size_t i = 0; i < arr->elements.size(); i++) {
+      oss << arr->elements[i].ToCxStrWithReplaced(replacers, newOffset);
+      newOffset += arr->elements[i].getSize();
       if (i != arr->elements.size() - 1)
         oss << ", ";
     }
