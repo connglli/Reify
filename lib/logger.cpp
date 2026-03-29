@@ -49,6 +49,9 @@ void Log::SetCout() {
 void Log::SetFout(const std::string &file) {
   deleteFoutSafely();
   fout_ = new std::ofstream(file);
+  if (!fout_->is_open()) {
+    std::cerr << "Failed to open file: " << file << std::endl;
+  }
   out = fout_;
 }
 
