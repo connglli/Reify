@@ -17,6 +17,11 @@ ifeq ($(FOUND_BITWUZLA),n)
 $(error Bitwuzla not found! Please install it!)
 endif
 
+FOUND_FLINT := $(shell pkg-config --exists bitwuzla && echo y || echo n)
+ifeq ($(FOUND_FLINT),n)
+$(error Flint not found! Please install it!)
+endif
+
 CSTD   := c17
 CXXSTD := c++20
 
@@ -64,7 +69,7 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 ## Building Flags
 ########################################################################
 
-DBGFLAGS := $(if $(DEBUG),-g,)
+DBGFLAGS := $(if $(DEBUG),$(if $(filter gdb,$(DEBUG)),-ggdb,-g) -fsanitize=undefined,)
 OPTFLAGS := $(if $(DEBUG),-O0,-O2)
 
 # Generate and include header dependency files (.d) so incremental builds
@@ -73,7 +78,7 @@ DEPFLAGS := -MMD -MP
 
 CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CXXSTD} -frtti ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
 CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CSTD} ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
-LDFLAGS  := $(DBGFLAGS) $(shell pkg-config --libs bitwuzla) -lpthread -lz
+LDFLAGS  := $(DBGFLAGS) $(shell pkg-config --libs bitwuzla) $(shell pkg-config --libs flint) -lpthread -lz
 
 # Dependency files produced alongside object files.
 DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/rysmith.d $(OBJ_DIR)/rylink.d $(OBJ_DIR)/symircc.d

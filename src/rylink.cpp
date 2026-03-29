@@ -190,8 +190,11 @@ int main(int argc, char *argv[]) {
     } else {
       Log::Get().SetFout(arts.GetLogPath(/*devnull=*/false));
     }
+    Log::Get().Out() << "[" << sampNo << "] Done" << std::endl;
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
     prog->GenerateCode(arts);
   }
+  // clean up flints global cache (To avoid valgrind errors)
+  flint_cleanup_master();
 }
