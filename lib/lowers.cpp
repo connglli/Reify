@@ -26,6 +26,7 @@
 #include "lib/lowers.hpp"
 #include "lib/chksum.hpp"
 #include "lib/jnifutils.hpp"
+#include "lib/lang.hpp"
 #include "lib/logger.hpp"
 
 namespace symir {
@@ -109,6 +110,31 @@ namespace symir {
     out << ")";
   }
 
+  void SymSexpLower::Visit(const ModExpr &e) {
+    auto coeffs = e.GetCoeffs();
+    auto vars = e.GetVars();
+    auto polynomial = e.GetPolynomial();
+    int mod = e.GetMod();
+    out << "(emodadd ";
+    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
+      this->out << "(";
+    }
+    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
+      out << "(emodmul ";
+      coeffs[i]->Accept(*this);
+      for (size_t j = 0; j < vars.size(); ++j) {
+        for (int d = 0; d < polynomial[vars.size()* j + i]; d++) {
+          this->out << " ";
+          vars[j]->Accept(*this);
+        }
+      }
+      this->out << "#" << mod << ")";
+      this->out << " ";
+    }
+    coeffs[coeffs.size() - 1]->Accept(*this);
+    this->out << "#" << mod << ")";
+  }
+
   void SymSexpLower::Visit(const Expr &e) {
     out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
     auto terms = e.GetTerms();
@@ -125,6 +151,17 @@ namespace symir {
     out << "(" << Cond::GetOpShort(c.GetOp()) << " ";
     c.GetExpr()->Accept(*this);
     out << ")";
+  }
+
+  void SymSexpLower::Visit(const ModAssStmt &a) {
+    indent();
+    out << "(" << KW_ASS << " ";
+    a.GetVar()->Accept(*this);
+    out << " ";
+    incIndent();
+    a.GetExpr()->Accept(*this);
+    decIndent();
+    out << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const AssStmt &a) {
@@ -186,6 +223,16 @@ namespace symir {
 
   void SymSexpLower::Visit(const StructParam &p) {
     out << "(" << KW_PAR << " " << p.GetName() << " " << p.GetStructName() << ")";
+  }
+
+  void SymSexpLower::Visit(const UnInitLocal &l) {
+    indent();
+    if (l.IsVolatile()) {
+      out << "(" << KW_VOL << " ";
+    } else {
+      out << "(" ;
+    }
+    out << KW_LOC << " " << l.GetName() << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
   void SymSexpLower::Visit(const ScaLocal &l) {
@@ -416,6 +463,34 @@ namespace symir {
     out << ")";
   }
 
+  void SymCxLower::Visit(const ModExpr &e) {
+    auto coeffs = e.GetCoeffs();
+    auto vars = e.GetVars();
+    auto polynomial = e.GetPolynomial();
+    int mod = e.GetMod();
+    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
+      // by precidence we must wrap each addition of a monomial in a bracket
+      this->out << "(";
+    }
+    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
+      coeffs[i]->Accept(*this);
+      for (size_t j = 0; j < vars.size(); ++j) {
+        Assert(vars.size() * i + j < polynomial.size(), "polynomial array out of bounds");
+        for (int d = 0; d < polynomial[vars.size() * i + j]; d++) {
+          this->out << " * RM(";
+          vars[j]->Accept(*this);
+          this->out << ", " << mod << ")";
+          this->out << " % " << mod;
+        }
+      }
+      if (i >= 1)
+        this->out << ") % " << mod;
+      this->out << " + ";
+    }
+    coeffs[coeffs.size() - 1]->Accept(*this);
+    this->out << ") % " << mod;
+  }
+
   void SymCxLower::Visit(const Expr &e) {
     auto terms = e.GetTerms();
     for (size_t i = 0; i < terms.size(); ++i) {
@@ -429,6 +504,14 @@ namespace symir {
   void SymCxLower::Visit(const Cond &c) {
     c.GetExpr()->Accept(*this);
     out << " " << Cond::GetOpSym(c.GetOp()) << " 0";
+  }
+
+  void SymCxLower::Visit(const ModAssStmt &a) {
+    indent();
+    a.GetVar()->Accept(*this);
+    out << " = ";
+    a.GetExpr()->Accept(*this);
+    out << ";" << std::endl;
   }
 
   void SymCxLower::Visit(const AssStmt &a) {
@@ -558,6 +641,14 @@ namespace symir {
 
   void SymCxLower::Visit(const StructParam &p) {
     out << "struct " << p.GetStructName() << " " << p.GetName();
+  }
+
+  void SymCxLower::Visit(const UnInitLocal &l) {
+    indent();
+    if (l.IsVolatile()) {
+      out << "volatile" << " ";
+    }
+    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << ";" << std::endl;
   }
 
   void SymCxLower::Visit(const ScaLocal &l) {
@@ -787,6 +878,10 @@ namespace symir {
     }
   }
 
+  void SymJavaBytecodeLower::Visit(const ModExpr &e) {
+    Panic("TODO: Implement java ModExpr");
+  }
+
   void SymJavaBytecodeLower::Visit(const Expr &e) {
     if (e.GetType() != SymIR::I32) {
       Panic("Unsupported expression for type %s", SymIR::GetTypeName(e.GetType()).c_str());
@@ -815,6 +910,10 @@ namespace symir {
       Panic("Unsupported condition for type %s", SymIR::GetTypeName(c.GetType()).c_str());
     }
     c.GetExpr()->Accept(*this);
+  }
+
+  void SymJavaBytecodeLower::Visit(const ModAssStmt &a) {
+    Panic("TODO: Implement java ModAssStmt");
   }
 
   void SymJavaBytecodeLower::Visit(const AssStmt &a) {
@@ -896,6 +995,10 @@ namespace symir {
 
   void SymJavaBytecodeLower::Visit(const StructParam &p) {
     Panic("Structs are not supported in Java backend yet");
+  }
+
+  void SymJavaBytecodeLower::Visit(const UnInitLocal &l) {
+    Panic("TODO: Implement java UnInitLocal");
   }
 
   void SymJavaBytecodeLower::Visit(const ScaLocal &l) {

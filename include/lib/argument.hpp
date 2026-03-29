@@ -57,6 +57,7 @@ struct ArgType {
   virtual bool IsScalar() const = 0;
   virtual bool IsArray() const = 0;
   virtual bool IsStruct() const = 0;
+  virtual size_t getSize() const = 0;
   virtual std::string GetTypeCastStr(const symir::VarDef *varDef) const = 0;
   virtual int GetNumLeaves() const = 0;
   virtual nlohmann::json ToJson() const = 0;
@@ -74,6 +75,8 @@ struct ScalarType : public ArgType<IntType> {
   bool IsArray() const override { return false; }
 
   bool IsStruct() const override { return false; }
+
+  size_t getSize() const override { return 1; }
 
   std::string GetTypeCastStr(const symir::VarDef *varDef) const override { return ""; }
 
@@ -103,6 +106,12 @@ struct ArrayType : public ArgType<IntType> {
 
   bool IsStruct() const override { return false; }
 
+  size_t getSize() const override { 
+    size_t res = 0;
+    for (const auto& ele : elements) res += ele.getSize();
+    return res;
+  }
+
   std::string GetTypeCastStr(const symir::VarDef *varDef) const override;
 
   int GetNumLeaves() const override;
@@ -124,6 +133,12 @@ struct StructType : public ArgType<IntType> {
   bool IsArray() const override { return false; }
 
   bool IsStruct() const override { return true; }
+
+  size_t getSize() const override {
+    size_t res = 0;
+    for (const auto& field : fields) res += field.getSize();
+    return res;
+  }
 
   std::string GetTypeCastStr(const symir::VarDef *varDef) const override;
 
@@ -173,6 +188,8 @@ public:
   [[nodiscard]] bool IsArray() const { return type->IsArray(); }
 
   [[nodiscard]] bool IsStruct() const { return type->IsStruct(); }
+
+  [[nodiscard]] bool getSize() const { return type->getSize(); }
 
   // Backward compatibility alias
   [[nodiscard]] bool IsVector() const { return IsArray(); }

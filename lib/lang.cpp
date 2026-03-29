@@ -24,79 +24,87 @@
 // SOFTWARE.
 
 #include "lib/lang.hpp"
+#include "lib/dbgutils.hpp"
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <ranges>
+#include <string>
+#include <tuple>
+#include <utility>
 
 namespace symir {
-  VarUse::VarUse(const VarDef *var, std::vector<Coef *> access) :
-      SymIR(SIR_VAR_USE), var(var), access(std::move(access)) {
-    Assert(this->var != nullptr, "No var to use: a nullptr is given");
-    if (this->var->IsVector()) {
-      Assert(
-          this->var->GetVecNumDims() <= static_cast<int>(this->access.size()),
-          "The number of access indices (%lu) "
-          "should be at least the number of vector dimensions (%d) for the variable %s",
-          this->access.size(), this->var->GetVecNumDims(), var->GetName().c_str()
-      );
-    } else if (this->var->GetType() == SymIR::Type::STRUCT) {
-      Assert(
-          this->access.size() >= 1,
-          "The number of access indices (%lu) should be at least 1 for the struct variable %s",
-          this->access.size(), var->GetName().c_str()
-      );
-    } else if (this->var->GetType() == SymIR::Type::ARRAY) {
-      // Should be covered by IsVector(), but just in case
-    } else {
-      Panic("The variable %s is not a vector or a struct", var->GetName().c_str());
-    }
-
-    for (const auto *c: this->access) {
-      Assert(c != nullptr, "The access coefficient cannot be a nullptr");
-      Assert(
-          c->GetType() == Type::I32, "The access coefficient should be an %s, but got %s",
-          SymIR::GetTypeCName(Type::I32).c_str(), SymIR::GetTypeName(c->GetType()).c_str()
-      );
-    }
-
-    // Resolve Type
-    SymIR::Type currType = var->GetType();
-    std::string currStruct = (currType == SymIR::Type::STRUCT) ? var->GetStructName() : "";
-    int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
-    int accessIdx = 0;
-    int totalAccess = static_cast<int>(this->access.size());
-
-    if (remainingDims > 0) {
-      int consumed = std::min(remainingDims, totalAccess);
-      remainingDims -= consumed;
-      accessIdx += consumed;
-      if (remainingDims == 0) {
-        currType = var->GetBaseType();
-        if (currType == SymIR::Type::STRUCT) {
-          currStruct = var->GetStructName();
-        }
-      }
-    }
-
-    while (accessIdx < totalAccess) {
-      if (currType == SymIR::Type::STRUCT) {
-        Assert(!currStruct.empty(), "Current type is struct but name is empty");
-        const auto *c = this->access[accessIdx];
-        Assert(c->IsSolved(), "Accessing struct field with non-constant coefficient");
-        // If we can't look up struct definition easily here, we just assume checking is done
-        // elsewhere. But for type resolution, we need it. Given limitations, we assume this
-        // constructor is used for scalar element access (as in SymReturn). If we can't resolve, we
-        // default to I32? Or maybe we leave it as STRUCT if we can't look inside? Since VarUse
-        // doesn't have FunctBuilder, we are stuck. We will assume I32 if we are drilling into a
-        // struct.
-        currType = SymIR::Type::I32;
-        break;
-      } else {
-        break;
-      }
-    }
-    setType(currType);
+VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
+    : SymIR(SIR_VAR_USE), var(var), access(std::move(access)) {
+  Assert(this->var != nullptr, "No var to use: a nullptr is given");
+  if (this->var->IsVector()) {
+    Assert(this->var->GetVecNumDims() <= static_cast<int>(this->access.size()),
+           "The number of access indices (%lu) "
+           "should be at least the number of vector dimensions (%d) for the "
+           "variable %s",
+           this->access.size(), this->var->GetVecNumDims(),
+           var->GetName().c_str());
+  } else if (this->var->GetType() == SymIR::Type::STRUCT) {
+    Assert(this->access.size() >= 1,
+           "The number of access indices (%lu) should be at least 1 for the "
+           "struct variable %s",
+           this->access.size(), var->GetName().c_str());
+  } else if (this->var->GetType() == SymIR::Type::ARRAY) {
+    // Should be covered by IsVector(), but just in case
+  } else {
+    Panic("The variable %s is not a vector or a struct",
+          var->GetName().c_str());
   }
+
+  for (const auto *c : this->access) {
+    Assert(c != nullptr, "The access coefficient cannot be a nullptr");
+    Assert(c->GetType() == Type::I32,
+           "The access coefficient should be an %s, but got %s",
+           SymIR::GetTypeCName(Type::I32).c_str(),
+           SymIR::GetTypeName(c->GetType()).c_str());
+  }
+
+  // Resolve Type
+  SymIR::Type currType = var->GetType();
+  std::string currStruct =
+      (currType == SymIR::Type::STRUCT) ? var->GetStructName() : "";
+  int remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+  int accessIdx = 0;
+  int totalAccess = static_cast<int>(this->access.size());
+
+  if (remainingDims > 0) {
+    int consumed = std::min(remainingDims, totalAccess);
+    remainingDims -= consumed;
+    accessIdx += consumed;
+    if (remainingDims == 0) {
+      currType = var->GetBaseType();
+      if (currType == SymIR::Type::STRUCT) {
+        currStruct = var->GetStructName();
+      }
+    }
+  }
+
+  while (accessIdx < totalAccess) {
+    if (currType == SymIR::Type::STRUCT) {
+      Assert(!currStruct.empty(), "Current type is struct but name is empty");
+      const auto *c = this->access[accessIdx];
+      Assert(c->IsSolved(),
+             "Accessing struct field with non-constant coefficient");
+      // If we can't look up struct definition easily here, we just assume
+      // checking is done elsewhere. But for type resolution, we need it. Given
+      // limitations, we assume this constructor is used for scalar element
+      // access (as in SymReturn). If we can't resolve, we default to I32? Or
+      // maybe we leave it as STRUCT if we can't look inside? Since VarUse
+      // doesn't have FunctBuilder, we are stuck. We will assume I32 if we are
+      // drilling into a struct.
+      currType = SymIR::Type::I32;
+      break;
+    } else {
+      break;
+    }
+  }
+  setType(currType);
+}
 
   VarUse::VarUse(const VarDef *var, std::vector<Coef *> access, SymIR::Type type) :
       SymIR(SIR_VAR_USE), var(var), access(std::move(access)) {
@@ -210,6 +218,35 @@ namespace symir {
     return eid;
   }
 
+  SymIRBuilder::ModExprID BlockBuilder::SymModExpr(
+    const std::vector<Coef *> coeffs,
+    const std::vector<const VarDef *> variables,
+    const std::vector<std::vector<Coef *>> accesses,
+    const std::vector<int> polynomial,
+    const int mod
+  ) {
+    // We do not check active since the target may have been already push but we still want to insert Mod Expressions
+
+    Assert(variables.size() == accesses.size(), "each variable must have an index");
+    ExprID eid = this->numCreatedModExprs++;
+    std::vector<std::unique_ptr<VarUse>> varAccess;
+    varAccess.resize(variables.size());
+    for (size_t i = 0; i < variables.size(); i++) {
+      auto var = variables[i];
+      if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
+          var->GetType() == SymIR::Type::ARRAY) {
+            varAccess[i] = std::make_unique<VarUse>(var, accesses[i], SymIR::Type::I32);
+      } else {
+          varAccess[i] = std::make_unique<VarUse>(var);
+      }
+
+    }
+
+    createdModExprs[eid] = std::make_unique<ModExpr>(coeffs, std::move(varAccess), polynomial, mod);
+    return eid;
+  }
+  
+
   SymIRBuilder::ExprID BlockBuilder::SymCond(Cond::Op op, ExprID eid) {
     Assert(isActive(), "The BlockBuilder is no longer active");
     CondID cid = numCreatedConds++;
@@ -257,7 +294,6 @@ namespace symir {
         }
       }
     }
-
     // After processing all accesses, if we still have an ARRAY type and no remaining dims,
     // that means we've consumed all array dimensions and should use the base type
     if (currType == SymIR::Type::ARRAY && remainingDims == 0) {
@@ -278,6 +314,88 @@ namespace symir {
     createdExprs.erase(it);
     return dynamic_cast<const AssStmt *>(stmts.back().get());
   }
+
+  const ModAssStmt *
+  BlockBuilder::SymModAssignAt(const VarDef *var, ModExprID eid, const std::vector<Coef *> &access, int32_t assignStmtIndex) {
+
+    // We do not check active since the target may have been already push but we still want to insert Mod Expressions
+
+    auto it = this->createdModExprs.find(eid);
+    Assert(it != this->createdModExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
+
+    SymIR::Type currType = var->GetType();
+    SymIR::Type currBaseType = var->GetBaseType();
+    std::string currStruct =
+        (currType == SymIR::Type::STRUCT)
+            ? var->GetStructName()
+            : (currBaseType == SymIR::Type::STRUCT ? var->GetStructName() : "");
+    int32_t remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+    Assert(remainingDims >= 0, "vector dim count cannot be negative");
+
+    for (const auto *c: access) {
+      if (remainingDims > 0) {
+        remainingDims--;
+        if (remainingDims == 0) {
+          currType = currBaseType;
+        }
+      } else if (currType == SymIR::Type::STRUCT) {
+        int32_t idx = c->GetI32Value();
+        Assert(idx >= 0, "struct index cannot be negative");
+        const auto *sDef = this->GetParent()->FindStruct(currStruct);
+        Assert(sDef, "Struct %s not found", currStruct.c_str());
+        const auto &field = sDef->GetField(idx);
+        currType = field.type;
+        currBaseType = field.baseType;
+        if (currType == SymIR::Type::STRUCT) {
+          currStruct = field.structName;
+        } else if (currType == SymIR::Type::ARRAY) {
+          remainingDims = field.shape.size();
+          if (currBaseType == SymIR::Type::STRUCT) {
+            currStruct = field.structName;
+          }
+        }
+      }
+    }
+    // After processing all accesses, if we still have an ARRAY type and no remaining dims,
+    // that means we've consumed all array dimensions and should use the base type
+    if (currType == SymIR::Type::ARRAY && remainingDims == 0) {
+      currType = currBaseType;
+    }
+
+    // find the 'assignStmtIndex'th assignment stmt
+    size_t index;
+    if (assignStmtIndex < 0) {
+      index = this->stmts.size();
+    } else {
+      index = 0;
+      size_t assignStmtCounter = 0;
+      size_t i;
+      for (i = 0; i < this->stmts.size(); i++) {
+        if (this->stmts[i]->GetIRId() != Local::SIR_STMT_ASS) continue;
+        index = i;
+        if (assignStmtCounter == (size_t) assignStmtIndex) break;
+        assignStmtCounter += 1;
+      }
+      // the case where assignStmtIndex is geq to the number of assign stmts (should be inserted after all assignments)
+      if (i == this->stmts.size() && assignStmtCounter <= (size_t) assignStmtIndex) index = this->stmts.size();
+    }
+
+    if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
+        var->GetType() == SymIR::Type::ARRAY) {
+      this->stmts.insert(this->stmts.begin() + index, std::make_unique<ModAssStmt>(
+        std::make_unique<VarUse>(var, access, currType), std::move(it->second)
+      ));
+    } else {
+      this->stmts.insert(this->stmts.begin() + index, std::make_unique<ModAssStmt>(
+        std::make_unique<VarUse>(var), std::move(it->second)
+      ));
+    }
+
+    this->createdModExprs.erase(it);
+    return dynamic_cast<const ModAssStmt *>(stmts[index].get());
+
+  }
+
 
   std::vector<std::vector<int>> BlockBuilder::GatherVecAccesses(const VarDef *var) const {
     Assert(
@@ -374,6 +492,187 @@ namespace symir {
     Assert(SymIRBuilderGeneric::isActive(), "The BlockBuilder is no longer active");
     deactivate();
     return std::make_unique<Block>(label, std::move(stmts), std::move(target));
+  }
+
+  const Block* BlockCopier::Copy() {
+    src->Accept(*this);
+    Assert(builder != nullptr, "The BlockCopier failed to create a function builder");
+    auto block = funBd->ReplaceOrCloseBlock(builder);
+    builder = nullptr;
+    return block;
+  }
+
+  BlockBuilder* BlockCopier::CopyAsBuilder() {
+    src->Accept(*this);
+    Assert(builder != nullptr, "The BlockCopier failed to create a function builder");
+    return builder;
+  }
+
+
+  void BlockCopier::Visit(const VarUse &v) {
+    for (auto &c: v.GetAccess()) {
+      c->Accept(*this);
+    }
+  };
+  void BlockCopier::Visit(const Coef &c) {
+    if (auto coef = this->funBd->FindSymbol(c.GetName()); coef != nullptr) {
+      Assert(
+          typeid(*coef) == typeid(Coef),
+          "Symbol \"%s\" is already defined and is not a coefficient", c.GetName().c_str()
+      );
+      pushCoef(dynamic_cast<Coef *>(coef));
+    } else {
+      Panic("coeff not found in provided function builder");
+    }
+  };
+  void BlockCopier::Visit(const Term &t) {
+    t.GetCoef()->Accept(*this);
+    const VarDef *var = nullptr;
+    std::vector<Coef *> access{};
+    if (t.GetOp() != Term::Op::OP_CST) {
+      const auto name = t.GetVar()->GetName();
+      var = this->funBd->FindVar(name);
+      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+      t.GetVar()->Accept(*this);
+      for (size_t i = 0; i < t.GetVar()->GetAccess().size(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
+    }
+    pushTerm(this->builder->SymTerm(t.GetOp(), popCoef(), var, access));
+  };
+  void BlockCopier::Visit(const Expr &e) {
+    const auto &terms = e.GetTerms();
+    std::vector<TermID> termIds;
+    for (const auto &t: terms) {
+      t->Accept(*this);
+      termIds.push_back(popTerm());
+    }
+    pushExpr(this->builder->SymExpr(e.GetOp(), termIds));
+  };
+  void BlockCopier::Visit(const ModExpr &e) {
+    std::vector<Coef *> coeffs;
+    for (const auto& c : e.GetCoeffs()) {
+      c->Accept(*this);
+      auto coeff = popCoef();
+      coeffs.push_back(coeff);
+    }
+    std::vector<const VarDef *> variables;
+
+    const VarDef *var = nullptr;
+    std::vector<std::vector<Coef *>> accesses{};
+    for (const auto& use: e.GetVars()) {
+      std::vector<Coef *> access{};
+      const auto name = use->GetName();
+      var = this->funBd->FindVar(name);
+      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+      use->Accept(*this);
+      for (size_t i = 0; i < use->GetAccess().size(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
+      variables.push_back(var);
+      accesses.push_back(std::vector(access));
+    }
+
+    const std::vector<int> polynomial = e.GetPolynomial();
+    const int mod = e.GetMod();
+
+    pushModExpr(this->builder->SymModExpr(
+      coeffs,
+      variables,
+      accesses,
+      polynomial,
+      mod
+    ));
+  };
+  void BlockCopier::Visit(const Cond &c) {
+    c.GetExpr()->Accept(*this);
+    auto exprId = popExpr();
+    pushCond(this->builder->SymCond(c.GetOp(), exprId));
+  }
+  void BlockCopier::Visit(const AssStmt &a) {
+    const auto use = a.GetVar();
+    const auto name = use->GetName();
+    const auto var = this->funBd->FindVar(name);
+    Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+
+    use->Accept(*this);
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
+    a.GetExpr()->Accept(*this);
+    auto exprId = popExpr();
+    this->builder->SymAssign(var, exprId, access);
+  }
+
+  void BlockCopier::Visit(const ModAssStmt &a) {
+    const auto use = a.GetVar();
+    const auto expr = a.GetExpr();
+    const auto name = use->GetName();
+    const auto var = this->funBd->FindVar(name);
+    Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+
+    use->Accept(*this);
+    expr->Accept(*this);
+    auto modExprId = popModExpr();
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
+    this->builder->SymModAssignAt(var, modExprId, access);
+  }
+  void BlockCopier::Visit(const RetStmt &r) {
+    this->builder->SymReturn();
+  }
+  void BlockCopier::Visit(const Branch &b) {
+    b.GetCond()->Accept(*this);
+    auto condId = popCond();
+    this->builder->SymBranch(b.GetTrueTarget(), b.GetFalseTarget(), condId);
+  }
+  void BlockCopier::Visit(const Goto &g) {
+    this->builder->SymGoto(g.GetTarget());
+  }
+  void BlockCopier::Visit(const ScaParam &p) {
+    Panic("BlockCopier should never visit a Param");
+  }
+  void BlockCopier::Visit(const VecParam &p) {
+    Panic("BlockCopier should never visit a Param");
+  }
+  void BlockCopier::Visit(const StructParam &p) {
+    Panic("BlockCopier should never visit a Param");
+  }
+  void BlockCopier::Visit(const UnInitLocal &l) {
+    Panic("BlockCopier should never visit a Locals");
+  }
+  void BlockCopier::Visit(const ScaLocal &l) {
+    Panic("BlockCopier should never visit a Locals");
+  }
+  void BlockCopier::Visit(const VecLocal &l) {
+    Panic("BlockCopier should never visit a Locals");
+  }
+  void BlockCopier::Visit(const StructLocal &l) {
+    Panic("BlockCopier should never visit a Locals");
+  }
+  void BlockCopier::Visit(const StructDef &s) {
+    Panic("BlockCopier should never visit a StructDef");
+  }
+  void BlockCopier::Visit(const Block &b) {
+    Assert(this->builder == nullptr, "The BlockCopier already has a builder");
+    Assert(this->coefStack.empty(), "The BlockCopier has a non-empty coefficient stack");
+    Assert(this->termStack.empty(), "The BlockCopier has a non-empty term stack");
+    Assert(this->exprStack.empty(), "The BlockCopier has a non-empty expression stack");
+    Assert(this->condStack.empty(), "The BlockCopier has a non-empty condition stack");
+
+    this->builder = this->funBd->ReopenBlock(b.GetLabel());
+
+    for (const auto &s: b.GetStmts()) {
+      s->Accept(*this);
+    }
+  }
+  void BlockCopier::Visit(const Funct &f) {
+    Panic("BlockCopier should never visit a Function");
   }
 
   const StructDef *
@@ -475,6 +774,25 @@ namespace symir {
     return dynamic_cast<StructParam *>(v);
   }
 
+  const UnInitLocal *FunctBuilder::SymUnInitLocal(const std::string &name, SymIR::Type type, bool isVolatile) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    Assert(
+        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    Assert(
+        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
+        name.c_str()
+    );
+    locals.push_back(std::make_unique<UnInitLocal>(name, type));
+    const auto v = locals.back().get();
+    if (isVolatile) {
+      v->SetVolatile();
+    }
+    localMap[name] = v;
+    return dynamic_cast<const UnInitLocal *>(v);
+  }
+
   const ScaLocal *FunctBuilder::SymScaLocal(
       const std::string &name, Coef *coef, SymIR::Type type, bool isVolatile
   ) {
@@ -559,6 +877,15 @@ namespace symir {
     return createdBlocks[label].get();
   }
 
+  BlockBuilder *FunctBuilder::ReopenBlock(const std::string &label) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    for (auto &b: createdBlocks) {
+      Assert(b.first != label, "Blocks with the same label \"%s\" is already open", label.c_str());
+    }
+    createdBlocks[label] = std::make_unique<BlockBuilder>(this, label);
+    return createdBlocks[label].get();
+  }
+
   const Block *FunctBuilder::CloseBlock(BlockBuilder *builder) {
     Assert(isActive(), "The FunctBuilder is no longer active");
     const std::string &label = builder->GetLabel();
@@ -568,6 +895,32 @@ namespace symir {
         label.c_str()
     );
     blocks.push_back(builder->Build());
+    blockMap[label] = blocks.back().get();
+    createdBlocks.erase(it);
+    return blocks.back().get();
+  }
+
+  const Block *FunctBuilder::ReplaceOrCloseBlock(BlockBuilder *builder) {
+    Assert(isActive(), "The FunctBuilder is no longer active");
+    const std::string &label = builder->GetLabel();
+    const auto it = createdBlocks.find(label);
+    Assert(
+        it != createdBlocks.end(), "Blocks with the same label \"%s\" does not exists",
+        label.c_str()
+    );
+
+    size_t blockIdx;
+    for (blockIdx = 0; blockIdx < this->blocks.size(); blockIdx++) {
+      if (this->blocks[blockIdx]->GetLabel() == label) {
+        break;
+      }
+    }
+
+    if (blockIdx != this->blocks.size()) {
+      blocks[blockIdx] = builder->Build();
+    } else {
+      blocks.push_back(builder->Build());
+    }
     blockMap[label] = blocks.back().get();
     createdBlocks.erase(it);
     return blocks.back().get();
@@ -653,6 +1006,42 @@ namespace symir {
     pushTerm(currentBlock->SymTerm(t.GetOp(), popCoef(), var, access));
   }
 
+  void FunctCopier::Visit(const ModExpr &e) {
+    std::vector<Coef *> coeffs;
+    for (const auto& c : e.GetCoeffs()) {
+      c->Accept(*this);
+      auto coeff = popCoef();
+      coeffs.push_back(coeff);
+    }
+    std::vector<const VarDef *> variables;
+
+    const VarDef *var = nullptr;
+    std::vector<std::vector<Coef *>> accesses{};
+    for (const auto& use: e.GetVars()) {
+      std::vector<Coef *> access{};
+      const auto name = use->GetName();
+      var = builder->FindVar(name);
+      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+      use->Accept(*this);
+      for (size_t i = 0; i < use->GetAccess().size(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
+      variables.push_back(var);
+      accesses.push_back(std::vector(access));
+    }
+
+    const std::vector<int> polynomial = e.GetPolynomial();
+    const int mod = e.GetMod();
+
+    pushModExpr(currentBlock->SymModExpr(
+      coeffs,
+      variables,
+      accesses,
+      polynomial,
+      mod
+    ));
+  }
+
   void FunctCopier::Visit(const Expr &e) {
     const auto &terms = e.GetTerms();
     std::vector<TermID> termIds;
@@ -667,6 +1056,24 @@ namespace symir {
     c.GetExpr()->Accept(*this);
     auto exprId = popExpr();
     pushCond(currentBlock->SymCond(c.GetOp(), exprId));
+  }
+
+  void FunctCopier::Visit(const ModAssStmt &a) {
+    const auto use = a.GetVar();
+    const auto expr = a.GetExpr();
+    const auto name = use->GetName();
+    const auto var = builder->FindVar(name);
+    Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+
+    use->Accept(*this);
+    expr->Accept(*this);
+    auto modExprId = popModExpr();
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
+    currentBlock->SymModAssignAt(var, modExprId, access);
   }
 
   void FunctCopier::Visit(const AssStmt &a) {
@@ -707,6 +1114,10 @@ namespace symir {
 
   void FunctCopier::Visit(const StructParam &p) {
     builder->SymStructParam(p.GetName(), p.GetStructName());
+  }
+
+  void FunctCopier::Visit(const UnInitLocal &l) {
+    builder->SymUnInitLocal(l.GetName(), l.GetType(), l.IsVolatile());
   }
 
   void FunctCopier::Visit(const ScaLocal &l) {

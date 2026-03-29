@@ -85,8 +85,10 @@ namespace symir {
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
     void Visit(const Term &t) override;
+    void Visit(const ModExpr &e) override;
     void Visit(const Expr &e) override;
     void Visit(const Cond &c) override;
+    void Visit(const ModAssStmt &e) override;
     void Visit(const AssStmt &e) override;
     void Visit(const RetStmt &r) override;
     void Visit(const Branch &b) override;
@@ -94,6 +96,7 @@ namespace symir {
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
+    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;
@@ -118,8 +121,10 @@ namespace symir {
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
     void Visit(const Term &t) override;
+    void Visit(const ModExpr &e) override;
     void Visit(const Expr &e) override;
     void Visit(const Cond &c) override;
+    void Visit(const ModAssStmt &e) override;
     void Visit(const AssStmt &e) override;
     void Visit(const RetStmt &r) override;
     void Visit(const Branch &b) override;
@@ -127,6 +132,7 @@ namespace symir {
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
+    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;
@@ -230,8 +236,10 @@ namespace symir {
     void Visit(const VarUse &v) override;
     void Visit(const Coef &c) override;
     void Visit(const Term &t) override;
+    void Visit(const ModExpr &e) override;
     void Visit(const Expr &e) override;
     void Visit(const Cond &c) override;
+    void Visit(const ModAssStmt &a) override;
     void Visit(const AssStmt &a) override;
     void Visit(const RetStmt &r) override;
     void Visit(const Branch &b) override;
@@ -239,6 +247,7 @@ namespace symir {
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
+    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;
