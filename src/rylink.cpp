@@ -25,6 +25,7 @@
 
 #include <set>
 #include <string>
+#include <flint/flint.h>
 
 #include "artifacts.hpp"
 #include "cxxopts.hpp"
@@ -40,6 +41,7 @@ struct ProgGenOpts {
   std::string input;
   int limits;
   bool debug;
+  bool verbose;
 
   static ProgGenOpts Parse(int argc, char **argv) {
     cxxopts::Options options("rylink", "rylink: Reify for whole program generation\n");
@@ -49,6 +51,7 @@ struct ProgGenOpts {
       ("i,input", "The directory saving the seed functions and mappings", cxxopts::value<std::string>())
       ("l,limit", "The number of new programs to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -106,10 +109,12 @@ struct ProgGenOpts {
     }
 
     const bool debug = args["debug"].as<bool>();
+    
+    const bool verbose = args["verbose"].as<bool>();
 
     GlobalOptions::Get().HandleProgArgs(args);
 
-    return {.uuid = uuid, .input = input, .limits = limit, .debug = debug};
+    return { .uuid = uuid, .input = input, .limits = limit, .debug = debug, .verbose = verbose };
   }
 };
 
@@ -122,6 +127,7 @@ int main(int argc, char *argv[]) {
 
   int genLimit = cliOpts.limits;
   bool enableDebug = cliOpts.debug;
+  bool verbose = cliOpts.verbose;
   if (enableDebug) {
     Log::Get().SetCout();
   }
@@ -143,6 +149,8 @@ int main(int argc, char *argv[]) {
   std::sort(allFunPaths.begin(), allFunPaths.end());
 
   for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
+    ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
+
     Log::Get().Out() << "[" << sampNo << "] Generating ... " << std::endl;
 
     // Randomly select FUNCTION_DEPTH functions for the new program
@@ -165,14 +173,25 @@ int main(int argc, char *argv[]) {
       selFunPaths.push_back(allFunPaths[index]);
     }
 
+    fs::create_directories(arts.GetTestDir());
+    // set logger to log file for prog generation
+    if (verbose) {
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/false));
+    } else {
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
+    }
     // Now we construct our new program
     auto prog = std::make_unique<ProgPlus>(progUuid, sampNo, selFunPaths);
     prog->Generate();
 
+    // reset logger back to 
+    if (enableDebug) {
+      Log::Get().SetCout();
+    } else {
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/false));
+    }
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
-    ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
-    fs::create_directories(arts.GetTestDir());
     prog->GenerateCode(arts);
   }
 }
