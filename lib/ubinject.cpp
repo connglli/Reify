@@ -188,6 +188,10 @@ void IntUBInject::Visit(const symir::Term &t) {
   }
 }
 
+void IntUBInject::Visit(const symir::ModExpr &e) {
+  Panic("No ModExpr should exist during function creation");
+}
+
 void IntUBInject::Visit(const symir::Expr &e) {
   std::vector<bitwuzla::Term> exprs;
   std::vector<symir::Coef *> coefs;
@@ -245,6 +249,10 @@ void IntUBInject::Visit(const symir::Cond &c) {
   }
 }
 
+void IntUBInject::Visit(const symir::ModAssStmt &a) {
+  Panic("No ModAssStmt should exist during function creation");
+}
+
 void IntUBInject::Visit(const symir::AssStmt &a) {
   a.GetExpr()->Accept(*this);
   const auto expr = popExpression();
@@ -293,6 +301,10 @@ void IntUBInject::Visit(const symir::ScaParam &p) {
 
 void IntUBInject::Visit(const symir::VecParam &p) {
   Panic("Cannot reach here: We only inject UBs into basic blocks, not parameters");
+}
+
+void IntUBInject::Visit(const symir::UnInitLocal &l) {
+  Panic("Cannot reach here: We only inject UBs into basic blocks, not locals");
 }
 
 void IntUBInject::Visit(const symir::ScaLocal &l) {
