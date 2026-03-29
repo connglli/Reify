@@ -161,6 +161,7 @@ IndexLoop:
       for (size_t i = 0; i < this->polynomial.size(); i++) {
         Log::Get().Out() << this->polynomial[i] << " ";
       }
+      Log::Get().Out() << std::endl;
 
       nmod_mat_t A;
       nmod_mat_t B;
@@ -596,99 +597,97 @@ void PrimeInterpFCallStrategy::generatePreamble(
   auto randTarget = Random::Get().Uniform(0, prime);
   auto randDouble = Random::Get().UniformReal();
   size_t flattIndex = 0;
-  for (int32_t i = 0; i < static_cast<int32_t>(this->init->size()); ++i) {
-    const auto &arg = (*this->init)[i];
-    flattIndex += 1; // arg.getSize();
+  for (size_t initIdx = 0; initIdx < this->init->size(); initIdx++) {
+    const auto &arg = (*this->init)[initIdx];
+    for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
+      flattIndex += 1;
 
 
-    if (!arg.IsScalar()) {
-      //TODO: allow non scalars
-      continue;
-    }
-    // select inits randomly TODO: Make probability global?
-    if (randDouble() <= 0.5) continue;
+      // select inits randomly TODO: Make probability global?
+      if (randDouble() <= 0.5) continue;
 
-    Log::Get().Out() << "Replacing the " << flattIndex << "-th argument" << std::endl;
+      Log::Get().Out() << "Replacing the " << flattIndex << "-th argument" << std::endl;
 
-    // use available locals if possible
-    const symir::VarDef *loc = funBd->SymUnInitLocal("arg_" + std::to_string(argUsed));
-    Assert(loc != nullptr, "creation or search for local has failed");
-    argUsed += 1;
+      // use available locals if possible
+      const symir::VarDef *loc = funBd->SymUnInitLocal("arg_" + std::to_string(argUsed));
+      Assert(loc != nullptr, "creation or search for local has failed");
+      argUsed += 1;
 
-    Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
+      Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
 
-    // randomly select a subset of variables and find there VarDef
-    std::vector<const symir::VarDef *> vars;
-    std::vector<std::vector<symir::Coef *>> accesses;
-    std::vector<size_t> indices;
-    auto varMap = varStateQuery->GetVarMap();
-    size_t lastVarStartIndex = 0;
-    for (size_t i = 0; i < nrVariables; i++) {
-      if (varMap.contains(i)) lastVarStartIndex = i;
-      // select vars randomly TODO: Make probability global?
-      if (indices.size() > 0 && randDouble() <= 0.2) continue;
-      indices.push_back(i);
-      const symir::VarDef *var = funBd->FindVar(varMap[lastVarStartIndex]);
-      vars.push_back(var);
-      accesses.push_back(unflattenAccess(funBd, var, i - lastVarStartIndex));
-    }
-    size_t filteredNrVariables = vars.size();
+      // randomly select a subset of variables and find there VarDef
+      std::vector<const symir::VarDef *> vars;
+      std::vector<std::vector<symir::Coef *>> accesses;
+      std::vector<size_t> indices;
+      auto varMap = varStateQuery->GetVarMap();
+      size_t lastVarStartIndex = 0;
+      for (size_t i = 0; i < nrVariables; i++) {
+        if (varMap.contains(i)) lastVarStartIndex = i;
+        // select vars randomly TODO: Make probability global?
+        if (indices.size() > 0 && randDouble() <= 0.2) continue;
+        indices.push_back(i);
+        const symir::VarDef *var = funBd->FindVar(varMap[lastVarStartIndex]);
+        vars.push_back(var);
+        accesses.push_back(unflattenAccess(funBd, var, i - lastVarStartIndex));
+      }
+      size_t filteredNrVariables = vars.size();
 
-    Log::Get().Out() << "Using Variables (" << filteredNrVariables << "): ";
-    for (size_t i = 0; i < filteredNrVariables; i++) {
-      Log::Get().Out() << vars[i]->GetName();
-      if (!vars[i]->IsScalar()) {
-        Log::Get().Out() << "[";
-        for (size_t j = 0; j < accesses[i].size() - 1; j++) {
-          Log::Get().Out() << accesses[i][j]->GetI32Value() << ", ";
+      Log::Get().Out() << "Using Variables (" << filteredNrVariables << "): ";
+      for (size_t i = 0; i < filteredNrVariables; i++) {
+        Log::Get().Out() << vars[i]->GetName();
+        if (!vars[i]->IsScalar()) {
+          Log::Get().Out() << "[";
+          for (size_t j = 0; j < accesses[i].size() - 1; j++) {
+            Log::Get().Out() << accesses[i][j]->GetI32Value() << ", ";
+          }
+          Log::Get().Out() << accesses[i][accesses[i].size() - 1]->GetI32Value() << "]";
         }
-        Log::Get().Out() << accesses[i][accesses[i].size() - 1]->GetI32Value() << "]";
+        if (i == vars.size() - 1) {
+          Log::Get().Out() << std::endl;
+        } else {
+          Log::Get().Out() << ", ";
+        }
       }
-      if (i == vars.size() - 1) {
-        Log::Get().Out() << std::endl;
+      
+      // Filter varState
+      std::vector<int32_t> filteredVarState;
+      filteredVarState.reserve(nrIterations * filteredNrVariables);
+      for (size_t i = 0; i < nrIterations; i++) {
+        for (size_t j = 0; j < filteredNrVariables; j++) {
+          filteredVarState.push_back(varState[i * nrVariables + indices[j]]);
+        }
+      }
+
+      // We need a target value in Z_p to achive this we choose one randomly and then figure out how to correct for it.
+      // TODO: iterate through init not just the first element
+      int32_t target = arg.IsScalar() ? arg.GetValue() : arg.GetValue(argIdx);
+      int32_t interpolTarget;
+      if (target == INT32_MIN) {
+        // avoid the div by 0 case of the else stmt
+        interpolTarget = 0;
       } else {
-        Log::Get().Out() << ", ";
+        interpolTarget = randTarget() % ((-(int64_t)INT32_MIN) + target);
       }
-    }
-    
-    // Filter varState
-    std::vector<int32_t> filteredVarState;
-    filteredVarState.reserve(nrIterations * filteredNrVariables);
-    for (size_t i = 0; i < nrIterations; i++) {
-      for (size_t j = 0; j < filteredNrVariables; j++) {
-        filteredVarState.push_back(varState[i * nrVariables + indices[j]]);
+
+      Log::Get().Out() << "Target: " << target << ", Interpolation Target: " << interpolTarget << std::endl;
+
+      interpolGen.interpolate(filteredNrVariables, nrIterations, filteredVarState, interpolTarget);
+      std::vector<int32_t> polynomial = interpolGen.getPolynomial();
+      std::vector<int32_t> coeffsVals = interpolGen.getCoeffs();
+
+      // we need coeff object to hand to the builder
+      std::vector<symir::Coef *> coeffs{};
+      coeffs.reserve(coeffsVals.size());
+      for (const int32_t c : coeffsVals) {
+        coeffs.push_back(funBd->SymI32Const(c));
       }
+
+      auto assignment = blockBd->SymModAssignAt(loc, blockBd->SymModExpr(coeffs, vars, accesses, polynomial, prime), {}, stmtIndex);
+      Assert(assignment != nullptr, "Failed to create a ModAssignment, likely by a failed dynamic_cast");
+      this->argVars[flattIndex - 1] = std::make_pair(assignment->GetVar()->GetName(), target - interpolTarget);
+      
+      Log::Get().Out() << std::endl;
     }
-
-    // We need a target value in Z_p to achive this we choose one randomly and then figure out how to correct for it.
-    // TODO: iterate through init not just the first element
-    int32_t target = arg.IsScalar() ? arg.GetValue() : arg.GetValue(0);
-    int32_t interpolTarget;
-    if (target == INT32_MIN) {
-      // avoid the div by 0 case of the else stmt
-      interpolTarget = 0;
-    } else {
-      interpolTarget = randTarget() % ((-(int64_t)INT32_MIN) + target);
-    }
-
-    Log::Get().Out() << "Target: " << target << ", Interpolation Target: " << interpolTarget << std::endl;
-
-    interpolGen.interpolate(filteredNrVariables, nrIterations, filteredVarState, interpolTarget);
-    std::vector<int32_t> polynomial = interpolGen.getPolynomial();
-    std::vector<int32_t> coeffsVals = interpolGen.getCoeffs();
-
-    // we need coeff object to hand to the builder
-    std::vector<symir::Coef *> coeffs{};
-    coeffs.reserve(coeffsVals.size());
-    for (const int32_t c : coeffsVals) {
-      coeffs.push_back(funBd->SymI32Const(c));
-    }
-
-    auto assignment = blockBd->SymModAssignAt(loc, blockBd->SymModExpr(coeffs, vars, accesses, polynomial, prime), {}, stmtIndex);
-    Assert(assignment != nullptr, "Failed to create a ModAssignment, likely by a failed dynamic_cast");
-    this->argVars[flattIndex - 1] = std::make_pair(assignment->GetVar()->GetName(), target - interpolTarget);
-    
-    Log::Get().Out() << std::endl;
   }
   funBd->ReplaceOrCloseBlock(blockBd);
   Log::Get().CloseSection();
@@ -705,7 +704,6 @@ std::string PrimeInterpFCallStrategy::generateCall() {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
   Assert(this->fina, "fina is not initialized");
-  Assert(this->argVars.size() > 0, "argVars is not initialized");
 
   int32_t checksum = StatelessChecksum::Compute(*this->fina);
   std::ostringstream fcall;
@@ -713,17 +711,21 @@ std::string PrimeInterpFCallStrategy::generateCall() {
         << "(";
 
   const auto &params = this->guest->GetParams();
+  size_t flattenedIndex = 0;
   for (int32_t i = 0; i < static_cast<int32_t>(init->size()); ++i) {
     const auto &p = params[i];
-    if (this->argVars.contains(i)) {
-      // TODO: allow for struct and arrays
-      const auto &argVar = this->argVars[i];
-      fcall << argVar.first << " + " << argVar.second;
-    } else {
-      const auto &arg = (*this->init)[i];
-      fcall << arg.GetTypeCastStr(p) 
-            << arg.ToCxStr();
+    const auto &arg = (*this->init)[i];
+
+    std::map<size_t, std::pair<std::string, int32_t> *> replacers;
+    for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
+      if (this->argVars.contains(flattenedIndex)) {
+        replacers[argIdx] = &this->argVars[i];
+      }
+      flattenedIndex += 1;
     }
+    fcall << arg.GetTypeCastStr(p) 
+          << arg.ToCxStrWithReplaced(replacers);
+
     if (i < static_cast<int32_t>(this->init->size()) - 1) {
       fcall << ", ";
     }
@@ -739,7 +741,7 @@ std::string PrimeInterpFCallStrategy::generateCall() {
     ) {
     return "(" + chk_call + " + " + std::to_string(diff) + ")";
   } else {
-    return "(int32_t) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
+    return "(int) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
   }
 }
 
@@ -849,7 +851,7 @@ void RandomFCallEmbedder::Visit(const symir::Block &b) {
   const auto rand = Random::Get().Uniform(0, static_cast<int32_t>(stmts.size()) - 1);
   const auto randDouble = Random::Get().UniformReal();
 
-  for (int32_t tries = 0; tries < 100; tries++) {
+  for (int32_t tries = 0; tries < 10; tries++) {
     const int32_t index = rand();
     const auto stmt = stmts[index];
     // Idea: 80% of the replacements should be in the conditional statements,
