@@ -24,12 +24,14 @@
 // SOFTWARE.
 
 #include <fstream>
+#include <string>
 
 #include "lib/chksum.hpp"
 #include "lib/parsers.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 #include "lib/fcallembed.hpp"
+#include "lib/varstate.hpp"
 
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
@@ -54,26 +56,30 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     this->functions.push_back(std::move(func));
     auto mapping = FunPlus::ParseMappingCode(arts.GetMapPath());
     this->mappings.push_back(std::move(mapping));
+    this->varStates.push_back(varstate::allFromJsonFile(arts.GetVarStatePath()));
 
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
     idx++;
   }
 }
 
-void ProgPlus::Generate() const {
+void ProgPlus::Generate() {
   const int numFuns = static_cast<int>(functions.size());
 
   // Now replace the mappings in the functions with the calls to the other functions
   for (int i = 0; i < numFuns - 1; ++i) {
     auto host = functions[i].get();
-    auto emb = RandomFCallEmbedder(host);
-    auto strat = LiteralFCallStrategy();
-    emb.setStrategy(&strat);
     int numCoeffs = host->GetSymbols().size();
 
-    Log::Get().Out() << "[" << sno << "] Host function: index=" << i
-                     << ", name=" << host->GetName() << ", num_replaceable=" << numCoeffs
-                     << std::endl;
+    Log::Get().OpenSection("Host function (" + std::to_string(i) + "): " + host->GetName());
+    Log::Get().Out() << "num_replaceable=" << numCoeffs << std::endl;
+
+    auto emb = RandomFCallEmbedder(host);
+    //auto strat = LiteralFCallStrategy();
+    auto strat = PrimeInterpFCallStrategy();
+    emb.setStrategy(&strat);
+    Log::Get().Out() << "Embed Strategy: " << strat.getStrategyName() << std::endl;
+
 
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
@@ -86,21 +92,36 @@ void ProgPlus::Generate() const {
       auto guest = functions[j].get();
       Assert(guest != nullptr, "The guest function is nullptr for index %d", j);
       auto guestMap = mappings[j];
-      int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
+
+      //int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
+      int index = 0; // TODO: Each init/fina pair for the HOST results in a different function.
+
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
+      auto varStateQuery = this->varStates[i][index];
+      emb.setVarStateQuery(&varStateQuery);
+
+      Log::Get().OpenSection("Embedding " + guest->GetName());
+      Log::Get().Out() << "Initials: ";
+      for (size_t i = 0 ; i < init->size(); i++) {
+        Log::Get().Out() << (*init)[i].ToCxStr() << ", ";
+      }
+      Log::Get().Out() << (*init)[init->size() - 1].ToCxStr() << std::endl;
+
       if (emb.embedGuest(guest, init, fina)) {
-        Log::Get().Out() << "[" << sno << "] " << k << "/" << randNum 
-                         << " embedding: " << "func#" << j << ": "
+        Log::Get().Out() << "Embed: " << k << "/" << randNum 
+                         << " Success: " << "func#" << j << ": "
                          << guest->GetName() << std::endl;
       } else {
-        Log::Get().Out() << "[" << sno << "] " << k << "/" << randNum 
-                         << " failed embedding: " << "func#" << j << ": "
+        Log::Get().Out() << "Embed: " << k << "/" << randNum 
+                         << " Failed: " << "func#" << j << ": "
                          << guest->GetName() << std::endl;
       }
+      Log::Get().CloseSection();
     }
 
-    Log::Get().Out() << "[" << sno << "]   Done" << std::endl;
+    functions[i] = emb.finalize();
+    Log::Get().CloseSection();
   }
 }
 
@@ -114,6 +135,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts) const {
   std::ofstream protoFile(arts.GetProtoPath());
   protoFile << "#ifndef PROTOTYPES_H" << std::endl;
   protoFile << "#define PROTOTYPES_H" << std::endl << std::endl;
+  protoFile << "#define RM(var, mod) ((var % mod + mod) % mod)" << std::endl << std::endl;
   protoFile << StatelessChecksum::GetCheckChksumCode(/*debug=*/true) << std::endl;
   protoFile << "extern " << StatelessChecksum::GetCrc32InitPrototype() << ";" << std::endl;
   protoFile << "extern " << StatelessChecksum::GetComputePrototype() << ";" << std::endl;
@@ -140,7 +162,8 @@ void ProgPlus::GenerateCode(const ProgArts &arts) const {
   mainFile << "    " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
 
   // Use the first function (index 0) as the entry point
-  int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
+  //int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
+  int index = 0; // TODO: See line 97
   const std::vector<ArgPlus<int>> *init = &(mappings[0].first[index]);
   const std::vector<ArgPlus<int>> *fina = &(mappings[0].second[index]);
   int checksum = StatelessChecksum::Compute(*fina);
