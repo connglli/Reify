@@ -43,7 +43,7 @@ public:
 
   [[nodiscard]] std::string GetName() const { return uuid + "_" + sno; }
 
-  void Generate() const;
+  void Generate();
   void GenerateCode(const ProgArts &arts) const;
 
 private:

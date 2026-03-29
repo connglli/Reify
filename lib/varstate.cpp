@@ -24,6 +24,7 @@
 // SOFTWARE.
 
 #include "lib/varstate.hpp"
+#include "lib/lang.hpp"
 #include "lib/symexec.hpp"
 #include "lib/ubfree.hpp"
 #include <bitwuzla/cpp/bitwuzla.h>
@@ -50,7 +51,7 @@ namespace varstate {
     }
     return res;
   }
-  void print_state(size_t nr_variables, std::vector<int> states) {
+  void print_state(size_t nr_variables, std::vector<int32_t> states) {
     for (size_t i = 0; i < states.size(); i++) {
       std::cout << states[i];
       if (i != 0 && i % nr_variables == 0) std::cout << std::endl;
@@ -66,7 +67,7 @@ nlohmann::json VariableState::toJson() {
     initArr[i] = this->init[i];
   }
   nlohmann::json varMap = nlohmann::json::object();
-  for (const auto& [name, idx] : this->varNamesMap) {
+  for (const auto& [idx, name] : this->varNamesMap) {
     varMap[name] = idx;
   }
   nlohmann::json pathArr = nlohmann::json::array();
@@ -122,23 +123,23 @@ void VariableState::fromJson(nlohmann::json mapObj) {
 
   // read variable indexes
   for (const auto& [name, idx] : varMap.items()) {
-    this->varNamesMap[name] = idx.get<int>();
+    this->varNamesMap[idx.get<int32_t>()] = name;
   }
 
   // read path states
   this->executionState.resize(pathArr.size());
   for (size_t i = 0; i < pathArr.size(); i++) {
-    Assert(pathArr.contains("block"), "varstate object does not contain an field 'block'");
-    Assert(pathArr.contains("blockLabel"), "varstate object does not contain an field 'blockLabel'");
-    Assert(pathArr.contains("assignments"), "varstate object does not contain an field 'blockLabel'");
+    Assert(pathArr[i].contains("block"), "varstate object does not contain an field 'block'");
+    Assert(pathArr[i].contains("blockLabel"), "varstate object does not contain an field 'blockLabel'");
+    Assert(pathArr[i].contains("assignments"), "varstate object does not contain an field 'blockLabel'");
     this->executionState[i].blockId.first = pathArr[i]["block"];
     this->executionState[i].blockId.second= pathArr[i]["blockLabel"];
 
-    nlohmann::json assignArr = pathArr["assignments"];
+    nlohmann::json assignArr = pathArr[i]["assignments"];
     this->executionState[i].assignments.resize(assignArr.size());
     for (size_t j = 0; j < assignArr.size(); j++) {
       this->executionState[i].assignments[j].first = assignArr[j]["variable"];
-      this->executionState[i].assignments[j].second = assignArr[j]["value"].get<int>();
+      this->executionState[i].assignments[j].second = assignArr[j]["value"].get<int32_t>();
     }
   }
 }
@@ -146,22 +147,33 @@ void VariableState::fromJson(nlohmann::json mapObj) {
 std::pair<size_t, std::vector<int32_t>> VariableState::query(size_t blockIndex, size_t stmtIndex) {
   std::vector<int32_t> varState = std::vector(this->init);
 
-  size_t flatVarsCount = varState.size();
+  size_t varsCount = varState.size();
   size_t currStateStartIdx = 0;
   for (const auto &blockState : this->executionState) {
     for (size_t assignIdx = 0; assignIdx < blockState.assignments.size(); assignIdx++) {
+      // if we reached the target block and stmt save the current state at this row and move on to the next row
+      if (blockIndex == (size_t) blockState.blockId.first && assignIdx == stmtIndex) {
+        varState.resize(varState.size() + varsCount);
+        for (size_t i = varState.size() - varsCount; i < varState.size() ; i++)
+          varState[i] = varState[i - varsCount];
+        currStateStartIdx += varsCount;
+      }
       // update assigned variables state
       varState[blockState.assignments[assignIdx].first + currStateStartIdx] =
         blockState.assignments[assignIdx].second;
-      if (blockIndex == (size_t) blockState.blockId.first && assignIdx == stmtIndex) {
-        // if we reached the target block and stmt save the current state at this row and move on to the next row
-        varState.resize(varState.size() + flatVarsCount);
-        for (size_t i = varState.size() - flatVarsCount; i < varState.size() ; i++)
-          varState[i] = varState[i - flatVarsCount];
-      }
+    }
+    // if we reached the target block and stmt is after the last assignment stmt store anyway
+    if (blockIndex == (size_t) blockState.blockId.first && blockState.assignments.size() <= stmtIndex) {
+      varState.resize(varState.size() + varsCount);
+      for (size_t i = varState.size() - varsCount; i < varState.size() ; i++)
+        varState[i] = varState[i - varsCount];
+      currStateStartIdx += varsCount;
     }
   }
-  return std::make_pair(flatVarsCount, varState);
+  // cut the temporary top variable state before returning
+  varState.resize(varState.size() - varsCount);
+  Assert(varState.size() != 0, "unable to find variable state at block %ld, stmt %ld", blockIndex, stmtIndex);
+  return std::make_pair(varsCount, varState);
 }
 
 void VariableState::extract(SymExec *symexec) {
@@ -174,6 +186,24 @@ void VariableState::extract(SymExec *symexec) {
   symexec->fun->Accept(*this);
 }
 
+std::vector<int32_t> VariableState::getPathBlocksIndices() {
+  std::vector<int32_t> path;
+  path.reserve(this->executionState.size());
+  for (const auto& es : executionState) {
+    path.push_back(es.blockId.first);
+  }
+  return path;
+}
+
+std::vector<std::string> VariableState::getPathBlocksLabels() {
+  std::vector<std::string> path;
+  path.reserve(this->executionState.size());
+  for (const auto& es : executionState) {
+    path.push_back(es.blockId.second);
+  }
+  return path;
+}
+
 void VariableState::Visit(const symir::VarUse &v) {
   const auto *varDef = v.GetDef();
   const auto &access = v.GetAccess();
@@ -184,36 +214,36 @@ void VariableState::Visit(const symir::VarUse &v) {
       (currType == symir::SymIR::Type::STRUCT)
           ? varDef->GetStructName()
           : (currBaseType == symir::SymIR::Type::STRUCT ? varDef->GetStructName() : "");
-  std::vector<int> currShape = varDef->GetVecShape();
-  size_t currentShapeIdx = 0; // Index into currShape
+  std::vector<int32_t> currShape = varDef->GetVecShape();
+  size_t currentShapeIdx = 0; // Index int32_to currShape
 
   std::ostringstream solverSuffix;
-  int flattenedIdx = 0;
+  int32_t flattenedIdx = 0;
 
   // Row-major flattening for the current contiguous array access chain.
-  std::vector<int> pendingArrayIndices;
-  std::vector<int> pendingArrayShape;
+  std::vector<int32_t> pendingArrayIndices;
+  std::vector<int32_t> pendingArrayShape;
 
   for (size_t i = 0; i < access.size(); ++i) {
     access[i]->Accept(*this);
     auto idxExpr = popTerm();
-    std::optional<int> idxValOpt = symexec->extractTermFromModel(idxExpr);
+    std::optional<int32_t> idxValOpt = symexec->extractTermFromModel(idxExpr);
     Assert(idxValOpt.has_value(), "Onpath index expression is not solved");
-    int idxVal = idxValOpt.value();
+    int32_t idxVal = idxValOpt.value();
 
     if (currentShapeIdx < currShape.size()) {
       // Array Access
-      int dimLen = currShape[currentShapeIdx];
+      int32_t dimLen = currShape[currentShapeIdx];
 
       Assert(0 <= idxVal || idxVal < dimLen, "This should have make the solver fail so something is very wrong");
-      int elLoc = idxVal;
+      int32_t elLoc = idxVal;
 
       pendingArrayShape.push_back(dimLen);
       pendingArrayIndices.push_back(elLoc);
       currentShapeIdx++;
 
       if (currentShapeIdx == currShape.size()) {
-        const int flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
+        const int32_t flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
         solverSuffix << "_el" << flatLoc;
         flattenedIdx += flatLoc;
         pendingArrayShape.clear();
@@ -226,10 +256,10 @@ void VariableState::Visit(const symir::VarUse &v) {
       // Struct Access
       Assert(currType == symir::SymIR::Type::STRUCT, "Excess access coefficients on non-struct");
       const auto *sDef = this->symexec->fun->GetStruct(currStruct);
-      int numFields = sDef->GetFields().size();
+      int32_t numFields = sDef->GetFields().size();
 
       Assert(0 <= idxVal || idxVal < numFields, "This should have make the solver fail so something is very wrong");
-      int  fIdx = idxVal;
+      int32_t  fIdx = idxVal;
 
       const auto &field = sDef->GetField(fIdx);
       solverSuffix << "_" << field.name;
@@ -259,49 +289,67 @@ void VariableState::Visit(const symir::VarUse &v) {
     this->symexec->ubSan->CreateVersionedExpr(
       this->currAssignVarDef, solverSuffix.str(), this->versions[solverName]
     );
-  std::optional<int> varValueOpt = this->symexec->extractTermFromModel(varUseExpr);
+  std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(varUseExpr);
   Assert(varValueOpt.has_value(), "VarUse %s is onpath and unsolved!", this->currAssignVarDef->GetName().c_str());
+
+  // look for the variable index to get the correct index into init;
+  size_t varIndex;
+  bool foundIndex = false;
+  for (const auto& [index, name] : this->varNamesMap) {
+    if (name == this->currAssignVarDef->GetName()) {
+      varIndex = index;
+      foundIndex = true;
+    }
+  }
+  Assert(foundIndex, "unable to find var %s in params / locals", this->currAssignVarDef->GetName().c_str());
+
 
   this->executionState[this->currBlock]
     .assignments
     .push_back(std::make_pair(
-      flattenedIdx,
+      varIndex + flattenedIdx,
       varValueOpt.value()
     ));
 }
 
 void VariableState::Visit(const symir::Coef &c) {
-  Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit integer variables are supported for now!");
+  Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit int32_teger variables are supported for now!");
   auto coefExpr = symexec->ubSan->CreateCoefExpr(c);
   pushTerm(coefExpr);
 }
 
-void VariableState::Visit(const symir::Term &t) { ((void) t); }
-void VariableState::Visit(const symir::Expr &e) { ((void) e); }
-void VariableState::Visit(const symir::Cond &c) { ((void) c); }
+void VariableState::Visit(const symir::Term &t) { /* Do Nothing */; }
+void VariableState::Visit(const symir::ModExpr &e) {
+  Panic("No ModExpr should exist during function creation");
+}
+void VariableState::Visit(const symir::Expr &e) { /* Do Nothing */; }
+void VariableState::Visit(const symir::Cond &c) { /* Do Nothing */; }
+void VariableState::Visit(const symir::ModAssStmt &a) {
+  Panic("No ModAssStmt should exist during function creation");
+}
 void VariableState::Visit(const symir::AssStmt &a) {
   this->currAssignVarDef = a.GetVar()->GetDef();
   a.GetVar()->Accept(*this);
 }
 
-void VariableState::Visit(const symir::RetStmt &r) { ((void) r); };
-void VariableState::Visit(const symir::Branch &b) { ((void) b); }
-void VariableState::Visit(const symir::Goto &g) { ((void) g); }
+void VariableState::Visit(const symir::RetStmt &r) { /* Do Nothing */; };
+void VariableState::Visit(const symir::Branch &b) { /* Do Nothing */; }
+void VariableState::Visit(const symir::Goto &g) { /* Do Nothing */; }
 void VariableState::Visit(const symir::ScaParam &p) {
   bitwuzla::Term varExpr = this->symexec->ubSan->CreateScaExpr(&p, 0);
   this->versions[p.GetName()] = 0;
-  std::optional<int> varValueOpt = this->symexec->extractTermFromModel(varExpr);
+  std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(varExpr);
   Assert(varValueOpt.has_value(), "Parameter %s is onpath and unsolved!", p.GetName().c_str());
   this->init.push_back(varValueOpt.value());
 }
 
 void VariableState::Visit(const symir::VecParam &p) {
-  int numEls = p.GetVecNumEls();
-  for (int i = 0; i < numEls; i++) {
+  int32_t numEls = p.GetVecNumEls();
+  for (int32_t i = 0; i < numEls; i++) {
     auto elName = this->symexec->ubSan->GetVecElName(&p, i);
     auto elExpr = this->symexec->ubSan->CreateVecElExpr(&p, i, 0);
     this->versions[elName] = 0;
-    std::optional<int> varValueOpt = this->symexec->extractTermFromModel(elExpr);
+    std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(elExpr);
     Assert(varValueOpt.has_value(), "Parameter %s is onpath and unsolved!", p.GetName().c_str());
     this->init.push_back(varValueOpt.value());
   }
@@ -313,27 +361,32 @@ void VariableState::Visit(const symir::StructParam &p) {
     auto fieldExpr = this->symexec->ubSan->CreateStructFieldExpr(&p, elName, 0);
     std::string fullFieldName = this->symexec->ubSan->GetStructFieldName(&p, elName);
     versions[fullFieldName] = 0;
-    std::optional<int> varValueOpt = this->symexec->extractTermFromModel(fieldExpr);
+    std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(fieldExpr);
     Assert(varValueOpt.has_value(), "Parameter %s is onpath and unsolved!", p.GetName().c_str());
     this->init.push_back(varValueOpt.value());
   });
 }
+
+void VariableState::Visit(const symir::UnInitLocal &l) {
+  Panic("No ModExpr should exist during function creation");
+}
+
 void VariableState::Visit(const symir::ScaLocal &l) {
   // we do not care for the coeffs term here
   auto varExpr = this->symexec->ubSan->CreateScaExpr(l.GetDefinition(), 0);
   this->versions[l.GetName()] = 0;
-  std::optional<int> varValueOpt = this->symexec->extractTermFromModel(varExpr);
+  std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(varExpr);
   Assert(varValueOpt.has_value(), "Parameter %s is onpath and unsolved!", l.GetName().c_str());
   this->init.push_back(varValueOpt.value());
 }
 
 void VariableState::Visit(const symir::VecLocal &l) {
-  int numEls = l.GetVecNumEls();
-  for (int i = 0; i < numEls; i++) {
+  int32_t numEls = l.GetVecNumEls();
+  for (int32_t i = 0; i < numEls; i++) {
     auto elName = this->symexec->ubSan->GetVecElName(l.GetDefinition(), i);
     auto elExpr = this->symexec->ubSan->CreateVecElExpr(l.GetDefinition(), i, 0);
     this->versions[elName] = 0;
-    std::optional<int> varValueOpt = this->symexec->extractTermFromModel(elExpr);
+    std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(elExpr);
     Assert(varValueOpt.has_value(), "Parameter %s is onpath and unsolved!", l.GetName().c_str());
     this->init.push_back(varValueOpt.value());
   }
@@ -344,12 +397,12 @@ void VariableState::Visit(const symir::StructLocal &l) {
     auto fieldExpr = this->symexec->ubSan->CreateStructFieldExpr(l.GetDefinition(), elName, 0);
     std::string fullFieldName = this->symexec->ubSan->GetStructFieldName(l.GetDefinition(), elName);
     versions[fullFieldName] = 0;
-    std::optional<int> varValueOpt = this->symexec->extractTermFromModel(fieldExpr);
+    std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(fieldExpr);
     Assert(varValueOpt.has_value(), "Parameter %s is onpath and unsolved!", l.GetName().c_str());
     this->init.push_back(varValueOpt.value());
   });
 }
-void VariableState::Visit(const symir::StructDef &s) { ((void) s); };
+void VariableState::Visit(const symir::StructDef &s) { /* Do Nothing */; };
 void VariableState::Visit(const symir::Block &b) {
   for (const auto &stmt: b.GetStmts()) {
     stmt->Accept(*this);
@@ -357,11 +410,11 @@ void VariableState::Visit(const symir::Block &b) {
 };
 void VariableState::Visit(const symir::Funct &f) {
   for (const auto &param: f.GetParams()) {
-    this->varNamesMap[param->GetName()] = this->init.size();
+    this->varNamesMap[this->init.size()] = param->GetName();
     param->Accept(*this);
   }
   for (const auto &local: f.GetLocals()) {
-    this->varNamesMap[local->GetName()] = this->init.size();
+    this->varNamesMap[this->init.size()] = local->GetName();
     local->Accept(*this);
   }
   for (size_t i = 0; i < this->executionState.size(); i++) {

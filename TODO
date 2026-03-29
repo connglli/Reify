@@ -10,3 +10,8 @@ C/C++:
 Java:
 1. rylink for java
 2. separation compilation units
+
+Interprocedural Dataflow: 
+1. During linking use all init/fina mappings (Currently only uses first)
+2. During call/preamble generation allow for non scalars to be used as a Interpolation Target
+3. Modular arithmetic SymIR Classes currently cannot compile to Java
