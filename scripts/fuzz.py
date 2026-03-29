@@ -630,7 +630,7 @@ class Worker:
       indir=self.wconf.wdir,
       limit=self.wconf.prog_limit,
       config=PGEN_SUGGESTED_CONFIGS[0],
-      extra="--Xreplace-proba 0.3",
+      extra="--Xreplace-proba 0.05",
     )
     start_msg = (
       f"Worker started successfully: workdir={self.wconf.wdir}, "

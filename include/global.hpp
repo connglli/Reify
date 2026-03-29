@@ -138,7 +138,7 @@ struct GlobalOptions {
   ////////////////////////////////////////////////////////////
 
   // Probability of replacing a coefficient with a call to another function
-  double ReplaceProba = 0.5;
+  double ReplaceProba = 0.05;
   // Number of functions we want to knit together
   // Fix: Large values would make the generated programs too slow due to bad LTO
   int FunctionDepth = 5;
