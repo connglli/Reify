@@ -150,7 +150,7 @@ IndexLoop:
     }
   
     void interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
-      Assert(0 <= target && target < (int32_t) this->mod.n, "targets must be in Z_%d", (int32_t) this->mod.n);
+      Assert(0 <= target && target < (int32_t) this->mod.n, "targets (%d) must be in Z_%ld", target, this->mod.n);
       Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
       Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
   
@@ -594,7 +594,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
   }
   Log::Get().Out() << std::endl;
 
-  auto randTarget = Random::Get().Uniform(0, prime);
+  auto randTarget = Random::Get().Uniform(0, prime - 1);
   auto randDouble = Random::Get().UniformReal();
   size_t flattIndex = 0;
   for (size_t initIdx = 0; initIdx < this->init->size(); initIdx++) {
