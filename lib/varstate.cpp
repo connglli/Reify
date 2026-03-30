@@ -215,7 +215,7 @@ void VariableState::Visit(const symir::VarUse &v) {
           ? varDef->GetStructName()
           : (currBaseType == symir::SymIR::Type::STRUCT ? varDef->GetStructName() : "");
   std::vector<int32_t> currShape = varDef->GetVecShape();
-  size_t currentShapeIdx = 0; // Index int32_to currShape
+  size_t currentShapeIdx = 0; // Index into currShape
 
   std::ostringstream solverSuffix;
   int32_t flattenedIdx = 0;
@@ -235,7 +235,7 @@ void VariableState::Visit(const symir::VarUse &v) {
       // Array Access
       int32_t dimLen = currShape[currentShapeIdx];
 
-      Assert(0 <= idxVal || idxVal < dimLen, "This should have make the solver fail so something is very wrong");
+      Assert(0 <= idxVal && idxVal < dimLen, "This should have make the solver fail so something is very wrong");
       int32_t elLoc = idxVal;
 
       pendingArrayShape.push_back(dimLen);
@@ -245,7 +245,11 @@ void VariableState::Visit(const symir::VarUse &v) {
       if (currentShapeIdx == currShape.size()) {
         const int32_t flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
         solverSuffix << "_el" << flatLoc;
-        flattenedIdx += flatLoc;
+        flattenedIdx += flatLoc * static_cast<int32_t>(symir::intSizeOfSymIRType(
+          this->symexec->fun->GetStructs(),
+          currBaseType, currBaseType, {},
+          currStruct
+        ));
         pendingArrayShape.clear();
         pendingArrayIndices.clear();
 
@@ -258,12 +262,23 @@ void VariableState::Visit(const symir::VarUse &v) {
       const auto *sDef = this->symexec->fun->GetStruct(currStruct);
       int32_t numFields = sDef->GetFields().size();
 
-      Assert(0 <= idxVal || idxVal < numFields, "This should have make the solver fail so something is very wrong");
-      int32_t  fIdx = idxVal;
-
+      Assert(0 <= idxVal && idxVal < numFields, "This should have make the solver fail so something is very wrong");
+      int32_t fIdx = idxVal;
       const auto &field = sDef->GetField(fIdx);
       solverSuffix << "_" << field.name;
-      flattenedIdx += fIdx;
+
+      // adding the size of all fields < fIdx to flattIndex
+      for (int32_t j = 0; j < fIdx; j++) {
+        const auto &field = sDef->GetField(j);
+        flattenedIdx += static_cast<int32_t>(symir::intSizeOfSymIRType(
+          this->symexec->fun->GetStructs(),
+          field.type,
+          field.baseType,
+          field.shape,
+          (field.type == symir::SymIR::Type::STRUCT || field.baseType == symir::SymIR::Type::STRUCT 
+            ? field.structName : currStruct)
+        ));
+      }
 
       // Update state for next level
       currType = field.type;
@@ -281,27 +296,27 @@ void VariableState::Visit(const symir::VarUse &v) {
     }
   }
   // handling our own version to avoid messing with the one from UBSan
-  std::string solverName = this->currAssignVarDef->GetName() + solverSuffix.str();
+  std::string solverName = varDef->GetName() + solverSuffix.str();
   Assert(versions.contains(solverName), "if the variable is used along the path is should have been initialized and hence versioned");
   this->versions[solverName] += 1;
 
   bitwuzla::Term varUseExpr = 
     this->symexec->ubSan->CreateVersionedExpr(
-      this->currAssignVarDef, solverSuffix.str(), this->versions[solverName]
+      varDef, solverSuffix.str(), this->versions[solverName]
     );
   std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(varUseExpr);
-  Assert(varValueOpt.has_value(), "VarUse %s is onpath and unsolved!", this->currAssignVarDef->GetName().c_str());
+  Assert(varValueOpt.has_value(), "VarUse %s is onpath and unsolved!", varDef->GetName().c_str());
 
   // look for the variable index to get the correct index into init;
   size_t varIndex;
   bool foundIndex = false;
   for (const auto& [index, name] : this->varNamesMap) {
-    if (name == this->currAssignVarDef->GetName()) {
+    if (name == varDef->GetName()) {
       varIndex = index;
       foundIndex = true;
     }
   }
-  Assert(foundIndex, "unable to find var %s in params / locals", this->currAssignVarDef->GetName().c_str());
+  Assert(foundIndex, "unable to find var %s in params / locals", varDef->GetName().c_str());
 
 
   this->executionState[this->currBlock]
@@ -328,7 +343,6 @@ void VariableState::Visit(const symir::ModAssStmt &a) {
   Panic("No ModAssStmt should exist during function creation");
 }
 void VariableState::Visit(const symir::AssStmt &a) {
-  this->currAssignVarDef = a.GetVar()->GetDef();
   a.GetVar()->Accept(*this);
 }
 

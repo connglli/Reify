@@ -1211,4 +1211,51 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
                            "condition stack"
     );
   }
+
+  size_t intSizeOfSymIRType(
+    std::vector<const symir::StructDef *> structs,
+    symir::SymIR::Type type,
+    symir::SymIR::Type baseType,
+    std::vector<int32_t> shape,
+    std::string structName
+  ) {
+    size_t size;
+    switch (type) {
+    case symir::SymIR::I32: {
+      return 1;
+    } break;
+    case symir::SymIR::ARRAY: {
+      size = 1;
+      for (const int32_t s: shape) size *= s;
+      type = baseType;
+      size *= intSizeOfSymIRType(structs, type, baseType, {}, structName);
+    } break;
+    case symir::SymIR::STRUCT: {
+      const symir::StructDef *sDef = nullptr;
+      for (const auto s : structs) {
+        if (s->GetName() == structName) {
+          sDef = s;
+        }
+      }
+      Assert(sDef, "Struct %s not found", structName.c_str());
+      shape = {};
+      size = 0;
+      for (const auto &field : sDef->GetFields()) {
+        type = field.type;
+        baseType = field.baseType;
+        if (type == symir::SymIR::Type::STRUCT) {
+          structName = field.structName;
+        } else if (type == symir::SymIR::Type::ARRAY) {
+          shape = field.shape;
+          if (baseType == symir::SymIR::Type::STRUCT) {
+            structName = field.structName;
+          }
+        }
+        size += intSizeOfSymIRType(structs, type, baseType, shape, structName);
+      }
+    } break;
+    default: Panic("Unknown Var type");
+    }
+    return size;
+  }
 } // namespace symir
