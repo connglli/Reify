@@ -95,7 +95,6 @@ private:
   size_t currBlock;
   std::map<std::string, int32_t> versions{};  // The SSA version table for each variable
   std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
-  const symir::VarDef *currAssignVarDef;
 };
 
 #endif // REIFY_VARSTATE_HPP
