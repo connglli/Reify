@@ -1,3 +1,28 @@
+// MIT License
+//
+// Copyright (c) 2025
+//
+// Kavya Chopra (chopra.kavya04@gmail.com)
+// Cong Li (cong.li@inf.ethz.ch)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #include <flint/ulong_extras.h>
 #include <flint/nmod.h>
 #include <flint/nmod_mat.h>
@@ -11,49 +36,7 @@
 #include "lib/symexec.hpp"
 
 namespace {
-  static size_t intSizeOfSymIRType(
-    symir::FunctBuilder *funBuilder,
-    symir::SymIR::Type type,
-    symir::SymIR::Type baseType,
-    std::vector<int32_t> shape,
-    std::string structName
-  ) {
-    size_t size;
-    switch (type) {
-    case symir::SymIR::I32: {
-      return 1;
-    } break;
-    case symir::SymIR::ARRAY: {
-      size = 1;
-      for (const int32_t s: shape) size *= s;
-      type = baseType;
-      size *= intSizeOfSymIRType(funBuilder, type, baseType, {}, structName);
-    } break;
-    case symir::SymIR::STRUCT: {
-      const auto *sDef = funBuilder ->FindStruct(structName);
-      Assert(sDef, "Struct %s not found", structName.c_str());
-      shape = {};
-      size = 0;
-      for (const auto &field : sDef->GetFields()) {
-        type = field.type;
-        baseType = field.baseType;
-        if (type == symir::SymIR::Type::STRUCT) {
-          structName = field.structName;
-        } else if (type == symir::SymIR::Type::ARRAY) {
-          shape = field.shape;
-          if (baseType == symir::SymIR::Type::STRUCT) {
-            structName = field.structName;
-          }
-        }
-        size += intSizeOfSymIRType(funBuilder, type, baseType, shape, structName);
-      }
-    } break;
-    default: Panic("Unknown Var type");
-    }
-    return size;
-  }
-
-  std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
+    std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
     if (var->GetType() == symir::SymIR::Type::I32) {
       Assert(
         flattenedIndex == 0,
@@ -81,7 +64,7 @@ IndexLoop:
     while (type != symir::SymIR::I32) {
       switch (type) {
       case symir::SymIR::ARRAY: {
-        size_t type_size = intSizeOfSymIRType(funBuilder, baseType, baseType, {}, structName);
+        size_t type_size = symir::intSizeOfSymIRType(funBuilder->GetStructs(), baseType, baseType, {}, structName);
         for (const int32_t dimSize: shape) {
           type_size *= dimSize;
         }
@@ -108,7 +91,7 @@ IndexLoop:
               structName = field.structName;
             }
           }
-          size_t field_size = intSizeOfSymIRType(funBuilder, type, baseType, shape, structName);
+          size_t field_size = intSizeOfSymIRType(funBuilder->GetStructs(), type, baseType, shape, structName);
           if (field_size > remainingIndex) {
             accessVals.push_back(fieldIdx);
             goto IndexLoop;
@@ -150,7 +133,7 @@ IndexLoop:
     }
   
     void interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
-      Assert(0 <= target && target < (int32_t) this->mod.n, "targets (%d) must be in Z_%ld", target, this->mod.n);
+      Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets (%d) must be in Z_%ld", target, this->mod.n);
       Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
       Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
   
@@ -174,15 +157,10 @@ IndexLoop:
       for (size_t row = 0; row < nrIterations; row++) {
         for (size_t col = 0; col < nrIterations; col++) {
           ulong term = 1;
-          const int32_t *monomial = &this->polynomial[col * nrVariables];
           for (uint32_t vari = 0; vari < nrVariables; vari++) {
-            int32_t var = varState[row * nrVariables + vari];
-            ulong pow = nmod_pow_ui(
-              this->reduceMod(var),
-              static_cast<ulong>(monomial[vari]),
-              this->mod
-            );
-            term = nmod_mul(term, pow, this->mod);
+            int32_t var = this->reduceMod(varState[row * nrVariables + vari]);
+            ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + vari]);
+            term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
           }
           nmod_mat_set_entry(A, row, col, term);
         }
@@ -195,15 +173,10 @@ IndexLoop:
       for (size_t col = 0; col < nrIterations; col ++) {
         ulong term = 1;
         Assert(col * nrVariables < nrIterations * nrVariables, "Array access out of bounds");
-        const int32_t *monomial = &this->polynomial[col * nrVariables];
         for (uint32_t i = 0; i < nrVariables; i++) {
-          int32_t var = unique_iter[i];
-          ulong pow = nmod_pow_ui(
-            this->reduceMod(var),
-            static_cast<ulong>(monomial[i]),
-            this->mod
-          );
-          term = nmod_mul(term, pow, this->mod);
+          int32_t var = this->reduceMod(unique_iter[i]);
+          ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + i]);
+          term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
         }
         nmod_mat_set_entry(A, nrIterations, col, term);
       }
@@ -259,7 +232,7 @@ IndexLoop:
 
       bool has_unique = false;
       for (const int32_t target: targets) {
-        Assert(0 <= target && target < (int32_t) this->mod.n, "targets must be in Z_%d", (int32_t) this->mod.n);
+        Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets must be in Z_%d", static_cast<int32_t>(this->mod.n));
         has_unique |= targets[0] != target;
       }
       Assert(has_unique, "target must have atleast on unique element");
@@ -277,11 +250,10 @@ IndexLoop:
       for (size_t row = 0; row < nrIterations; row++) {
         for (size_t col = 0; col < nrIterations - 1; col ++) {
           ulong term = 1;
-          const int32_t *monomial = &this->polynomial[col * nrVariables];
-          for (uint32_t vari = 0; vari < nrVariables; vari++) {
-            int32_t var = varState[row * nrVariables + vari];
-            ulong pow = nmod_pow_ui(this->reduceMod(var), (ulong) monomial[vari], this->mod);
-            term = nmod_mul(term, pow, this->mod);
+          for (size_t vari = 0; vari < nrVariables; vari++) {
+            int32_t var = this->reduceMod(varState[row * nrVariables + vari]);
+            ulong deg = static_cast<int32_t>(this->polynomial[col * nrVariables + vari]);
+            term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
           }
           nmod_mat_set_entry(A, row, col, term);
         }
@@ -289,7 +261,7 @@ IndexLoop:
       }
   
       // build B from m and d
-      for (uint32_t row = 0; row < nrIterations; row++) {
+      for (size_t row = 0; row < nrIterations; row++) {
         nmod_mat_set_entry(B, row, 0, targets[row]);
       }
   
@@ -303,7 +275,7 @@ IndexLoop:
       // build B from m and d
       this->coeffs.clear();
       this->coeffs.resize(nrIterations);
-      for (uint32_t row = 0; row < nrIterations; row++) {
+      for (size_t row = 0; row < nrIterations; row++) {
         this->coeffs[row] = nmod_mat_get_entry(X, row, 0);
       }
       nmod_mat_clear(X);
@@ -317,6 +289,77 @@ IndexLoop:
       return std::vector(this->coeffs);
     }
   
+    void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
+      Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets (%d) must be in Z_%ld", target, this->mod.n);
+      Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
+      Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
+
+      Assert(this->polynomial.size() == nrVariables * nrIterations, "Interpolation not solved");
+      Assert(this->coeffs.size() == nrIterations + 1, "Interpolation not solved or does not match input");
+
+      for (size_t i = 0; i < nrIterations; i++) {
+        int32_t result = 0;
+        for (size_t m = 0; m < nrIterations; m++) {
+          Assert(0 <= this->coeffs[m] && this->coeffs[m] < static_cast<int32_t>(this->mod.n), "Coef (%d) not in Z_%ld", this->coeffs[m], this->mod.n);
+          int32_t term = this->coeffs[m];
+          for (size_t j = 0; j < nrVariables; j++) {
+            ulong var = this->reduceMod(varState[i * nrVariables + j]);
+            Assert(
+              0 <= this->polynomial[m * nrVariables + j] && this->polynomial[m * nrVariables + j] < static_cast<int32_t>(this->mod.n),
+              "Coef (%d) not in Z_%ld", this->polynomial[m * nrVariables + j], this->mod.n
+            );
+            ulong deg = static_cast<ulong>(this->polynomial[m * nrVariables + j]);
+            term = static_cast<int32_t>(nmod_mul(static_cast<ulong>(term), nmod_pow_ui(var, deg, this->mod), this->mod));
+          }
+          result = static_cast<int32_t>(nmod_add(static_cast<ulong>(result), static_cast<ulong>(term), this->mod));
+        }
+        Assert(
+          0 <= this->coeffs[nrIterations] && this->coeffs[nrIterations] < static_cast<int32_t>(this->mod.n),
+          "Coef (%d) not in Z_%ld", this->coeffs[nrIterations], this->mod.n
+        );
+        result = static_cast<int32_t>(nmod_add(static_cast<ulong>(result), static_cast<ulong>(this->coeffs[nrIterations]), this->mod));
+        Assert(result == target, "interpolation is incorrect!");
+      }
+    }
+
+    void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets) {
+      bool has_unique = false;
+      for (const int32_t target: targets) {
+        Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets must be in Z_%d", static_cast<int32_t>(this->mod.n));
+        has_unique |= targets[0] != target;
+      }
+      Assert(has_unique, "target must have atleast on unique element");
+      Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
+      Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
+
+      Assert(this->polynomial.size() == nrVariables * (nrIterations - 1), "Interpolation not solved");
+      Assert(this->coeffs.size() == nrIterations, "Interpolation not solved or does not match input");
+
+      for (size_t i = 0; i < nrIterations; i++) {
+        int32_t result = 0;
+        for (size_t m = 0; m < nrIterations - 1; m++) {
+          Assert(0 <= this->coeffs[m] && this->coeffs[m] < static_cast<int32_t>(this->mod.n), "Coef (%d) not in Z_%ld", this->coeffs[m], this->mod.n);
+          int32_t term = this->coeffs[m];
+          for (size_t j = 0; j < nrVariables; j++) {
+            ulong var = this->reduceMod(varState[i * nrVariables + j]);
+            Assert(
+              0 <= this->polynomial[m * nrVariables + j] && this->polynomial[m * nrVariables + j] < static_cast<int32_t>(this->mod.n),
+              "Coef (%d) not in Z_%ld", this->polynomial[m * nrVariables + j], this->mod.n
+            );
+            ulong deg = static_cast<ulong>(this->polynomial[m * nrVariables + j]);
+            term = static_cast<int32_t>(nmod_mul(static_cast<ulong>(term), nmod_pow_ui(var, deg, this->mod), this->mod));
+          }
+          result = static_cast<int32_t>(nmod_add(static_cast<ulong>(result), static_cast<ulong>(term), this->mod));
+        }
+        Assert(
+          0 <= this->coeffs[nrIterations - 1] && this->coeffs[nrIterations - 1] < static_cast<int32_t>(this->mod.n),
+          "Coef (%d) not in Z_%ld", this->coeffs[nrIterations - 1], this->mod.n
+        );
+        result = static_cast<int32_t>(nmod_add(static_cast<ulong>(result), static_cast<ulong>(this->coeffs[nrIterations - 1]), this->mod));
+        Assert(result == targets[i], "interpolation is incorrect!");
+      }
+    }
+
   private:
   
     std::vector<int32_t> findUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState) {
@@ -337,7 +380,7 @@ IndexLoop:
         bool added_unique = false;
         for (size_t k = 0; k < nrIterations; k++) {
           // if the next value is not the successor of - or equal to the last one there must be a unique value inbetween
-          if (currVarState[k] != (int32_t)((last + 1) % mod.n) && currVarState[k] != last) {
+          if (currVarState[k] != static_cast<int32_t>((last + 1) % mod.n) && currVarState[k] != last) {
               unique.push_back(Random::Get().Uniform(last + 1, currVarState[k] - 1)());
               added_unique = true;
               break;
@@ -345,8 +388,8 @@ IndexLoop:
             last = currVarState[k];
           }
         }
-        if (!added_unique && currVarState[currVarState.size() - 1] != (int32_t) mod.n - 1) {
-          unique.push_back(Random::Get().Uniform(currVarState[currVarState.size() - 1] + 1, (int32_t) mod.n - 1)());
+        if (!added_unique && currVarState[currVarState.size() - 1] != static_cast<int32_t>(mod.n - 1)) {
+          unique.push_back(Random::Get().Uniform(currVarState[currVarState.size() - 1] + 1, static_cast<int32_t>(mod.n - 1))());
           added_unique = true;
         }
         Assert(added_unique, "unable for find a unique element");
@@ -378,7 +421,7 @@ IndexLoop:
         Assert((nrMonomials - d) * nrVariables < nrMonomials * nrVariables, "Array out of bounds");
         int32_t *monomial = &this->polynomial[(nrMonomials - d) * nrVariables];
         int32_t upper = d;
-        for (uint32_t j = 0; j < nrVariables - 1; j++) {
+        for (size_t j = 0; j < nrVariables - 1; j++) {
           monomial[j] = abs(Random::Get().Binomial(upper * 2, 0.5)() - upper);
           upper -= monomial[j];
           if (upper == 0) break;
@@ -535,7 +578,7 @@ std::string LiteralFCallStrategy::generateCall() {
     ) {
     return "(" + chk_call + " + " + std::to_string(diff) + ")";
   } else {
-    return "(int32_t) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
+    return "(int) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
   }
 }
 
@@ -635,12 +678,21 @@ void PrimeInterpFCallStrategy::generatePreamble(
       Log::Get().Out() << "Using Variables (" << filteredNrVariables << "): ";
       for (size_t i = 0; i < filteredNrVariables; i++) {
         Log::Get().Out() << vars[i]->GetName();
-        if (!vars[i]->IsScalar()) {
+        if (vars[i]->GetType() != symir::SymIR::I32) {
           Log::Get().Out() << "[";
           for (size_t j = 0; j < accesses[i].size() - 1; j++) {
             Log::Get().Out() << accesses[i][j]->GetI32Value() << ", ";
           }
           Log::Get().Out() << accesses[i][accesses[i].size() - 1]->GetI32Value() << "]";
+        }
+        Log::Get().Out() << "(" << indices[i] << "): [";
+        for (size_t k = 0; k < nrIterations; k++) {
+          Log::Get().Out() << varState[k * nrVariables + indices[i]];
+          if (k == nrIterations - 1) {
+            Log::Get().Out() << "]";
+          } else {
+            Log::Get().Out() << ", ";
+          }
         }
         if (i == vars.size() - 1) {
           Log::Get().Out() << std::endl;
@@ -666,7 +718,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
         // avoid the div by 0 case of the else stmt
         interpolTarget = 0;
       } else {
-        interpolTarget = randTarget() % ((-(int64_t)INT32_MIN) + target);
+        interpolTarget = randTarget() % static_cast<int32_t>((-static_cast<int64_t>(INT32_MIN)) + target);
       }
 
       Log::Get().Out() << "Target: " << target << ", Interpolation Target: " << interpolTarget << std::endl;
@@ -674,6 +726,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
       interpolGen.interpolate(filteredNrVariables, nrIterations, filteredVarState, interpolTarget);
       std::vector<int32_t> polynomial = interpolGen.getPolynomial();
       std::vector<int32_t> coeffsVals = interpolGen.getCoeffs();
+      interpolGen.assertCorrectness(filteredNrVariables, nrIterations, filteredVarState, interpolTarget);
 
       // we need coeff object to hand to the builder
       std::vector<symir::Coef *> coeffs{};

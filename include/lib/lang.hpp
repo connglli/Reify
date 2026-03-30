@@ -41,7 +41,6 @@
 #include "lib/dbgutils.hpp"
 
 namespace symir {
-
   ///////////////////////////////////////////////////////////////////////
   // The SymIR Tiny Language
   ///////////////////////////////////////////////////////////////////////
@@ -2152,6 +2151,17 @@ private:
     std::stack<ExprID> modExprStack{};
     std::stack<CondID> condStack{};
   };
+
+  // Helper Function
+
+  size_t intSizeOfSymIRType(
+    std::vector<const symir::StructDef *> structs,
+    symir::SymIR::Type type,
+    symir::SymIR::Type baseType,
+    std::vector<int32_t> shape,
+    std::string structName
+  );
+ 
 } // namespace symir
 
 #endif // REIFY_LANG_HPP
