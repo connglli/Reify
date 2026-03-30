@@ -36,7 +36,8 @@
 #include "lib/symexec.hpp"
 
 namespace {
-    std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
+  /// given a flattend intex recover the access vector needed to create a VarUse Object
+  std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
     if (var->GetType() == symir::SymIR::Type::I32) {
       Assert(
         flattenedIndex == 0,
@@ -60,7 +61,7 @@ namespace {
     size_t remainingIndex = flattenedIndex;
 
     // walk down the type tree to generate the access vector
-IndexLoop:
+typeLoop:
     while (type != symir::SymIR::I32) {
       switch (type) {
       case symir::SymIR::ARRAY: {
@@ -94,7 +95,7 @@ IndexLoop:
           size_t field_size = intSizeOfSymIRType(funBuilder->GetStructs(), type, baseType, shape, structName);
           if (field_size > remainingIndex) {
             accessVals.push_back(fieldIdx);
-            goto IndexLoop;
+            goto typeLoop;
           }
           remainingIndex -= field_size;
           fieldIdx += 1;
@@ -289,6 +290,7 @@ IndexLoop:
       return std::vector(this->coeffs);
     }
   
+    /// Triggers an assert if the last interpolation does not correctly yield 'target' when evaluated over 'varState'
     void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
       Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets (%d) must be in Z_%ld", target, this->mod.n);
       Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
@@ -322,6 +324,7 @@ IndexLoop:
       }
     }
 
+    /// Triggers an assert if the last interpolation does not correctly yield 'targets' when evaluated over 'varState'
     void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets) {
       bool has_unique = false;
       for (const int32_t target: targets) {
@@ -362,6 +365,7 @@ IndexLoop:
 
   private:
   
+    /// Find a new unused iteration according to varState
     std::vector<int32_t> findUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState) {
       std::vector<int32_t> unique;
       std::vector<int32_t> currVarState;
@@ -398,7 +402,7 @@ IndexLoop:
       return unique;
     }
     
-    // see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+    /// see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
     void shuffel(const size_t n, int32_t *arr) {
       for (size_t i = n - 1; i >= 1; i--) {
         size_t r = rand() % (i + 1);
@@ -410,6 +414,7 @@ IndexLoop:
     
     // This is a quite biased in its selection. TODO: Are the more uniform / fair algorithms for finding a random polynomial fast?
     // Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
+    /// Samples a new random polynomial
     void randomizePolynomial(
       const size_t nrVariables,
       const size_t nrMonomials
@@ -431,6 +436,7 @@ IndexLoop:
       }
     }
 
+    /// Returns the (mathematical) modulo of 'var' (e.g. 'var' mod 'this->mod.n')
     ulong reduceMod(int32_t var) {
       ulong res;
       if (var < 0) {
@@ -460,8 +466,8 @@ void FCallStrategy::initialize(
   this->fina = fina;
 }
 
-void FCallStrategy::setTarget(const int32_t coefVal) {
-  this->coefVal = coefVal;
+void FCallStrategy::setTarget(const int32_t target) {
+  this->emplaceTargetValue = target;
 }
 
 std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) {
@@ -474,6 +480,94 @@ std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) {
       << ")";
   return res.str();
 }
+
+// TODO: make this smarter to reduce the total number of "UnInitLocals"
+size_t FCallStrategy::findUnusedAssignVar(std::vector<const symir::Local *> locals) {
+  // Very hacky way to keep track of already used arguments
+  size_t argUsed = 0;
+  for (size_t i = 0; i < locals.size(); i++) {
+    if (locals[i]->GetName().starts_with("arg_")) {
+      argUsed += 1;
+    }
+  }
+  return argUsed;
+}
+
+void FCallStrategy::setVarState(VariableState *varStateQuery, size_t blockIndex, size_t stmtIndex) {
+  // get the current variable state for all variables in scope
+  this->varMap = varStateQuery->GetVarMap();
+  auto varStatePair = varStateQuery->query(blockIndex, stmtIndex);
+  this->nrVariables = varStatePair.first;
+  this->varState = varStatePair.second;
+  Assert(this->varState.size() % nrVariables == 0, "nrVariables * nr_iteration == varState.size must hold");
+  this->nrIterations = this->varState.size() / nrVariables;
+  
+  Log::Get().Out() << "Variables State: (nrVariables: " << this->nrVariables << "), (nrIterations: " << this->nrIterations << ")" << std::endl;
+  for (size_t i = 0; i < this->nrIterations; i++) {
+    Log::Get().Out() << "Iteration " << i << ": ";
+    for (size_t j = 0; j < this->nrVariables; j++) {
+      Log::Get().Out() << this->varState[i * nrVariables + j];
+      if (j == this->nrVariables - 1) {
+        Log::Get().Out() << std::endl;
+      } else {
+        Log::Get().Out() << ", ";
+      }
+    }
+  }
+  Log::Get().Out() << std::endl;
+}
+
+void FCallStrategy::randomlyFilterVarState(symir::FunctBuilder *funBd) {
+  // randomly select a subset of variables and find there VarDef
+  std::vector<size_t> indices;
+  size_t lastVarStartIndex = 0;
+  for (size_t i = 0; i < nrVariables; i++) {
+    if (this->varMap.contains(i)) lastVarStartIndex = i;
+    // select vars randomly TODO: Make probability global?
+    if (indices.size() > 0 && this->randDouble() > 0.3) continue;
+    indices.push_back(i);
+    const symir::VarDef *var = funBd->FindVar(this->varMap[lastVarStartIndex]);
+    this->filteredVars.push_back(var);
+    this->filteredAccesses.push_back(unflattenAccess(funBd, var, i - lastVarStartIndex));
+  }
+  this->filteredNrVariables = this->filteredVars.size();
+
+  Log::Get().Out() << "Using Variables (" << this->filteredNrVariables << "): ";
+  for (size_t i = 0; i < this->filteredNrVariables; i++) {
+    Log::Get().Out() << this->filteredVars[i]->GetName();
+    if (this->filteredVars[i]->GetType() != symir::SymIR::I32) {
+      Log::Get().Out() << "[";
+      for (size_t j = 0; j < this->filteredAccesses[i].size() - 1; j++) {
+        Log::Get().Out() << this->filteredAccesses[i][j]->GetI32Value() << ", ";
+      }
+      Log::Get().Out() << this->filteredAccesses[i][this->filteredAccesses[i].size() - 1]->GetI32Value() << "]";
+    }
+    Log::Get().Out() << "(" << indices[i] << "): [";
+    for (size_t k = 0; k < this->nrIterations; k++) {
+      Log::Get().Out() << this->varState[k * nrVariables + indices[i]];
+      if (k == this->nrIterations - 1) {
+        Log::Get().Out() << "]";
+      } else {
+        Log::Get().Out() << ", ";
+      }
+    }
+    if (i == this->filteredVars.size() - 1) {
+      Log::Get().Out() << std::endl;
+    } else {
+      Log::Get().Out() << ", ";
+    }
+  }
+  
+  // Filter varState
+  this->filteredVarState.reserve(this->nrIterations * this->filteredNrVariables);
+  for (size_t i = 0; i < this->nrIterations; i++) {
+    for (size_t j = 0; j < this->filteredNrVariables; j++) {
+      this->filteredVarState.push_back(this->varState[i * this->nrVariables + indices[j]]);
+    }
+  }
+}
+
+void smartlyFilterVarState(const symir::FunctBuilder *funBd) { Panic("TODO: Not yet implemented"); }
 
 // ==================== FCallEmbedder Base Implementations ====================
 FCallEmbedder::FCallEmbedder(symir::Funct *const host): host(host) {
@@ -552,11 +646,10 @@ std::string LiteralFCallStrategy::generateCall() {
   Assert(this->init, "init is not initialized");
   Assert(this->fina, "fina is not initialized");
 
-  int32_t checksum = StatelessChecksum::Compute(*this->fina);
+  // Build call
   std::ostringstream fcall;
   fcall << this->guest->GetName() 
         << "(";
-
   const auto &params = this->guest->GetParams();
   for (int32_t i = 0; i < static_cast<int32_t>(init->size()); ++i) {
     const auto &p = params[i];
@@ -568,9 +661,14 @@ std::string LiteralFCallStrategy::generateCall() {
     }
   }
   fcall << ")";
+
+  // Handle checksum
+  int32_t checksum = StatelessChecksum::Compute(*this->fina);
   std::string chk_call = this->wrapChecksum(checksum, fcall.str());
+
+  // Correct call result such that it matches the emplacedTargetValue
   // To avoid UBs, we'd use an upper type to save the result: long long here
-  long long diff = static_cast<long long>(this->coefVal)
+  long long diff = static_cast<long long>(this->emplaceTargetValue)
                  - static_cast<long long>(checksum);
   if (
       diff >= static_cast<long long>(INT32_MIN) 
@@ -604,48 +702,20 @@ void PrimeInterpFCallStrategy::generatePreamble(
   std::vector<const symir::Param *> params = funBd->GetParams();
   std::vector<const symir::Local *> locals = funBd->GetLocals();
 
-  // Very hacky way to keep track of already used arguments
-  size_t argUsed = 0;
-  for (size_t i = 0; i < locals.size(); i++) {
-    if (locals[i]->GetName().starts_with("arg_")) {
-      argUsed += 1;
-    }
-  }
+  size_t argUsed = this->findUnusedAssignVar(locals);
 
   const symir::Block *targetBlock= funBd->GetBlocks()[blockIndex];
   Log::Get().Out() << "Targeting Block: " << targetBlock->GetLabel() << ", " << stmtIndex << "-th Statement" << std::endl;
   symir::BlockBuilder *blockBd = symir::BlockCopier(funBd, targetBlock).CopyAsBuilder();
 
-  // get the current variable state for all variables in scope
-  auto varStatePair = varStateQuery->query(blockIndex, stmtIndex);
-  size_t nrVariables = varStatePair.first;
-  std::vector<int32_t> varState = varStatePair.second;
-  Assert(varState.size() % nrVariables == 0, "nrVariables * nr_iteration == varState.size must hold");
-  size_t nrIterations = varState.size() / nrVariables;
-  
-  Log::Get().Out() << "Variables State: (nrVariables: " << nrVariables << "), (nrIterations: " << nrIterations << ")" << std::endl;
-  for (size_t i = 0; i < nrIterations; i++) {
-    Log::Get().Out() << "Iteration " << i << ": ";
-    for (size_t j = 0; j < nrVariables; j++) {
-      Log::Get().Out() << varState[i * nrVariables + j];
-      if (j == nrVariables - 1) {
-        Log::Get().Out() << std::endl;
-      } else {
-        Log::Get().Out() << ", ";
-      }
-    }
-  }
-  Log::Get().Out() << std::endl;
+  this->setVarState(varStateQuery, blockIndex, stmtIndex);
 
   auto randTarget = Random::Get().Uniform(0, prime - 1);
-  auto randDouble = Random::Get().UniformReal();
   size_t flattIndex = 0;
   for (size_t initIdx = 0; initIdx < this->init->size(); initIdx++) {
     const auto &arg = (*this->init)[initIdx];
     for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
       flattIndex += 1;
-
-
       // select inits randomly TODO: Make probability global?
       if (randDouble() <= 0.5) continue;
 
@@ -655,60 +725,9 @@ void PrimeInterpFCallStrategy::generatePreamble(
       const symir::VarDef *loc = funBd->SymUnInitLocal("arg_" + std::to_string(argUsed));
       Assert(loc != nullptr, "creation or search for local has failed");
       argUsed += 1;
-
       Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
 
-      // randomly select a subset of variables and find there VarDef
-      std::vector<const symir::VarDef *> vars;
-      std::vector<std::vector<symir::Coef *>> accesses;
-      std::vector<size_t> indices;
-      auto varMap = varStateQuery->GetVarMap();
-      size_t lastVarStartIndex = 0;
-      for (size_t i = 0; i < nrVariables; i++) {
-        if (varMap.contains(i)) lastVarStartIndex = i;
-        // select vars randomly TODO: Make probability global?
-        if (indices.size() > 0 && randDouble() > 0.3) continue;
-        indices.push_back(i);
-        const symir::VarDef *var = funBd->FindVar(varMap[lastVarStartIndex]);
-        vars.push_back(var);
-        accesses.push_back(unflattenAccess(funBd, var, i - lastVarStartIndex));
-      }
-      size_t filteredNrVariables = vars.size();
-
-      Log::Get().Out() << "Using Variables (" << filteredNrVariables << "): ";
-      for (size_t i = 0; i < filteredNrVariables; i++) {
-        Log::Get().Out() << vars[i]->GetName();
-        if (vars[i]->GetType() != symir::SymIR::I32) {
-          Log::Get().Out() << "[";
-          for (size_t j = 0; j < accesses[i].size() - 1; j++) {
-            Log::Get().Out() << accesses[i][j]->GetI32Value() << ", ";
-          }
-          Log::Get().Out() << accesses[i][accesses[i].size() - 1]->GetI32Value() << "]";
-        }
-        Log::Get().Out() << "(" << indices[i] << "): [";
-        for (size_t k = 0; k < nrIterations; k++) {
-          Log::Get().Out() << varState[k * nrVariables + indices[i]];
-          if (k == nrIterations - 1) {
-            Log::Get().Out() << "]";
-          } else {
-            Log::Get().Out() << ", ";
-          }
-        }
-        if (i == vars.size() - 1) {
-          Log::Get().Out() << std::endl;
-        } else {
-          Log::Get().Out() << ", ";
-        }
-      }
-      
-      // Filter varState
-      std::vector<int32_t> filteredVarState;
-      filteredVarState.reserve(nrIterations * filteredNrVariables);
-      for (size_t i = 0; i < nrIterations; i++) {
-        for (size_t j = 0; j < filteredNrVariables; j++) {
-          filteredVarState.push_back(varState[i * nrVariables + indices[j]]);
-        }
-      }
+      this->randomlyFilterVarState(funBd);
 
       // We need a target value in Z_p to achive this we choose one randomly and then figure out how to correct for it.
       // TODO: iterate through init not just the first element
@@ -735,7 +754,12 @@ void PrimeInterpFCallStrategy::generatePreamble(
         coeffs.push_back(funBd->SymI32Const(c));
       }
 
-      auto assignment = blockBd->SymModAssignAt(loc, blockBd->SymModExpr(coeffs, vars, accesses, polynomial, prime), {}, stmtIndex);
+      auto assignment = blockBd->SymModAssignAt(
+        loc,
+        blockBd->SymModExpr(coeffs, this->filteredVars, this->filteredAccesses, polynomial, prime),
+        {},
+        stmtIndex
+      );
       Assert(assignment != nullptr, "Failed to create a ModAssignment, likely by a failed dynamic_cast");
       this->argVars[flattIndex - 1] = std::make_pair(assignment->GetVar()->GetName(), target - interpolTarget);
       
@@ -786,7 +810,7 @@ std::string PrimeInterpFCallStrategy::generateCall() {
   fcall << ")";
   std::string chk_call = this->wrapChecksum(checksum, fcall.str());
   // To avoid UBs, we'd use an upper type to save the result: long long here
-  long long diff = static_cast<long long>(this->coefVal)
+  long long diff = static_cast<long long>(this->emplaceTargetValue)
                  - static_cast<long long>(checksum);
   if (
       diff >= static_cast<long long>(INT32_MIN) 
