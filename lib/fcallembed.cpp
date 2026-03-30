@@ -470,7 +470,15 @@ void FCallStrategy::setTarget(const int32_t target) {
   this->emplaceTargetValue = target;
 }
 
-std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) {
+void FCallStrategy::setMaxNrBlocks(size_t nrBlocks) {
+  this->argUsedMatrix.clear();
+  this->argUsedMatrix.resize(nrBlocks);
+  this->nrStmts = 1;
+  this->nrBlocks = nrBlocks;
+}
+
+
+std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) const {
   std::ostringstream res;
   res << StatelessChecksum::GetCheckChksumName()
       <<"(" 
@@ -481,16 +489,37 @@ std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) {
   return res.str();
 }
 
-// TODO: make this smarter to reduce the total number of "UnInitLocals"
-size_t FCallStrategy::findUnusedAssignVar(std::vector<const symir::Local *> locals) {
-  // Very hacky way to keep track of already used arguments
-  size_t argUsed = 0;
+const symir::VarDef *FCallStrategy::getUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) {
+  Assert(blockIndex < this->nrBlocks, "blockIndex must be less then the set max number of blocks");
+
+  if (stmtIndex + 1 > nrStmts) {
+    this->argUsedMatrix.resize(this->nrBlocks * (stmtIndex + 1));
+    nrStmts = stmtIndex + 1;
+  }
+
+  // How many argument variables are already in use at this stmt
+  size_t argUsed = this->argUsedMatrix[stmtIndex * this->nrBlocks + blockIndex];
+
+  // How many argument variables exist in the current function
+  auto locals = funBd->GetLocals();
+  size_t argAvailable = 0;
   for (size_t i = 0; i < locals.size(); i++) {
-    if (locals[i]->GetName().starts_with("arg_")) {
-      argUsed += 1;
+    if (locals[i]->GetIRId() == symir::SymIR::SIR_LOCAL_UNINIT) {
+      argAvailable += 1;
     }
   }
-  return argUsed;
+
+  const symir::VarDef *loc;
+  if (argUsed >= argAvailable) {
+    loc = funBd->SymUnInitLocal("arg_" + std::to_string(argUsed));
+  } else {
+    loc = funBd->FindVar("arg_" + std::to_string(argUsed));
+  }
+  Assert(loc != nullptr, "creation or search for local has failed");
+  Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
+
+  this->argUsedMatrix[stmtIndex * this->nrBlocks + blockIndex] += 1;
+  return loc;
 }
 
 void FCallStrategy::setVarState(VariableState *varStateQuery, size_t blockIndex, size_t stmtIndex) {
@@ -518,13 +547,16 @@ void FCallStrategy::setVarState(VariableState *varStateQuery, size_t blockIndex,
 }
 
 void FCallStrategy::randomlyFilterVarState(symir::FunctBuilder *funBd) {
+  auto randDouble = Random::Get().UniformReal();
   // randomly select a subset of variables and find there VarDef
+  this->filteredVars.clear();
+  this->filteredAccesses.clear();
   std::vector<size_t> indices;
   size_t lastVarStartIndex = 0;
   for (size_t i = 0; i < nrVariables; i++) {
     if (this->varMap.contains(i)) lastVarStartIndex = i;
     // select vars randomly TODO: Make probability global?
-    if (indices.size() > 0 && this->randDouble() > 0.3) continue;
+    if (indices.size() > 0 && randDouble() > 0.3) continue;
     indices.push_back(i);
     const symir::VarDef *var = funBd->FindVar(this->varMap[lastVarStartIndex]);
     this->filteredVars.push_back(var);
@@ -559,6 +591,7 @@ void FCallStrategy::randomlyFilterVarState(symir::FunctBuilder *funBd) {
   }
   
   // Filter varState
+  this->filteredVarState.clear();
   this->filteredVarState.reserve(this->nrIterations * this->filteredNrVariables);
   for (size_t i = 0; i < this->nrIterations; i++) {
     for (size_t j = 0; j < this->filteredNrVariables; j++) {
@@ -696,13 +729,13 @@ void PrimeInterpFCallStrategy::generatePreamble(
 
   this->argVars.clear();
 
+  if (this->nrBlocks == 0) this->setMaxNrBlocks(funBd->GetBlocks().size());
+
   int32_t prime = 46337; //TODO: maybe allow users to choose 2 <= P <= 46337 via a global?
   PrimeInterpolation interpolGen = PrimeInterpolation(prime); 
 
   std::vector<const symir::Param *> params = funBd->GetParams();
   std::vector<const symir::Local *> locals = funBd->GetLocals();
-
-  size_t argUsed = this->findUnusedAssignVar(locals);
 
   const symir::Block *targetBlock= funBd->GetBlocks()[blockIndex];
   Log::Get().Out() << "Targeting Block: " << targetBlock->GetLabel() << ", " << stmtIndex << "-th Statement" << std::endl;
@@ -710,6 +743,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
 
   this->setVarState(varStateQuery, blockIndex, stmtIndex);
 
+  auto randDouble = Random::Get().UniformReal();
   auto randTarget = Random::Get().Uniform(0, prime - 1);
   size_t flattIndex = 0;
   for (size_t initIdx = 0; initIdx < this->init->size(); initIdx++) {
@@ -720,12 +754,6 @@ void PrimeInterpFCallStrategy::generatePreamble(
       if (randDouble() <= 0.5) continue;
 
       Log::Get().Out() << "Replacing the " << flattIndex << "-th argument" << std::endl;
-
-      // use available locals if possible
-      const symir::VarDef *loc = funBd->SymUnInitLocal("arg_" + std::to_string(argUsed));
-      Assert(loc != nullptr, "creation or search for local has failed");
-      argUsed += 1;
-      Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
 
       this->randomlyFilterVarState(funBd);
 
@@ -742,7 +770,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
 
       Log::Get().Out() << "Target: " << target << ", Interpolation Target: " << interpolTarget << std::endl;
 
-      interpolGen.interpolate(filteredNrVariables, nrIterations, filteredVarState, interpolTarget);
+      interpolGen.interpolate(this->filteredNrVariables, this->nrIterations, this->filteredVarState, interpolTarget);
       std::vector<int32_t> polynomial = interpolGen.getPolynomial();
       std::vector<int32_t> coeffsVals = interpolGen.getCoeffs();
       interpolGen.assertCorrectness(filteredNrVariables, nrIterations, filteredVarState, interpolTarget);
@@ -753,6 +781,8 @@ void PrimeInterpFCallStrategy::generatePreamble(
       for (const int32_t c : coeffsVals) {
         coeffs.push_back(funBd->SymI32Const(c));
       }
+
+      const symir::VarDef *loc = this->getUnusedAssignVar(funBd, blockIndex, stmtIndex);
 
       auto assignment = blockBd->SymModAssignAt(
         loc,
