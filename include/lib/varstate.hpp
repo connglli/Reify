@@ -46,6 +46,7 @@ public:
   void extract(SymExec *symexec);
   std::vector<int32_t> getPathBlocksIndices();
   std::vector<std::string> getPathBlocksLabels();
+  size_t getNrPathBlocks() {return this->executionState.size(); }
 
   std::map<size_t, std::string> GetVarMap() { return this->varNamesMap; }
 
