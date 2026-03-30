@@ -30,6 +30,7 @@
 #include "lib/argument.hpp"
 #include "lib/symexec.hpp"
 #include "lib/varstate.hpp"
+#include "lib/random.hpp"
 
 
 class FCallStrategy {
@@ -39,9 +40,20 @@ public:
     const std::vector<ArgPlus<int32_t>> *init,
     const std::vector<ArgPlus<int32_t>> *fina
   );
-  void setTarget(const int32_t coefVal);
+  void setTarget(const int32_t target);
 
+  /// wrap checksum function/macro around the function call string
   std::string wrapChecksum(int32_t checksum, std::string call);
+
+  size_t findUnusedAssignVar(std::vector<const symir::Local *> locals);
+
+  void setVarState(VariableState *varStateQuery, size_t blockIndex, size_t stmtIndex);
+
+  void randomlyFilterVarState(symir::FunctBuilder *funBd);
+
+  void smartlyFilterVarState(symir::FunctBuilder *funBd);
+
+  
 
   virtual std::string getStrategyName() = 0;
   /// generate the string representing the call
@@ -55,7 +67,20 @@ protected:
   const symir::Funct *guest;
   const std::vector<ArgPlus<int32_t>> *init;
   const std::vector<ArgPlus<int32_t>> *fina;
-  int32_t coefVal;
+  int32_t emplaceTargetValue;
+
+  std::map<size_t, std::string> varMap;
+  std::vector<int32_t> varState;
+  size_t nrVariables;
+  size_t nrIterations;
+
+  std::vector<int32_t> filteredVarState;
+  std::vector<const symir::VarDef *> filteredVars;
+  std::vector<std::vector<symir::Coef *>> filteredAccesses;
+  size_t filteredNrVariables;
+
+
+  std::function<int()> randDouble = Random::Get().UniformReal();
 };
 
 class FCallEmbedder : protected symir::SymIRVisitor {
