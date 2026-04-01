@@ -136,12 +136,22 @@ struct GlobalOptions {
   ////////////////////////////////////////////////////////////
   ////// Program Generation Parameters
   ////////////////////////////////////////////////////////////
+  enum DataflowStrategy {
+    Literal,
+    PrimeFieldInterpolation,
+  };
 
   // Probability of replacing a coefficient with a call to another function
-  double ReplaceProba = 0.05;
+  double CoeffReplaceProba = 0.05;
   // Number of functions we want to knit together
   // Fix: Large values would make the generated programs too slow due to bad LTO
   int FunctionDepth = 5;
+  // Probablility of replacing an argument literal with a variable for dataflow
+  double InitReplaceProba = 0.5;
+  // Probablility of including a variable in the dataflow expression
+  double VariableTakeProba = 0.7;
+  // strategy to introduce dataflow between function
+  enum DataflowStrategy DataflowStrategy = PrimeFieldInterpolation;
 
   ////////////////////////////////////////////////////////////
   ////// Solver Parameters
@@ -198,8 +208,11 @@ struct GlobalOptions {
     // clang-format off
     opts.add_options()
       // Program generation
-      ("Xreplace-proba", "Probability of replacing a coefficient with a function call", cxxopts::value<double>())
-      ("Xfunction-depth", "The number of functions to knit together per program", cxxopts::value<int>());
+      ("Xcoeff-replace-proba", "Probability of replacing a coefficient with a function call", cxxopts::value<double>())
+      ("Xfunction-depth", "The number of functions to knit together per program", cxxopts::value<int>())
+      ("Xdataflow-strategy", "strategy to introduce dataflow between function {0=literal, 1=Prime interpolating}", cxxopts::value<int>())
+      ("Xinit-replace-proba", "Probablility of replacing an argument literal with a variable for dataflow", cxxopts::value<double>())
+      ("Xvar-take-proba", "Probablility of including a variable in the dataflow expression", cxxopts::value<double>());
     // clang-format on
   }
 
@@ -417,16 +430,16 @@ struct GlobalOptions {
   }
 
   void HandleProgArgs(const cxxopts::ParseResult &args) {
-    if (args.count("Xreplace-proba")) {
-      ReplaceProba = args["Xreplace-proba"].as<double>();
-      if (ReplaceProba <= 0) {
-        std::cerr << "Error: The probability for replacing (--Xreplace-proba) a coefficient cannot "
+    if (args.count("Xcoeff-replace-proba")) {
+      CoeffReplaceProba = args["Xcoeff-replace-proba"].as<double>();
+      if (CoeffReplaceProba <= 0) {
+        std::cerr << "Error: The probability for replacing (--Xcoeff-replace-proba) a coefficient cannot "
                      "be less than or equal to 0. It should be within 0 to 1."
                   << std::endl;
         exit(1);
       }
-      if (ReplaceProba > 1) {
-        std::cerr << "Error: The probability for replacing (--Xreplace-proba) a coefficient cannot "
+      if (CoeffReplaceProba > 1) {
+        std::cerr << "Error: The probability for replacing (--Xcoeff-replace-proba) a coefficient cannot "
                      "be larger than 1. It should be within 0 to 1."
                   << std::endl;
         exit(1);
@@ -435,6 +448,38 @@ struct GlobalOptions {
 
     if (args.count("Xfunction-depth")) {
       FunctionDepth = args["Xfunction-depth"].as<int>();
+    }
+
+    if (args.count("Xdataflow-strategy")) {
+      switch (args["Xdataflow-strategy"].as<int>()) {
+      case 0: DataflowStrategy = Literal; break;
+      case 1: DataflowStrategy = PrimeFieldInterpolation; break;
+      default: {
+        std::cerr << "Error: Invalid DataflowStrategy. It must be one of {0=literal, 1=Prime interpolating}"
+                  << std::endl;
+        exit(1);
+      }
+      }
+    }
+
+    if (args.count("Xinit-replace-proba")) {
+      InitReplaceProba = args["Xinit-replace-proba"].as<double>();
+      if (!(0 <= InitReplaceProba && InitReplaceProba <= 1)) {
+        std::cerr << "Error: The probability for replacing (--Xinit-replace-proba) a initials cannot "
+                     "be less than or equal to 0. It should be within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("Xvar-take-proba")) {
+      InitReplaceProba = args["Xvar-take-proba"].as<double>();
+      if (!(0 <= InitReplaceProba && InitReplaceProba <= 1)) {
+        std::cerr << "Error: The probability for replacing (--Xvar-take-proba) a initials cannot "
+                     "be less than or equal to 0. It should be within 0 to 1."
+                  << std::endl;
+        exit(1);
+      }
     }
   }
 
