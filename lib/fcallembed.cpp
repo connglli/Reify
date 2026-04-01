@@ -30,8 +30,9 @@
 #include <lib/samputils.hpp>
 #include <utility>
 
-#include "lib/fcallembed.hpp"
+#include "global.hpp"
 #include "lib/chksum.hpp"
+#include "lib/fcallembed.hpp"
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
 
@@ -386,7 +387,7 @@ typeLoop:
         int32_t candidate = -1;
         for (size_t k = 0; k < nrIterations; k++) {
           // if the next value is not the successor of - or equal to the last one there must be a unique value inbetween
-          if (currVarState[k] != (last + 1) % mod.n
+          if (currVarState[k] != static_cast<int32_t>((last + 1) % mod.n)
               && currVarState[k] - 1 - (last + 1) >= largest_range) {
             largest_range = currVarState[k] - 1 - (last + 1);
             candidate = Random::Get().Uniform(last + 1, currVarState[k] - 1)();
@@ -567,8 +568,7 @@ void FCallStrategy::randomlyFilterVarState(symir::FunctBuilder *funBd) {
   size_t lastVarStartIndex = 0;
   for (size_t i = 0; i < nrVariables; i++) {
     if (this->varMap.contains(i)) lastVarStartIndex = i;
-    // select vars randomly TODO: Make probability global?
-    if (indices.size() > 0 && randDouble() > 0.3) continue;
+    if (indices.size() > 0 && randDouble() > 1 - GlobalOptions::Get().VariableTakeProba) continue;
     indices.push_back(i);
     const symir::VarDef *var = funBd->FindVar(this->varMap[lastVarStartIndex]);
     this->filteredVars.push_back(var);
@@ -774,8 +774,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
     const auto &arg = (*this->init)[initIdx];
     for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
       flattIndex += 1;
-      // select inits randomly TODO: Make probability global?
-      if (randDouble() <= 0.5) continue;
+      if (randDouble() <= GlobalOptions::Get().InitReplaceProba) continue;
 
       Log::Get().Out() << "Replacing the " << flattIndex << "-th argument" << std::endl;
 
