@@ -12,5 +12,4 @@ Java:
 2. separation compilation units
 
 Interprocedural Dataflow: 
-1. During linking use all init/fina mappings (Currently only uses first)
 5. Modular arithmetic SymIR Classes currently cannot compile to Java

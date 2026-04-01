@@ -34,15 +34,15 @@ class SymExec; // Bit of a hacky forward declaration
 
 class VariableStateBase {
 public:
-  std::vector<int32_t> getPathBlocksIndices();
+  std::vector<size_t> getPathBlocksIndices();
   std::vector<std::string> getPathBlocksLabels();
   size_t getNrPathBlocks() {return this->executionState.size(); }
 
   struct BlockState {
     // first: Index, second: Label
-    std::pair<int32_t, std::string> blockId;
+    std::pair<size_t, std::string> blockId;
     // every 2 int32_ts are Variable index followed by target value
-    std::vector<std::pair<int32_t, int32_t>> assignments;
+    std::vector<std::pair<size_t, int32_t>> assignments;
   };
 
 protected:
