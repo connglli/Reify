@@ -28,9 +28,7 @@
 
 #include "lib/lang.hpp"
 #include "lib/argument.hpp"
-#include "lib/symexec.hpp"
 #include "lib/varstate.hpp"
-#include "lib/random.hpp"
 
 
 class FCallStrategy {
@@ -46,9 +44,9 @@ public:
   /// generate the string representing the call
   virtual std::string generateCall() = 0;
   /// generates the nessessary preamble that create the function arguments
-  virtual void generatePreamble(VariableStateQuery *varStateQuery, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
+  virtual void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
   /// generates the nessessary postamble that map the function call's return value back to the replaced coeff
-  virtual void generatePostamble(VariableStateQuery *varStateQuery, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
+  virtual void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
 
 protected:
   void setMaxNrBlocks(size_t nrBlocks);
@@ -58,7 +56,7 @@ protected:
 
   const symir::VarDef *getUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex);
 
-  void setVarState(VariableStateQuery *varStateQuery, size_t blockIndex, size_t stmtIndex);
+  void appendVarState(VariableStateQuery *varStateQuery, size_t blockIndex, size_t stmtIndex);
 
   void randomlyFilterVarState(symir::FunctBuilder *funBd);
 
@@ -97,7 +95,7 @@ public:
     this->callGenStrategy = callGenStrategy;
   }
 
-  void setVarStateQuery(VariableStateQuery *varStateQuery) { this->varStateQuery = varStateQuery; }
+  void setVarStateQueries(std::vector<VariableStateQuery> *varStateQueries) { this->varStateQueries = varStateQueries; }
 
   /// embeds the guest function with a coeff
   bool embedGuest(
@@ -120,7 +118,7 @@ protected:
   symir::Funct *const host;
   std::unique_ptr<symir::FunctBuilder> hostBuilder;
   FCallStrategy *callGenStrategy;
-  VariableStateQuery *varStateQuery;
+  std::vector<VariableStateQuery> *varStateQueries;
 
   bool succeeded = false;
   std::map<symir::Coef *, bool> symbols;
@@ -131,8 +129,8 @@ class LiteralFCallStrategy : public FCallStrategy {
 public:
   explicit LiteralFCallStrategy():
     FCallStrategy() {};
-  void generatePreamble(VariableStateQuery *varStateQuery, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void generatePostamble(VariableStateQuery *varStateQuery, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
+  void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
+  void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
   std::string generateCall() override;
   std::string getStrategyName() const override {return "Literal Strategy"; }
 };
@@ -142,12 +140,11 @@ class PrimeInterpFCallStrategy : public FCallStrategy {
 public:
   explicit PrimeInterpFCallStrategy():
     FCallStrategy() {};
-  void generatePreamble(VariableStateQuery *varStateQuery, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void generatePostamble(VariableStateQuery *varStateQuery, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
+  void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
+  void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
   std::string generateCall() override;
   std::string getStrategyName() const override {return "PrimeInterpolation Stratgey"; }
 private:
-  bool InsertedArgVars = false;
   // maps variable index to UnInitVar name and correction value
   std::map<size_t, std::pair<std::string, int32_t>> argVars;
 };
@@ -156,6 +153,8 @@ class RandomFCallEmbedder : public FCallEmbedder {
 public:
   explicit RandomFCallEmbedder(symir::Funct *const host):
     FCallEmbedder(host) {};
+  void setBlockWhitelist(std::vector<size_t> indices) { this->blockIndicesWhitelist = indices; };
+  void createPathBlockWhitelist();
 private:
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;
@@ -178,6 +177,9 @@ private:
   void Visit(const symir::StructDef &s) override;
   void Visit(const symir::Block &b) override;
   void Visit(const symir::Funct &f) override;
+
+private:
+  std::vector<size_t> blockIndicesWhitelist;
 };
 
 #endif // REIFY_FCALLEMBED_HPP

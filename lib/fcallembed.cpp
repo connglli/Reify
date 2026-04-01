@@ -33,7 +33,7 @@
 #include "lib/fcallembed.hpp"
 #include "lib/chksum.hpp"
 #include "lib/lang.hpp"
-#include "lib/symexec.hpp"
+#include "lib/logger.hpp"
 
 namespace {
   /// given a flattend intex recover the access vector needed to create a VarUse Object
@@ -192,6 +192,7 @@ typeLoop:
         }
         Log::Get().Out() << "]" << std::endl;
       }
+      Log::Get().Out() << "Rank(A) = " << nmod_mat_rank(A);
 
       // Fill B vector
       for (size_t row = 0; row < nrIterations; row++) {
@@ -200,7 +201,6 @@ typeLoop:
       // Fill the last element of B with a unique new target value to avoid the const polynomial
       nmod_mat_set_entry(B, nrIterations, 0, nmod_add(static_cast<ulong>(target), 1, this->mod));
   
-
       // solve the system
       int32_t res = nmod_mat_can_solve(X, A, B);
       //TODO: I believe this can fail by change, maybe we can retry in this case (should not need many retries).
@@ -379,24 +379,26 @@ typeLoop:
         }
         std::sort(currVarState.begin(), currVarState.end());
   
-        // starting at 1 to avoid the all 0 vector since that can lead to a lower ranked matrix
+        // To actually find a unique element we look for the largest difference between to successive elements.
+        // This is to minimize the chance the AX = B is unsolvable
         int32_t last = 0;
-        bool added_unique = false;
+        int32_t largest_range = 0;
+        int32_t candidate = -1;
         for (size_t k = 0; k < nrIterations; k++) {
           // if the next value is not the successor of - or equal to the last one there must be a unique value inbetween
-          if (currVarState[k] != static_cast<int32_t>((last + 1) % mod.n) && currVarState[k] != last) {
-              unique.push_back(Random::Get().Uniform(last + 1, currVarState[k] - 1)());
-              added_unique = true;
-              break;
-          } else {
-            last = currVarState[k];
+          if (currVarState[k] != (last + 1) % mod.n
+              && currVarState[k] - 1 - (last + 1) >= largest_range) {
+            largest_range = currVarState[k] - 1 - (last + 1);
+            candidate = Random::Get().Uniform(last + 1, currVarState[k] - 1)();
           }
+          last = currVarState[k];
         }
-        if (!added_unique && currVarState.back() != static_cast<int32_t>(mod.n - 1)) {
-          unique.push_back(Random::Get().Uniform(currVarState.back() + 1, static_cast<int32_t>(mod.n - 1))());
-          added_unique = true;
+        if (static_cast<int32_t>(mod.n - 1) - currVarState.back() >= largest_range) {
+          largest_range = static_cast<int32_t>(mod.n - 1) - currVarState.back();
+          candidate = Random::Get().Uniform(currVarState.back() + 1, static_cast<int32_t>(mod.n - 1))();
         }
-        Assert(added_unique, "unable for find a unique element");
+        if (largest_range > 0) unique.push_back(candidate);
+        else Panic("unable for find a unique element");
       }
       Assert(unique.size() == nrVariables, "unique array not of the right size");
       return unique;
@@ -522,14 +524,24 @@ const symir::VarDef *FCallStrategy::getUnusedAssignVar(symir::FunctBuilder *funB
   return loc;
 }
 
-void FCallStrategy::setVarState(VariableStateQuery *varStateQuery, size_t blockIndex, size_t stmtIndex) {
+void FCallStrategy::appendVarState(VariableStateQuery *varStateQuery, size_t blockIndex, size_t stmtIndex) {
   // get the current variable state for all variables in scope
-  this->varMap = varStateQuery->GetVarMap();
   auto varStatePair = varStateQuery->query(blockIndex, stmtIndex);
-  this->nrVariables = varStatePair.first;
-  this->varState = varStatePair.second;
-  Assert(this->varState.size() % nrVariables == 0, "nrVariables * nr_iteration == varState.size must hold");
-  this->nrIterations = this->varState.size() / nrVariables;
+  size_t currVarStateSize;
+  if (this->nrVariables == 0) {
+    this->nrVariables = varStatePair.first;
+    this->varState = varStatePair.second;
+    currVarStateSize = this->varState.size();
+  } else {
+    Assert(this->nrVariables == varStatePair.first, "Different Queries have different nrVariables");
+    this->varState.reserve(this->varState.size() + varStatePair.second.size());
+    currVarStateSize = varStatePair.second.size();
+    for (size_t i = 0; i < currVarStateSize; i++) {
+      this->varState.push_back(varStatePair.second[i]);
+    }
+  }
+  Assert(this->varState.size() % this->nrVariables == 0, "nrVariables * nr_iteration == varState.size must hold");
+  this->nrIterations += currVarStateSize / this->nrVariables;
   
   Log::Get().Out() << "Variables State: (nrVariables: " << this->nrVariables << "), (nrIterations: " << this->nrIterations << ")" << std::endl;
   for (size_t i = 0; i < this->nrIterations; i++) {
@@ -625,8 +637,8 @@ bool FCallEmbedder::embedGuest(
   const std::vector<ArgPlus<int32_t>> *init,
   const std::vector<ArgPlus<int32_t>> *fina
 ) {
-  Assert(this->callGenStrategy, "No embedding strategy choosen");
-  Assert(this->varStateQuery, "varStateQuery not initialized");
+  Assert(this->callGenStrategy != nullptr, "No embedding strategy choosen");
+  Assert(this->varStateQueries != nullptr, "varStateQuery not initialized");
   Assert(guest != nullptr, "No valid guest to embed");
   Assert(init != nullptr, "No valid init to embed");
   Assert(fina != nullptr, "No valid fina to embed");
@@ -661,14 +673,14 @@ void FCallEmbedder::markMutated(symir::Coef *c) {
 
 // ==================== LiteralFCallStrategy Implementations ====================
 void LiteralFCallStrategy::generatePreamble(
-  VariableStateQuery *varState,
+  std::vector<VariableStateQuery> *varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
 ) { /* Do Nothing */ }
 
 void LiteralFCallStrategy::generatePostamble(
-  VariableStateQuery *varState,
+  std::vector<VariableStateQuery> *varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -715,7 +727,7 @@ std::string LiteralFCallStrategy::generateCall() {
 
 // ==================== PrimeInterpFCallStrategy Implementations ====================
 void PrimeInterpFCallStrategy::generatePreamble(
-  VariableStateQuery *varStateQuery,
+  std::vector<VariableStateQuery> *varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -727,7 +739,16 @@ void PrimeInterpFCallStrategy::generatePreamble(
 
   Log::Get().OpenSection("generatePreable");
 
+  // clear temporaries
   this->argVars.clear();
+  this->varState.clear();
+  this->varMap.clear();
+  this->filteredVarState.clear();
+  this->filteredVars.clear();
+  this->filteredAccesses.clear();
+  this->nrVariables = 0;
+  this->nrIterations = 0;
+  this->filteredNrVariables = 0;
 
   if (this->nrBlocks == 0) this->setMaxNrBlocks(funBd->GetBlocks().size());
 
@@ -741,7 +762,10 @@ void PrimeInterpFCallStrategy::generatePreamble(
   Log::Get().Out() << "Targeting Block: " << targetBlock->GetLabel() << ", " << stmtIndex << "-th Statement" << std::endl;
   symir::BlockBuilder *blockBd = symir::BlockCopier(funBd, targetBlock).CopyAsBuilder();
 
-  this->setVarState(varStateQuery, blockIndex, stmtIndex);
+  this->varMap = (*varStateQueries)[0].GetVarMap();
+  for (size_t i = 0; i < varStateQueries->size(); i++) {
+    this->appendVarState(&(*varStateQueries)[i], blockIndex, stmtIndex);
+  }
 
   auto randDouble = Random::Get().UniformReal();
   auto randTarget = Random::Get().Uniform(0, prime - 1);
@@ -801,7 +825,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
 }
 
 void PrimeInterpFCallStrategy::generatePostamble(
-  VariableStateQuery *varState,
+  std::vector<VariableStateQuery> *varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -854,6 +878,18 @@ std::string PrimeInterpFCallStrategy::generateCall() {
 
 
 // ==================== RandomFCallEmbedder Implementations ====================
+void RandomFCallEmbedder::createPathBlockWhitelist() {
+  Assert(this->varStateQueries != nullptr, "varStateQueries must be set to create white list");
+  this->blockIndicesWhitelist.clear();
+  for (size_t i = 0; i < this->varStateQueries->size(); i++) {
+    const auto indices = (*this->varStateQueries)[0].getPathBlocksIndices();
+    this->blockIndicesWhitelist.resize(this->blockIndicesWhitelist.size() + indices.size());
+    for (size_t j = 0; j < indices.size(); j++) {
+      this->blockIndicesWhitelist.push_back(indices[j]);
+    }
+  }
+}
+
 void RandomFCallEmbedder::Visit(const symir::VarUse &v) {
   if (this->succeeded) {
     return;
@@ -866,7 +902,8 @@ void RandomFCallEmbedder::Visit(const symir::VarUse &v) {
       }
     }
   }
- }
+}
+
 void RandomFCallEmbedder::Visit(const symir::Coef &c) {
   if (this->succeeded) {
     return;
@@ -885,9 +922,9 @@ void RandomFCallEmbedder::Visit(const symir::Coef &c) {
 
   this->callGenStrategy->setTarget(pc->GetI32Value());
 
-  this->callGenStrategy->generatePreamble(this->varStateQuery, this->hostBuilder.get(), this->current_block, this->current_stmt);
+  this->callGenStrategy->generatePreamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
   this->hostBuilder->FindSymbol(pc->GetName())->SetValue(this->callGenStrategy->generateCall());
-  this->callGenStrategy->generatePostamble(this->varStateQuery, this->hostBuilder.get(), this->current_block, this->current_stmt);
+  this->callGenStrategy->generatePostamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
 
   markMutated(pc);
   this->succeeded = true;
@@ -988,12 +1025,11 @@ void RandomFCallEmbedder::Visit(const symir::Block &b) {
 void RandomFCallEmbedder::Visit(const symir::Funct &f) {
   const auto blocks = f.GetBlocks();
   // We could remove duplicates from the path but not doing so gives a bias to blocks inside loops which is not totally undesirable.
-  std::vector<int32_t> pathBlocksIndices = varStateQuery->getPathBlocksIndices();
-  const auto rand = Random::Get().Uniform(0, static_cast<int32_t>(pathBlocksIndices.size()) - 1);
+  const auto rand = Random::Get().Uniform(0, static_cast<int32_t>(this->blockIndicesWhitelist.size()) - 1);
   // Sample a statement from the list of statements for replacement
   for (int32_t tries = 0; tries < 100; tries++) {
-    const int32_t index = pathBlocksIndices[rand()];
-    Assert((size_t)index < blocks.size(), "pathBlock index out of bounds");
+    const size_t index = this->blockIndicesWhitelist[rand()];
+    Assert(index < blocks.size(), "whitelisted index out of bounds");
     this->current_block = index;
     blocks[index]->Accept(*this);
     if (this->succeeded) {
