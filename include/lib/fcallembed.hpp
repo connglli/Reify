@@ -29,6 +29,7 @@
 #include "lib/lang.hpp"
 #include "lib/argument.hpp"
 #include "lib/varstate.hpp"
+#include "lib/logger.hpp"
 
 
 class FCallStrategy {
@@ -93,6 +94,7 @@ public:
       "The callGenStrategy passed to the setStragegy method is a nullptr"
     );
     this->callGenStrategy = callGenStrategy;
+    Log::Get().Out() << "Embed Strategy: " << callGenStrategy->getStrategyName() << std::endl;
   }
 
   void setVarStateQueries(std::vector<VariableStateQuery> *varStateQueries) { this->varStateQueries = varStateQueries; }

@@ -26,6 +26,7 @@
 #include <fstream>
 #include <string>
 
+#include "global.hpp"
 #include "lib/chksum.hpp"
 #include "lib/parsers.hpp"
 #include "lib/program.hpp"
@@ -75,10 +76,20 @@ void ProgPlus::Generate() {
     Log::Get().Out() << "num_replaceable=" << numCoeffs << std::endl;
 
     auto emb = RandomFCallEmbedder(host);
-    //auto strat = LiteralFCallStrategy();
-    auto strat = PrimeInterpFCallStrategy();
-    emb.setStrategy(&strat);
-    Log::Get().Out() << "Embed Strategy: " << strat.getStrategyName() << std::endl;
+
+    LiteralFCallStrategy litStrategy;
+    PrimeInterpFCallStrategy interpStrategy;
+    switch (GlobalOptions::Get().DataflowStrategy) {
+    case GlobalOptions::Literal: {
+      litStrategy = LiteralFCallStrategy();
+      emb.setStrategy(&litStrategy);
+    } break;
+    case GlobalOptions::PrimeFieldInterpolation: {
+      interpStrategy = PrimeInterpFCallStrategy();
+      emb.setStrategy(&interpStrategy);
+    } break;
+    default: Panic("DataflowStrategy is set to an invalid value");
+    }
 
 
     // Random Generator to sample a function from i + 1 to the end
@@ -86,7 +97,7 @@ void ProgPlus::Generate() {
     auto randU = Random::Get().UniformReal();
     // TODO: since we are only replacing on path coeffs using numCoeffs forces ReplaceProba to be really low (e.g. 0.05)
     // Hence we need a better way to come up with a way to generate a random number of repacements
-    int randNum = Random::Get().Binomial(numCoeffs - 1, GlobalOptions::Get().ReplaceProba)();
+    int randNum = Random::Get().Binomial(numCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
 
     // we replace randNum coeffs with function calls
     for (int k = 0; k < randNum; ++k) {
