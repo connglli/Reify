@@ -294,9 +294,8 @@ bool SymExec::solve(
   extractSymbolsFromModel();
 
   // Extract the state of each variable along the exec path from the model
-  VariableState varState = VariableState();
-  varState.extract(this);
-  this->varStateJson["solve_" + std::to_string(this->inits.size())] = varState.toJson();
+  this->varStateExtractor.push_back(VariableStateExtractor());
+  varStateExtractor.back().extract(this);
 
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
@@ -502,5 +501,5 @@ void SymExec::insertRandomValueIntoUnsolvedSymbols() {
 }
 
 std::string SymExec::getVarStateJson() {
-  return this->varStateJson.dump() + "\n";
+  return varstate::allToJsonFile(this->varStateExtractor);
 }

@@ -131,7 +131,7 @@ namespace symir {
       this->out << "#" << mod << ")";
       this->out << " ";
     }
-    coeffs[coeffs.size() - 1]->Accept(*this);
+    coeffs.back()->Accept(*this);
     this->out << "#" << mod << ")";
   }
 
@@ -487,7 +487,7 @@ namespace symir {
         this->out << ") % " << mod;
       this->out << " + ";
     }
-    coeffs[coeffs.size() - 1]->Accept(*this);
+    coeffs.back()->Accept(*this);
     this->out << ") % " << mod;
   }
 

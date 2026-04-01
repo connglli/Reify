@@ -28,9 +28,9 @@
 
 #include <bitwuzla/cpp/bitwuzla.h>
 #include <cstddef>
-#include "json.hpp"
 #include "lib/function.hpp"
 #include "lib/ubfree.hpp"
+#include "lib/varstate.hpp"
 
 class FunPlus;
 
@@ -126,9 +126,9 @@ private:
   // The value of each input parameter at the exit of the function.
   std::vector<std::vector<ArgPlus<int>>> finas{};
 
-  nlohmann::json varStateJson = nlohmann::json::object();
+  std::vector<VariableStateExtractor> varStateExtractor;
 
-  friend class VariableState;
+  friend class VariableStateExtractor;
 };
 
 #endif // REIFY_SYMEXEC_HPP

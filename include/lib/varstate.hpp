@@ -27,28 +27,36 @@
 #define REIFY_VARSTATE_HPP
 
 #include "lib/lang.hpp"
-#include "lib/symexec.hpp"
-#include "lib/ubfree.hpp"
+#include "json.hpp"
 #include <bitwuzla/cpp/bitwuzla.h>
 
-class VariableState;
+class SymExec; // Bit of a hacky forward declaration
 
-namespace varstate {
-  std::vector<VariableState> allFromJsonFile(std::string filepath);
-  void print32_t_state(size_t nr_variables, std::vector<int32_t> states);
-}
-
-class VariableState : symir::SymIRVisitor {
+class VariableStateBase {
 public:
-  nlohmann::json toJson();
-  void fromJson(nlohmann::json json);
-  std::pair<size_t, std::vector<int32_t>> query(size_t blockIndex, size_t stmtIndex);
-  void extract(SymExec *symexec);
   std::vector<int32_t> getPathBlocksIndices();
   std::vector<std::string> getPathBlocksLabels();
   size_t getNrPathBlocks() {return this->executionState.size(); }
 
-  std::map<size_t, std::string> GetVarMap() { return this->varNamesMap; }
+  struct BlockState {
+    // first: Index, second: Label
+    std::pair<int32_t, std::string> blockId;
+    // every 2 int32_ts are Variable index followed by target value
+    std::vector<std::pair<int32_t, int32_t>> assignments;
+  };
+
+protected:
+  std::vector<int32_t> init;
+  std::vector<BlockState> executionState;
+
+};
+
+
+class VariableStateExtractor : public VariableStateBase, symir::SymIRVisitor {
+public:
+  nlohmann::json toJson();
+  void extract(SymExec *symexec);
+  std::map<std::string, size_t> GetVarMap() { return this->varNamesMap; }
 
 private:
   void pushTerm(bitwuzla::Term term) { this->termStack.push(std::move(term)); }
@@ -57,12 +65,7 @@ private:
     this->termStack.pop();
     return term;
   }
-  struct blockState {
-    // first: Index, second: Label
-    std::pair<int32_t, std::string> blockId;
-    // every 2 int32_ts are Variable index followed by target value
-    std::vector<std::pair<int32_t, int32_t>> assignments;
-  };
+
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;
   void Visit(const symir::Term &t) override;
@@ -85,17 +88,29 @@ private:
   void Visit(const symir::Block &b) override;
   void Visit(const symir::Funct &f) override;
 
-
 private:
-  std::vector<int32_t> init;
-  std::map<size_t, std::string> varNamesMap;
-  std::vector<blockState> executionState;
-
-// Used only by extraction
+  std::map<std::string, size_t> varNamesMap;
   SymExec *symexec;
   size_t currBlock;
   std::map<std::string, int32_t> versions{};  // The SSA version table for each variable
   std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
 };
+
+
+class VariableStateQuery : public VariableStateBase {
+public:
+  void fromJson(nlohmann::json json);
+  std::pair<size_t, std::vector<int32_t>> query(size_t blockIndex, size_t stmtIndex);
+  std::map<size_t, std::string> GetVarMap() { return this->varNamesMap; }
+
+private:
+  std::map<size_t, std::string> varNamesMap;
+};
+
+namespace varstate {
+  std::vector<VariableStateQuery> allFromJsonFile(std::string filepath);
+  std::string allToJsonFile(std::vector<VariableStateExtractor> extractors);
+  void print32_t_state(size_t nr_variables, std::vector<int32_t> states);
+}
 
 #endif // REIFY_VARSTATE_HPP
