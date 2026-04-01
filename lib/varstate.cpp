@@ -71,8 +71,8 @@ namespace varstate {
 
 // ==================== VariableStateBase Implementation ====================
 
-std::vector<int32_t> VariableStateBase::getPathBlocksIndices() {
-  std::vector<int32_t> path;
+std::vector<size_t> VariableStateBase::getPathBlocksIndices() {
+  std::vector<size_t> path;
   path.reserve(this->executionState.size());
   for (const auto& es : executionState) {
     path.push_back(es.blockId.first);
@@ -145,7 +145,7 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
   size_t currentShapeIdx = 0; // Index into currShape
 
   std::ostringstream solverSuffix;
-  int32_t flattenedIdx = 0;
+  size_t flattenedIdx = 0;
 
   // Row-major flattening for the current contiguous array access chain.
   std::vector<int32_t> pendingArrayIndices;
