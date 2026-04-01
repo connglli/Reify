@@ -56,7 +56,7 @@ private:
   std::string uuid, sno;
   std::vector<std::unique_ptr<symir::Funct>> functions{};
   std::vector<FunPlus::IniFinMap> mappings{};
-  std::vector<std::vector<VariableState>> varStates{};
+  std::vector<std::vector<VariableStateQuery>> varStates{};
 };
 
 #endif // REIFY_PROGRAM_HPP

@@ -392,8 +392,8 @@ typeLoop:
             last = currVarState[k];
           }
         }
-        if (!added_unique && currVarState[currVarState.size() - 1] != static_cast<int32_t>(mod.n - 1)) {
-          unique.push_back(Random::Get().Uniform(currVarState[currVarState.size() - 1] + 1, static_cast<int32_t>(mod.n - 1))());
+        if (!added_unique && currVarState.back() != static_cast<int32_t>(mod.n - 1)) {
+          unique.push_back(Random::Get().Uniform(currVarState.back() + 1, static_cast<int32_t>(mod.n - 1))());
           added_unique = true;
         }
         Assert(added_unique, "unable for find a unique element");
@@ -522,7 +522,7 @@ const symir::VarDef *FCallStrategy::getUnusedAssignVar(symir::FunctBuilder *funB
   return loc;
 }
 
-void FCallStrategy::setVarState(VariableState *varStateQuery, size_t blockIndex, size_t stmtIndex) {
+void FCallStrategy::setVarState(VariableStateQuery *varStateQuery, size_t blockIndex, size_t stmtIndex) {
   // get the current variable state for all variables in scope
   this->varMap = varStateQuery->GetVarMap();
   auto varStatePair = varStateQuery->query(blockIndex, stmtIndex);
@@ -572,7 +572,7 @@ void FCallStrategy::randomlyFilterVarState(symir::FunctBuilder *funBd) {
       for (size_t j = 0; j < this->filteredAccesses[i].size() - 1; j++) {
         Log::Get().Out() << this->filteredAccesses[i][j]->GetI32Value() << ", ";
       }
-      Log::Get().Out() << this->filteredAccesses[i][this->filteredAccesses[i].size() - 1]->GetI32Value() << "]";
+      Log::Get().Out() << this->filteredAccesses[i].back()->GetI32Value() << "]";
     }
     Log::Get().Out() << "(" << indices[i] << "): [";
     for (size_t k = 0; k < this->nrIterations; k++) {
@@ -661,14 +661,14 @@ void FCallEmbedder::markMutated(symir::Coef *c) {
 
 // ==================== LiteralFCallStrategy Implementations ====================
 void LiteralFCallStrategy::generatePreamble(
-  VariableState *varState,
+  VariableStateQuery *varState,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
 ) { /* Do Nothing */ }
 
 void LiteralFCallStrategy::generatePostamble(
-  VariableState *varState,
+  VariableStateQuery *varState,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -715,7 +715,7 @@ std::string LiteralFCallStrategy::generateCall() {
 
 // ==================== PrimeInterpFCallStrategy Implementations ====================
 void PrimeInterpFCallStrategy::generatePreamble(
-  VariableState *varStateQuery,
+  VariableStateQuery *varStateQuery,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -801,7 +801,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
 }
 
 void PrimeInterpFCallStrategy::generatePostamble(
-  VariableState *varState,
+  VariableStateQuery *varState,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex

@@ -106,7 +106,7 @@ void ProgPlus::Generate() {
       for (size_t i = 0 ; i < init->size(); i++) {
         Log::Get().Out() << (*init)[i].ToCxStr() << ", ";
       }
-      Log::Get().Out() << (*init)[init->size() - 1].ToCxStr() << std::endl;
+      Log::Get().Out() << (*init).back().ToCxStr() << std::endl;
 
       if (emb.embedGuest(guest, init, fina)) {
         Log::Get().Out() << "Embed: " << k << "/" << randNum 
