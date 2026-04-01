@@ -84,6 +84,8 @@ void ProgPlus::Generate() {
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
     auto randU = Random::Get().UniformReal();
+    // TODO: since we are only replacing on path coeffs using numCoeffs forces ReplaceProba to be really low (e.g. 0.05)
+    // Hence we need a better way to come up with a way to generate a random number of repacements
     int randNum = Random::Get().Binomial(numCoeffs - 1, GlobalOptions::Get().ReplaceProba)();
 
     // we replace randNum coeffs with function calls
@@ -93,13 +95,11 @@ void ProgPlus::Generate() {
       Assert(guest != nullptr, "The guest function is nullptr for index %d", j);
       auto guestMap = mappings[j];
 
-      //int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
-      int index = 0; // TODO: Each init/fina pair for the HOST results in a different function.
-
+      int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
-      auto varStateQuery = this->varStates[i][index];
-      emb.setVarStateQuery(&varStateQuery);
+      emb.setVarStateQueries(&this->varStates[i]);
+      emb.createPathBlockWhitelist();
 
       Log::Get().OpenSection("Embedding " + guest->GetName());
       Log::Get().Out() << "Initials: ";
@@ -162,8 +162,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts) const {
   mainFile << "    " << StatelessChecksum::GetCrc32InitName() << "();" << std::endl;
 
   // Use the first function (index 0) as the entry point
-  //int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
-  int index = 0; // TODO: See line 97
+  int index = Random::Get().Uniform(0, static_cast<int>(mappings[0].first.size()) - 1)();
   const std::vector<ArgPlus<int>> *init = &(mappings[0].first[index]);
   const std::vector<ArgPlus<int>> *fina = &(mappings[0].second[index]);
   int checksum = StatelessChecksum::Compute(*fina);
