@@ -140,13 +140,6 @@ typeLoop:
       Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
   
       Log::Get().OpenSection("Interpolation");
-      this->randomizePolynomial(nrVariables, nrIterations);
-  
-      Log::Get().Out() << "Polynomial (" << this->polynomial.size() << "): ";
-      for (size_t i = 0; i < this->polynomial.size(); i++) {
-        Log::Get().Out() << this->polynomial[i] << " ";
-      }
-      Log::Get().Out() << std::endl;
 
       nmod_mat_t A;
       nmod_mat_t B;
@@ -155,56 +148,69 @@ typeLoop:
       nmod_mat_init(B, nrIterations + 1, 1, this->mod.n);
       nmod_mat_init(X, nrIterations + 1, 1, this->mod.n);
   
-      // set all entries of A
-      for (size_t row = 0; row < nrIterations; row++) {
-        for (size_t col = 0; col < nrIterations; col++) {
-          ulong term = 1;
-          for (uint32_t vari = 0; vari < nrVariables; vari++) {
-            int32_t var = this->reduceMod(varState[row * nrVariables + vari]);
-            ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + vari]);
-            term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
-          }
-          nmod_mat_set_entry(A, row, col, term);
-        }
-        nmod_mat_set_entry(A, row, nrIterations, 1);
-      }
-  
-      // fill the last row of the A matrix with unique new numbers to avoid the const polynomial
-      std::vector<int32_t> unique_iter =
-        this->findUniqueIteration(nrVariables, nrIterations, varState);
-      for (size_t col = 0; col < nrIterations; col ++) {
-        ulong term = 1;
-        Assert(col * nrVariables < nrIterations * nrVariables, "Array access out of bounds");
-        for (uint32_t i = 0; i < nrVariables; i++) {
-          int32_t var = this->reduceMod(unique_iter[i]);
-          ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + i]);
-          term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
-        }
-        nmod_mat_set_entry(A, nrIterations, col, term);
-      }
-      nmod_mat_set_entry(A, nrIterations, nrIterations, 1);
-  
-      Log::Get().Out() << "Interpolation Matrix A["<< nrIterations + 1 << ", " << nrIterations + 1 << "]:" << std::endl;
-      for (size_t row = 0; row < nrIterations + 1; row++) {
-        Log::Get().Out() << "[";
-        for (size_t col = 0; col < nrIterations + 1; col ++) {
-          Log::Get().Out() << nmod_mat_get_entry(A, row, col);
-          if (col != nrIterations) Log::Get().Out() << ", ";
-        }
-        Log::Get().Out() << "]" << std::endl;
-      }
-      Log::Get().Out() << "Rank(A) = " << nmod_mat_rank(A);
-
       // Fill B vector
       for (size_t row = 0; row < nrIterations; row++) {
         nmod_mat_set_entry(B, row, 0, target);
       }
       // Fill the last element of B with a unique new target value to avoid the const polynomial
       nmod_mat_set_entry(B, nrIterations, 0, nmod_add(static_cast<ulong>(target), 1, this->mod));
+
+
+      int32_t res;
+      for (size_t i = 0; i < 5; i++) { // retry up to 5 times incase the system is unsolvable should rarly happen
+        this->randomizePolynomial(nrVariables, nrIterations);
   
-      // solve the system
-      int32_t res = nmod_mat_can_solve(X, A, B);
-      //TODO: I believe this can fail by change, maybe we can retry in this case (should not need many retries).
+        Log::Get().Out() << "Polynomial (" << this->polynomial.size() << "): ";
+        for (size_t i = 0; i < this->polynomial.size(); i++) {
+          Log::Get().Out() << this->polynomial[i] << " ";
+        }
+        Log::Get().Out() << std::endl;
+
+        // set all entries of A
+        for (size_t row = 0; row < nrIterations; row++) {
+          for (size_t col = 0; col < nrIterations; col++) {
+            ulong term = 1;
+            for (uint32_t vari = 0; vari < nrVariables; vari++) {
+              int32_t var = this->reduceMod(varState[row * nrVariables + vari]);
+              ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + vari]);
+              term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
+            }
+            nmod_mat_set_entry(A, row, col, term);
+          }
+          nmod_mat_set_entry(A, row, nrIterations, 1);
+        }
+
+        // fill the last row of the A matrix with unique new numbers to avoid the const polynomial
+        std::vector<int32_t> unique_iter =
+          this->findUniqueIteration(nrVariables, nrIterations, varState);
+        for (size_t col = 0; col < nrIterations; col ++) {
+          ulong term = 1;
+          Assert(col * nrVariables < nrIterations * nrVariables, "Array access out of bounds");
+          for (uint32_t i = 0; i < nrVariables; i++) {
+            int32_t var = this->reduceMod(unique_iter[i]);
+            ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + i]);
+            term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
+          }
+          nmod_mat_set_entry(A, nrIterations, col, term);
+        }
+        nmod_mat_set_entry(A, nrIterations, nrIterations, 1);
+  
+        Log::Get().Out() << "Interpolation Matrix A["<< nrIterations + 1 << ", " << nrIterations + 1 << "]:" << std::endl;
+        for (size_t row = 0; row < nrIterations + 1; row++) {
+          Log::Get().Out() << "[";
+          for (size_t col = 0; col < nrIterations + 1; col ++) {
+            Log::Get().Out() << nmod_mat_get_entry(A, row, col);
+            if (col != nrIterations) Log::Get().Out() << ", ";
+          }
+          Log::Get().Out() << "]" << std::endl;
+        }
+        Log::Get().Out() << "Rank(A) = " << nmod_mat_rank(A) << std::endl;
+
+        // solve the system
+        res = nmod_mat_can_solve(X, A, B);
+        if (res == 1) break;
+        Log::Get().Out() << "System Unsolvable" << std::endl;
+      }
       Assert(res == 1, "Unable to solve AX = B");
   
       nmod_mat_clear(A);
