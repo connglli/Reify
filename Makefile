@@ -69,16 +69,18 @@ CHKSUM_CODE_VALUE := "\"$(shell (awk '{ printf "%s\\n", $$0 }' $(CHKSUM_RES) | s
 ## Building Flags
 ########################################################################
 
-DBGFLAGS := $(if $(DEBUG),$(if $(filter gdb,$(DEBUG)),-ggdb,-g) -fsanitize=undefined,)
+SANFLAGS := $(if $(SANITIZE),-fsanitize=$(SANITIZE),)
+PROFFLAGS := $(if $(PROFILE),-pg,)
+DBGFLAGS := $(if $(DEBUG),$(if $(filter gdb,$(DEBUG)),-ggdb,-g),)
 OPTFLAGS := $(if $(DEBUG),-O0,-O2)
 
 # Generate and include header dependency files (.d) so incremental builds
 # rebuild objects when headers change.
 DEPFLAGS := -MMD -MP
 
-CXXFLAGS := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CXXSTD} -frtti ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
-CFLAGS   := $(DBGFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CSTD} ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
-LDFLAGS  := $(DBGFLAGS) $(shell pkg-config --libs bitwuzla) $(shell pkg-config --libs flint) -lpthread -lz
+CXXFLAGS := $(DBGFLAGS) $(SANFLAGS) $(PROFFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CXXSTD} -frtti ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
+CFLAGS   := $(DBGFLAGS) $(SANFLAGS) $(PROFFLAGS) -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -std=${CSTD} ${OPTFLAGS} $(DEPFLAGS) -I$(INC_DIR)
+LDFLAGS  := $(DBGFLAGS) $(SANFLAGS) $(PROFFLAGS) $(shell pkg-config --libs bitwuzla) $(shell pkg-config --libs flint) -lpthread -lz
 
 # Dependency files produced alongside object files.
 DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/rysmith.d $(OBJ_DIR)/rylink.d $(OBJ_DIR)/symircc.d
