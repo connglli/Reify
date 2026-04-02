@@ -20,12 +20,19 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     libgmp-dev \
     libmpfr6 \
     libmpfr-dev \
+    libtool-bin \
+    autoconf \
     tmux \
     vim \
   && apt autoremove -y && apt clean -y \
   && rm -rf /var/lib/apt/lists/* \
+  && git clone --depth 1 https://github.com/flintlib/flint.git /tmp/flint \
+  && cd /tmp/flint && ./bootstrap.sh && ./configure \
+  && make -j && make install && cd /reify \
+  && rm -rf /tmp/flint \
   && git clone --depth 1 https://github.com/bitwuzla/bitwuzla.git /tmp/bitwuzla \
   && cd /tmp/bitwuzla && ./configure.py && ninja -C build install && cd /reify \
-  && rm -rf /tmp/bitwuzla
+  && rm -rf /tmp/bitwuzla \
+  && ldconfig
 
 ENTRYPOINT ["bash"]
