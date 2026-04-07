@@ -780,7 +780,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
     const auto &arg = (*this->init)[initIdx];
     for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
       flattIndex += 1;
-      if (randDouble() <= GlobalOptions::Get().InitReplaceProba) continue;
+      if (randDouble() <= 1 - GlobalOptions::Get().InitReplaceProba) continue;
 
       Log::Get().Out() << "Replacing the " << flattIndex << "-th argument" << std::endl;
 
