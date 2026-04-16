@@ -131,7 +131,7 @@ The generated Java class is placed inside the `javaclasses` subdirectory.
 
 Navigate to [bugs](./hunting).
 
-## ✏️ Cite Us
+## ✏️ Citing Us
 
 If you found this work helpful, please consider citing our work:
 
