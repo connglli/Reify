@@ -131,6 +131,19 @@ The generated Java class is placed inside the `javaclasses` subdirectory.
 
 Navigate to [bugs](./hunting).
 
+## ✏️ Cite Us
+
+If you found this work helpful, please consider citing our work:
+
+@inproceedings{reify,
+  title={Semantic Reification: A New Paradigm for Random Program Generation},
+  author={Kavya Chopra and Cong Li and Thodoris Sotiropoulos and Zhendong Su},
+  year={2026},
+  booktitle={Proceedings of the 2026 ACM SIGPLAN Conference on Programming Language Design and Implementation},
+  series={PLDI '26},
+  doi={10.1145/3808268},
+}
+
 ## 🧾 License
 
 ```
