@@ -135,6 +135,7 @@ Navigate to [bugs](./hunting).
 
 If you found this work helpful, please consider citing our work:
 
+```bibtex
 @inproceedings{reify,
   title={Semantic Reification: A New Paradigm for Random Program Generation},
   author={Kavya Chopra and Cong Li and Thodoris Sotiropoulos and Zhendong Su},
@@ -143,6 +144,7 @@ If you found this work helpful, please consider citing our work:
   series={PLDI '26},
   doi={10.1145/3808268},
 }
+```
 
 ## 🧾 License
 
