@@ -12,4 +12,4 @@ Java:
 2. separation compilation units
 
 Interprocedural Dataflow: 
-5. Modular arithmetic SymIR Classes currently cannot compile to Java
+1. Add lowering for new structures (For mod arithmetic and for/while/ifelse) Java and SYMIR as well as parsing for SYMIR
