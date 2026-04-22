@@ -813,12 +813,11 @@ void PrimeInterpFCallStrategy::generatePreamble(
 
       const symir::VarDef *loc = this->getUnusedAssignVar(funBd, blockIndex, stmtIndex);
 
-      auto assignment = blockBd->SymModAssignAt(
+      auto assignment = dynamic_cast<symir::ModAssStmt *>(blockBd->SymCommitStmtAtAssign(blockBd->SymModAssStmt(
         loc,
         blockBd->SymModExpr(coeffs, this->filteredVars, this->filteredAccesses, polynomial, prime),
-        {},
-        stmtIndex
-      );
+        {}
+      ), stmtIndex));
       Assert(assignment != nullptr, "Failed to create a ModAssignment, likely by a failed dynamic_cast");
       this->argVars[flattIndex - 1] = std::make_pair(assignment->GetVar()->GetName(), target - interpolTarget);
       
@@ -967,7 +966,7 @@ void RandomFCallEmbedder::Visit(const symir::Cond &c) {
  }
  c.GetExpr()->Accept(*this);
 }
-void RandomFCallEmbedder::Visit(const symir::ModAssStmt &a) { /* Do Nothing */ }
+void RandomFCallEmbedder::Visit(const symir::ModAssStmt &a) { Panic("Should not travel through an already linked function"); }
 void RandomFCallEmbedder::Visit(const symir::AssStmt &a) {
   if (this->succeeded) {
     return;
@@ -977,19 +976,24 @@ void RandomFCallEmbedder::Visit(const symir::AssStmt &a) {
     return;
   }
   a.GetVar()->Accept(*this);
+}
+void RandomFCallEmbedder::Visit(const symir::RetStmt &r) { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::IfStmt &i) { Panic("Should not travel through an already linked function"); };
+void RandomFCallEmbedder::Visit(const symir::ForStmt &f) { Panic("Should not travel through an already linked function"); };
+void RandomFCallEmbedder::Visit(const symir::WhileStmt &w) { Panic("Should not travel through an already linked function"); };
+
+void RandomFCallEmbedder::Visit(const symir::Branch &b) {
+ if (this->succeeded) {
+   return;
  }
- void RandomFCallEmbedder::Visit(const symir::RetStmt &r) { /* Do Nothing */ }
- void RandomFCallEmbedder::Visit(const symir::Branch &b) {
-  if (this->succeeded) {
-    return;
-  }
-  b.GetCond()->Accept(*this);
- }
+ b.GetCond()->Accept(*this);
+}
 void RandomFCallEmbedder::Visit(const symir::Goto &g)        { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::ScaParam &p)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::VecParam &p)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::StructParam &p) { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::UnInitLocal &l)    { /* Do Nothing */ }
+void RandomFCallEmbedder::Visit(const symir::UnInitLocal &l) { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::ScaLocal &l)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::VecLocal &l)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::StructLocal &l) { /* Do Nothing */ }

@@ -912,7 +912,7 @@ namespace symir {
       delete t;
     }
 
-    bblBd->SymAssign(varDef, *eid, vecAcc);
+    bblBd->SymCommitStmt(bblBd->SymAssStmt(varDef, *eid, vecAcc));
     delete eid;
     delete varToken;
   }

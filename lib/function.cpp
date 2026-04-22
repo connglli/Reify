@@ -321,9 +321,9 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
 
     // Create the assignment statement with a random expression
     std::vector<symir::Coef *> assAcc = generateVarAccess(funBd, var, bblId, stmtIndex, 0);
-    bblBd->SymAssign(
+    bblBd->SymCommitStmt(bblBd->SymAssStmt(
         var, bblBd->SymExpr(static_cast<symir::Expr::Op>(randExprOp()), terms), assAcc
-    );
+    ));
   }
 
   // Define a specific target that our conditional/unconditional controls
@@ -388,7 +388,7 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
     bblBd->SymGoto(NameLabel(bblSkt.GetSuccessors()[0]));
   } else {
     // Return the function if there is no successor
-    bblBd->SymReturn();
+    bblBd->SymCommitStmt(bblBd->SymReturn());
   }
 
   // Now we build our basic block
