@@ -637,6 +637,18 @@ void UBSan::Visit(const symir::AssStmt &a) {
 
 void UBSan::Visit(const symir::RetStmt &r) { /* DO NOTHING */ }
 
+void UBSan::Visit(const symir::IfStmt &i) {
+  Panic("No IfStmt should exist during function creation");
+}
+
+void UBSan::Visit(const symir::ForStmt &f) {
+  Panic("No ForStmt should exist during function creation");
+}
+
+void UBSan::Visit(const symir::WhileStmt &w) {
+  Panic("No WhileStmt should exist during function creation");
+}
+
 void UBSan::Visit(const symir::Branch &b) {
   b.GetCond()->Accept(*this);
   auto condExpr = popExpression();

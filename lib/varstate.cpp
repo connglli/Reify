@@ -266,6 +266,15 @@ void VariableStateExtractor::Visit(const symir::AssStmt &a) {
 }
 
 void VariableStateExtractor::Visit(const symir::RetStmt &r) { /* Do Nothing */; };
+void VariableStateExtractor::Visit(const symir::IfStmt &i) {
+  Panic("No IfStmt should exist during function creation");
+}
+void VariableStateExtractor::Visit(const symir::ForStmt &f) {
+  Panic("No ForStmt should exist during function creation");
+}
+void VariableStateExtractor::Visit(const symir::WhileStmt &w) {
+  Panic("No WhileStmt should exist during function creation");
+}
 void VariableStateExtractor::Visit(const symir::Branch &b) { /* Do Nothing */; }
 void VariableStateExtractor::Visit(const symir::Goto &g) { /* Do Nothing */; }
 void VariableStateExtractor::Visit(const symir::ScaParam &p) {

@@ -99,12 +99,12 @@ SymExec::SymExec(const FunPlus &fun, const std::vector<int> &execution) {
     // Insert a basic block to count and check the pass counter right before the stop block
     auto passCounterBlockBd = funBd->OpenBlock(PassCounterBblLabel);
     auto passCounter = funBd->SymScaLocal("passCounterLocal", funBd->SymCoef("zero", "0"));
-    passCounterBlockBd->SymAssign(
+    passCounterBlockBd->SymCommitStmt(passCounterBlockBd->SymAssStmt(
         passCounter, passCounterBlockBd->SymAddExpr(
                          {passCounterBlockBd->SymMulTerm(funBd->SymCoef("one1", "1"), passCounter),
                           passCounterBlockBd->SymCstTerm(funBd->SymCoef("one2", "1"), nullptr)}
                      )
-    );
+    ));
     // Jump to the exit block if the pass counter is greater than the value
     passCounterBlockBd->SymBranch(
         exitBlock->GetLabel(), stopBlock->GetLabel(),
