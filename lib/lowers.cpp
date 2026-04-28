@@ -405,6 +405,7 @@ namespace symir {
   }
 
   void SymCxLower::Visit(const VarUse &v) {
+    Assert(v.GetName() != "", "Empty string as a name is not allowed");
     out << v.GetName();
 
     const VarDef *currVar = v.GetDef();
@@ -626,13 +627,15 @@ namespace symir {
     for (size_t i = 0; i < bodies.size(); i++) {
       if (i == 0) {
         out << "if (";
+        conds[i]->Accept(*this);
+        out << ") {" << std::endl;
       } else if (i == bodies.size() - 1 && i == conds.size()) {
-        out << "else (";
+        out << "else {" << std::endl;
       } else {
         out << "else if (";
+        conds[i]->Accept(*this);
+        out << ") {" << std::endl;
       }
-      conds[i]->Accept(*this);
-      out << ") {" << std::endl;
 
       incIndent();
       for (size_t j = 0; j < bodies[i].size(); j++) {
@@ -640,21 +643,24 @@ namespace symir {
       }
       decIndent();
       indent();
-      out << "}" << std::endl;
+      if (i == bodies.size() - 1) out << "}" << std::endl;
+      else out << "} ";
     }
-
   }
 
   void SymCxLower::Visit(const ForStmt &f) {
     indent();
     out << "for (";
-    const VarDef *var = f.GetVar();
-    Assert(var->GetType() == symir::SymIR::Type::I32, "ForStmt currently only supports I32's");
-    out << SymIR::GetTypeCName(var->GetType()) << " " << var->GetName() << " = ";
+    const VarUse *use = f.GetVar();
+
+    use->Accept(*this);
+    out << " = ";
     f.GetInit()->Accept(*this);
     out << "; ";
     f.GetCond()->Accept(*this);
-    out << "; " << var->GetName() << " += ";
+    out << "; ";
+    use->Accept(*this);
+    out << " += ";
     f.GetIncrement()->Accept(*this);
     out << ") {" << std::endl;
 

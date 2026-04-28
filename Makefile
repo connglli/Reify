@@ -83,7 +83,7 @@ CFLAGS   := $(DBGFLAGS) $(SANFLAGS) $(PROFFLAGS) -Wall -Wextra -Wno-unused-funct
 LDFLAGS  := $(DBGFLAGS) $(SANFLAGS) $(PROFFLAGS) $(shell pkg-config --libs bitwuzla) $(shell pkg-config --libs flint) -lpthread -lz
 
 # Dependency files produced alongside object files.
-DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/rysmith.d $(OBJ_DIR)/rylink.d $(OBJ_DIR)/symircc.d
+DEP_FILES := $(LIB_OBJ:.o=.d) $(OBJ_DIR)/rysmith.d $(OBJ_DIR)/rylink.d $(OBJ_DIR)/symircc.d $(OBJ_DIR)/deopt_fgen.o
 -include $(DEP_FILES)
 
 
@@ -126,13 +126,19 @@ $(BIN_DIR)/symircc: $(LIB_OBJ) $(OBJ_DIR)/symircc.o
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+$(BIN_DIR)/deopt-fgen: $(LIB_OBJ) $(OBJ_DIR)/deopt-fgen.o
+	@mkdir -p $(dir $@)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
 rysmith: $(BIN_DIR)/rysmith
 
 rylink: $(BIN_DIR)/rylink
 
 symircc: $(BIN_DIR)/symircc
 
-bins: rysmith rylink symircc
+deopt-fgen: $(BIN_DIR)/deopt-fgen
+
+bins: rysmith rylink symircc deopt-fgen
 
 
 ########################################################################

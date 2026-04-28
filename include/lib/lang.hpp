@@ -282,7 +282,9 @@ namespace symir {
   class VarDef : public WithType {
   public:
     VarDef(std::string name, const SymIR::Type type, std::string structName = "") :
-        WithType(type), name(std::move(name)), structName(std::move(structName)), baseType(type) {}
+        WithType(type), name(std::move(name)), structName(std::move(structName)), baseType(type) {
+      Assert(this->name != "", "Variable Name cannot be the empty string");
+    }
 
     VarDef(
         std::string name, std::vector<int> vecShape, const SymIR::Type type,
@@ -293,6 +295,7 @@ namespace symir {
       if (!this->vecShape.empty()) {
         setType(SymIR::Type::ARRAY);
       }
+      Assert(this->name != "", "Variable Name cannot be the empty string");
       Assert(
           !this->vecShape.empty(), "The vector dimensions for variable %s should be non-negative",
           name.c_str()
@@ -909,9 +912,17 @@ namespace symir {
   public:
     explicit IfStmt(std::vector<std::unique_ptr<Cond>> conds, std::vector<std::vector<std::unique_ptr<Stmt>>> bodies) :
       Stmt(SIR_STMT_IF), conds(std::move(conds)), bodies(std::move(bodies)) {
-        Assert(conds.size() > 0, "IfStmt must have atleast condition");
-        Assert(bodies.size() >= conds.size(), "IfStmt must have atleast as many bodies as conditions");
-        Assert(bodies.size() <= conds.size() + 1, "IfStmt must have atmost one more body as conditions");
+        Assert(this->conds.size() > 0, "IfStmt must have atleast condition, but has %ld", this->conds.size());
+        Assert(
+          this->bodies.size() >= this->conds.size(),
+          "IfStmt must have atleast as many bodies as conditions (%ld >/= %ld)",
+          this->bodies.size(), this->conds.size()
+        );
+        Assert(
+          this->bodies.size() <= this->conds.size() + 1,
+          "IfStmt must have atmost one more body as conditions (%ld >/= %ld + 1)",
+          this->bodies.size(), this->conds.size()
+        );
       }
 
     [[nodiscard]] size_t NumConditions() const { return this->conds.size(); }
@@ -951,26 +962,28 @@ namespace symir {
   class ForStmt : public Stmt {
   public:
     explicit ForStmt(
-      std::unique_ptr<VarDef> var,
+      std::unique_ptr<VarUse> var,
       std::unique_ptr<Cond> cond,
-      const Coef *init,
-      const Coef *increment,
+      std::unique_ptr<Expr> init,
+      std::unique_ptr<Expr> increment,
       std::vector<std::unique_ptr<Stmt>> body
     ) :
       Stmt(SIR_STMT_FOR),
       var(std::move(var)),
       cond(std::move(cond)),
-      init(init),
-      increment(increment),
+      init(std::move(init)),
+      increment(std::move(increment)),
       body(std::move(body)) {}
 
     [[nodiscard]] size_t NumStmts() const { return this->body.size(); }
 
-    [[nodiscard]] const Coef *GetInit() const { return this->init; }
+    [[nodiscard]] const Expr *GetInit() const { return this->init.get(); }
 
-    [[nodiscard]] const Coef *GetIncrement() const { return this->increment; }
+    [[nodiscard]] const Expr *GetIncrement() const { return this->increment.get(); }
 
-    [[nodiscard]] const VarDef *GetVar() const { return this->var.get(); }
+    [[nodiscard]] const VarUse *GetVar() const { return this->var.get(); }
+
+    [[nodiscard]] const VarDef *GetDefinition() const override { return this->var->GetDef(); };
 
     [[nodiscard]] const Cond *GetCond() const { return this->cond.get(); }
 
@@ -985,15 +998,13 @@ namespace symir {
 
     [[nodiscard]] std::vector<const VarUse *> GetUses() const override { Panic("TODO"); return {}; }
 
-    [[nodiscard]] const VarDef *GetDefinition() const override { return this->var.get(); }
-
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
 
   private:
-    std::unique_ptr<VarDef> var;
+    std::unique_ptr<VarUse> var;
     std::unique_ptr<Cond> cond;
-    const Coef *init;
-    const Coef *increment;
+    std::unique_ptr<Expr> init;
+    std::unique_ptr<Expr> increment;
     std::vector<std::unique_ptr<Stmt>> body;
   };
 
@@ -1785,12 +1796,11 @@ namespace symir {
     /// Create a RetStmt for the builder.
     StmtID SymReturn();
 
-
     /// Create an IfStmts for the builder
     StmtID SymIfStmt(std::vector<CondID> cids, std::vector<std::vector<StmtID>> sids);
 
     /// Create an IfStmts for the builder
-    StmtID SymForStmt(std::unique_ptr<VarDef> var, CondID cid, const Coef* init, const Coef* increment, std::vector<StmtID> sids);
+    StmtID SymForStmt(const VarDef *var, CondID cid, ExprID initID, ExprID incrementID, std::vector<StmtID> sids, const std::vector<Coef *> &access = {});
 
     /// Create an IfStmts for the builder
     StmtID SymWhileStmt(CondID cid, std::vector<StmtID> sids);
@@ -1802,7 +1812,7 @@ namespace symir {
     Stmt *SymCommitStmtAt(StmtID sid, int stmtIndex);
 
     /// Commits a Stmt to the builder by replacing 'stmtIndex'
-    Stmt *SymReplaceCommitStmt(StmtID sid, int stmtIndex);
+    std::vector<Stmt *> SymReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex);
 
     /// Commits a Stmt to the builder before the 'stmtIndex'th assignmet (TODO: There must be a better way of doing this (used for Prime Interp strat))
     Stmt *SymCommitStmtAtAssign(StmtID sid, int assignStmtIndex);
@@ -1832,6 +1842,7 @@ namespace symir {
     }
 
     [[nodiscard]] const Stmt * GetCommitedStmt(size_t idx) {
+      Assert(idx < this->stmts.size(), "Attempting to access out ouf bound commited stmt");
       return this->stmts[idx].get();
     }
 
@@ -1867,50 +1878,12 @@ namespace symir {
     std::map<StmtID, std::unique_ptr<Stmt>> createdStmts{};
   };
 
+  template<typename T, typename TBuilder>
+  class SymIRCopier : protected SymIRBuilder {
+    virtual T Copy() = 0;
+    virtual TBuilder CopyAsBuilder() = 0;
 
-  /// Utility to deep-copy a built Block.
-  class BlockCopier : protected SymIRVisitor, SymIRBuilder {
-  public:
-    explicit BlockCopier(
-        FunctBuilder *funBd,
-        const Block *src
-    ) : funBd(funBd), src(src) {
-      Assert(src != nullptr, "The source function is a nullptr");
-    }
-
-    /// Copy the function and return a new Funct object.
-    const Block *Copy();
-
-    /// Copy the function and return a new FunctBuilder object.
-    BlockBuilder *CopyAsBuilder();
-
-  protected:
-    void Visit(const VarUse &v) override;
-    void Visit(const Coef &c) override;
-    void Visit(const Term &t) override;
-    void Visit(const Expr &e) override;
-    void Visit(const ModExpr &e) override;
-    void Visit(const Cond &c) override;
-    void Visit(const AssStmt &a) override;
-    void Visit(const ModAssStmt &a) override;
-    void Visit(const RetStmt &r) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
-    void Visit(const Branch &b) override;
-    void Visit(const Goto &g) override;
-    void Visit(const ScaParam &p) override;
-    void Visit(const VecParam &p) override;
-    void Visit(const StructParam &p) override;
-    void Visit(const UnInitLocal &l) override;
-    void Visit(const ScaLocal &l) override;
-    void Visit(const VecLocal &l) override;
-    void Visit(const StructLocal &l) override;
-    void Visit(const StructDef &s) override;
-    void Visit(const Block &b) override;
-    void Visit(const Funct &f) override;
-
-private:
+protected:
     void pushCoef(Coef *c) { coefStack.push(c); }
 
     Coef *popCoef() {
@@ -1964,12 +1937,6 @@ private:
       return sid;
     }
 
-  private:
-    FunctBuilder *funBd;
-    const Block *src;
-    BlockBuilder *builder = nullptr;
-
-
     // Stacks to manage objects during copying
     std::stack<Coef *> coefStack{};
     std::stack<TermID> termStack{};
@@ -1977,6 +1944,55 @@ private:
     std::stack<ExprID> modExprStack{};
     std::stack<CondID> condStack{};
     std::stack<StmtID> stmtStack{};
+  };
+
+
+  /// Utility to deep-copy a built Block.
+  class BlockCopier : protected SymIRVisitor, SymIRCopier<const Block *, BlockBuilder *> {
+  public:
+    explicit BlockCopier(
+        FunctBuilder *funBd,
+        const Block *src
+    ) : funBd(funBd), src(src) {
+      Assert(src != nullptr, "The source function is a nullptr");
+    }
+
+    /// Copy the function and return a new Funct object.
+    const symir::Block *Copy() override;
+
+    /// Copy the function and return a new FunctBuilder object.
+    symir::BlockBuilder *CopyAsBuilder() override;
+
+  protected:
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const ModExpr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &a) override;
+    void Visit(const ModAssStmt &a) override;
+    void Visit(const RetStmt &r) override;
+    void Visit(const IfStmt &i) override;
+    void Visit(const ForStmt &f) override;
+    void Visit(const WhileStmt &w) override;
+    void Visit(const Branch &b) override;
+    void Visit(const Goto &g) override;
+    void Visit(const ScaParam &p) override;
+    void Visit(const VecParam &p) override;
+    void Visit(const StructParam &p) override;
+    void Visit(const UnInitLocal &l) override;
+    void Visit(const ScaLocal &l) override;
+    void Visit(const VecLocal &l) override;
+    void Visit(const StructLocal &l) override;
+    void Visit(const StructDef &s) override;
+    void Visit(const Block &b) override;
+    void Visit(const Funct &f) override;
+
+  private:
+    FunctBuilder *funBd;
+    const Block *src;
+    BlockBuilder *builder = nullptr;
   };
   
   /// Builder to facilitate building a function
@@ -2210,8 +2226,9 @@ private:
     std::map<std::string, std::unique_ptr<BlockBuilder>> createdBlocks{};
   };
 
+
   /// Utility to deep-copy a built function.
-  class FunctCopier : protected SymIRVisitor, SymIRBuilder {
+  class FunctCopier : protected SymIRVisitor, SymIRCopier<std::unique_ptr<Funct>, std::unique_ptr<FunctBuilder>>{
   public:
     // Hooks right before opening a new block. The input is the label of the new block.
     using BeforeBlockOpenHook = std::function<void(FunctBuilder *, const std::string &)>;
@@ -2240,10 +2257,10 @@ private:
     }
 
     /// Copy the function and return a new Funct object.
-    std::unique_ptr<Funct> Copy();
+    std::unique_ptr<Funct> Copy() override;
 
     /// Copy the function and return a new FunctBuilder object.
-    std::unique_ptr<FunctBuilder> CopyAsBuilder();
+    std::unique_ptr<FunctBuilder> CopyAsBuilder() override;
 
   protected:
     void Visit(const VarUse &v) override;
@@ -2272,55 +2289,6 @@ private:
     void Visit(const Funct &f) override;
 
   private:
-    void pushCoef(Coef *c) { coefStack.push(c); }
-
-    Coef *popCoef() {
-      Coef *c = coefStack.top();
-      coefStack.pop();
-      return c;
-    }
-
-    void pushTerm(TermID tid) { termStack.push(tid); }
-
-    TermID popTerm() {
-      TermID tid = termStack.top();
-      termStack.pop();
-      return tid;
-    }
-
-    void pushModExpr(ExprID eid) { this->modExprStack.push(eid); }
-    ModExprID popModExpr() {
-      ModExprID eid = this->modExprStack.top();
-      this->modExprStack.pop();
-      return eid;
-    }
-
-    void pushExpr(ExprID eid) { exprStack.push(eid); }
-
-    ExprID popExpr() {
-      ExprID eid = exprStack.top();
-      exprStack.pop();
-      return eid;
-    }
-
-    void pushCond(CondID cid) { condStack.push(cid); }
-
-    CondID popCond() {
-      CondID cid = condStack.top();
-      condStack.pop();
-      return cid;
-    }
-
-    void pushStmt(StmtID sid) { stmtStack.push(sid); }
-
-    StmtID popStmt() {
-      Assert(this->stmtStack.size() != 0, "stmtStack is empty");
-      StmtID sid = stmtStack.top();
-      stmtStack.pop();
-      return sid;
-    }
-
-  private:
     // The function being copied/cloned
     const Funct *src;
     // The function builder to build the copied function
@@ -2333,12 +2301,6 @@ private:
     BeforeBlockCloseHook beforeBlockCloseHook = nullptr;
     AfterBlockClosedHook afterBlockClosedHook = nullptr;
     // Stacks to manage objects during copying
-    std::stack<Coef *> coefStack{};
-    std::stack<TermID> termStack{};
-    std::stack<ExprID> exprStack{};
-    std::stack<ExprID> stmtStack{};
-    std::stack<ExprID> modExprStack{};
-    std::stack<CondID> condStack{};
   };
 
   // Helper Function
