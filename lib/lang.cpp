@@ -137,6 +137,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       Term::Op op, Coef *coef, const VarDef *var, const std::vector<Coef *> &access
   ) {
     Assert(isActive(), "The BlockBuilder is no longer active");
+    Assert(op == Term::Op::OP_CST || var != nullptr, "var may only be nullptr if op is CST");
+    Assert(op != Term::Op::OP_CST || var == nullptr, "var may must be nullptr if op is CST");
     TermID tid = numCreatedTerms++;
     if (op == Term::Op::OP_CST) {
       createdTerms[tid] = std::make_unique<Term>(op, coef, nullptr);
@@ -453,6 +455,9 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   BlockBuilder::StmtID
   BlockBuilder::SymIfStmt(std::vector<CondID> cids, std::vector<std::vector<StmtID>> sids) {
     Assert(isActive(), "The BlockBuilder is no longer active");
+    Assert(cids.size() > 0, "IfStmt must have atleast condition");
+    Assert(sids.size() >= cids.size(), "IfStmt must have atleast as many bodies as conditions");
+    Assert(sids.size() <= cids.size() + 1, "IfStmt must have atmost one more body as conditions");
 
     std::vector<std::unique_ptr<Cond>> conds;
     conds.resize(cids.size());
@@ -480,11 +485,17 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   BlockBuilder::StmtID 
-  BlockBuilder::SymForStmt(std::unique_ptr<VarDef> var, CondID cid, const Coef* init, const Coef* increment, std::vector<StmtID> sids) {
+  BlockBuilder::SymForStmt(const VarDef *var, CondID cid, ExprID initID, ExprID incrementID, std::vector<StmtID> sids, const std::vector<Coef *> &access) {
     Assert(isActive(), "The BlockBuilder is no longer active");
 
     auto it = this->createdConds.find(cid);
     Assert(it != this->createdConds.end(), "Cond with ID \"%lu\" does not exist", cid);
+
+    auto init = this->createdExprs.find(initID);
+    Assert(init != this->createdExprs.end(), "Expr with ID \"%lu\" does not exist", initID);
+
+    auto increment = this->createdExprs.find(incrementID);
+    Assert(increment != this->createdExprs.end(), "Expr with ID \"%lu\" does not exist", incrementID);
 
     std::vector<std::unique_ptr<Stmt>> body;
     body.resize(sids.size());
@@ -495,8 +506,65 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       body[i] = std::move(it->second);
     }
 
+    SymIR::Type currType = var->GetType();
+    SymIR::Type currBaseType = var->GetBaseType();
+    std::string currStruct =
+        (currType == SymIR::Type::STRUCT)
+            ? var->GetStructName()
+            : (currBaseType == SymIR::Type::STRUCT ? var->GetStructName() : "");
+    int32_t remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
+    Assert(remainingDims >= 0, "vector dim count cannot be negative");
+
+    for (const auto *c: access) {
+      if (remainingDims > 0) {
+        remainingDims--;
+        if (remainingDims == 0) {
+          currType = currBaseType;
+        }
+      } else if (currType == SymIR::Type::STRUCT) {
+        int32_t idx = c->GetI32Value();
+        Assert(idx >= 0, "struct index cannot be negative");
+        const auto *sDef = this->GetParent()->FindStruct(currStruct);
+        Assert(sDef, "Struct %s not found", currStruct.c_str());
+        const auto &field = sDef->GetField(idx);
+        currType = field.type;
+        currBaseType = field.baseType;
+        if (currType == SymIR::Type::STRUCT) {
+          currStruct = field.structName;
+        } else if (currType == SymIR::Type::ARRAY) {
+          remainingDims = field.shape.size();
+          if (currBaseType == SymIR::Type::STRUCT) {
+            currStruct = field.structName;
+          }
+        }
+      }
+    }
+    // After processing all accesses, if we still have an ARRAY type and no remaining dims,
+    // that means we've consumed all array dimensions and should use the base type
+    if (currType == SymIR::Type::ARRAY && remainingDims == 0) {
+      currType = currBaseType;
+    }
+
     StmtID sid = this->numCreatedStmts++;
-    this->createdStmts[sid] = std::make_unique<ForStmt>(std::move(var), std::move(it->second), init, increment, std::move(body));
+    if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
+        var->GetType() == SymIR::Type::ARRAY) {
+      this->createdStmts[sid] = std::make_unique<ForStmt>(
+        std::make_unique<VarUse>(var, access, currType),
+        std::move(it->second),
+        std::move(init->second),
+        std::move(increment->second),
+        std::move(body)
+      );
+    } else {
+      this->createdStmts[sid] = std::make_unique<ForStmt>(
+        std::make_unique<VarUse>(var),
+        std::move(it->second),
+        std::move(init->second),
+        std::move(increment->second),
+        std::move(body)
+      );
+    }
+
     return sid;
   }
 
@@ -563,6 +631,26 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     this->stmts.insert(this->stmts.begin() + index, std::move(it->second));
     this->createdStmts.erase(sid);
     return this->stmts[index].get();
+  }
+
+  std::vector<Stmt *>  BlockBuilder::SymReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex) {
+    Assert(isActive(), "The BlockBuilder is no longer active");
+
+    int currIndex = stmtIndex;
+    for (size_t i = 0; i < sids.size(); i++) {
+      auto it = this->createdStmts.find(sids[i]);
+      Assert(it != this->createdStmts.end(), "Stmt with ID \"%lu\" does not exist", sids[i]);
+      this->stmts.insert(this->stmts.begin() + currIndex++, std::move(it->second));
+      this->createdStmts.erase(sids[i]);
+    }
+    this->stmts.erase(this->stmts.begin() + currIndex);
+
+    std::vector<Stmt *> newStmts;
+    newStmts.resize(sids.size());
+    for (size_t i = 0; i < sids.size(); i++) {
+      newStmts[i] = this->stmts[i + stmtIndex].get();
+    }
+    return newStmts;
   }
 
   const Branch *
@@ -749,21 +837,27 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   void BlockCopier::Visit(const ForStmt &f) {
-    const VarDef *var = f.GetVar();
-    const Coef *init = f.GetInit();
-    const Coef *increment = f.GetIncrement();
+    const VarUse *use = f.GetVar();
+    const Expr *init = f.GetInit();
+    const Expr *increment = f.GetIncrement();
     const auto cond = f.GetCond();
     const auto body = f.GetBody();
 
-    std::unique_ptr<VarDef> newVar;
-    if (var->IsVector() || var->GetType() == SymIR::Type::ARRAY) {
-      newVar = std::make_unique<VarDef>(var->GetName(), var->GetVecShape(), var->GetType(), var->GetStructName());
-    } else {
-      newVar = std::make_unique<VarDef>(var->GetName(), var->GetType(), var->GetStructName());
+    use->Accept(*this);
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
     }
+
 
     cond->Accept(*this);
     CondID cid = popCond();
+
+    init->Accept(*this);
+    ExprID initID = popExpr();
+
+    increment->Accept(*this);
+    ExprID incrementID = popExpr();
 
     std::vector<StmtID> sids;
     sids.resize(body.size());
@@ -773,7 +867,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       sids[i] = popStmt();
     }
 
-    pushStmt(this->builder->SymForStmt(std::move(newVar), cid, init, increment, sids));
+    pushStmt(this->builder->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
   }
 
   void BlockCopier::Visit(const WhileStmt &w) {
@@ -1304,21 +1398,26 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   void FunctCopier::Visit(const ForStmt &f) {
-    const VarDef *var = f.GetVar();
-    const Coef *init = f.GetInit();
-    const Coef *increment = f.GetIncrement();
+    const VarUse *use = f.GetVar();
+    const Expr *init = f.GetInit();
+    const Expr *increment = f.GetIncrement();
     const auto cond = f.GetCond();
     const auto body = f.GetBody();
 
-    std::unique_ptr<VarDef> newVar;
-    if (var->IsVector() || var->GetType() == SymIR::Type::ARRAY) {
-      newVar = std::make_unique<VarDef>(var->GetName(), var->GetVecShape(), var->GetType(), var->GetStructName());
-    } else {
-      newVar = std::make_unique<VarDef>(var->GetName(), var->GetType(), var->GetStructName());
+    use->Accept(*this);
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
     }
 
     cond->Accept(*this);
     CondID cid = popCond();
+
+    init->Accept(*this);
+    ExprID initID = popExpr();
+
+    increment->Accept(*this);
+    ExprID incrementID = popExpr();
 
     std::vector<StmtID> sids;
     sids.resize(body.size());
@@ -1328,7 +1427,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       sids[i] = popStmt();
     }
 
-    pushStmt(this->currentBlock->SymForStmt(std::move(newVar), cid, init, increment, sids));
+    pushStmt(this->currentBlock->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
   };
 
   void FunctCopier::Visit(const WhileStmt &w) {
