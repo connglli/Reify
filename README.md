@@ -2,6 +2,7 @@
 
 > [!WARNING]
 > Bitwuzla does not perform as good as Z3 in our project. We are working on diagnosing the issue.
+> For the legacy version, checkout the `legacy` branch.
 
 Reify is a random program generator based on *semantic reification*.
 It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
