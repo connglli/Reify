@@ -77,11 +77,11 @@ public:
   /// generate the string representing the call
   virtual std::string generateCall() = 0;
   /// generates the nessessary preamble that create the function arguments
-  virtual void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
+  virtual void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
   /// generates the nessessary postamble that map the function call's return value back to the replaced coeff
-  virtual void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
+  virtual void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
   /// Any post processing that needs to be done
-  virtual void finalize(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd) = 0;
+  virtual void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) = 0;
 
 protected:
   void setMaxNrBlocks(size_t nrBlocks);
@@ -132,7 +132,7 @@ public:
     Log::Get().Out() << "Embed Strategy: " << this->callGenStrategy->getStrategyName() << std::endl;
   }
 
-  void setVarStateQueries(std::vector<VariableStateQuery> *varStateQueries) { this->varStateQueries = varStateQueries; }
+  void setVarStateQueries(std::vector<VariableStateQuery *> varStateQueries) { this->varStateQueries = varStateQueries; }
 
   /// embeds the guest function with a coeff
   bool embedGuest(
@@ -158,7 +158,7 @@ protected:
   symir::Funct *const host;
   std::unique_ptr<symir::FunctBuilder> hostBuilder;
   std::unique_ptr<FCallStrategy> callGenStrategy;
-  std::vector<VariableStateQuery> *varStateQueries;
+  std::vector<VariableStateQuery *> varStateQueries;
 
   bool succeeded = false;
   std::map<symir::Coef *, bool> symbols;
@@ -168,10 +168,10 @@ protected:
 class LiteralFCallStrategy : public FCallStrategy {
 public:
   explicit LiteralFCallStrategy() {};
-  void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
+  void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
+  void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
   std::string generateCall() override;
-  void finalize(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd) override {};
+  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override {};
   std::string getStrategyName() const override {return "Literal Strategy"; }
 };
 
@@ -179,10 +179,10 @@ public:
 class PrimeInterpFCallStrategy : public FCallStrategy {
 public:
   explicit PrimeInterpFCallStrategy() {};
-  void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
+  void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
+  void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
   std::string generateCall() override;
-  void finalize(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd) override {};
+  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override {};
   std::string getStrategyName() const override {return "PrimeInterpolation Stratgey"; }
 private:
   // maps variable index to UnInitVar name and correction value
@@ -197,10 +197,10 @@ public:
     this->rewriteEngine.addRule(std::make_unique<ConstToForSum>(), 2);
     this->rewriteEngine.addRule(std::make_unique<AssToDeadCode>(), 1);
   }
-  void generatePreamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void generatePostamble(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
+  void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
+  void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
   std::string generateCall() override;
-  void finalize(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd) override;
+  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
   std::string getStrategyName() const override {return "RevOptFCallStrategy Stratgey"; }
 private:
   // maps variable index to UnInitVar name and correction value
