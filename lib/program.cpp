@@ -24,11 +24,12 @@
 // SOFTWARE.
 
 #include <fstream>
+#include <memory>
 #include <string>
 
 #include "global.hpp"
+#include "lib/lowers.hpp"
 #include "lib/chksum.hpp"
-#include "lib/parsers.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 #include "lib/fcallembed.hpp"
@@ -77,19 +78,20 @@ void ProgPlus::Generate() {
 
     auto emb = RandomFCallEmbedder(host);
 
-    LiteralFCallStrategy litStrategy;
-    PrimeInterpFCallStrategy interpStrategy;
+    std::unique_ptr<FCallStrategy> strat;
     switch (GlobalOptions::Get().DataflowStrategy) {
     case GlobalOptions::Literal: {
-      litStrategy = LiteralFCallStrategy();
-      emb.setStrategy(&litStrategy);
+      strat = std::make_unique<LiteralFCallStrategy>();
     } break;
     case GlobalOptions::PrimeFieldInterpolation: {
-      interpStrategy = PrimeInterpFCallStrategy();
-      emb.setStrategy(&interpStrategy);
+      strat = std::make_unique<PrimeInterpFCallStrategy>();
+    } break;
+    case GlobalOptions::ReverseOptimization: {
+      strat = std::make_unique<RevOptFCallStrategy>(std::make_unique<ModInterpGuardStrategy>());
     } break;
     default: Panic("DataflowStrategy is set to an invalid value");
     }
+    emb.setStrategy(std::move(strat));
 
 
     // Random Generator to sample a function from i + 1 to the end

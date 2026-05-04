@@ -23,8 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef REIFY_UBBASE_HPP
-#define REIFY_UBBASE_HPP
+#ifndef REIFY_TRANSFORMATIONS_HPP
+#define REIFY_TRANSFORMATIONS_HPP
 
 #include "lib/lang.hpp"
 #include "lib/random.hpp"
@@ -54,7 +54,8 @@ public:
 
   StmtID Copy() override;
   TermID CopyTerm(const symir::Term *t);
-  TermID CopyExpr(const symir::Expr* e);
+  ExprID CopyExpr(const symir::Expr* e);
+  CondID CopyCond(const symir::Cond* c);
   StmtID CopyWithReplacement(std::function<symir::BlockBuilder::ExprID(const symir::Expr *, symir::Coef **)> repFun);
   void CopyAsBuilder() override { Panic("Stmt has no builder class"); }
   symir::Coef *getReplacedCoef() { return replacedCoef; }
@@ -124,7 +125,9 @@ private:
 /// ==================== Virtual Rule Definition ====================
 struct Rule {
   Rule(std::string locPrefix = "tmp") : locPrefix(locPrefix) {}
+  virtual ~Rule() = default;
   virtual bool match(const symir::Stmt *stmt) const = 0;
+  virtual double applyProbability(const symir::Stmt *stmt) const = 0;
   virtual size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) = 0;
 
   const symir::VarDef *getNewLocal(symir::FunctBuilder *funBd) {
@@ -141,6 +144,7 @@ protected:
 
 /// ==================== Rewrite Engine Definition ====================
 struct RewriteEngine {
+  ~RewriteEngine() { this->rules.clear(); }
   void addRule(std::unique_ptr<Rule> rule, int weight);
   /// normal run method used for random selection of passes based on the passed weight, runs `times` passes in total
   void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t times) const;
@@ -148,34 +152,38 @@ struct RewriteEngine {
   void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::vector<int> indices) const;
 protected:
 
-  std::vector<std::unique_ptr<Rule>> rules;
-  std::vector<int> weights;
+  std::vector<std::unique_ptr<Rule>> rules{};
+  std::vector<int> weights{};
 };
 
 /// ==================== Various Rule Definition ====================
 struct VariableInjection : Rule {
   VariableInjection() : Rule("vj") {}
   bool match(const symir::Stmt *stmt) const override;
+  double applyProbability(const symir::Stmt *stmt) const override;
   size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
 };
 
 struct ConstToAdd : Rule {
   bool match(const symir::Stmt *stmt) const override;
+  double applyProbability(const symir::Stmt *stmt) const override;
   size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
 };
 
 struct ConstToForSum: Rule {
   ConstToForSum() : Rule("i") {}
   bool match(const symir::Stmt *stmt) const override;
+  double applyProbability(const symir::Stmt *stmt) const override;
   size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
 };
 
-struct ConstToDeadCode: Rule {
-  ConstToDeadCode(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
+struct AssToDeadCode: Rule {
+  AssToDeadCode(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
     minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
-    Assert(minBranches >= 2, "ConstToDeadCode must have atleast 2 branches");
+    Assert(minBranches >= 2, "AssToDeadCode must have atleast 2 branches");
   }
   bool match(const symir::Stmt *stmt) const override;
+  double applyProbability(const symir::Stmt *stmt) const override;
   size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
 private:
   int minBranches;
@@ -258,4 +266,4 @@ private:
 
 };
 
-#endif //REIFY_UBBASE_HPP
+#endif //REIFY_TRANSFORMATIONS_HPP

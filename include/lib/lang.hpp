@@ -1827,6 +1827,9 @@ namespace symir {
     /// and the builder cannot be used any more to create more SIRs.
     const Goto *SymGoto(const std::string &label);
 
+    /// Removes the target. This esentially resets the BlockBuilder to before SymGoto was called;
+    void UndoTarget() { this->target = nullptr; }
+
     /// Get the list of used variables in this block
     [[nodiscard]] std::vector<const VarUse *> GetUses(bool removeDefs = true) const {
       return Block::GetUses(stmts, removeDefs);
