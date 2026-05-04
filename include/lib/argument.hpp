@@ -623,7 +623,11 @@ std::string ArgPlus<IntType>::ToCxStrWithReplaced(std::map<size_t, std::pair<std
   if (IsScalar()) {
     if (replacers.contains(offset)) {
       const auto& replacer = *replacers[offset];
-      return replacer.first + " + " + std::to_string(replacer.second);
+      if (replacer.second == 0) {
+        return replacer.first;
+      } else {
+        return replacer.first + " + " + std::to_string(replacer.second);
+      }
     } else {
       return std::to_string(GetValue());
     }
