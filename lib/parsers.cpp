@@ -917,7 +917,7 @@ namespace symir {
     delete varToken;
   }
 
-  void SymSexpParser::buildReturn() { bblBd->SymReturn(); }
+  void SymSexpParser::buildReturn() { bblBd->SymCommitStmt(bblBd->SymReturn()); }
 
   void SymSexpParser::buildBranch() {
     const auto *cid = popArg<SymIRBuilder::CondID>();
