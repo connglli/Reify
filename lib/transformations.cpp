@@ -175,7 +175,7 @@ symir::BlockBuilder::StmtID StmtExprReplacer::CopyWithReplacement(
 ) {
   this->hasReplaced = false;
   this->repFun = repFun;
-  symir::BlockBuilder::StmtID res;
+  symir::BlockBuilder::StmtID res = 0;
   // this is stupitly inefficent. ToDo find way to make this not stupit
   while (!this->hasReplaced) {
     this->targetStmt->Accept(*this);

@@ -508,6 +508,7 @@ struct GlobalOptions {
       switch (args["Xdataflow-strategy"].as<int>()) {
       case 0: DataflowStrategy = Literal; break;
       case 1: DataflowStrategy = PrimeFieldInterpolation; break;
+      case 2: DataflowStrategy = ReverseOptimization; break;
       default: {
         std::cerr << "Error: Invalid DataflowStrategy. It must be one of {0=literal, 1=Prime interpolating}"
                   << std::endl;

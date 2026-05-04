@@ -38,7 +38,6 @@
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
   // Parse all selected function files
-  int idx = 0;
   std::set<std::string> funNames;
   for (const auto &funPath: funPaths) {
     FunArts arts(funPath);
@@ -61,7 +60,6 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     this->varStates.push_back(varstate::allFromJsonFile(arts.GetVarStatePath()));
 
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
-    idx++;
   }
 }
 
