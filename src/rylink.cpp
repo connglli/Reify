@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
     if (enableDebug) {
       Log::Get().SetCout();
     } else {
-      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/false));
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
     }
     Log::Get().Out() << "[" << sampNo << "] Done" << std::endl;
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
