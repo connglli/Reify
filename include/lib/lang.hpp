@@ -1844,9 +1844,14 @@ namespace symir {
       return this->stmts.size();
     }
 
-    [[nodiscard]] const Stmt * GetCommitedStmt(size_t idx) {
+    [[nodiscard]] const Stmt *GetCommitedStmt(size_t idx) {
       Assert(idx < this->stmts.size(), "Attempting to access out ouf bound commited stmt");
       return this->stmts[idx].get();
+    }
+
+    [[nodiscard]] const Stmt *GetUncommitedStmt(StmtID id) {
+      Assert(createdStmts.contains(id), "Stmt either never existed or is already committed");
+      return createdStmts[id].get();
     }
 
     /// Gather all accesses of the vector variable

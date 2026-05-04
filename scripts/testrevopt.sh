@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 dir=$1
 
 # small 1 thread fuzzing that terminates on any error (other than hangs) useful for debugging rylink.
@@ -8,12 +10,8 @@ for i in {0..1024}; do
 	echo "seed: " $i;
 	uuid=$(uuidgen)
 	echo "generating.. " $uuid
-	./build/bin/deopt-fgen -v -m -n 0 -o $dir $uuid -s $i;
+	./build/bin/revopt-fgen -v -m -n 0 -o $dir $uuid -s $i;
 	retVal=$?
-	if [ $retVal -ne 0 ]; then
-		echo "Deopt Failed"
-		exit $retVal
-	fi
 	echo "compiling.. " $uuid;
 	path="$dir/func_${uuid//"-"/"_"}_0";
 	echo $path;

@@ -195,6 +195,7 @@ public:
         << std::endl;
     }
 
+    std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
     std::map<const symir::Term *, symir::BlockBuilder::TermID> varMap;
     this->args.resize(numParams);
     for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
