@@ -47,16 +47,21 @@ public:
   void GenerateCode(const ProgArts &arts) const;
 
 private:
-  bool replaceFirstCoef(
-      symir::Funct *host, symir::Funct *guest, const std::vector<int> &inits,
-      const std::vector<int> &finas
-  ) const;
+  std::vector<VariableStateQuery *> getVarStateQuerys(size_t idx) {
+    Assert(this->varStates.size() > idx, "There should be atleast one Variable state Query for each function");
+    std::vector<VariableStateQuery *> res;
+    res.reserve(this->varStates.size());
+    for (size_t i = 0; i < this->varStates[idx].size(); i++)
+      res.push_back(this->varStates[idx][i].get());
+    Assert(res.size() > 0, "There should be atleast one Variable state Query for each function");
+    return res;
+  }
 
 private:
   std::string uuid, sno;
   std::vector<std::unique_ptr<symir::Funct>> functions{};
   std::vector<FunPlus::IniFinMap> mappings{};
-  std::vector<std::vector<VariableStateQuery>> varStates{};
+  std::vector<std::vector<std::unique_ptr<VariableStateQuery>>> varStates{};
 };
 
 #endif // REIFY_PROGRAM_HPP

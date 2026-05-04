@@ -702,7 +702,6 @@ bool FCallEmbedder::embedGuest(
   const std::vector<ArgPlus<int32_t>> *fina
 ) {
   Assert(this->callGenStrategy != nullptr, "No embedding strategy choosen");
-  Assert(this->varStateQueries != nullptr, "varStateQuery not initialized");
   Assert(guest != nullptr, "No valid guest to embed");
   Assert(init != nullptr, "No valid init to embed");
   Assert(fina != nullptr, "No valid fina to embed");
@@ -801,13 +800,6 @@ symir::BlockBuilder::TermID ModInterpGuardStrategy::addGuard(
 }
 
 // ==================== LiteralFCallStrategy Implementations ====================
-void LiteralFCallStrategy::generatePreamble(
-  std::vector<VariableStateQuery> *varStateQueries,
-  symir::FunctBuilder *funBd,
-  size_t blockIndex,
-  size_t stmtIndex
-) { /* Do Nothing */ }
-
 std::string LiteralFCallStrategy::generateCall() {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
@@ -849,7 +841,7 @@ std::string LiteralFCallStrategy::generateCall() {
 
 // ==================== PrimeInterpFCallStrategy Implementations ====================
 void PrimeInterpFCallStrategy::generatePreamble(
-  std::vector<VariableStateQuery> *varStateQueries,
+  std::vector<VariableStateQuery *> varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -884,9 +876,9 @@ void PrimeInterpFCallStrategy::generatePreamble(
   Log::Get().Out() << "Targeting Block: " << targetBlock->GetLabel() << ", " << stmtIndex << "-th Statement" << std::endl;
   symir::BlockBuilder *blockBd = symir::BlockCopier(funBd, targetBlock).CopyAsBuilder();
 
-  this->varMap = (*varStateQueries)[0].GetVarMap();
-  for (size_t i = 0; i < varStateQueries->size(); i++) {
-    this->appendVarState(&(*varStateQueries)[i], blockIndex, stmtIndex);
+  this->varMap = varStateQueries[0]->GetVarMap();
+  for (size_t i = 0; i < varStateQueries.size(); i++) {
+    this->appendVarState(varStateQueries[i], blockIndex, stmtIndex);
   }
 
   auto randDouble = Random::Get().UniformReal();
@@ -997,7 +989,7 @@ std::string PrimeInterpFCallStrategy::generateCall() {
 }
 
 void RevOptFCallStrategy::generatePreamble(
-  std::vector<VariableStateQuery> *varStateQueries,
+  std::vector<VariableStateQuery *> varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
   size_t stmtIndex
@@ -1098,7 +1090,7 @@ std::string RevOptFCallStrategy::generateCall() {
   }
 }
 
-void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery> *varStateQueries, symir::FunctBuilder *funBd) {
+void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
   // needs variable state
   Log::Get().OpenSection("RevOptFCallStrategy::finalize for " + funBd->GetName());
 
@@ -1113,7 +1105,9 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery> *varStateQuer
     labelToIdx[blk->GetLabel()] = idx++;
   }
 
-  this->varMap = (*varStateQueries)[0].GetVarMap();
+  Assert(varStateQueries.size() > 0, "must have atleast on Variable State Query");
+
+  this->varMap = varStateQueries[0]->GetVarMap();
   for (auto const &[blkLabel, headBlockBd] : this->argBlocks) {
     // clear temporaries
     this->argVars.clear();
@@ -1126,13 +1120,13 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery> *varStateQuer
     this->filteredNrVariables = 0;
 
     // loop through all headers and run the rewrite engine
-    this->rewriteEngine.run(funBd, headBlockBd, 3);
+    this->rewriteEngine.run(funBd, headBlockBd, 20);
 
     std::vector<const symir::Term *> cstTerms = ConstQuery(funBd, headBlockBd).query();
     std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
 
-    for (size_t i = 0; i < varStateQueries->size(); i++) {
-      this->appendVarState(&(*varStateQueries)[i], labelToIdx[blkLabel], 0);
+    for (size_t i = 0; i < varStateQueries.size(); i++) {
+      this->appendVarState(varStateQueries[i], labelToIdx[blkLabel], 0);
     }
     this->randomlyFilterVarState(funBd);
 
@@ -1172,10 +1166,9 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery> *varStateQuer
 
 // ==================== RandomFCallEmbedder Implementations ====================
 void RandomFCallEmbedder::createPathBlockWhitelist() {
-  Assert(this->varStateQueries != nullptr, "varStateQueries must be set to create white list");
   this->blockIndicesWhitelist.clear();
-  for (size_t i = 0; i < this->varStateQueries->size(); i++) {
-    const auto indices = (*this->varStateQueries)[0].getPathBlocksIndices();
+  for (size_t i = 0; i < this->varStateQueries.size(); i++) {
+    const auto indices = this->varStateQueries[0]->getPathBlocksIndices();
     this->blockIndicesWhitelist.resize(this->blockIndicesWhitelist.size() + indices.size());
     for (size_t j = 0; j < indices.size(); j++) {
       this->blockIndicesWhitelist.push_back(indices[j]);

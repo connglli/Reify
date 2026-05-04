@@ -1,0 +1,34 @@
+----Deopt function generation------------------------------------------------
+------RewriteEngine::run() for BB0----------------------------------------------
+Running randomized RewriteEngine 20 times with 4 passes and total weight: 9
+Running ConstToAdd
+Replacing Const -1747586611 with -1754187964 + 6601353
+Running ConstToAdd
+Replacing Const -1754187964 with -1808214842 + 54026878
+Running ConstToAdd
+Replacing Const -1808214842 with -1813096383 + 4881541
+Running AssToDeadCode
+Building 3 branches, True branch: 1
+Running VariableInjection
+Replacing Const -2059637328 with vj0
+Running VariableInjection
+Replacing Const 1 with vj1
+Running ConstToAdd
+Replacing Const -2059637328 with -2079243278 + 19605950
+Running ConstToAdd
+Replacing Const 1 with 1 + 0
+Running ConstToAdd
+Replacing Const -1813096383 with -1910837888 + 97741505
+Running ConstToAdd
+Replacing Const -1189026610 with -1838782747 + 649756137
+Running ConstToAdd
+Replacing Const -2079243278 with -2105489607 + 26246329
+Running ConstToAdd
+Replacing Const -1910837888 with -2069511833 + 158673945
+Running ConstToAdd
+Replacing Const -1838782747 with -2028462596 + 189679849
+Embedding variables:
+  v0 = -2105489607
+  v1 = 26246329
+  v2 = 19605950
+  v3 = 1
