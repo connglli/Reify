@@ -608,7 +608,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   Stmt *BlockBuilder::SymCommitStmtAtAssign(StmtID sid, int assignStmtIndex) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
     // find the 'assignStmtIndex'th assignment stmt
     size_t index;
     if (assignStmtIndex < 0) {
@@ -1194,10 +1193,11 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
 
     if (blockIdx != this->blocks.size()) {
       blocks[blockIdx] = builder->Build();
+      blockMap[label] = blocks[blockIdx].get();
     } else {
       blocks.push_back(builder->Build());
+      blockMap[label] = blocks.back().get();
     }
-    blockMap[label] = blocks.back().get();
     createdBlocks.erase(it);
     return blocks.back().get();
   }
@@ -1212,15 +1212,15 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     );
     Assert(atBlk != nullptr, "The given block to insert before cannot be null");
     const auto atPos =
-        std::ranges::find_if(blocks, [=](const auto &b) { return b.get() == atBlk; });
+        std::ranges::find_if(this->blocks, [=](const auto &b) { return b.get() == atBlk; });
     Assert(
         atPos != blocks.end(), "The given block with label \"%s\" is not part of the function",
         atBlk->GetLabel().c_str()
-    );
-    blocks.insert(atPos, builder->Build());
-    blockMap[label] = ((atPos - 1))->get();
+        );
+    auto newPos = this->blocks.insert(atPos, builder->Build());
+    blockMap[label] = newPos->get();
     createdBlocks.erase(it);
-    return ((atPos - 1))->get();
+    return newPos->get();
   }
 
   std::unique_ptr<Funct> FunctBuilder::Build() {

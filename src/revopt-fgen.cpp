@@ -177,12 +177,12 @@ public:
       )
     );
 
-    auto deopt = RewriteEngine();
-    deopt.addRule(std::make_unique<VariableInjection>(), 3);
-    deopt.addRule(std::make_unique<ConstToAdd>(), 3);
-    deopt.addRule(std::make_unique<ConstToForSum>(), 2);
-    deopt.addRule(std::make_unique<ConstToDeadCode>(), 1);
-    deopt.run(builder.get(), bblBd, 20);
+    auto revopt = RewriteEngine();
+    revopt.addRule(std::make_unique<VariableInjection>(), 3);
+    revopt.addRule(std::make_unique<ConstToAdd>(), 3);
+    revopt.addRule(std::make_unique<ConstToForSum>(), 2);
+    revopt.addRule(std::make_unique<AssToDeadCode>(), 1);
+    revopt.run(builder.get(), bblBd, 20);
 
     auto cstTerms = ConstQuery(builder.get(), bblBd).query();
     Log::Get().Out() << "Embedding variables:" << std::endl;

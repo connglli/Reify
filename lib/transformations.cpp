@@ -147,17 +147,27 @@ symir::BlockBuilder::StmtID StmtExprReplacer::Copy() {
 }
 
 symir::BlockBuilder::StmtID StmtExprReplacer::CopyTerm(const symir::Term *t) {
+  bool orig = this->hasReplaced;
   this->hasReplaced = true;
   t->Accept(*this);
-  this->hasReplaced = false;
+  this->hasReplaced = orig;
   return popTerm();
 }
 
 symir::BlockBuilder::StmtID StmtExprReplacer::CopyExpr(const symir::Expr *e) {
+  bool orig = this->hasReplaced;
   this->hasReplaced = true;
   e->Accept(*this);
-  this->hasReplaced = false;
+  this->hasReplaced = orig;
   return popExpr();
+}
+
+symir::BlockBuilder::StmtID StmtExprReplacer::CopyCond(const symir::Cond *c) {
+  bool orig = this->hasReplaced;
+  this->hasReplaced = true;
+  c->Accept(*this);
+  this->hasReplaced = orig;
+  return popCond();
 }
 
 symir::BlockBuilder::StmtID StmtExprReplacer::CopyWithReplacement(
@@ -413,7 +423,8 @@ void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd
   int totalWeight = 0;
   for (int weight : this->weights) totalWeight += weight;
   auto rand = Random::Get().Uniform(0, totalWeight);
-  Log::Get().OpenSection("RewriteEngine::run()");
+  auto randDouble = Random::Get().UniformReal();
+  Log::Get().OpenSection("RewriteEngine::run() for " + blockBd->GetLabel());
   Log::Get().Out() << "Running randomized RewriteEngine " << times 
                    << " times with " << this->rules.size() 
                    << " passes and total weight: " << totalWeight << std::endl;
@@ -427,7 +438,7 @@ void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd
     size_t nrStmts = blockBd->GetNumberCommitedStmt();
     for (size_t i = 0; i < nrStmts; i++) {
       auto *stmt = blockBd->GetCommitedStmt(i);
-      if (rule->match(stmt)) {
+      if (rule->match(stmt) && rule->applyProbability(stmt) >= randDouble()) {
         size_t increase = rule->rewrite(funBd, blockBd, i);
         i += increase;
         nrStmts += increase;
@@ -438,7 +449,7 @@ void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd
 }
 
 void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::vector<int> indices) const {
-  Log::Get().OpenSection("RewriteEngine::run()");
+  Log::Get().OpenSection("RewriteEngine::run() for " + blockBd->GetLabel());
   Log::Get().Out() << "Running indexed RewriteEngine with " << this->rules.size() << " passes on indices: ";
   for (int index : indices) {
     Log::Get().Out() << index << " ";
@@ -446,12 +457,14 @@ void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd
   Log::Get().Out() << std::endl;
   
 
+  auto randDouble = Random::Get().UniformReal();
+
   for (int index : indices) {
     auto rule = this->rules[index].get();
     size_t nrStmts = blockBd->GetNumberCommitedStmt();
     for (size_t i = 0; i < nrStmts; i++) {
       auto *stmt = blockBd->GetCommitedStmt(i);
-      if (rule->match(stmt)) {
+      if (rule->match(stmt) && rule->applyProbability(stmt) >= randDouble()) {
         size_t increase = rule->rewrite(funBd, blockBd, i);
         i += increase;
         nrStmts += increase;
@@ -463,6 +476,16 @@ void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd
 
 bool VariableInjection::match(const symir::Stmt *stmt) const {
   return stmtHasConstTerm(stmt);
+}
+
+double VariableInjection::applyProbability(const symir::Stmt *stmt) const {
+  switch (stmt->GetIRId()) {
+  case symir::SymIR::SIR_STMT_ASS: return 0.05;
+  case symir::SymIR::SIR_STMT_FOR: return 0.8;
+  case symir::SymIR::SIR_STMT_IF: return 0.8;
+  case symir::SymIR::SIR_STMT_WHILE: return 0.8;
+  default: Panic("No other stmts should appear here");
+  }
 }
 
 size_t VariableInjection::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) {
@@ -508,6 +531,10 @@ size_t VariableInjection::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilde
 bool ConstToAdd::match(const symir::Stmt *stmt) const {
   if (stmt->GetIRId() != symir::SymIR::SIR_STMT_ASS) return false;
   return stmtHasConstTerm(stmt);
+}
+
+double ConstToAdd::applyProbability(const symir::Stmt *stmt) const {
+  return 0.9;
 }
 
 size_t ConstToAdd::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) {
@@ -573,6 +600,10 @@ bool ConstToForSum::match(const symir::Stmt *stmt) const {
   if (terms.size() != 1) return false;
   if (terms[0]->GetOp() != symir::Term::OP_CST) return false;
   return true;
+}
+
+double ConstToForSum::applyProbability(const symir::Stmt *stmt) const {
+  return 0.7;
 }
 
 size_t ConstToForSum::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) {
@@ -670,13 +701,17 @@ size_t ConstToForSum::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *b
   return 1;
 }
 
-bool ConstToDeadCode::match(const symir::Stmt *stmt) const {
+bool AssToDeadCode::match(const symir::Stmt *stmt) const {
   if (stmt->GetIRId() != symir::SymIR::SIR_STMT_ASS) return false;
-  return stmtHasConstTerm(stmt);
+  return true;
 }
 
-size_t ConstToDeadCode::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) {
-  Log::Get().Out() << "Running ConstToDeadCode on stmt " << stmtIdx << std::endl;
+double AssToDeadCode::applyProbability(const symir::Stmt *stmt) const {
+  return 0.5;
+}
+
+size_t AssToDeadCode::rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) {
+  Log::Get().Out() << "Running AssToDeadCode on stmt " << stmtIdx << std::endl;
 
   const symir::AssStmt *assStmt = dynamic_cast<const symir::AssStmt *>(blockBd->GetCommitedStmt(stmtIdx));
   Assert(assStmt != nullptr, "Cast is checked and should not fail");
