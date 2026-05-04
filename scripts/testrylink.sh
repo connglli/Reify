@@ -11,8 +11,7 @@ for i in {0..1024}; do
 	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i;
 	echo "compiling.. " $uuid;
 	path="$dir/prog_${uuid//"-"/"_"}_0";
-	echo $path;
-	gcc -O3 $path/*.c -o $path/main.out;
+	clang -O0 $path/*.c -o $path/main.out;
 	echo "running.. " $uuid;
 	./$path/main.out;
 	retVal=$?

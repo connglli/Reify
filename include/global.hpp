@@ -141,6 +141,7 @@ struct GlobalOptions {
   enum DataflowStrategy {
     Literal,
     PrimeFieldInterpolation,
+    ReverseOptimization
   };
 
   // Probability of replacing a coefficient with a call to another function
@@ -153,7 +154,7 @@ struct GlobalOptions {
   // Probablility of including a variable in the dataflow expression
   double VariableTakeProba = 0.7;
   // strategy to introduce dataflow between function
-  enum DataflowStrategy DataflowStrategy = PrimeFieldInterpolation;
+  enum DataflowStrategy DataflowStrategy = ReverseOptimization;
 
   ////////////////////////////////////////////////////////////
   ////// Solver Parameters
@@ -232,7 +233,7 @@ struct GlobalOptions {
       // Program generation
       ("Xcoeff-replace-proba", "Probability of replacing a coefficient with a function call", cxxopts::value<double>())
       ("Xfunction-depth", "The number of functions to knit together per program", cxxopts::value<int>())
-      ("Xdataflow-strategy", "strategy to introduce dataflow between function {0=literal, 1=Prime interpolating}", cxxopts::value<int>())
+      ("Xdataflow-strategy", "strategy to introduce dataflow between function {0=literal, 1=Prime interpolating, 2=Reverse Optimizations}", cxxopts::value<int>())
       ("Xinit-replace-proba", "Probablility of replacing an argument literal with a variable for dataflow", cxxopts::value<double>())
       ("Xvar-take-proba", "Probablility of including a variable in the dataflow expression", cxxopts::value<double>());
     // clang-format on
