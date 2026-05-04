@@ -111,7 +111,7 @@ private:
 };
 
 namespace varstate {
-  std::vector<VariableStateQuery> allFromJsonFile(std::string filepath);
+  std::vector<std::unique_ptr<VariableStateQuery>> allFromJsonFile(std::string filepath);
   std::string allToJsonFile(std::vector<VariableStateExtractor> extractors);
   void print32_t_state(size_t nr_variables, std::vector<int32_t> states);
 }

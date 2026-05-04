@@ -100,6 +100,10 @@ void ProgPlus::Generate() {
     // TODO: since we are only replacing on path coeffs using numCoeffs forces ReplaceProba to be really low (e.g. 0.05)
     // Hence we need a better way to come up with a way to generate a random number of repacements
     int randNum = Random::Get().Binomial(numCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
+    if (randNum == 0) {
+      Log::Get().CloseSection();
+      continue;
+    }
 
     // we replace randNum coeffs with function calls
     for (int k = 0; k < randNum; ++k) {
@@ -111,7 +115,7 @@ void ProgPlus::Generate() {
       int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
-      emb.setVarStateQueries(&this->varStates[i]);
+      emb.setVarStateQueries(this->getVarStateQuerys(i));
       emb.createPathBlockWhitelist();
 
       Log::Get().OpenSection("Embedding " + guest->GetName());

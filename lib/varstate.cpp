@@ -29,12 +29,13 @@
 #include "lib/ubfree.hpp"
 #include <bitwuzla/cpp/bitwuzla.h>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
 
 namespace varstate {
-  std::vector<VariableStateQuery> allFromJsonFile(std::string filepath) {
+  std::vector<std::unique_ptr<VariableStateQuery>> allFromJsonFile(std::string filepath) {
     std::ifstream filestream(filepath);
     Assert(filestream.is_open(), "Error: failed to open file: %s", filepath.c_str());
 
@@ -43,11 +44,13 @@ namespace varstate {
     std::getline(filestream, line);
     nlohmann::json mapObj = nlohmann::json::parse(line);
 
-    std::vector<VariableStateQuery> res;
+    std::vector<std::unique_ptr<VariableStateQuery>> res;
     res.resize(mapObj.size());
     size_t i = 0;
     for (const auto& [k, varStateJson] : mapObj.items()) {
-      res[i++].fromJson(varStateJson);
+      res[i] = std::make_unique<VariableStateQuery>();
+      res[i]->fromJson(varStateJson);
+      i += 1;
     }
     return res;
   }

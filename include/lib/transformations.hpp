@@ -128,7 +128,11 @@ struct Rule {
   virtual ~Rule() = default;
   virtual bool match(const symir::Stmt *stmt) const = 0;
   virtual double applyProbability(const symir::Stmt *stmt) const = 0;
-  virtual size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) = 0;
+  virtual std::vector<symir::BlockBuilder::StmtID> rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) = 0;
 
   const symir::VarDef *getNewLocal(symir::FunctBuilder *funBd) {
     std::string locName = this->locPrefix + std::to_string(this->unique_counter++);
@@ -146,10 +150,36 @@ protected:
 struct RewriteEngine {
   ~RewriteEngine() { this->rules.clear(); }
   void addRule(std::unique_ptr<Rule> rule, int weight);
-  /// normal run method used for random selection of passes based on the passed weight, runs `times` passes in total
+  /// normal run method used for random selection of rules based on the passed weight, attempts to runs `times` rules in total
   void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t times) const;
-  /// run method for debuging runs passes based in the index given by the `indices` vector
+  /// run method for debuging runs rules based in the index given by the `indices` vector
   void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::vector<int> indices) const;
+
+  void applyRuleOnBlock(Rule *rule, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) const;
+  symir::BlockBuilder::StmtID applyRuleForSubStmt(
+    Rule *rule,
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) const;
+  symir::BlockBuilder::StmtID applyRuleOnFor(
+    Rule *rule,
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::ForStmt *forStmt
+  ) const;
+  symir::BlockBuilder::StmtID applyRuleOnWhile(
+    Rule *rule,
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::WhileStmt *whileStmt
+  ) const;
+  symir::BlockBuilder::StmtID applyRuleOnIf(
+    Rule *rule,
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::IfStmt *ifStmt
+  ) const;
 protected:
 
   std::vector<std::unique_ptr<Rule>> rules{};
@@ -161,20 +191,32 @@ struct VariableInjection : Rule {
   VariableInjection() : Rule("vj") {}
   bool match(const symir::Stmt *stmt) const override;
   double applyProbability(const symir::Stmt *stmt) const override;
-  size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
+  std::vector<symir::BlockBuilder::StmtID> rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) override;
 };
 
 struct ConstToAdd : Rule {
   bool match(const symir::Stmt *stmt) const override;
   double applyProbability(const symir::Stmt *stmt) const override;
-  size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
+  std::vector<symir::BlockBuilder::StmtID> rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) override;
 };
 
 struct ConstToForSum: Rule {
   ConstToForSum() : Rule("i") {}
   bool match(const symir::Stmt *stmt) const override;
   double applyProbability(const symir::Stmt *stmt) const override;
-  size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
+  std::vector<symir::BlockBuilder::StmtID> rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) override;
 };
 
 struct AssToDeadCode: Rule {
@@ -184,7 +226,12 @@ struct AssToDeadCode: Rule {
   }
   bool match(const symir::Stmt *stmt) const override;
   double applyProbability(const symir::Stmt *stmt) const override;
-  size_t rewrite(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t stmtIdx) override;
+  std::vector<symir::BlockBuilder::StmtID> rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) override;
+
 private:
   int minBranches;
   int maxBranches;
