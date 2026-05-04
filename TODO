@@ -13,3 +13,8 @@ Java:
 
 Interprocedural Dataflow: 
 1. Add lowering for new structures (For mod arithmetic and for/while/ifelse) Java and SYMIR as well as parsing for SYMIR
+2. Move Stmt/Cond/Expr/Term copy abilities to lang.{hpp,cpp} instead of transformation
+3. turn FCallStrategy state like varMap, filtered{Variables, VarState, ...} etc into locals 
+
+General: 
+1. Bug in fuzzier python causes mass wrong flanging of whole programs when finding one faulty function
