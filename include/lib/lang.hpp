@@ -927,8 +927,8 @@ namespace symir {
 
     [[nodiscard]] size_t NumConditions() const { return this->conds.size(); }
 
-    [[nodiscard]] std::vector<Cond *> getConds() const {
-      std::vector<Cond *> c;
+    [[nodiscard]] std::vector<const Cond *> GetConds() const {
+      std::vector<const Cond *> c;
       c.resize(this->conds.size());
       for (size_t i = 0; i < this->conds.size(); i++) {
         c[i] = this->conds[i].get();
@@ -936,8 +936,8 @@ namespace symir {
       return c;
     }
 
-    [[nodiscard]] std::vector<std::vector<Stmt *>> getBodies() const {
-      std::vector<std::vector<Stmt *>> b;
+    [[nodiscard]] std::vector<std::vector<const Stmt *>> GetBodies() const {
+      std::vector<std::vector<const Stmt *>> b;
       b.resize(this->bodies.size());
       for (size_t i = 0; i < this->bodies.size(); i++) {
         b[i].resize(this->bodies[i].size());
@@ -987,8 +987,8 @@ namespace symir {
 
     [[nodiscard]] const Cond *GetCond() const { return this->cond.get(); }
 
-    [[nodiscard]] std::vector<Stmt *> GetBody() const {
-      std::vector<Stmt *> b;
+    [[nodiscard]] std::vector<const Stmt *> GetBody() const {
+      std::vector<const Stmt *> b;
       b.resize(this->body.size());
       for (size_t i = 0; i < this->body.size(); i++) {
         b[i] = this->body[i].get();
@@ -1017,8 +1017,8 @@ namespace symir {
 
     [[nodiscard]] const Cond *GetCond() const { return this->cond.get(); }
 
-    [[nodiscard]] std::vector<Stmt *> GetBody() const {
-      std::vector<Stmt *> b;
+    [[nodiscard]] std::vector<const Stmt *> GetBody() const {
+      std::vector<const Stmt *> b;
       b.resize(this->body.size());
       for (size_t i = 0; i < this->body.size(); i++) {
         b[i] = this->body[i].get();

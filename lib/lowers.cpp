@@ -619,8 +619,8 @@ namespace symir {
   }
 
   void SymCxLower::Visit(const IfStmt &i) {
-    auto conds = i.getConds();
-    auto bodies = i.getBodies();
+    auto conds = i.GetConds();
+    auto bodies = i.GetBodies();
     Assert(conds.size() > 0, "IfStmt must have atleast condition");
 
     indent();
@@ -665,7 +665,7 @@ namespace symir {
     out << ") {" << std::endl;
 
     incIndent();
-    std::vector<Stmt *> body = f.GetBody();
+    std::vector<const Stmt *> body = f.GetBody();
     for (size_t i = 0; i < body.size(); i++) {
       body[i]->Accept(*this);
     }
@@ -681,7 +681,7 @@ namespace symir {
     out << ") {" << std::endl;
 
     incIndent();
-    std::vector<Stmt *> body = w.GetBody();
+    std::vector<const Stmt *> body = w.GetBody();
     for (size_t i = 0; i < body.size(); i++) {
       body[i]->Accept(*this);
     }
