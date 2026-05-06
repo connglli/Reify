@@ -811,8 +811,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   void BlockCopier::Visit(const IfStmt &i) {
-    const auto conds = i.getConds();
-    const auto bodies = i.getBodies();
+    const auto conds = i.GetConds();
+    const auto bodies = i.GetBodies();
 
     std::vector<CondID> cids;
     cids.resize(conds.size());
@@ -1373,8 +1373,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
 
 
   void FunctCopier::Visit(const IfStmt &i) {
-    const auto conds = i.getConds();
-    const auto bodies = i.getBodies();
+    const auto conds = i.GetConds();
+    const auto bodies = i.GetBodies();
 
     std::vector<CondID> cids;
     cids.resize(conds.size());
