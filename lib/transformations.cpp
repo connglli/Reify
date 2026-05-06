@@ -30,10 +30,13 @@
 #include <ostream>
 #include <string>
 
+#include "lib/patternmatch.hpp"
 #include "lib/transformations.hpp"
 #include "lib/lang.hpp"
 #include "lib/random.hpp"
 #include "lib/logger.hpp"
+
+using namespace patternmatch;
 
 namespace {
   bool stmtHasConstTerm(const symir::Stmt *stmt);
@@ -70,10 +73,10 @@ namespace {
 
   bool ifHasConstTerm(const symir::IfStmt *ifStmt) {
     Assert(ifStmt != nullptr, "Cast is checked and should not fail");
-    for (const auto &cond : ifStmt->getConds()) {
+    for (const auto &cond : ifStmt->GetConds()) {
       if (exprHasConstTerm(cond->GetExpr())) return true;
     }
-    for (const auto &body : ifStmt->getBodies()) {
+    for (const auto &body : ifStmt->GetBodies()) {
       for (const auto &stmt : body) {
         if (stmtHasConstTerm(stmt)) return true;
       }
@@ -321,8 +324,8 @@ void StmtExprReplacer::Visit(const symir::AssStmt &a) {
 }
 
 void StmtExprReplacer::Visit(const symir::IfStmt &i) {
-  const auto conds = i.getConds();
-  const auto bodies = i.getBodies();
+  const auto conds = i.GetConds();
+  const auto bodies = i.GetBodies();
 
   std::vector<CondID> cids;
   cids.resize(conds.size());
@@ -555,7 +558,7 @@ symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnIf(
   const symir::IfStmt *ifStmt
 ) const {
   auto randDouble = Random::Get().UniformReal();
-  auto bodies = ifStmt->getBodies();
+  auto bodies = ifStmt->GetBodies();
   std::vector<std::vector<symir::BlockBuilder::StmtID>> newBodies;
   newBodies.resize(bodies.size());
   for (size_t j = 0; j < bodies.size(); j++) {
@@ -576,7 +579,7 @@ symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnIf(
 
   auto copier = StmtExprReplacer(funBd, blockBd, nullptr);
   std::vector<symir::BlockBuilder::CondID> cids;
-  auto conds = ifStmt->getConds();
+  auto conds = ifStmt->GetConds();
   cids.reserve(conds.size());
   for (auto cond : conds) {
     cids.push_back(copier.CopyCond(cond));
@@ -585,7 +588,49 @@ symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnIf(
 }
 
 bool VariableInjection::match(const symir::Stmt *stmt) const {
-  return stmtHasConstTerm(stmt);
+  bool assMatch = patternmatch::match(
+    stmt,
+    m_AssStmt(
+      m_WildCard<const symir::VarUse *>(),
+      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))
+    )
+  );
+
+  // for each of these we are only checking inside the first list of substmts
+  bool whileMatch = patternmatch::match(
+    stmt,
+    m_WhileStmt(
+      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+    )
+  );
+
+  bool forMatch = patternmatch::match(
+    stmt,
+    m_ForStmt(
+      m_WildCard<const symir::VarUse *>(),
+      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
+      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
+      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+    )
+  );
+
+  bool ifMatch = patternmatch::match(
+    stmt,
+    m_IfStmt(
+      m_Any(m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))),
+      m_Any<std::vector<const symir::Stmt *>>(
+        m_Any(
+          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))
+        )
+      )
+    )
+  );
+
+
+  return assMatch || whileMatch || forMatch || ifMatch;
+
 }
 
 double VariableInjection::applyProbability(const symir::Stmt *stmt) const {
@@ -641,8 +686,13 @@ std::vector<symir::BlockBuilder::StmtID> VariableInjection::rewrite(
 
 
 bool ConstToAdd::match(const symir::Stmt *stmt) const {
-  if (stmt->GetIRId() != symir::SymIR::SIR_STMT_ASS) return false;
-  return stmtHasConstTerm(stmt);
+  return patternmatch::match(
+      stmt,
+      m_AssStmt(
+        m_WildCard<const symir::VarUse *>(),
+        m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))
+    );
+  // TODO also do For/While and If
 }
 
 double ConstToAdd::applyProbability(const symir::Stmt *stmt) const {
@@ -706,14 +756,13 @@ std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
 }
 
 bool ConstToForSum::match(const symir::Stmt *stmt) const {
-  if (stmt->GetIRId() != symir::SymIR::SIR_STMT_ASS) return false;
-  const symir::AssStmt *assStmt = dynamic_cast<const symir::AssStmt *>(stmt);
-  Assert(assStmt != nullptr, "Cast is checked and should not fail");
-  const auto expr = assStmt->GetExpr();
-  auto terms = expr->GetTerms();
-  if (terms.size() != 1) return false;
-  if (terms[0]->GetOp() != symir::Term::OP_CST) return false;
-  return true;
+  return patternmatch::match(
+      stmt,
+      m_AssStmt(
+        m_WildCard<const symir::VarUse *>(),
+        m_Expr(m_One(m_TermCst(m_Solved(), m_NoVar())))
+      )
+    );
 }
 
 double ConstToForSum::applyProbability(const symir::Stmt *stmt) const {
@@ -818,8 +867,7 @@ std::vector<symir::BlockBuilder::StmtID> ConstToForSum::rewrite(
 }
 
 bool AssToDeadCode::match(const symir::Stmt *stmt) const {
-  if (stmt->GetIRId() != symir::SymIR::SIR_STMT_ASS) return false;
-  return true;
+  return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse *>(), m_WildCard<const symir::Expr *>()));
 }
 
 double AssToDeadCode::applyProbability(const symir::Stmt *stmt) const {
@@ -921,8 +969,8 @@ void ConstQuery::Visit(const symir::AssStmt &a) {
 }
 
 void ConstQuery::Visit(const symir::IfStmt &i) {
-  const auto conds = i.getConds();
-  const auto bodies = i.getBodies();
+  const auto conds = i.GetConds();
+  const auto bodies = i.GetBodies();
 
   for (size_t i = 0; i < conds.size(); i++) {
     conds[i]->Accept(*this);
@@ -1112,8 +1160,8 @@ void VariableEmbedder::Visit(const symir::AssStmt &a) {
 }
 
 void VariableEmbedder::Visit(const symir::IfStmt &i) {
-  const auto conds = i.getConds();
-  const auto bodies = i.getBodies();
+  const auto conds = i.GetConds();
+  const auto bodies = i.GetBodies();
 
   std::vector<CondID> cids;
   cids.resize(conds.size());
