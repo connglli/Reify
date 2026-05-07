@@ -504,7 +504,7 @@ typeLoop:
                        << " from true: " << branch_target->GetTrueTarget() << " false: " << branch_target->GetFalseTarget()
                        << " to true: " << trueLabel << " false: " << falseLabel << std::endl;
 
-      blkBd->SymBranch(trueLabel, falseLabel, StmtExprReplacer(funBd, blkBd, nullptr).CopyCond(branch_target->GetCond()));
+      blkBd->SymBranch(trueLabel, falseLabel, symir::StmtCopier(funBd, blkBd).CopyCond(branch_target->GetCond()));
       funBd->ReplaceOrCloseBlock(blkBd);
 
     } else {
@@ -1094,6 +1094,14 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
   // needs variable state
   Log::Get().OpenSection("RevOptFCallStrategy::finalize for " + funBd->GetName());
 
+  for (auto it = this->argBlocks.cbegin(); it != this->argBlocks.cend();) {
+    if (it->second->GetNumberCommitedStmt() == 0) {
+      it = this->argBlocks.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   // loop through all blocks and if the target has a header change their target to the header.
   for (auto &blk : funBd->GetBlocks()) {
     retargetBlock(funBd, blk, this->argBlocks);
@@ -1109,6 +1117,7 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
 
   this->varMap = varStateQueries[0]->GetVarMap();
   for (auto const &[blkLabel, headBlockBd] : this->argBlocks) {
+    // if this head has not contain any arg replacements we can safly ignre it
     // clear temporaries
     this->argVars.clear();
     this->varState.clear();
@@ -1119,7 +1128,6 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
     this->nrIterations = 0;
     this->filteredNrVariables = 0;
 
-    // loop through all headers and run the rewrite engine
     this->rewriteEngine.run(funBd, headBlockBd, 20);
 
     std::vector<const symir::Term *> cstTerms = ConstQuery(funBd, headBlockBd).query();
