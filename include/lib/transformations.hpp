@@ -27,99 +27,47 @@
 #define REIFY_TRANSFORMATIONS_HPP
 
 #include "lib/lang.hpp"
-#include "lib/random.hpp"
 #include <memory>
-#include <stack>
 
-/// ==================== StmtExprReplacer Definition ====================
-/// Copies Stmt with the options of modifying a random expression inside the Stmt
-/// Also has helpers to copy Exprs and Terms
-class StmtExprReplacer : protected symir::SymIRVisitor, symir::SymIRCopier<symir::BlockBuilder::StmtID, void> {
+// ==================== StmtReplacers Definition ====================
+
+template<typename Node>
+class StmtReplacer : public symir::StmtCopier {
 public:
-  explicit StmtExprReplacer(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt,
-    double assStmtReplProba = 0.2,
-    double condReplProba = 0.5,
-    double forInitReplProba = 0.5,
-    double forIncrReplProba = 0.5
-  ) : funBd(funBd), blockBd(blockBd), targetStmt(stmt),
-      assStmtReplProba(assStmtReplProba),
-      condReplProba(condReplProba),
-      forInitReplProba(forInitReplProba),
-      forIncrReplProba(forIncrReplProba),
-      randFun(Random::Get().UniformReal())
-	{}
+  StmtReplacer(
+   symir::FunctBuilder *funBd,
+   symir::BlockBuilder *blockBd
+  ) : symir::StmtCopier(funBd, blockBd) {}
+  /// Copies Stmt with while also replacing any Subexpression that matches 'matchFunction' with the return value of 'replaceFunction'
+  StmtID CopyStmtWithReplacement(
+    const symir::Stmt *s, 
+    std::function<bool(const Node *)> matchFunction,
+    std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
+    double randThreshold = 1,
+    size_t replaceMax = 1
+  );
 
-  StmtID Copy() override;
-  TermID CopyTerm(const symir::Term *t);
-  ExprID CopyExpr(const symir::Expr* e);
-  CondID CopyCond(const symir::Cond* c);
-  StmtID CopyWithReplacement(std::function<symir::BlockBuilder::ExprID(const symir::Expr *, symir::Coef **)> repFun);
-  void CopyAsBuilder() override { Panic("Stmt has no builder class"); }
-  symir::Coef *getReplacedCoef() { return replacedCoef; }
-  bool hasConst(const symir::Expr *e) {
-    bool res = false;
-    for (auto &t : e->GetTerms()) res |= t->GetOp() == symir::Term::OP_CST;
-    return res;
-  }
-  bool canReplExpr(const symir::Expr *e, double proba) {
-    return !this->hasReplaced && hasConst(e) && this->randFun() <= proba;
-  }
-  ExprID applyReplFun(const symir::Expr *e) {
-    return this->repFun(e, &this->replacedCoef);
-  }
+  void *getExtractedDataRef() { return this->data; }
 
 protected:
-  void Visit(const symir::VarUse &v) override;
-  void Visit(const symir::Coef &c) override;
-  void Visit(const symir::Term &t) override;
-  void Visit(const symir::Expr &e) override;
-  void Visit(const symir::ModExpr &e) override;
-  void Visit(const symir::Cond &c) override;
-  void Visit(const symir::AssStmt &a) override;
-  void Visit(const symir::ModAssStmt &a) override;
-  void Visit(const symir::IfStmt &i) override;
-  void Visit(const symir::ForStmt &f) override;
-  void Visit(const symir::WhileStmt &w) override;
-  void Visit(const symir::RetStmt &r) override { Panic("Not a valid rewrite target"); }
-  void Visit(const symir::Branch &b) override { Panic("Not a valid rewrite target"); }
-  void Visit(const symir::Goto &g) override { Panic("Not a valid rewrite target"); }
-  void Visit(const symir::ScaParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::VecParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::UnInitLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::ScaLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::VecLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructDef &s) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::Block &b) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::Funct &f) override { Panic("Not a subnode of any STMT"); }
+  void Visit(const Node &e) override;
+private:
+  bool match(const Node &e) {
+    return !this->hasReplaced && this->rand() <= this->randThreshold && this->matchFunction(&e);
+  }
+  ExprID replace(const Node &e) { 
+    this->hasReplaced = true;
+    return this->replaceFunction(funBd, blockBd, e, &this->data); 
+  }
+  double rand() { return this->randUniform(); }
 
 private:
-  symir::FunctBuilder *funBd;
-  symir::BlockBuilder *blockBd;
-  const symir::Stmt *targetStmt;
-  std::function<symir::BlockBuilder::ExprID(const symir::Expr *, symir::Coef **)> repFun = nullptr;
-
-  double assStmtReplProba;
-  double condReplProba;
-  double forInitReplProba;
-  double forIncrReplProba;
-  std::function<double()> randFun;
-
+  std::function<bool(const Node *)> matchFunction;
+  std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
+  std::function<double()> randUniform;
+  void *data = nullptr;
+  double randThreshold = 1;
   bool hasReplaced = false;
-
-  symir::Coef *replacedCoef;
-
-  std::stack<symir::Coef *> coefStack{};
-  std::stack<symir::BlockBuilder::TermID> termStack{};
-  std::stack<symir::BlockBuilder::ExprID> exprStack{};
-  std::stack<symir::BlockBuilder::ExprID> modExprStack{};
-  std::stack<symir::BlockBuilder::CondID> condStack{};
-
-
 };
 
 /// ==================== Virtual Rule Definition ====================
@@ -147,39 +95,34 @@ protected:
 };
 
 /// ==================== Rewrite Engine Definition ====================
-struct RewriteEngine {
-  ~RewriteEngine() { this->rules.clear(); }
+class RewriteEngine {
+public:
   void addRule(std::unique_ptr<Rule> rule, int weight);
   /// normal run method used for random selection of rules based on the passed weight, attempts to runs `times` rules in total
   void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t times) const;
-  /// run method for debuging runs rules based in the index given by the `indices` vector
-  void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::vector<int> indices) const;
 
-  void applyRuleOnBlock(Rule *rule, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) const;
-  symir::BlockBuilder::StmtID applyRuleForSubStmt(
-    Rule *rule,
+private:
+  std::optional<symir::BlockBuilder::StmtID> runInSubStmt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::Stmt *stmt
   ) const;
-  symir::BlockBuilder::StmtID applyRuleOnFor(
-    Rule *rule,
+  std::optional<symir::BlockBuilder::StmtID> runInForStmt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::ForStmt *forStmt
   ) const;
-  symir::BlockBuilder::StmtID applyRuleOnWhile(
-    Rule *rule,
+  std::optional<symir::BlockBuilder::StmtID> runInWhileStmt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::WhileStmt *whileStmt
   ) const;
-  symir::BlockBuilder::StmtID applyRuleOnIf(
-    Rule *rule,
+  std::optional<symir::BlockBuilder::StmtID> runInIfStmt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::IfStmt *ifStmt
   ) const;
+  std::optional<Rule *> getRandomMatchingRule(const symir::Stmt *stmt) const;
 protected:
 
   std::vector<std::unique_ptr<Rule>> rules{};
