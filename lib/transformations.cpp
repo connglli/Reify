@@ -27,6 +27,7 @@
 #include <climits>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 
@@ -39,8 +40,6 @@
 using namespace patternmatch;
 
 namespace {
-  bool stmtHasConstTerm(const symir::Stmt *stmt);
-
   std::vector<symir::Coef *> copyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use) {
     std::vector<symir::Coef *> access;
     access.reserve(use->GetAccess().size());
@@ -56,70 +55,6 @@ namespace {
       }
     }
     return access;
-  }
-
-  bool exprHasConstTerm(const symir::Expr *expr) {
-    for (const auto &term : expr->GetTerms()) {
-      if (term->GetOp() != symir::Term::OP_CST) continue;
-      if (term->GetCoef()->IsSolved()) return true;
-    }
-    return false;
-  }
-
-  bool assignHasConstTerm(const symir::AssStmt *assStmt) {
-    Assert(assStmt != nullptr, "Cast is checked and should not fail");
-    return exprHasConstTerm(assStmt->GetExpr());
-  }
-
-  bool ifHasConstTerm(const symir::IfStmt *ifStmt) {
-    Assert(ifStmt != nullptr, "Cast is checked and should not fail");
-    for (const auto &cond : ifStmt->GetConds()) {
-      if (exprHasConstTerm(cond->GetExpr())) return true;
-    }
-    for (const auto &body : ifStmt->GetBodies()) {
-      for (const auto &stmt : body) {
-        if (stmtHasConstTerm(stmt)) return true;
-      }
-    }
-    return false;
-  }
-
-  bool forHasConstTerm(const symir::ForStmt *forStmt) {
-    Assert(forStmt != nullptr, "Cast is checked and should not fail");
-    if (exprHasConstTerm(forStmt->GetInit())) return true;
-    if (exprHasConstTerm(forStmt->GetIncrement())) return true;
-    if (exprHasConstTerm(forStmt->GetCond()->GetExpr())) return true;
-    for (const auto &stmt: forStmt->GetBody()) {
-      if (stmtHasConstTerm(stmt)) return true;
-    }
-    return false;
-  }
-
-  bool whileHasConstTerm(const symir::WhileStmt *whileStmt) {
-    Assert(whileStmt != nullptr, "Cast is checked and should not fail");
-    if (exprHasConstTerm(whileStmt->GetCond()->GetExpr())) return true;
-    for (const auto &stmt: whileStmt->GetBody()) {
-      if (stmtHasConstTerm(stmt)) return true;
-    }
-    return false;
-  }
-
-  bool stmtHasConstTerm(const symir::Stmt *stmt) {
-    switch(stmt->GetIRId()) {
-    case symir::SymIR::SIR_STMT_ASS: {
-      return assignHasConstTerm(static_cast<const symir::AssStmt *>(stmt));
-    } break;
-    case symir::SymIR::SIR_STMT_IF: {
-      return ifHasConstTerm(static_cast<const symir::IfStmt *>(stmt));
-    } break;
-    case symir::SymIR::SIR_STMT_FOR: {
-      return forHasConstTerm(static_cast<const symir::ForStmt *>(stmt));
-    } break;
-    case symir::SymIR::SIR_STMT_WHILE: {
-      return whileHasConstTerm(static_cast<const symir::WhileStmt *>(stmt));
-    } break;
-    default: Panic("Unsupported stmt");
-    }
   }
 
   symir::BlockBuilder::CondID triviallyFalseCond(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) {
@@ -142,279 +77,59 @@ namespace {
 
 } // namespace
 
-symir::BlockBuilder::StmtID StmtExprReplacer::Copy() {
-  this->hasReplaced = true;
-  this->targetStmt->Accept(*this);
+template<typename Node>
+void StmtReplacer<Node>::Visit(const Node &n) { StmtCopier::Visit(n); }
+
+template<typename Node>
+symir::BlockBuilder::StmtID StmtReplacer<Node>::CopyStmtWithReplacement(
+  const symir::Stmt *s, 
+  std::function<bool(const Node *)> matchFunction,
+  std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
+  double randThreshold,
+  size_t replaceMax
+) {
+  this->matchFunction = matchFunction;
+  this->replaceFunction = replaceFunction;
+  this->randThreshold = randThreshold;
+  this->randUniform = Random::Get().UniformReal();
   this->hasReplaced = false;
+
+  s->Accept(*this);
+
+  if (!this->hasReplaced) {
+    // if by change (e.g. randTheshold) we have not replaced anything we run it again with a threshold of 1 to guarentee a replacement
+    popStmt();
+    this->randThreshold = 1;
+    s->Accept(*this);
+  }
+
+  Assert(this->hasReplaced, "StmtReplacer should only be called on stmt that are guaranteed to be able to be replaced");
+
   return popStmt();
 }
 
-symir::BlockBuilder::StmtID StmtExprReplacer::CopyTerm(const symir::Term *t) {
-  bool orig = this->hasReplaced;
-  this->hasReplaced = true;
-  t->Accept(*this);
-  this->hasReplaced = orig;
-  return popTerm();
-}
-
-symir::BlockBuilder::StmtID StmtExprReplacer::CopyExpr(const symir::Expr *e) {
-  bool orig = this->hasReplaced;
-  this->hasReplaced = true;
-  e->Accept(*this);
-  this->hasReplaced = orig;
-  return popExpr();
-}
-
-symir::BlockBuilder::StmtID StmtExprReplacer::CopyCond(const symir::Cond *c) {
-  bool orig = this->hasReplaced;
-  this->hasReplaced = true;
-  c->Accept(*this);
-  this->hasReplaced = orig;
-  return popCond();
-}
-
-symir::BlockBuilder::StmtID StmtExprReplacer::CopyWithReplacement(
-  std::function<symir::BlockBuilder::ExprID(const symir::Expr *, symir::Coef **)> repFun
-) {
-  this->hasReplaced = false;
-  this->repFun = repFun;
-  symir::BlockBuilder::StmtID res = 0;
-  // this is stupitly inefficent. ToDo find way to make this not stupit
-  while (!this->hasReplaced) {
-    this->targetStmt->Accept(*this);
-    res = popStmt();
-  }
-  this->repFun = nullptr;
-  return res;
-}
-
-void StmtExprReplacer::Visit(const symir::VarUse &v) {
-  for (auto &c: v.GetAccess()) {
-      c->Accept(*this);
-  }
-}
-
-void StmtExprReplacer::Visit(const symir::Coef &c) {
-  if (auto coef = this->funBd->FindSymbol(c.GetName()); coef != nullptr) {
-    Assert(
-        typeid(*coef) == typeid(symir::Coef),
-        "Symbol \"%s\" is already defined and is not a coefficient", c.GetName().c_str()
-    );
-    pushCoef(dynamic_cast<symir::Coef *>(coef));
-  } else if (c.IsSolved()) {
-    pushCoef(this->funBd->SymCoef(c.GetName(), c.GetValue(), c.GetType()));
+template<> void StmtReplacer<symir::Expr>::Visit(const symir::Expr &e) {
+  if (this->match(e)) {
+    pushExpr(this->replace(e));
   } else {
-    pushCoef(this->funBd->SymCoef(c.GetName(), c.GetType()));
+    StmtCopier::Visit(e);
   }
 }
 
-void StmtExprReplacer::Visit(const symir::Term &t) {
-  t.GetCoef()->Accept(*this);
-  const symir::VarDef *var = nullptr;
-  std::vector<symir::Coef *> access{};
-  if (t.GetOp() != symir::Term::Op::OP_CST) {
-    const auto name = t.GetVar()->GetName();
-    var = t.GetVar()->GetDef();
-    t.GetVar()->Accept(*this);
-    for (size_t i = 0; i < t.GetVar()->GetAccess().size(); i++) {
-      access.insert(access.begin(), popCoef());
-    }
-  }
-  pushTerm(this->blockBd->SymTerm(t.GetOp(), popCoef(), var, access));
-}
-
-void StmtExprReplacer::Visit(const symir::ModExpr &e) {
-    std::vector<symir::Coef *> coeffs;
-    for (const auto& c : e.GetCoeffs()) {
-      c->Accept(*this);
-      auto coeff = popCoef();
-      coeffs.push_back(coeff);
-    }
-    std::vector<const symir::VarDef *> variables;
-
-    const symir::VarDef *var = nullptr;
-    std::vector<std::vector<symir::Coef *>> accesses{};
-    for (const auto& use: e.GetVars()) {
-      std::vector<symir::Coef *> access{};
-      const auto name = use->GetName();
-      var = use->GetDef();
-      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
-      use->Accept(*this);
-      for (size_t i = 0; i < use->GetAccess().size(); i++) {
-        access.insert(access.begin(), popCoef());
-      }
-      variables.push_back(var);
-      accesses.push_back(std::vector(access));
-    }
-
-    const std::vector<int> polynomial = e.GetPolynomial();
-    const int mod = e.GetMod();
-
-    pushModExpr(this->blockBd->SymModExpr(
-      coeffs,
-      variables,
-      accesses,
-      polynomial,
-      mod
-    ));
-  }
-
-void StmtExprReplacer::Visit(const symir::Expr &e) {
-  const auto &terms = e.GetTerms();
-  std::vector<TermID> termIds;
-  for (const auto &t: terms) {
-    t->Accept(*this);
-    termIds.push_back(popTerm());
-  }
-  pushExpr(this->blockBd->SymExpr(e.GetOp(), termIds));
-}
-
-void StmtExprReplacer::Visit(const symir::Cond &c) {
-  ExprID exprId;
-  if (canReplExpr(c.GetExpr(), this->condReplProba)) {
-    exprId = applyReplFun(c.GetExpr());
-    this->hasReplaced = true;
+template<> void StmtReplacer<symir::Term>::Visit(const symir::Term &t) {
+  if (this->match(t)) {
+    pushTerm(this->replace(t));
   } else {
-    c.GetExpr()->Accept(*this);
-    exprId = popExpr();
+    StmtCopier::Visit(t);
   }
-  pushCond(this->blockBd->SymCond(c.GetOp(), exprId));
 }
 
-void StmtExprReplacer::Visit(const symir::ModAssStmt &a) {
-  const auto use = a.GetVar();
-  const auto expr = a.GetExpr();
-  const auto name = use->GetName();
-  const auto var = use->GetDef();
-  Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
-
-  use->Accept(*this);
-  expr->Accept(*this);
-  auto modExprId = popModExpr();
-  std::vector<symir::Coef *> access{};
-  for (size_t i = 0; i < use->GetAccess().size(); i++) {
-    access.insert(access.begin(), popCoef());
-  }
-
-  pushStmt(this->blockBd->SymModAssStmt(var, modExprId, access));
-}
-
-void StmtExprReplacer::Visit(const symir::AssStmt &a) {
-  const auto use = a.GetVar();
-  const auto name = use->GetName();
-  const auto var = use->GetDef();
-  Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
-
-  use->Accept(*this);
-  std::vector<symir::Coef *> access{};
-  for (size_t i = 0; i < use->GetAccess().size(); i++) {
-    access.insert(access.begin(), popCoef());
-  }
-
-  ExprID exprId;
-  if (canReplExpr(a.GetExpr(), this->assStmtReplProba)) {
-    exprId = applyReplFun(a.GetExpr());
-    this->hasReplaced = true;
+template<> void StmtReplacer<symir::Cond>::Visit(const symir::Cond &c) {
+  if (this->match(c)) {
+    pushCond(this->replace(c));
   } else {
-    a.GetExpr()->Accept(*this);
-    exprId = popExpr();
+    StmtCopier::Visit(c);
   }
-
-  pushStmt(this->blockBd->SymAssStmt(var, exprId, access));
-}
-
-void StmtExprReplacer::Visit(const symir::IfStmt &i) {
-  const auto conds = i.GetConds();
-  const auto bodies = i.GetBodies();
-
-  std::vector<CondID> cids;
-  cids.resize(conds.size());
-  for (size_t i = 0; i < conds.size(); i++) {
-    conds[i]->Accept(*this);
-    cids[i] = popCond();
-  }
-
-  std::vector<std::vector<StmtID>> sids;
-  sids.resize(bodies.size());
-  for (size_t i = 0; i < bodies.size(); i++) {
-    sids[i].resize(bodies[i].size());
-    for (size_t j = 0; j < bodies[i].size(); j++) {
-      Assert(
-        bodies[i][j]->GetIRId() != symir::SymIR::SIR_TGT_BRA || bodies[i][j]->GetIRId() != symir::SymIR::SIR_TGT_GOTO,
-        "IfStmt contains Goto or Branch"
-      );
-      bodies[i][j]->Accept(*this);
-      sids[i][j] = popStmt();
-    }
-  }
-
-  pushStmt(this->blockBd->SymIfStmt(cids, sids));
-}
-
-void StmtExprReplacer::Visit(const symir::ForStmt &f) {
-  const symir::VarUse *use = f.GetVar();
-  const symir::Expr *init = f.GetInit();
-  const symir::Expr *increment = f.GetIncrement();
-  const auto cond = f.GetCond();
-  const auto body = f.GetBody();
-
-  use->Accept(*this);
-  std::vector<symir::Coef *> access{};
-  for (size_t i = 0; i < use->GetAccess().size(); i++) {
-    access.insert(access.begin(), popCoef());
-  }
-
-  cond->Accept(*this);
-  CondID cid = popCond();
-
-  ExprID initID;
-  if (canReplExpr(init, this->forInitReplProba)) {
-    initID = applyReplFun(init);
-    this->hasReplaced = true;
-  } else {
-    init->Accept(*this);
-    initID = popExpr();
-  }
-
-  ExprID incrementID;
-  if (canReplExpr(increment, this->forIncrReplProba)) {
-    incrementID = applyReplFun(increment);
-    this->hasReplaced = true;
-  } else {
-    increment->Accept(*this);
-    incrementID = popExpr();
-  }
-
-  std::vector<StmtID> sids;
-  sids.resize(body.size());
-  for (size_t i = 0; i < body.size(); i++) {
-    Assert(body[i]->GetIRId() != symir::SymIR::SIR_TGT_BRA || body[i]->GetIRId() != symir::SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-    body[i]->Accept(*this);
-    sids[i] = popStmt();
-  }
-
-  pushStmt(this->blockBd->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
-}
-
-void StmtExprReplacer::Visit(const symir::WhileStmt &w) {
-  const auto cond = w.GetCond();
-  const auto body = w.GetBody();
-
-  cond->Accept(*this);
-  CondID cid = popCond();
-
-  std::vector<StmtID> sids;
-  sids.resize(body.size());
-  for (size_t i = 0; i < body.size(); i++) {
-    Assert(
-      body[i]->GetIRId() != symir::SymIR::SIR_TGT_BRA || body[i]->GetIRId() != symir::SymIR::SIR_TGT_GOTO,
-      "ForStmt contains Goto or Branch"
-    );
-    body[i]->Accept(*this);
-    sids[i] = popStmt();
-  }
-
-  pushStmt(this->blockBd->SymWhileStmt(cid, sids));
 }
 
 void RewriteEngine::addRule(std::unique_ptr<Rule> rule, int weight) {
@@ -423,99 +138,83 @@ void RewriteEngine::addRule(std::unique_ptr<Rule> rule, int weight) {
 }
 
 void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t times) const {
-  int totalWeight = 0;
-  for (int weight : this->weights) totalWeight += weight;
-  auto rand = Random::Get().Uniform(0, totalWeight);
   Log::Get().OpenSection("RewriteEngine::run() for " + blockBd->GetLabel());
   Log::Get().Out() << "Running randomized RewriteEngine " << times 
-                   << " times with " << this->rules.size() 
-                   << " passes and total weight: " << totalWeight << std::endl;
+                   << " times with " << this->rules.size() << " rules" << std::endl;
 
   for (size_t t = 0; t < times; t++) {
-    int selWeight = rand();
-    int index = 0;
-    while (selWeight > this->weights[index]) selWeight -= this->weights[index++];
-    auto rule = this->rules[index].get();
+    size_t nrStmts = blockBd->GetNumberCommitedStmt();
+    Assert(nrStmts > 0, "to rewrite a block it needs atleast one stmt");
+    auto randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
+    const auto *stmt = blockBd->GetCommitedStmt(randStmt);
+    std::optional rewrittenStmt = this->runInSubStmt(funBd, blockBd, stmt);
+    if (rewrittenStmt.has_value())
+      stmt = blockBd->SymReplaceCommitStmt({ rewrittenStmt.value() }, randStmt)[0];
 
-    this->applyRuleOnBlock(rule, funBd, blockBd);
-  }
-  Log::Get().CloseSection();
-}
-
-void RewriteEngine::run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::vector<int> indices) const {
-  Log::Get().OpenSection("RewriteEngine::run() for " + blockBd->GetLabel());
-  Log::Get().Out() << "Running indexed RewriteEngine with " << this->rules.size() << " passes on indices: ";
-  for (int index : indices) {
-    Log::Get().Out() << index << " ";
-  }
-  Log::Get().Out() << std::endl;
-  
-
-  auto randDouble = Random::Get().UniformReal();
-
-  for (int index : indices) {
-    auto rule = this->rules[index].get();
-    this->applyRuleOnBlock(rule, funBd, blockBd);
-  }
-  Log::Get().CloseSection();
-}
-
-void RewriteEngine::applyRuleOnBlock(Rule *rule, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) const {
-  auto randDouble = Random::Get().UniformReal();
-  size_t nrStmts = blockBd->GetNumberCommitedStmt();
-  for (size_t i = 0; i < nrStmts; i++) {
-    const auto *stmt = blockBd->GetCommitedStmt(i);
-    stmt = blockBd->SymReplaceCommitStmt({ this->applyRuleForSubStmt(rule, funBd, blockBd, stmt) }, i)[0];
-    if (rule->match(stmt) && rule->applyProbability(stmt) >= randDouble()) {
-      std::vector<symir::BlockBuilder::StmtID> newStmts = rule->rewrite(funBd, blockBd, stmt);
-      size_t blockSizeIncrease = newStmts.size() - 1;
-      blockBd->SymReplaceCommitStmt(newStmts, i);
-      i += blockSizeIncrease;
-      nrStmts += blockSizeIncrease;
+    std::optional rule = this->getRandomMatchingRule(stmt);
+    if (rule.has_value()) {
+      std::vector<symir::BlockBuilder::StmtID> newStmts = rule.value()->rewrite(funBd, blockBd, stmt);
+      Assert(newStmts.size() > 0, "rewrite deleted all stmts");
+      blockBd->SymReplaceCommitStmt(newStmts, randStmt);
     }
   }
+  Log::Get().CloseSection();
 }
 
-symir::BlockBuilder::StmtID RewriteEngine::applyRuleForSubStmt(
-  Rule *rule,
+std::optional<symir::BlockBuilder::StmtID> RewriteEngine::runInSubStmt(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::Stmt *stmt
 ) const {
   switch (stmt->GetIRId()) {
   case symir::SymIR::SIR_STMT_FOR:
-    return this->applyRuleOnFor(rule, funBd, blockBd, static_cast<const symir::ForStmt *>(stmt));
+    return this->runInForStmt(funBd, blockBd, static_cast<const symir::ForStmt *>(stmt));
   case symir::SymIR::SIR_STMT_WHILE:
-    return this->applyRuleOnWhile(rule, funBd, blockBd, static_cast<const symir::WhileStmt *>(stmt));
+    return this->runInWhileStmt(funBd, blockBd, static_cast<const symir::WhileStmt *>(stmt));
   case symir::SymIR::SIR_STMT_IF:
-    return this->applyRuleOnIf(rule, funBd, blockBd, static_cast<const symir::IfStmt *>(stmt));
-  default: return StmtExprReplacer(funBd, blockBd, stmt).Copy();
+    return this->runInIfStmt(funBd, blockBd, static_cast<const symir::IfStmt *>(stmt));
+  default: return {};
   }
 }
 
-symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnFor(
-  Rule *rule,
+std::optional<symir::BlockBuilder::StmtID> RewriteEngine::runInForStmt(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::ForStmt *forStmt
 ) const {
-  auto randDouble = Random::Get().UniformReal();
   auto body = forStmt->GetBody();
-  std::vector<symir::BlockBuilder::StmtID> newBody;
-  newBody.reserve(body.size());
   size_t nrStmts = body.size();
-  for (size_t i = 0; i < nrStmts; i++) {
-    const auto *stmt = body[i];
-    stmt = blockBd->GetUncommitedStmt(this->applyRuleForSubStmt(rule, funBd, blockBd, stmt));
-    if (rule->match(stmt) && rule->applyProbability(stmt) >= randDouble()) {
-      std::vector<symir::BlockBuilder::StmtID> newStmts = rule->rewrite(funBd, blockBd, stmt);
-      for (auto newStmt : newStmts) newBody.push_back(newStmt);
-    } else {
-      newBody.push_back(StmtExprReplacer(funBd, blockBd, stmt).Copy());
+  bool hasRewritten = false;
+  std::vector<symir::BlockBuilder::StmtID> newBody;
+  newBody.reserve(nrStmts);
+  for (size_t j = 0; j < nrStmts; j++) {
+    auto randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
+    for (size_t i = 0; i < nrStmts; i++) {
+      const auto *stmt = body[i];
+
+      std::optional rewrittenStmt = this->runInSubStmt(funBd, blockBd, stmt);
+      if (i != static_cast<size_t>(randStmt)) {
+        newBody.push_back(symir::StmtCopier(funBd, blockBd).CopyStmt(stmt));
+        continue;
+      }
+      if (rewrittenStmt.has_value())
+        stmt = blockBd->GetUncommitedStmt(rewrittenStmt.value());
+
+      std::optional rule = this->getRandomMatchingRule(stmt);
+      if (rule.has_value()) {
+        std::vector<symir::BlockBuilder::StmtID> newStmts = rule.value()->rewrite(funBd, blockBd, stmt);
+        for (auto newStmt : newStmts) newBody.push_back(newStmt);
+        hasRewritten = true;
+      } else if (rewrittenStmt.has_value()) {
+        newBody.push_back(rewrittenStmt.value());
+        hasRewritten = true;
+      }
     }
+    if (hasRewritten) break;
+    else newBody.clear();
   }
 
-  auto copier = StmtExprReplacer(funBd, blockBd, nullptr);
+  auto copier = symir::StmtCopier(funBd, blockBd);
   return blockBd->SymForStmt(
     forStmt->GetVar()->GetDef(),
     copier.CopyCond(forStmt->GetCond()),
@@ -525,34 +224,49 @@ symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnFor(
   );
 }
 
-symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnWhile(
-  Rule *rule,
+std::optional<symir::BlockBuilder::StmtID> RewriteEngine::runInWhileStmt(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::WhileStmt *whileStmt
 ) const {
-  auto randDouble = Random::Get().UniformReal();
   auto body = whileStmt->GetBody();
+  size_t nrStmts = body.size();
+  bool hasRewritten = false;
   std::vector<symir::BlockBuilder::StmtID> newBody;
   newBody.reserve(body.size());
-  size_t nrStmts = body.size();
-  for (size_t i = 0; i < nrStmts; i++) {
-    const auto *stmt = body[i];
-    stmt = blockBd->GetUncommitedStmt(this->applyRuleForSubStmt(rule, funBd, blockBd, stmt));
-    if (rule->match(stmt) && rule->applyProbability(stmt) >= randDouble()) {
-      std::vector<symir::BlockBuilder::StmtID> newStmts = rule->rewrite(funBd, blockBd, stmt);
-      for (auto newStmt : newStmts) newBody.push_back(newStmt);
-    } else {
-      newBody.push_back(StmtExprReplacer(funBd, blockBd, stmt).Copy());
+  for (size_t j = 0; j < nrStmts; j++) {
+    newBody.reserve(nrStmts);
+    auto randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
+    for (size_t i = 0; i < nrStmts; i++) {
+      const auto *stmt = body[i];
+
+      std::optional rewrittenStmt = this->runInSubStmt(funBd, blockBd, stmt);
+      if (i != static_cast<size_t>(randStmt)) {
+        newBody.push_back(symir::StmtCopier(funBd, blockBd).CopyStmt(stmt));
+        continue;
+      }
+      if (rewrittenStmt.has_value())
+        stmt = blockBd->GetUncommitedStmt(rewrittenStmt.value());
+
+      std::optional rule = this->getRandomMatchingRule(stmt);
+      if (rule.has_value()) {
+        std::vector<symir::BlockBuilder::StmtID> newStmts = rule.value()->rewrite(funBd, blockBd, stmt);
+        for (auto newStmt : newStmts) newBody.push_back(newStmt);
+        hasRewritten = true;
+      } else if (rewrittenStmt.has_value()) {
+        newBody.push_back(rewrittenStmt.value());
+        hasRewritten = true;
+      }
     }
+    if (hasRewritten) break;
+    else newBody.clear();
   }
 
-  auto copier = StmtExprReplacer(funBd, blockBd, nullptr);
+  auto copier = symir::StmtCopier(funBd, blockBd);
   return blockBd->SymWhileStmt(copier.CopyCond(whileStmt->GetCond()), newBody);
 }
 
-symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnIf(
-  Rule *rule,
+std::optional<symir::BlockBuilder::StmtID> RewriteEngine::runInIfStmt(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::IfStmt *ifStmt
@@ -563,21 +277,38 @@ symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnIf(
   newBodies.resize(bodies.size());
   for (size_t j = 0; j < bodies.size(); j++) {
     auto body = bodies[j];
-    newBodies[j].reserve(bodies[j].size());
     size_t nrStmts = body.size();
-    for (size_t i = 0; i < nrStmts; i++) {
-      const auto *stmt = body[i];
-      stmt = blockBd->GetUncommitedStmt(this->applyRuleForSubStmt(rule, funBd, blockBd, stmt));
-      if (rule->match(stmt) && rule->applyProbability(stmt) >= randDouble()) {
-        std::vector<symir::BlockBuilder::StmtID> newStmts = rule->rewrite(funBd, blockBd, stmt);
-        for (auto newStmt : newStmts) newBodies[j].push_back(newStmt);
-      } else {
-        newBodies[j].push_back(StmtExprReplacer(funBd, blockBd, stmt).Copy());
-      }
-    }
-  }
+    bool hasRewritten = false;
+    newBodies[j].reserve(nrStmts);
+    for (size_t k = 0; k < nrStmts; k++) {
+      auto randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
+      for (size_t i = 0; i < nrStmts; i++) {
+        const auto *stmt = body[i];
 
-  auto copier = StmtExprReplacer(funBd, blockBd, nullptr);
+        std::optional rewrittenStmt = this->runInSubStmt(funBd, blockBd, stmt);
+        if (i != static_cast<size_t>(randStmt)) {
+          newBodies[j].push_back(symir::StmtCopier(funBd, blockBd).CopyStmt(stmt));
+          continue;
+        }
+        if (rewrittenStmt.has_value())
+          stmt = blockBd->GetUncommitedStmt(rewrittenStmt.value());
+
+        std::optional rule = this->getRandomMatchingRule(stmt);
+        if (rule.has_value()) {
+          std::vector<symir::BlockBuilder::StmtID> newStmts = rule.value()->rewrite(funBd, blockBd, stmt);
+          for (auto newStmt : newStmts) newBodies[j].push_back(newStmt);
+          hasRewritten = true;
+        } else if (rewrittenStmt.has_value()) {
+          newBodies[j].push_back(rewrittenStmt.value());
+          hasRewritten = true;
+        }
+      }
+      if (hasRewritten) break;
+      else newBodies[j].clear();
+    }
+  } 
+
+  auto copier = symir::StmtCopier(funBd, blockBd);
   std::vector<symir::BlockBuilder::CondID> cids;
   auto conds = ifStmt->GetConds();
   cids.reserve(conds.size());
@@ -585,6 +316,22 @@ symir::BlockBuilder::StmtID RewriteEngine::applyRuleOnIf(
     cids.push_back(copier.CopyCond(cond));
   }
   return blockBd->SymIfStmt(cids, newBodies);
+}
+
+std::optional<Rule *> RewriteEngine::getRandomMatchingRule(const symir::Stmt *stmt) const {
+  std::vector<size_t> matchingRules;
+  int totalWeight = 0;
+  for (size_t i = 0; i < this->rules.size(); i++) {
+    if (!this->rules[i]->match(stmt)) continue;
+    matchingRules.push_back(i);
+    totalWeight += this->weights[i];
+  }
+
+  if (totalWeight == 0) return {};
+  int selWeight = Random::Get().Uniform(0, totalWeight)();
+  int index = 0;
+  while (selWeight > this->weights[matchingRules[index]]) selWeight -= this->weights[matchingRules[index++]];
+  return this->rules[matchingRules[index]].get();
 }
 
 bool VariableInjection::match(const symir::Stmt *stmt) const {
@@ -595,6 +342,7 @@ bool VariableInjection::match(const symir::Stmt *stmt) const {
       m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))
     )
   );
+  if (assMatch) return true;
 
   // for each of these we are only checking inside the first list of substmts
   bool whileMatch = patternmatch::match(
@@ -604,6 +352,7 @@ bool VariableInjection::match(const symir::Stmt *stmt) const {
       m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
     )
   );
+  if (whileMatch) return true;
 
   bool forMatch = patternmatch::match(
     stmt,
@@ -615,6 +364,7 @@ bool VariableInjection::match(const symir::Stmt *stmt) const {
       m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
     )
   );
+  if (forMatch) return true;
 
   bool ifMatch = patternmatch::match(
     stmt,
@@ -627,10 +377,7 @@ bool VariableInjection::match(const symir::Stmt *stmt) const {
       )
     )
   );
-
-
-  return assMatch || whileMatch || forMatch || ifMatch;
-
+  return ifMatch;
 }
 
 double VariableInjection::applyProbability(const symir::Stmt *stmt) const {
@@ -650,34 +397,32 @@ std::vector<symir::BlockBuilder::StmtID> VariableInjection::rewrite(
 ) {
   Log::Get().Out() << "Running VariableInjection" << std::endl;
 
-  StmtExprReplacer rep = StmtExprReplacer(funBd, blockBd, stmt);
+  StmtReplacer rep = StmtReplacer<symir::Term>(funBd, blockBd);
   const symir::VarDef *var = this->getNewLocal(funBd);
-  std::function<symir::BlockBuilder::ExprID(const symir::Expr *, symir::Coef **)> varInsertFun =
-    [&](const symir::Expr *e, symir::Coef **c) {
-      const auto &terms = e->GetTerms();
-      std::vector<symir::BlockBuilder::TermID> termIds;
-      bool repConst = false;
-      for (const auto &t: terms) {
-        if (!repConst && t->GetOp() == symir::Term::OP_CST) {
-          *c = t->GetCoef();
-          termIds.push_back(blockBd->SymMulTerm(funBd->SymI32Const(1), var));
-          repConst = true;
-        } else {
-          termIds.push_back(rep.CopyTerm(t));
-        }
-      }
-      return blockBd->SymExpr(e->GetOp(), termIds);
-    };
+  std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
+    varInsertFun =
+      [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+        *data = t.GetCoef();
+        return thisBlockBd->SymMulTerm(thisFunBd->SymI32Const(1), var);
+      };
 
-  symir::BlockBuilder::StmtID newStmt = rep.CopyWithReplacement(varInsertFun);
+  symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    stmt,
+    make_matcher(const symir::Term *, m_TermCst(m_Solved(), m_NoVar())),
+    varInsertFun,
+    0.25
+  );
+  symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+  Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
+  Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
 
-  Log::Get().Out() << "Replacing Const " << rep.getReplacedCoef()->GetI32Value() << " with " << var->GetName() << std::endl;
+  Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with " << var->GetName() << std::endl;
 
   symir::BlockBuilder::StmtID assignStmts = blockBd->SymAssStmt(
     var,
     blockBd->SymExpr(
       symir::Expr::OP_ADD,
-      { blockBd->SymCstTerm(rep.getReplacedCoef(), nullptr) }
+      { blockBd->SymCstTerm(replacedCoef, nullptr) }
     )
   );
 
@@ -748,7 +493,7 @@ std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
         nullptr, {})
       );
     } else {
-      termIds.push_back(StmtExprReplacer(funBd, blockBd, nullptr).CopyTerm(term));
+      termIds.push_back(symir::StmtCopier(funBd, blockBd).CopyTerm(term));
     }
   }
 
@@ -887,7 +632,7 @@ std::vector<symir::BlockBuilder::StmtID> AssToDeadCode::rewrite(
   const auto expr = assStmt->GetExpr();
   auto access = copyAccess(funBd, use);
 
-  symir::BlockBuilder::ExprID exprId = StmtExprReplacer(funBd, blockBd, nullptr).CopyExpr(expr);
+  symir::BlockBuilder::ExprID exprId = symir::StmtCopier(funBd, blockBd).CopyExpr(expr);
 
   int nrBranches = Random::Get().Uniform(this->minBranches, this->maxBranches)();
   int trueBranch = Random::Get().Uniform(0, nrBranches - 1)();

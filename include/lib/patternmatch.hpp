@@ -32,8 +32,13 @@
 namespace patternmatch {
   template<typename Node>
   struct Pattern {
+    Pattern() {  }
     virtual ~Pattern() = default;
     virtual bool match(Node N) const = 0;
+  private:
+    // Avoid any derived pattern being assigned or copied
+    Pattern(const Pattern& obj) {  }
+    Pattern &operator=(const Pattern& tmp_obj) {  }
   };
 
   // ==================== Generic ====================
@@ -420,7 +425,11 @@ SYMIR_TERMOP_LIST(XX)
   };
 
   template<typename Node>
+  /// Pattern matches the passed symir Class `N` based on the Pattern `P` passed
   bool match(Node N, const Pattern<Node> &P) { return P.match(N); }
+
+  /// Create a lambda function that captures the pattern to match e.g. `make_matcher(P)(n)` is equivalent to match(n, P)
+#define make_matcher(Node, P) ([&](Node N) { return patternmatch::match(N, (P)); })
 }
 
 #endif // REIFY_PATTERNMATCH_HPP
