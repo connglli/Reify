@@ -897,38 +897,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     this->builder->SymGoto(g.GetTarget());
   }
 
-  void BlockCopier::Visit(const ScaParam &p) {
-    Panic("BlockCopier should never visit a Param");
-  }
-
-  void BlockCopier::Visit(const VecParam &p) {
-    Panic("BlockCopier should never visit a Param");
-  }
-
-  void BlockCopier::Visit(const StructParam &p) {
-    Panic("BlockCopier should never visit a Param");
-  }
-
-  void BlockCopier::Visit(const UnInitLocal &l) {
-    Panic("BlockCopier should never visit a Locals");
-  }
-
-  void BlockCopier::Visit(const ScaLocal &l) {
-    Panic("BlockCopier should never visit a Locals");
-  }
-
-  void BlockCopier::Visit(const VecLocal &l) {
-    Panic("BlockCopier should never visit a Locals");
-  }
-
-  void BlockCopier::Visit(const StructLocal &l) {
-    Panic("BlockCopier should never visit a Locals");
-  }
-
-  void BlockCopier::Visit(const StructDef &s) {
-    Panic("BlockCopier should never visit a StructDef");
-  }
-
   void BlockCopier::Visit(const Block &b) {
     Assert(this->builder == nullptr, "The BlockCopier already has a builder");
     Assert(this->coefStack.empty(), "The BlockCopier has a non-empty coefficient stack");
@@ -946,8 +914,223 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     }
   }
 
-  void BlockCopier::Visit(const Funct &f) {
-    Panic("BlockCopier should never visit a Function");
+  BlockBuilder::StmtID StmtCopier::CopyStmt(const Stmt *s) {
+    s->Accept(*this);
+    return popStmt();
+  }
+
+  BlockBuilder::TermID StmtCopier::CopyTerm(const Term *t) {
+    t->Accept(*this);
+    return popTerm();
+  }
+
+  BlockBuilder::ExprID StmtCopier::CopyExpr(const Expr* e) {
+    e->Accept(*this);
+    return popExpr();
+  }
+
+  BlockBuilder::CondID StmtCopier::CopyCond(const Cond* c) {
+    c->Accept(*this);
+    return popCond();
+  }
+
+  BlockBuilder::ModExprID StmtCopier::CopyModExpr(const ModExpr *e) {
+    e->Accept(*this);
+    return popModExpr();
+  }
+
+  void StmtCopier::Visit(const VarUse &v) {
+    for (auto &c: v.GetAccess()) {
+      c->Accept(*this);
+    }
+  };
+  void StmtCopier::Visit(const Coef &c) {
+    if (auto coef = this->funBd->FindSymbol(c.GetName()); coef != nullptr) {
+      Assert(
+          typeid(*coef) == typeid(Coef),
+          "Symbol \"%s\" is already defined and is not a coefficient", c.GetName().c_str()
+      );
+      pushCoef(dynamic_cast<Coef *>(coef));
+    } else {
+      Panic("coeff not found in provided function blockBd");
+    }
+  };
+  void StmtCopier::Visit(const Term &t) {
+    t.GetCoef()->Accept(*this);
+    const VarDef *var = nullptr;
+    std::vector<Coef *> access{};
+    if (t.GetOp() != Term::Op::OP_CST) {
+      const auto name = t.GetVar()->GetName();
+      var = this->funBd->FindVar(name);
+      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+      t.GetVar()->Accept(*this);
+      for (size_t i = 0; i < t.GetVar()->GetAccess().size(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
+    }
+    pushTerm(this->blockBd->SymTerm(t.GetOp(), popCoef(), var, access));
+  };
+
+  void StmtCopier::Visit(const Expr &e) {
+    const auto &terms = e.GetTerms();
+    std::vector<TermID> termIds;
+    for (const auto &t: terms) {
+      t->Accept(*this);
+      termIds.push_back(popTerm());
+    }
+    pushExpr(this->blockBd->SymExpr(e.GetOp(), termIds));
+  };
+
+  void StmtCopier::Visit(const ModExpr &e) {
+    std::vector<Coef *> coeffs;
+    for (const auto& c : e.GetCoeffs()) {
+      c->Accept(*this);
+      auto coeff = popCoef();
+      coeffs.push_back(coeff);
+    }
+    std::vector<const VarDef *> variables;
+
+    const VarDef *var = nullptr;
+    std::vector<std::vector<Coef *>> accesses{};
+    for (const auto& use: e.GetVars()) {
+      std::vector<Coef *> access{};
+      const auto name = use->GetName();
+      var = this->funBd->FindVar(name);
+      Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+      use->Accept(*this);
+      for (size_t i = 0; i < use->GetAccess().size(); i++) {
+        access.insert(access.begin(), popCoef());
+      }
+      variables.push_back(var);
+      accesses.push_back(std::vector(access));
+    }
+
+    const std::vector<int> polynomial = e.GetPolynomial();
+    const int mod = e.GetMod();
+
+    pushModExpr(this->blockBd->SymModExpr(
+      coeffs,
+      variables,
+      accesses,
+      polynomial,
+      mod
+    ));
+  };
+  void StmtCopier::Visit(const Cond &c) {
+    c.GetExpr()->Accept(*this);
+    auto exprId = popExpr();
+    pushCond(this->blockBd->SymCond(c.GetOp(), exprId));
+  }
+  void StmtCopier::Visit(const AssStmt &a) {
+    const auto use = a.GetVar();
+    const auto name = use->GetName();
+    const auto var = this->funBd->FindVar(name);
+    Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+
+    use->Accept(*this);
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
+    a.GetExpr()->Accept(*this);
+    auto exprId = popExpr();
+    pushStmt(this->blockBd->SymAssStmt(var, exprId, access));
+  }
+
+  void StmtCopier::Visit(const ModAssStmt &a) {
+    const auto use = a.GetVar();
+    const auto expr = a.GetExpr();
+    const auto name = use->GetName();
+    const auto var = this->funBd->FindVar(name);
+    Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
+
+    use->Accept(*this);
+    expr->Accept(*this);
+    auto modExprId = popModExpr();
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
+    pushStmt(this->blockBd->SymModAssStmt(var, modExprId, access));
+  }
+
+  void StmtCopier::Visit(const IfStmt &i) {
+    const auto conds = i.GetConds();
+    const auto bodies = i.GetBodies();
+
+    std::vector<CondID> cids;
+    cids.resize(conds.size());
+    for (size_t i = 0; i < conds.size(); i++) {
+      conds[i]->Accept(*this);
+      cids[i] = popCond();
+    }
+
+    std::vector<std::vector<StmtID>> sids;
+    sids.resize(bodies.size());
+    for (size_t i = 0; i < bodies.size(); i++) {
+      sids[i].resize(bodies[i].size());
+      for (size_t j = 0; j < bodies[i].size(); j++) {
+        Assert(bodies[i][j]->GetIRId() != SymIR::SIR_TGT_BRA || bodies[i][j]->GetIRId() != SymIR::SIR_TGT_GOTO, "IfStmt contains Goto or Branch");
+        bodies[i][j]->Accept(*this);
+        sids[i][j] = popStmt();
+      }
+    }
+
+    pushStmt(this->blockBd->SymIfStmt(cids, sids));
+  }
+
+  void StmtCopier::Visit(const ForStmt &f) {
+    const VarUse *use = f.GetVar();
+    const Expr *init = f.GetInit();
+    const Expr *increment = f.GetIncrement();
+    const auto cond = f.GetCond();
+    const auto body = f.GetBody();
+
+    use->Accept(*this);
+    std::vector<Coef *> access{};
+    for (size_t i = 0; i < use->GetAccess().size(); i++) {
+      access.insert(access.begin(), popCoef());
+    }
+
+
+    cond->Accept(*this);
+    CondID cid = popCond();
+
+    init->Accept(*this);
+    ExprID initID = popExpr();
+
+    increment->Accept(*this);
+    ExprID incrementID = popExpr();
+
+    std::vector<StmtID> sids;
+    sids.resize(body.size());
+    for (size_t i = 0; i < body.size(); i++) {
+      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
+      body[i]->Accept(*this);
+      sids[i] = popStmt();
+    }
+
+    pushStmt(this->blockBd->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
+  }
+
+  void StmtCopier::Visit(const WhileStmt &w) {
+    const auto cond = w.GetCond();
+    const auto body = w.GetBody();
+
+    cond->Accept(*this);
+    CondID cid = popCond();
+
+    std::vector<StmtID> sids;
+    sids.resize(body.size());
+    for (size_t i = 0; i < body.size(); i++) {
+      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
+      body[i]->Accept(*this);
+      sids[i] = popStmt();
+    }
+
+    pushStmt(this->blockBd->SymWhileStmt(cid, sids));
   }
 
   const StructDef *

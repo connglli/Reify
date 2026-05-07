@@ -1986,21 +1986,80 @@ protected:
     void Visit(const WhileStmt &w) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
-    void Visit(const ScaParam &p) override;
-    void Visit(const VecParam &p) override;
-    void Visit(const StructParam &p) override;
-    void Visit(const UnInitLocal &l) override;
-    void Visit(const ScaLocal &l) override;
-    void Visit(const VecLocal &l) override;
-    void Visit(const StructLocal &l) override;
-    void Visit(const StructDef &s) override;
+    void Visit(const ScaParam &p) override    { Panic("Not a subnode of Block"); }
+    void Visit(const VecParam &p) override    { Panic("Not a subnode of Block"); }
+    void Visit(const StructParam &p) override { Panic("Not a subnode of Block"); }
+    void Visit(const UnInitLocal &l) override { Panic("Not a subnode of Block"); }
+    void Visit(const ScaLocal &l) override    { Panic("Not a subnode of Block"); }
+    void Visit(const VecLocal &l) override    { Panic("Not a subnode of Block"); }
+    void Visit(const StructLocal &l) override { Panic("Not a subnode of Block"); }
+    void Visit(const StructDef &s) override   { Panic("Not a subnode of Block"); }
     void Visit(const Block &b) override;
-    void Visit(const Funct &f) override;
+    void Visit(const Funct &f) override       { Panic("Not a subnode of Block"); }
 
   private:
     FunctBuilder *funBd;
     const Block *src;
     BlockBuilder *builder = nullptr;
+  };
+
+  class StmtCopier : protected SymIRVisitor, public SymIRCopier<void, void> {
+  public :
+    explicit StmtCopier(
+      symir::FunctBuilder *funBd,
+      symir::BlockBuilder *blockBd
+    ) : funBd(funBd), blockBd(blockBd) {}
+
+
+    /// Copies a Stmt inside this blockblock
+    StmtID CopyStmt(const Stmt *s);
+
+    /// Copies a Term inside this block
+    TermID CopyTerm(const Term *t);
+
+    /// Copies a Expr inside this block
+    ExprID CopyExpr(const Expr* e);
+
+    /// Copies a Cond inside this block
+    CondID CopyCond(const Cond* c);
+
+    /// Copies a ModExpr inside this block
+    ModExprID CopyModExpr(const ModExpr *e);
+
+    /// Ugly hack to not use this virtual functions
+    void Copy() override { Panic("Use the specialized functions (CopyStmt, CopyTerm, etc)"); };
+    void CopyAsBuilder() override { Panic("Stmts have no builder class"); };
+
+  protected:
+    void Visit(const VarUse &v) override;
+    void Visit(const Coef &c) override;
+    void Visit(const Term &t) override;
+    void Visit(const Expr &e) override;
+    void Visit(const ModExpr &e) override;
+    void Visit(const Cond &c) override;
+    void Visit(const AssStmt &a) override;
+    void Visit(const ModAssStmt &a) override;
+    void Visit(const IfStmt &i) override;
+    void Visit(const ForStmt &f) override;
+    void Visit(const WhileStmt &w) override;
+    void Visit(const RetStmt &r) override     { Panic("Not a valid Stmt to be copied"); }
+    void Visit(const Branch &b) override      { Panic("Not a valid Stmt to be copied"); }
+    void Visit(const Goto &g) override        { Panic("Not a valid Stmt to be copied"); }
+    void Visit(const ScaParam &p) override    { Panic("Not a valid Stmt to be copied"); }
+    void Visit(const VecParam &p) override    { Panic("Not a subnode of a Stmt"); }
+    void Visit(const StructParam &p) override { Panic("Not a subnode of a Stmt"); }
+    void Visit(const UnInitLocal &l) override { Panic("Not a subnode of a Stmt"); }
+    void Visit(const ScaLocal &l) override    { Panic("Not a subnode of a Stmt"); }
+    void Visit(const VecLocal &l) override    { Panic("Not a subnode of a Stmt"); }
+    void Visit(const StructLocal &l) override { Panic("Not a subnode of a Stmt"); }
+    void Visit(const StructDef &s) override   { Panic("Not a subnode of a Stmt"); }
+    void Visit(const Block &b) override       { Panic("Not a subnode of a Stmt"); }
+    void Visit(const Funct &f) override       { Panic("Not a subnode of a Stmt"); }
+
+
+  protected:
+    symir::FunctBuilder *funBd;
+    symir::BlockBuilder *blockBd;
   };
   
   /// Builder to facilitate building a function
