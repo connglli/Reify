@@ -42,7 +42,7 @@ public:
   StmtID CopyStmtWithReplacement(
     const symir::Stmt *s, 
     std::function<bool(const Node *)> matchFunction,
-    std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
+    std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
     double randThreshold = 1,
     size_t replaceMax = 1
   );
@@ -63,7 +63,7 @@ private:
 
 private:
   std::function<bool(const Node *)> matchFunction;
-  std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
+  std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
   std::function<double()> randUniform;
   void *data = nullptr;
   double randThreshold = 1;
@@ -75,7 +75,6 @@ struct Rule {
   Rule(std::string locPrefix = "tmp") : locPrefix(locPrefix) {}
   virtual ~Rule() = default;
   virtual bool match(const symir::Stmt *stmt) const = 0;
-  virtual double applyProbability(const symir::Stmt *stmt) const = 0;
   virtual std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
@@ -129,11 +128,19 @@ protected:
   std::vector<int> weights{};
 };
 
-/// ==================== Various Rule Definition ====================
-struct VariableInjection : Rule {
-  VariableInjection() : Rule("vj") {}
+// ==================== Various Rule Definition ====================
+
+// Notation:
+// C1, C2, ... := constants/Literals
+// E1, E2, ... := (Sub)Expression
+// S1, S2, ... := statement (e.g. Assign, For, While or if)
+// B1, B2, ... := Conditional Stmt
+// {A, ..., Z, a, ..., z} Variables
+
+/// E1 + C1 + E2 => cpk = C1; E1 + cpk + E2
+struct ConstProba : Rule {
+  ConstProba() : Rule("cp") {}
   bool match(const symir::Stmt *stmt) const override;
-  double applyProbability(const symir::Stmt *stmt) const override;
   std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
@@ -141,9 +148,10 @@ struct VariableInjection : Rule {
   ) override;
 };
 
+/// E1 + C1 + E2 => E1 + C2 + C3 +E2
+/// where C2 + C3 = C1
 struct ConstToAdd : Rule {
   bool match(const symir::Stmt *stmt) const override;
-  double applyProbability(const symir::Stmt *stmt) const override;
   std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
@@ -151,10 +159,11 @@ struct ConstToAdd : Rule {
   ) override;
 };
 
+/// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; }, 
+/// where C3 * C4 + C2 = C1
 struct ConstToForSum: Rule {
   ConstToForSum() : Rule("i") {}
   bool match(const symir::Stmt *stmt) const override;
-  double applyProbability(const symir::Stmt *stmt) const override;
   std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
@@ -162,13 +171,14 @@ struct ConstToForSum: Rule {
   ) override;
 };
 
+/// x = E1 => if (B1) { x = E2 } else if (B2) { x = E3 } ... else { x = E`n` }
+/// where exactly one or no B1 evaluates to true, if one does evaluate true the corresponding branch contains x = E1, if non are true then the else branch contains x = E1
 struct AssToDeadCode: Rule {
   AssToDeadCode(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
     minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
     Assert(minBranches >= 2, "AssToDeadCode must have atleast 2 branches");
   }
   bool match(const symir::Stmt *stmt) const override;
-  double applyProbability(const symir::Stmt *stmt) const override;
   std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
