@@ -178,7 +178,7 @@ public:
     );
 
     auto revopt = RewriteEngine();
-    revopt.addRule(std::make_unique<VariableInjection>(), 3);
+    revopt.addRule(std::make_unique<ConstProba>(), 3);
     revopt.addRule(std::make_unique<ConstToAdd>(), 3);
     revopt.addRule(std::make_unique<ConstToForSum>(), 2);
     revopt.addRule(std::make_unique<AssToDeadCode>(), 1);

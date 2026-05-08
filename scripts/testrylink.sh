@@ -4,6 +4,9 @@ set -e
 
 dir=$1
 
+make clean
+make -j 8
+
 # small 1 thread fuzzing that terminates on any error (other than hangs) useful for debugging rylink.
 # Iterates over seeds for easy reproduce
 for i in {0..1024}; do

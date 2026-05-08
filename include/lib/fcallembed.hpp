@@ -192,7 +192,7 @@ private:
 class RevOptFCallStrategy : public FCallStrategy {
 public:
   explicit RevOptFCallStrategy(std::unique_ptr<GuardStrategy> guardGen) : guardGen(std::move(guardGen)) {
-    this->rewriteEngine.addRule(std::make_unique<VariableInjection>(), 3);
+    this->rewriteEngine.addRule(std::make_unique<ConstProba>(), 3);
     this->rewriteEngine.addRule(std::make_unique<ConstToAdd>(), 4);
     this->rewriteEngine.addRule(std::make_unique<ConstToForSum>(), 2);
     this->rewriteEngine.addRule(std::make_unique<AssToDeadCode>(), 1);
