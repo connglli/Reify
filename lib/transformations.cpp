@@ -334,7 +334,7 @@ std::optional<Rule *> RewriteEngine::getRandomMatchingRule(const symir::Stmt *st
   return this->rules[matchingRules[index]].get();
 }
 
-bool VariableInjection::match(const symir::Stmt *stmt) const {
+bool ConstProba::match(const symir::Stmt *stmt) const {
   bool assMatch = patternmatch::match(
     stmt,
     m_AssStmt(
@@ -380,22 +380,12 @@ bool VariableInjection::match(const symir::Stmt *stmt) const {
   return ifMatch;
 }
 
-double VariableInjection::applyProbability(const symir::Stmt *stmt) const {
-  switch (stmt->GetIRId()) {
-  case symir::SymIR::SIR_STMT_ASS: return 0.05;
-  case symir::SymIR::SIR_STMT_FOR: return 0.8;
-  case symir::SymIR::SIR_STMT_IF: return 0.8;
-  case symir::SymIR::SIR_STMT_WHILE: return 0.8;
-  default: Panic("No other stmts should appear here");
-  }
-}
-
-std::vector<symir::BlockBuilder::StmtID> VariableInjection::rewrite(
+std::vector<symir::BlockBuilder::StmtID> ConstProba::rewrite(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::Stmt *stmt
 ) {
-  Log::Get().Out() << "Running VariableInjection" << std::endl;
+  Log::Get().Out() << "Running ConstProba" << std::endl;
 
   StmtReplacer rep = StmtReplacer<symir::Term>(funBd, blockBd);
   const symir::VarDef *var = this->getNewLocal(funBd);
@@ -431,17 +421,50 @@ std::vector<symir::BlockBuilder::StmtID> VariableInjection::rewrite(
 
 
 bool ConstToAdd::match(const symir::Stmt *stmt) const {
-  return patternmatch::match(
-      stmt,
-      m_AssStmt(
-        m_WildCard<const symir::VarUse *>(),
-        m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))
-    );
-  // TODO also do For/While and If
-}
+  bool assMatch = patternmatch::match(
+    stmt,
+    m_AssStmt(
+      m_WildCard<const symir::VarUse *>(),
+      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))
+    )
+  );
+  if (assMatch) return true;
 
-double ConstToAdd::applyProbability(const symir::Stmt *stmt) const {
-  return 0.7;
+  // for each of these we are only checking inside the first list of substmts
+  bool whileMatch = patternmatch::match(
+    stmt,
+    m_WhileStmt(
+      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+    )
+  );
+  if (whileMatch) return true;
+
+  bool forMatch = patternmatch::match(
+    stmt,
+    m_ForStmt(
+      m_WildCard<const symir::VarUse *>(),
+      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
+      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
+      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+    )
+  );
+  if (forMatch) return true;
+
+  bool ifMatch = patternmatch::match(
+    stmt,
+    m_IfStmt(
+      m_Any(m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))),
+      m_Any<std::vector<const symir::Stmt *>>(
+        m_Any(
+          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))
+        )
+      )
+    )
+  );
+  return ifMatch;
+
 }
 
 std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
@@ -451,53 +474,63 @@ std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
 ) {
   Log::Get().Out() << "Running ConstToAdd" << std::endl;
 
-  const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
-  const auto use = assStmt->GetVar();
-  const auto def = use->GetDef();
-  const auto expr = assStmt->GetExpr();
+  StmtReplacer rep = StmtReplacer<symir::Expr>(funBd, blockBd);
+  const symir::VarDef *var = this->getNewLocal(funBd);
+  std::function<symir::BlockBuilder::ExprID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
+    varInsertFun =
+      [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
+        std::vector<symir::BlockBuilder::TermID> termIds;
+        termIds.reserve(e.GetTerms().size() + 1);
+        bool has_transformed = false;
+        for (const auto &term : e.GetTerms()) {
+          if (!has_transformed && term->GetOp() == symir::Term::OP_CST && term->GetCoef()->IsSolved()) {
+            has_transformed = true;
+            *data = term->GetCoef();
+            int target = term->GetCoef()->GetI32Value();
+            int v1, v2;
+            if (target > 0) {
+              v1 = Random::Get().Uniform(0, target)();
+              v2 = target - v1;
+            } else if (target < 0){
+              v1 = Random::Get().Uniform(INT_MIN, target)();
+              v2 = target - v1;
+            } else {
+              // if target == 0 we can choose any positive int and build (x - x)
+              v1 = Random::Get().Uniform(0, INT_MAX)();
+              v2 = -v1;
+            }
+            if (e.GetOp() == symir::Expr::OP_SUB) v2 = -v2;
 
-  auto access = copyAccess(funBd, use);
+            termIds.push_back(blockBd->SymTerm(
+              symir::Term::OP_CST,
+              funBd->SymI32Const(v1),
+              nullptr, {})
+            );
+            termIds.push_back(blockBd->SymTerm(
+              symir::Term::OP_CST,
+              funBd->SymI32Const(v2),
+              nullptr, {})
+            );
+          } else {
+            termIds.push_back(symir::StmtCopier(funBd, blockBd).CopyTerm(term));
+          }
+        }
 
-  std::vector<symir::BlockBuilder::TermID> termIds;
-  termIds.reserve(expr->GetTerms().size() + 1);
-  bool has_transformed = false;
-  for (const auto &term : expr->GetTerms()) {
-    if (!has_transformed && term->GetOp() == symir::Term::OP_CST && term->GetCoef()->IsSolved()) {
-      has_transformed = true;
-      int target = term->GetCoef()->GetI32Value();
-      int v1, v2;
-      if (target > 0) {
-        v1 = Random::Get().Uniform(0, target)();
-        v2 = target - v1;
-      } else if (target < 0){
-        v1 = Random::Get().Uniform(INT_MIN, target)();
-        v2 = target - v1;
-      } else {
-        // if target == 0 we can choose any positive int and build (x - x)
-        v1 = Random::Get().Uniform(0, INT_MAX)();
-        v2 = -v1;
-      }
-      if (expr->GetOp() == symir::Expr::OP_SUB) v2 = -v2;
+      return blockBd->SymExpr(e.GetOp(), termIds);
+    };
+  symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    stmt,
+    make_matcher(const symir::Expr *, m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
+    varInsertFun,
+    0.25
+  );
+  symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+  Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
+  Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
 
-      Log::Get().Out() << "Replacing Const " << target << " with "
-                       << v1 << " " << expr->GetOpSym(expr->GetOp()) << " " << v2 << std::endl;
+  Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with addition" << std::endl;
 
-      termIds.push_back(blockBd->SymTerm(
-        symir::Term::OP_CST,
-        funBd->SymI32Const(v1),
-        nullptr, {})
-      );
-      termIds.push_back(blockBd->SymTerm(
-        symir::Term::OP_CST,
-        funBd->SymI32Const(v2),
-        nullptr, {})
-      );
-    } else {
-      termIds.push_back(symir::StmtCopier(funBd, blockBd).CopyTerm(term));
-    }
-  }
-
-  return { blockBd->SymAssStmt(def, blockBd->SymExpr(expr->GetOp(), termIds), access) };
+  return {newStmt};
 }
 
 bool ConstToForSum::match(const symir::Stmt *stmt) const {
@@ -508,10 +541,6 @@ bool ConstToForSum::match(const symir::Stmt *stmt) const {
         m_Expr(m_One(m_TermCst(m_Solved(), m_NoVar())))
       )
     );
-}
-
-double ConstToForSum::applyProbability(const symir::Stmt *stmt) const {
-  return 0.35;
 }
 
 std::vector<symir::BlockBuilder::StmtID> ConstToForSum::rewrite(
@@ -613,10 +642,6 @@ std::vector<symir::BlockBuilder::StmtID> ConstToForSum::rewrite(
 
 bool AssToDeadCode::match(const symir::Stmt *stmt) const {
   return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse *>(), m_WildCard<const symir::Expr *>()));
-}
-
-double AssToDeadCode::applyProbability(const symir::Stmt *stmt) const {
-  return 0.25;
 }
 
 std::vector<symir::BlockBuilder::StmtID> AssToDeadCode::rewrite(
