@@ -43,9 +43,111 @@ namespace patternmatch {
 
   // ==================== Generic ====================
 
+  template<typename Node, typename Comparable>
+  struct m_Eq: Pattern<Node> {
+    m_Eq(Comparable val) : val(val) {}
+    inline bool match(Node n) const override {
+      return n == val;
+    }
+    Comparable val;
+  };
+
+  template<typename Node, typename Comparable>
+  struct m_Lt: Pattern<Node> {
+    m_Lt(Comparable val) : val(val) {}
+    inline bool match(Node n) const override {
+      return n < val;
+    }
+    Comparable val;
+  };
+
+  template<typename Node, typename Comparable>
+  struct m_Lte: Pattern<Node> {
+    m_Lte(Comparable val) : val(val) {}
+    inline bool match(Node n) const override {
+      return n <= val;
+    }
+    Comparable val;
+  };
+
+  template<typename Node, typename Comparable>
+  struct m_Gt: Pattern<Node> {
+    m_Gt(Comparable val) : val(val) {}
+    inline bool match(Node n) const override {
+      return n > val;
+    }
+    Comparable val;
+  };
+
+  template<typename Node, typename Comparable>
+  struct m_Gte: Pattern<Node> {
+    m_Gte(Comparable val) : val(val) {}
+    inline bool match(Node n) const override {
+      return n >= val;
+    }
+    Comparable val;
+  };
+
+  template<typename Node, typename Comparable>
+  struct m_Range: Pattern<Node> {
+    m_Range(Comparable low, Comparable upp) : low(low), upp(upp) {}
+    inline bool match(Node n) const override {
+      return low <= n && n <= upp;
+    }
+    Comparable low;
+    Comparable upp;
+  };
+
+  template<typename Node>
+  struct m_And : Pattern<Node> {
+    m_And(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
+    inline bool match(Node n) const override {
+      return N1.match(n) && N2.match(n);
+    }
+    const Pattern<Node> &N1;
+    const Pattern<Node> &N2;
+  };
+
+
+  template<typename Node>
+  struct m_Or : Pattern<Node> {
+    m_Or(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
+    inline bool match(Node n) const override {
+      return N1.match(n) || N2.match(n);
+    }
+    const Pattern<Node> &N1;
+    const Pattern<Node> &N2;
+  };
+
+  template<typename Node>
+  struct m_Xor : Pattern<Node> {
+    m_Xor(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
+    inline bool match(Node n) const override {
+      bool a = N1.match(n);
+      bool b = N2.match(n);
+      return (a || b) && !(a && b);
+    }
+    const Pattern<Node> &N1;
+    const Pattern<Node> &N2;
+  };
+
+  template<typename Node>
+  struct m_Not : Pattern<Node> {
+    m_Not(const Pattern<Node> &N) : N(N) {}
+    inline bool match(Node n) const override {
+      return !N.match(n);
+    }
+    const Pattern<Node> &N;
+  };
+
   template<typename Node>
   struct m_WildCard : Pattern<Node> {
     inline bool match(Node N) const override { return true; }
+  };
+
+  template<typename Node>
+  struct m_NoMatch : Pattern<Node> {
+    inline bool match(Node N) const override { return false; }
   };
 
   // ==================== Generic: Vectors ====================
@@ -168,6 +270,63 @@ namespace patternmatch {
 
   // ==================== Stmt ====================
 
+  struct m_AnyStmt : Pattern<const symir::Stmt *> {
+    m_AnyStmt(
+      const Pattern<const symir::VarUse *> &V,
+      const Pattern<std::vector<const symir::VarUse *>> &Vs,
+      const Pattern<const symir::Expr *> &E,
+      const Pattern<const symir::Cond *> &C,
+      const Pattern<std::vector<const symir::Cond *>> &Cs,
+      const Pattern<const symir::ModExpr *> &M,
+      const Pattern<std::vector<const symir::Stmt *>> &B,
+      const Pattern<std::vector<std::vector<const symir::Stmt *>>> &Bs
+    ) : V(V), Vs(Vs), E(E), C(C), Cs(Cs), M(M), B(B), Bs(Bs) {};
+
+    inline bool match(const symir::Stmt *s) const override {
+      switch (s->GetIRId()) {
+      case symir::SymIR::SIR_STMT_ASS: {
+        const symir::AssStmt *a = static_cast<const symir::AssStmt *>(s);
+        return V.match(a->GetVar()) && E.match(a->GetExpr());
+      } break;
+      case symir::SymIR::SIR_STMT_FOR: {
+        const symir::ForStmt *f = static_cast<const symir::ForStmt *>(s);
+        return V.match(f->GetVar())
+            && E.match(f->GetInit())
+            && C.match(f->GetCond())
+            && E.match(f->GetIncrement())
+            && B.match(f->GetBody());
+      } break;
+      case symir::SymIR::SIR_STMT_WHILE: {
+        const symir::WhileStmt *w = static_cast<const symir::WhileStmt *>(s);
+        return C.match(w->GetCond()) && B.match(w->GetBody());
+      } break;
+      case symir::SymIR::SIR_STMT_IF: {
+        const symir::IfStmt *i = static_cast<const symir::IfStmt *>(s);
+        return Cs.match(i->GetConds()) && Bs.match(i->GetBodies());
+      } break;
+      case symir::SymIR::SIR_STMT_MODASS: {
+        const symir::ModAssStmt *a = static_cast<const symir::ModAssStmt *>(s);
+        return V.match(a->GetVar()) && M.match(a->GetExpr());
+      } break;
+      case symir::SymIR::SIR_STMT_RET: {
+        const symir::RetStmt *r = static_cast<const symir::RetStmt *>(s);
+        return Vs.match(r->GetVars());
+      } break;
+      default : Panic("Unhandled Stmt inside pattern matching");
+      }
+    }
+
+    const Pattern<const symir::VarUse *> &V;
+    const Pattern<std::vector<const symir::VarUse *>> &Vs;
+    const Pattern<const symir::Expr *> &E;
+    const Pattern<const symir::Cond *> &C;
+    const Pattern<std::vector<const symir::Cond *>> &Cs;
+    const Pattern<const symir::ModExpr *> &M;
+    const Pattern<std::vector<const symir::Stmt *>> &B;
+    const Pattern<std::vector<std::vector<const symir::Stmt *>>> &Bs;
+  };
+
+
   struct m_AssStmt : Pattern<const symir::Stmt *> {
     m_AssStmt(const Pattern<const symir::VarUse *> &V, const Pattern<const symir::Expr *> &E) : V(V), E(E) {}
     inline bool match(const symir::Stmt *s) const override {
@@ -285,8 +444,8 @@ namespace patternmatch {
   // ==================== Cond ====================
 
 #define XX(val, capt, smal, sym)                                                   \
-  struct m_Cond##capt : Pattern<const symir::Cond *> {                             \
-    m_Cond##capt(const Pattern<const symir::Expr *> &E) : E(E) {}                  \
+  struct m_##capt##Cond : Pattern<const symir::Cond *> {                             \
+    m_##capt##Cond(const Pattern<const symir::Expr *> &E) : E(E) {}                  \
     inline bool match(const symir::Cond *c) const override {                       \
       return c->GetOp() == symir::Cond::OP_##val && E.match(c->GetExpr());  \
     }                                                                              \
@@ -326,8 +485,8 @@ SYMIR_CONDOP_LIST(XX)
   // ==================== Expr ====================
 
 #define XX(val, capt, smal, sym)                                                   \
-  struct m_Expr##capt : Pattern<const symir::Expr *> {                             \
-    m_Expr##capt(const Pattern<std::vector<const symir::Term *>> &Ts) : Ts(Ts) {}  \
+  struct m_##capt##Expr : Pattern<const symir::Expr *> {                             \
+    m_##capt##Expr(const Pattern<std::vector<const symir::Term *>> &Ts) : Ts(Ts) {}  \
     inline bool match(const symir::Expr *e) const override {                       \
       return e->GetOp() == symir::Expr::OP_##val && Ts.match(e->GetTerms());       \
     }                                                                              \
@@ -347,8 +506,8 @@ SYMIR_EXPROP_LIST(XX)
   // ==================== Term ====================
 
 #define XX(val, capt, smal, sym)                                                                     \
-  struct m_Term##capt : Pattern<const symir::Term *> {                                                 \
-    m_Term##capt(const Pattern<const symir::Coef *> &C, const Pattern<const symir::VarUse *> &V) : C(C), V(V) {}      \
+  struct m_##capt##Term : Pattern<const symir::Term *> {                                                 \
+    m_##capt##Term(const Pattern<const symir::Coef *> &C, const Pattern<const symir::VarUse *> &V) : C(C), V(V) {}      \
     inline bool match(const symir::Term *t) const override {                                                      \
       return t->GetOp() == symir::Term::OP_##val && C.match(t->GetCoef()) && V.match(t->GetVar()); \
     }                                                                                                \
@@ -375,12 +534,61 @@ SYMIR_TERMOP_LIST(XX)
     }
   };
 
-  struct m_Specific : Pattern<const symir::Coef *> {
-    m_Specific(int32_t val) : val(val) {}
+  template<>
+  struct m_Eq<const symir::Coef *, int32_t> : Pattern<const symir::Coef *> {
+    m_Eq(int32_t val) : val(val) {}
     inline bool match(const symir::Coef *c) const override {
       return c->IsSolved() && c->GetI32Value() == val;
     }
     int32_t val;
+  };
+
+  template<>
+  struct m_Lt<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+    m_Lt(int32_t val) : val(val) {}
+    inline bool match(const symir::Coef * c) const override {
+      return c->IsSolved() && c->GetI32Value() < val;
+    }
+    int32_t val;
+  };
+
+  template<>
+  struct m_Lte<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+    m_Lte(int32_t val) : val(val) {}
+    inline bool match(const symir::Coef * c) const override {
+      return c->IsSolved() && c->GetI32Value() <= val;
+    }
+    int32_t val;
+  };
+
+  template<>
+  struct m_Gt<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+    m_Gt(int32_t val) : val(val) {}
+    inline bool match(const symir::Coef * c) const override {
+      return c->IsSolved() && c->GetI32Value() > val;
+    }
+    int32_t val;
+  };
+
+  template<>
+  struct m_Gte<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+    m_Gte(int32_t val) : val(val) {}
+    inline bool match(const symir::Coef * c) const override {
+      return c->IsSolved() && c->GetI32Value() >= val;
+    }
+    int32_t val;
+  };
+
+  template<>
+  struct m_Range<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+    m_Range(int32_t low, int32_t upp) : low(low), upp(upp) {}
+    inline bool match(const symir::Coef *c) const override {
+      if (!c->IsSolved()) return false;
+      int32_t n = c->GetI32Value();
+      return low <= n && n <= upp;
+    }
+    int32_t low;
+    int32_t upp;
   };
 
   // ==================== VarUse ====================
