@@ -42,6 +42,8 @@ namespace patternmatch {
     Pattern &operator=(const Pattern& tmp_obj) {  }
   };
 
+
+
   // ==================== Generic ====================
 
   template<typename Node, typename Comparable>
@@ -241,6 +243,18 @@ namespace patternmatch {
     const Pattern<Node> &N3;
   };
 
+  template<typename Node>
+  struct m_Four : Pattern<std::vector<Node>> {
+    m_Four(const Pattern<Node> &N1, const Pattern<Node> &N2,const Pattern<Node> &N3, const Pattern<Node> &N4) : N1(N1), N2(N2), N3(N3), N4(N4) {}
+    inline bool match(std::vector<Node> Vs) const override {
+      return Vs.size() == 4 && N1.match(Vs[0]) && N2.match(Vs[1]) && N3.match(Vs[2]);
+    }
+    const Pattern<Node> &N1;
+    const Pattern<Node> &N2;
+    const Pattern<Node> &N3;
+    const Pattern<Node> &N4;
+  };
+
   template<typename Node, size_t N>
   struct m_AnyNSeq: Pattern<std::vector<Node>> {
     template<typename... Args>
@@ -289,6 +303,19 @@ namespace patternmatch {
   };
 
   template<typename Node>
+  struct m_AnyFourSeq : Pattern<std::vector<Node>> {
+    m_AnyFourSeq(const Pattern<Node> &N1, const Pattern<Node> &N2, const Pattern<Node> &N3, const Pattern<Node> &N4) : N1(N1), N2(N2), N3(N3), N4(N4) {}
+    inline bool match(std::vector<Node> Vs) const override {
+      for (size_t i = 0; i < Vs.size() - 2; i++) {
+        if (N1.match(Vs[i]) && N2.match(Vs[i + 1]) && N3.match(Vs[i + 2]) ) return true;
+      }
+      return false;
+    }
+    const Pattern<Node> &N1;
+    const Pattern<Node> &N2;
+    const Pattern<Node> &N3;
+    const Pattern<Node> &N4;
+  };
 
   // ==================== Funct ====================
 
@@ -381,7 +408,6 @@ namespace patternmatch {
     const Pattern<std::vector<const symir::Stmt *>> &B;
     const Pattern<std::vector<std::vector<const symir::Stmt *>>> &Bs;
   };
-
 
   struct m_AssStmt : Pattern<const symir::Stmt *> {
     m_AssStmt(const Pattern<const symir::VarUse *> &V, const Pattern<const symir::Expr *> &E) : V(V), E(E) {}
@@ -651,6 +677,10 @@ SYMIR_TERMOP_LIST(XX)
 
   struct m_NoVar : Pattern<const symir::VarUse *> {
     inline bool match(const symir::VarUse *v) const override { return v == nullptr; }
+  };
+
+  struct m_AnyVar : Pattern<const symir::VarUse *> {
+    inline bool match(const symir::VarUse *v) const override { return v != nullptr; }
   };
 
   struct m_WithName : Pattern<const symir::VarUse *> {
