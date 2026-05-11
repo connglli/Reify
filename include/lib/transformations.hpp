@@ -137,6 +137,8 @@ protected:
 // B1, B2, ... := Conditional Stmt
 // {A, ..., Z, a, ..., z} Variables
 
+// ======== Primitive creating rules ========
+
 /// E1 + C1 + E2 => cpk = C1; E1 + cpk + E2
 struct ConstProba : Rule {
   ConstProba() : Rule("cp") {}
@@ -150,7 +152,7 @@ struct ConstProba : Rule {
 
 /// E1 + C1 + E2 => E1 + C2 + C3 +E2
 /// where C2 + C3 = C1
-struct ConstToAdd : Rule {
+struct AdditionFromConst : Rule {
   bool match(const symir::Stmt *stmt) const override;
   std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
@@ -161,8 +163,8 @@ struct ConstToAdd : Rule {
 
 /// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; }, 
 /// where C3 * C4 + C2 = C1
-struct ConstToForSum: Rule {
-  ConstToForSum() : Rule("i") {}
+struct ForSumFromConst: Rule {
+  ForSumFromConst() : Rule("i") {}
   bool match(const symir::Stmt *stmt) const override;
   std::vector<symir::BlockBuilder::StmtID> rewrite(
     symir::FunctBuilder *funBd,
@@ -173,8 +175,8 @@ struct ConstToForSum: Rule {
 
 /// x = E1 => if (B1) { x = E2 } else if (B2) { x = E3 } ... else { x = E`n` }
 /// where exactly one or no B1 evaluates to true, if one does evaluate true the corresponding branch contains x = E1, if non are true then the else branch contains x = E1
-struct AssToDeadCode: Rule {
-  AssToDeadCode(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
+struct DeadCodeFromAssign: Rule {
+  DeadCodeFromAssign(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
     minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
     Assert(minBranches >= 2, "AssToDeadCode must have atleast 2 branches");
   }
