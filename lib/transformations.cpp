@@ -339,7 +339,7 @@ bool ConstProba::match(const symir::Stmt *stmt) const {
     stmt,
     m_AssStmt(
       m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))
+      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))
     )
   );
   if (assMatch) return true;
@@ -348,8 +348,8 @@ bool ConstProba::match(const symir::Stmt *stmt) const {
   bool whileMatch = patternmatch::match(
     stmt,
     m_WhileStmt(
-      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
     )
   );
   if (whileMatch) return true;
@@ -358,10 +358,10 @@ bool ConstProba::match(const symir::Stmt *stmt) const {
     stmt,
     m_ForStmt(
       m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
-      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
-      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
+      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
+      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
     )
   );
   if (forMatch) return true;
@@ -369,10 +369,10 @@ bool ConstProba::match(const symir::Stmt *stmt) const {
   bool ifMatch = patternmatch::match(
     stmt,
     m_IfStmt(
-      m_Any(m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))),
+      m_Any(m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))),
       m_Any<std::vector<const symir::Stmt *>>(
         m_Any(
-          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))
+          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))
         )
       )
     )
@@ -398,7 +398,7 @@ std::vector<symir::BlockBuilder::StmtID> ConstProba::rewrite(
 
   symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
     stmt,
-    make_matcher(const symir::Term *, m_TermCst(m_Solved(), m_NoVar())),
+    make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
     varInsertFun,
     0.25
   );
@@ -425,7 +425,7 @@ bool ConstToAdd::match(const symir::Stmt *stmt) const {
     stmt,
     m_AssStmt(
       m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))
+      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))
     )
   );
   if (assMatch) return true;
@@ -434,8 +434,8 @@ bool ConstToAdd::match(const symir::Stmt *stmt) const {
   bool whileMatch = patternmatch::match(
     stmt,
     m_WhileStmt(
-      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
     )
   );
   if (whileMatch) return true;
@@ -444,10 +444,10 @@ bool ConstToAdd::match(const symir::Stmt *stmt) const {
     stmt,
     m_ForStmt(
       m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
-      m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
-      m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))))
+      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
+      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
+      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
+      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
     )
   );
   if (forMatch) return true;
@@ -455,10 +455,10 @@ bool ConstToAdd::match(const symir::Stmt *stmt) const {
   bool ifMatch = patternmatch::match(
     stmt,
     m_IfStmt(
-      m_Any(m_Cond(m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))),
+      m_Any(m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))),
       m_Any<std::vector<const symir::Stmt *>>(
         m_Any(
-          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar()))))
+          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))
         )
       )
     )
@@ -481,24 +481,23 @@ std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
       [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
         std::vector<symir::BlockBuilder::TermID> termIds;
         termIds.reserve(e.GetTerms().size() + 1);
-        bool has_transformed = false;
-        for (const auto &term : e.GetTerms()) {
-          if (!has_transformed && term->GetOp() == symir::Term::OP_CST && term->GetCoef()->IsSolved()) {
-            has_transformed = true;
+        bool hasReplaced = false;
+        for (auto term : e.GetTerms()) {
+          if (!hasReplaced && term->GetOp() == symir::Term::OP_CST) {
+            hasReplaced = true;
             *data = term->GetCoef();
             int target = term->GetCoef()->GetI32Value();
+            // v1 must be choosen s.t. |v1| < |target| and sign(v1) == sign(target)
+            // this ensures a UB free transformation since:
+            // if Sk is the prefix sum up to the target Term then
+            // |Sk op v1| < |Sk op target| and since Sk op target does not overflow neither does |Sk op v1|
             int v1, v2;
-            if (target > 0) {
+            if (target >= 0) {
               v1 = Random::Get().Uniform(0, target)();
-              v2 = target - v1;
-            } else if (target < 0){
-              v1 = Random::Get().Uniform(INT_MIN, target)();
-              v2 = target - v1;
             } else {
-              // if target == 0 we can choose any positive int and build (x - x)
-              v1 = Random::Get().Uniform(0, INT_MAX)();
-              v2 = -v1;
+              v1 = Random::Get().Uniform(target, -1)();
             }
+            v2 = target - v1;
             if (e.GetOp() == symir::Expr::OP_SUB) v2 = -v2;
 
             termIds.push_back(blockBd->SymTerm(
@@ -520,7 +519,7 @@ std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
     };
   symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
     stmt,
-    make_matcher(const symir::Expr *, m_Expr(m_Any(m_TermCst(m_Solved(), m_NoVar())))),
+    make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
     varInsertFun,
     0.25
   );
@@ -538,7 +537,8 @@ bool ConstToForSum::match(const symir::Stmt *stmt) const {
       stmt,
       m_AssStmt(
         m_WildCard<const symir::VarUse *>(),
-        m_Expr(m_One(m_TermCst(m_Solved(), m_NoVar())))
+        m_Expr(m_NMany<const symir::Term *, 1>(m_CstTerm(m_Solved(), m_NoVar())))
+        //m_Expr(m_One(m_CstTerm(m_Solved(), m_NoVar())))
       )
     );
 }

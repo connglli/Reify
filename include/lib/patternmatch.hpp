@@ -28,6 +28,7 @@
 
 #include "lib/lang.hpp"
 #include <string>
+#include <utility>
 
 namespace patternmatch {
   template<typename Node>
@@ -178,6 +179,39 @@ namespace patternmatch {
   };
 
   template<typename Node>
+    struct m_FirstN : Pattern<std::vector<Node>> {
+      m_FirstN(size_t N, const Pattern<Node> &P) : N(N), P(P) {}
+
+      inline bool match(std::vector<Node> Vs) const override {
+        if (Vs.size() < N) return false;
+        bool matchFound = true;
+        for (size_t i = 0; i < N; i++) {
+          matchFound &= P.match(Vs[i]);
+        }
+        return matchFound;
+      }
+
+      size_t N;
+      const Pattern<Node> &P;
+    };
+
+  template<typename Node, size_t N>
+  struct m_NMany: Pattern<std::vector<Node>> {
+    template<typename... Args>
+    m_NMany(const Args&... args) : patterns{args...} {}
+
+    inline bool match(std::vector<Node> Vs) const override {
+      if (Vs.size() != N) return false;
+
+      for (size_t i = 0; i < N; i++) {
+        if (!patterns[i].get().match(Vs[i])) return false;
+      }
+      return true;
+    }
+    std::array<std::reference_wrapper<const Pattern<Node>>, N> patterns;
+  };
+
+  template<typename Node>
   struct m_One : Pattern<std::vector<Node>> {
     m_One(const Pattern<Node> &N) : N(N) {}
     inline bool match(std::vector<Node> Vs) const override {
@@ -200,16 +234,36 @@ namespace patternmatch {
   struct m_Three : Pattern<std::vector<Node>> {
     m_Three(const Pattern<Node> &N1, const Pattern<Node> &N2,const Pattern<Node> &N3) : N1(N1), N2(N2), N3(N3) {}
     inline bool match(std::vector<Node> Vs) const override {
-      return Vs.size() == 2 && N1.match(Vs[0]) && N2.match(Vs[1]) && N3.match(Vs[2]);
+      return Vs.size() == 3 && N1.match(Vs[0]) && N2.match(Vs[1]) && N3.match(Vs[2]);
     }
     const Pattern<Node> &N1;
     const Pattern<Node> &N2;
     const Pattern<Node> &N3;
   };
 
+  template<typename Node, size_t N>
+  struct m_AnyNSeq: Pattern<std::vector<Node>> {
+    template<typename... Args>
+    m_AnyNSeq(const Args&... args) : patterns{args...} {}
+
+    inline bool match(std::vector<Node> Vs) const override {
+      if (Vs.size() < N) return false;
+      for (size_t i = 0; i < Vs.size() - N; i++) {
+        bool matchFound = true;
+        for (size_t j = 0; j < N; j++) {
+          matchFound &= patterns[j].get().match(Vs[i + j]);
+        }
+        if (matchFound) return true;
+      }
+      return false;
+    }
+
+    std::array<std::reference_wrapper<const Pattern<Node>>, N> patterns;
+  };
+
   template<typename Node>
-  struct m_AnySeqTwo : Pattern<std::vector<Node>> {
-    m_AnySeqTwo(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
+  struct m_AnyTwoSeq : Pattern<std::vector<Node>> {
+    m_AnyTwoSeq(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
     inline bool match(std::vector<Node> Vs) const override {
       for (size_t i = 0; i < Vs.size() - 1; i++) {
         if (N1.match(Vs[i]) && N2.match(Vs[i + 1])) return true;
@@ -221,8 +275,8 @@ namespace patternmatch {
   };
 
   template<typename Node>
-  struct m_AnySeqThree : Pattern<std::vector<Node>> {
-    m_AnySeqThree(const Pattern<Node> &N1, const Pattern<Node> &N2,const Pattern<Node> &N3) : N1(N1), N2(N2), N3(N3) {}
+  struct m_AnyThreeSeq : Pattern<std::vector<Node>> {
+    m_AnyThreeSeq(const Pattern<Node> &N1, const Pattern<Node> &N2,const Pattern<Node> &N3) : N1(N1), N2(N2), N3(N3) {}
     inline bool match(std::vector<Node> Vs) const override {
       for (size_t i = 0; i < Vs.size() - 2; i++) {
         if (N1.match(Vs[i]) && N2.match(Vs[i + 1]) && N3.match(Vs[i + 2]) ) return true;
@@ -233,6 +287,8 @@ namespace patternmatch {
     const Pattern<Node> &N2;
     const Pattern<Node> &N3;
   };
+
+  template<typename Node>
 
   // ==================== Funct ====================
 
