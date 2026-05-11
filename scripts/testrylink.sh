@@ -4,8 +4,11 @@ set -e
 
 dir=$1
 
-make clean
-make -j 8
+#make clean
+#make -j 8
+
+CC="clang"
+CC_FLAGS="-O0 -fsanitize=address,undefined"
 
 # small 1 thread fuzzing that terminates on any error (other than hangs) useful for debugging rylink.
 # Iterates over seeds for easy reproduce
@@ -16,7 +19,7 @@ for i in {0..1024}; do
 	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i;
 	echo "compiling.. " $uuid;
 	path="$dir/prog_${uuid//"-"/"_"}_0";
-	clang -O0 $path/*.c -o $path/main.out;
+	$CC $CC_FLAGS $path/*.c -o $path/main.out;
 	echo "running.. " $uuid;
 	./$path/main.out;
 	retVal=$?
