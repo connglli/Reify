@@ -75,6 +75,29 @@ namespace {
     );
   }
 
+  // match helpers:
+  bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E) {
+    return patternmatch::match(
+      stmt,
+      m_AnyStmt(
+        m_WildCard<const symir::VarUse *>(),
+        m_WildCard<std::vector<const symir::VarUse *>>(),
+        E,
+        m_Cond(E),
+        m_Any(m_Cond(E)),
+        m_WildCard<const symir::ModExpr *>(),
+        m_Any(m_AssStmt(
+          m_WildCard<const symir::VarUse *>(),
+          E
+        )),
+        m_Any<std::vector<const symir::Stmt *>>(m_Any(m_AssStmt(
+          m_WildCard<const symir::VarUse *>(),
+          E
+        )))
+      )
+    );
+  }
+
 } // namespace
 
 template<typename Node>
@@ -335,49 +358,7 @@ std::optional<Rule *> RewriteEngine::getRandomMatchingRule(const symir::Stmt *st
 }
 
 bool ConstProba::match(const symir::Stmt *stmt) const {
-  bool assMatch = patternmatch::match(
-    stmt,
-    m_AssStmt(
-      m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))
-    )
-  );
-  if (assMatch) return true;
-
-  // for each of these we are only checking inside the first list of substmts
-  bool whileMatch = patternmatch::match(
-    stmt,
-    m_WhileStmt(
-      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
-    )
-  );
-  if (whileMatch) return true;
-
-  bool forMatch = patternmatch::match(
-    stmt,
-    m_ForStmt(
-      m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
-      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
-      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
-    )
-  );
-  if (forMatch) return true;
-
-  bool ifMatch = patternmatch::match(
-    stmt,
-    m_IfStmt(
-      m_Any(m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))),
-      m_Any<std::vector<const symir::Stmt *>>(
-        m_Any(
-          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))
-        )
-      )
-    )
-  );
-  return ifMatch;
+  return matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
 }
 
 std::vector<symir::BlockBuilder::StmtID> ConstProba::rewrite(
@@ -420,59 +401,16 @@ std::vector<symir::BlockBuilder::StmtID> ConstProba::rewrite(
 }
 
 
-bool ConstToAdd::match(const symir::Stmt *stmt) const {
-  bool assMatch = patternmatch::match(
-    stmt,
-    m_AssStmt(
-      m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))
-    )
-  );
-  if (assMatch) return true;
-
-  // for each of these we are only checking inside the first list of substmts
-  bool whileMatch = patternmatch::match(
-    stmt,
-    m_WhileStmt(
-      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
-    )
-  );
-  if (whileMatch) return true;
-
-  bool forMatch = patternmatch::match(
-    stmt,
-    m_ForStmt(
-      m_WildCard<const symir::VarUse *>(),
-      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
-      m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
-      m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))),
-      m_Any(m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))))
-    )
-  );
-  if (forMatch) return true;
-
-  bool ifMatch = patternmatch::match(
-    stmt,
-    m_IfStmt(
-      m_Any(m_Cond(m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))),
-      m_Any<std::vector<const symir::Stmt *>>(
-        m_Any(
-          m_AssStmt(m_WildCard<const symir::VarUse *>(), m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))))
-        )
-      )
-    )
-  );
-  return ifMatch;
-
+bool AdditionFromConst::match(const symir::Stmt *stmt) const {
+  return matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
 }
 
-std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
+std::vector<symir::BlockBuilder::StmtID> AdditionFromConst::rewrite(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::Stmt *stmt
 ) {
-  Log::Get().Out() << "Running ConstToAdd" << std::endl;
+  Log::Get().Out() << "Running AdditionFromConst" << std::endl;
 
   StmtReplacer rep = StmtReplacer<symir::Expr>(funBd, blockBd);
   const symir::VarDef *var = this->getNewLocal(funBd);
@@ -532,18 +470,17 @@ std::vector<symir::BlockBuilder::StmtID> ConstToAdd::rewrite(
   return {newStmt};
 }
 
-bool ConstToForSum::match(const symir::Stmt *stmt) const {
+bool ForSumFromConst::match(const symir::Stmt *stmt) const {
   return patternmatch::match(
       stmt,
       m_AssStmt(
         m_WildCard<const symir::VarUse *>(),
-        m_Expr(m_NMany<const symir::Term *, 1>(m_CstTerm(m_Solved(), m_NoVar())))
-        //m_Expr(m_One(m_CstTerm(m_Solved(), m_NoVar())))
+        m_Expr(m_One(m_CstTerm(m_Solved(), m_NoVar())))
       )
     );
 }
 
-std::vector<symir::BlockBuilder::StmtID> ConstToForSum::rewrite(
+std::vector<symir::BlockBuilder::StmtID> ForSumFromConst::rewrite(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::Stmt *stmt
@@ -640,11 +577,11 @@ std::vector<symir::BlockBuilder::StmtID> ConstToForSum::rewrite(
   return { initAss, forSum };
 }
 
-bool AssToDeadCode::match(const symir::Stmt *stmt) const {
+bool DeadCodeFromAssign::match(const symir::Stmt *stmt) const {
   return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse *>(), m_WildCard<const symir::Expr *>()));
 }
 
-std::vector<symir::BlockBuilder::StmtID> AssToDeadCode::rewrite(
+std::vector<symir::BlockBuilder::StmtID> DeadCodeFromAssign::rewrite(
   symir::FunctBuilder *funBd,
   symir::BlockBuilder *blockBd,
   const symir::Stmt *stmt
