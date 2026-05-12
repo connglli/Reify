@@ -413,7 +413,6 @@ std::vector<symir::BlockBuilder::StmtID> AdditionFromConst::rewrite(
   Log::Get().Out() << "Running AdditionFromConst" << std::endl;
 
   StmtReplacer rep = StmtReplacer<symir::Expr>(funBd, blockBd);
-  const symir::VarDef *var = this->getNewLocal(funBd);
   std::function<symir::BlockBuilder::ExprID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
     varInsertFun =
       [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
@@ -635,6 +634,24 @@ std::vector<symir::BlockBuilder::StmtID> DeadCodeFromAssign::rewrite(
   }
 
   return { blockBd->SymIfStmt(conds, sids) };
+}
+
+bool VectorizerDeadAssignFromCopy::match(const symir::Stmt *stmt) const {
+  return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse*>(), m_WildCard<const symir::Expr *>()));
+}
+
+std::vector<symir::BlockBuilder::StmtID> VectorizerDeadAssignFromCopy::rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) {
+  auto copier = symir::StmtCopier(funBd, blockBd);
+  symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
+  symir::BlockBuilder::StmtID deadStmt = blockBd->SymAssStmt(
+    this->getNewLocal(funBd),
+    copier.CopyExpr(static_cast<const symir::AssStmt *>(stmt)->GetExpr())
+  );
+  return {deadStmt, origStmt};
 }
 
 std::vector<const symir::Term *> ConstQuery::query() {
