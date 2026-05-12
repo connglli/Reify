@@ -369,7 +369,7 @@ std::vector<symir::BlockBuilder::StmtID> ConstProba::rewrite(
   Log::Get().Out() << "Running ConstProba" << std::endl;
 
   StmtReplacer rep = StmtReplacer<symir::Term>(funBd, blockBd);
-  const symir::VarDef *var = this->getNewLocal(funBd);
+  const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
   std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
     varInsertFun =
       [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
@@ -539,7 +539,7 @@ std::vector<symir::BlockBuilder::StmtID> ForSumFromConst::rewrite(
     access
   );
 
-  auto loopVar = this->getNewLocal(funBd);
+  auto loopVar = this->getNewLocal(funBd, blockBd->GetLabel());
   symir::BlockBuilder::StmtID forSum = blockBd->SymForStmt(
     // loop variable i
     loopVar,
@@ -648,7 +648,7 @@ std::vector<symir::BlockBuilder::StmtID> VectorizerDeadAssignFromCopy::rewrite(
   auto copier = symir::StmtCopier(funBd, blockBd);
   symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
   symir::BlockBuilder::StmtID deadStmt = blockBd->SymAssStmt(
-    this->getNewLocal(funBd),
+    this->getNewLocal(funBd, blockBd->GetLabel()),
     copier.CopyExpr(static_cast<const symir::AssStmt *>(stmt)->GetExpr())
   );
   return {deadStmt, origStmt};

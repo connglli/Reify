@@ -3,6 +3,7 @@
 set -e
 
 dir=$1
+nrTests=1024
 
 #make clean
 #make -j 8
@@ -12,51 +13,47 @@ CC_FLAGS="-O0 -fsanitize=address,undefined"
 j=8
 
 generate() {
-	uuid=$1
-	seed=$2
+	seed_start=$1
+	nr=$2
+	for (( i=$seed_start; i<=$(($seed_start + $nr)); i++ )); do
+	uuid="id$i"
 	echo "generating.. " $uuid
-	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $seed > /dev/null;
+	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i > /dev/null;
 	retVal=$?
 	if [ $retVal -ne 0 ]; then
-		echo "found failing generation for seed" $seed
+		echo "found failing generation for seed" $i
 	fi
+	done
 }
 
 compile_and_run() {
-	path=$1
-	echo "compiling.. " $path;
-	$CC $CC_FLAGS $path/*.c -o $path/main.out;
-	echo "running.. " $path;
-	./$path/main.out;
-	retVal=$?
-	if [ $retVal -ne 0 ]; then
-		echo "found failing testcase at" $path
-	fi
-	exit 0
+	seed_start=$1
+	nr=$2
+	for (( i=$seed_start; i<=$(($seed_start + $nr)); i++ )); do
+		uuid="id$i"
+		path="${dir}/prog_${uuid}_0"
+		echo "compiling.. " $path;
+		$CC $CC_FLAGS $path/*.c -o $path/main.out;
+		echo "running.. " $path;
+		./$path/main.out;
+		retVal=$?
+		if [ $retVal -ne 0 ]; then
+			echo "found failing testcase for seed" $i
+		fi
+	done
 }
 
+test_per_proc=$(($nrTests / $j))
+#
 # Iterates over seeds for easy reproduction
-generateJ=0
-for i in {0..1024}; do
-	uuid="id$i"
-	generate $uuid $i &
-	generateJ=$((1 + $generateJ))
-	if [ $generateJ -gt $j ]; then
-		wait
-		generateJ=0
-	fi	
+for (( i=0; i<$j; i++)); do
+	generate $(($i * $test_per_proc)) $test_per_proc &
 done
 
 wait
 
-compileJ=0
-for d in $dir/prog_*/; do
-	compile_and_run $d &
-	compileJ=$((1 + $compileJ))
-	if [ $compileJ -gt $j ]; then
-		wait
-		compileJ=0
-	fi	
+for (( i=0; i<$j; i++)); do
+	compile_and_run $(($i * $test_per_proc)) $test_per_proc &
 done
 
 wait
