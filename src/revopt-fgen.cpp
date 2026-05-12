@@ -182,6 +182,7 @@ public:
     revopt.addRule(std::make_unique<AdditionFromConst>(), 3);
     revopt.addRule(std::make_unique<ForSumFromConst>(), 2);
     revopt.addRule(std::make_unique<DeadCodeFromAssign>(), 1);
+    revopt.addRule(std::make_unique<VectorizerDeadAssignFromCopy>(), 1);
     revopt.run(builder.get(), bblBd, 20);
 
     auto cstTerms = ConstQuery(builder.get(), bblBd).query();
