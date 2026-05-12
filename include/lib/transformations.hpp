@@ -72,7 +72,7 @@ private:
 
 /// ==================== Virtual Rule Definition ====================
 struct Rule {
-  Rule(std::string locPrefix = "tmp") : locPrefix(locPrefix) {}
+  Rule(std::string locPrefix = "local_created_by_rule_without_proper_locPrefix") : locPrefix(locPrefix) {}
   virtual ~Rule() = default;
   virtual bool match(const symir::Stmt *stmt) const = 0;
   virtual std::vector<symir::BlockBuilder::StmtID> rewrite(
@@ -81,8 +81,9 @@ struct Rule {
     const symir::Stmt *stmt
   ) = 0;
 
-  const symir::VarDef *getNewLocal(symir::FunctBuilder *funBd) {
-    std::string locName = this->locPrefix + std::to_string(this->unique_counter++);
+  /// get a new local that is not yet used in the block with label `blockLabel`
+  const symir::VarDef *getNewLocal(symir::FunctBuilder *funBd, std::string blockLabel) {
+    std::string locName = this->locPrefix + "_" + std::to_string(varCounterMap[blockLabel]++);
     const symir::VarDef *loc = funBd->FindVar(locName);
     if (loc == nullptr) loc = funBd->SymUnInitLocal(locName);
     return loc;
@@ -90,7 +91,7 @@ struct Rule {
 
 protected:
   std::string locPrefix;
-  size_t unique_counter = 0;
+  std::map<std::string, size_t> varCounterMap;
 };
 
 /// ==================== Rewrite Engine Definition ====================
