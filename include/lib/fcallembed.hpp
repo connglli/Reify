@@ -191,12 +191,8 @@ private:
 
 class RevOptFCallStrategy : public FCallStrategy {
 public:
-  explicit RevOptFCallStrategy(std::unique_ptr<GuardStrategy> guardGen) : guardGen(std::move(guardGen)) {
-    this->rewriteEngine.addRule(std::make_unique<ConstProba>(), 3);
-    this->rewriteEngine.addRule(std::make_unique<AdditionFromConst>(), 4);
-    this->rewriteEngine.addRule(std::make_unique<ForSumFromConst>(), 2);
-    this->rewriteEngine.addRule(std::make_unique<DeadCodeFromAssign>(), 1);
-    this->rewriteEngine.addRule(std::make_unique<VectorizerDeadAssignFromCopy>(), 1);
+  explicit RevOptFCallStrategy(std::unique_ptr<GuardStrategy> guardGen) : 
+    rewriteEngine(RewriteEngine::Default()), guardGen(std::move(guardGen)) {
   }
   void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
   void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
