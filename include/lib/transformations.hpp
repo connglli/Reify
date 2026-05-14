@@ -26,82 +26,34 @@
 #ifndef REIFY_TRANSFORMATIONS_HPP
 #define REIFY_TRANSFORMATIONS_HPP
 
+#include "lib/Transformations/primitive.hpp"
+#include "lib/Transformations/instcombine.hpp"
+#include "lib/Transformations/vectorize.hpp"
 #include "lib/lang.hpp"
-#include <memory>
 
-// ==================== StmtReplacers Definition ====================
-
-template<typename Node>
-class StmtReplacer : public symir::StmtCopier {
-public:
-  StmtReplacer(
-   symir::FunctBuilder *funBd,
-   symir::BlockBuilder *blockBd
-  ) : symir::StmtCopier(funBd, blockBd) {}
-  /// Copies Stmt with while also replacing any Subexpression that matches 'matchFunction' with the return value of 'replaceFunction'
-  StmtID CopyStmtWithReplacement(
-    const symir::Stmt *s, 
-    std::function<bool(const Node *)> matchFunction,
-    std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
-    double randThreshold = 1,
-    size_t replaceMax = 1
-  );
-
-  void *getExtractedDataRef() { return this->data; }
-
-protected:
-  void Visit(const Node &e) override;
-private:
-  bool match(const Node &e) {
-    return !this->hasReplaced && this->rand() <= this->randThreshold && this->matchFunction(&e);
-  }
-  ExprID replace(const Node &e) { 
-    this->hasReplaced = true;
-    return this->replaceFunction(funBd, blockBd, e, &this->data); 
-  }
-  double rand() { return this->randUniform(); }
-
-private:
-  std::function<bool(const Node *)> matchFunction;
-  std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
-  std::function<double()> randUniform;
-  void *data = nullptr;
-  double randThreshold = 1;
-  bool hasReplaced = false;
-};
-
-/// ==================== Virtual Rule Definition ====================
-struct Rule {
-  Rule(std::string locPrefix = "local_created_by_rule_without_proper_locPrefix") : locPrefix(locPrefix) {}
-  virtual ~Rule() = default;
-  virtual bool match(const symir::Stmt *stmt) const = 0;
-  virtual std::vector<symir::BlockBuilder::StmtID> rewrite(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) = 0;
-
-  /// get a new local that is not yet used in the block with label `blockLabel`
-  const symir::VarDef *getNewLocal(symir::FunctBuilder *funBd, std::string blockLabel) {
-    std::string locName = this->locPrefix + "_" + std::to_string(varCounterMap[blockLabel]++);
-    const symir::VarDef *loc = funBd->FindVar(locName);
-    if (loc == nullptr) loc = funBd->SymUnInitLocal(locName);
-    return loc;
-  }
-
-protected:
-  std::string locPrefix;
-  std::map<std::string, size_t> varCounterMap;
-};
-
+using namespace transformations;
 /// ==================== Rewrite Engine Definition ====================
 class RewriteEngine {
 public:
+  /// Get empty RewriteEngine without any rules added
+  static RewriteEngine Empty() { return RewriteEngine(); }
+  /// Get default RewriteEngine with the default set of rules added
+  static RewriteEngine Default() { 
+    auto engine = RewriteEngine();
+    engine.addRule(std::make_unique<primitive::SimpleConstProbagation>(), 3);
+    engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 4);
+    engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 4);
+    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
+    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
+    return engine;
+  }
   void addRule(std::unique_ptr<Rule> rule, int weight);
   /// normal run method used for random selection of rules based on the passed weight, attempts to runs `times` rules in total
   void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t times) const;
 
 private:
+  RewriteEngine() = default;
+
   std::optional<symir::BlockBuilder::StmtID> runInSubStmt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
@@ -123,86 +75,14 @@ private:
     const symir::IfStmt *ifStmt
   ) const;
   std::optional<Rule *> getRandomMatchingRule(const symir::Stmt *stmt) const;
+
 protected:
 
   std::vector<std::unique_ptr<Rule>> rules{};
   std::vector<int> weights{};
 };
 
-// ==================== Various Rule Definition ====================
-
-// Notation:
-// C1, C2, ... := constants/Literals
-// E1, E2, ... := (Sub)Expression
-// S1, S2, ... := statement (e.g. Assign, For, While or if)
-// B1, B2, ... := Conditional Stmt
-// {A, ..., Z, a, ..., z} Variables
-
-// ======== Primitive creating rules ========
-
-/// E1 + C1 + E2 => cpk = C1; E1 + cpk + E2
-struct ConstProba : Rule {
-  ConstProba() : Rule("const_proba") {}
-  bool match(const symir::Stmt *stmt) const override;
-  std::vector<symir::BlockBuilder::StmtID> rewrite(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) override;
-};
-
-/// E1 + C1 + E2 => E1 + C2 + C3 +E2
-/// where C2 + C3 = C1
-struct AdditionFromConst : Rule {
-  bool match(const symir::Stmt *stmt) const override;
-  std::vector<symir::BlockBuilder::StmtID> rewrite(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) override;
-};
-
-/// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; }, 
-/// where C3 * C4 + C2 = C1
-struct ForSumFromConst : Rule {
-  ForSumFromConst() : Rule("i") {}
-  bool match(const symir::Stmt *stmt) const override;
-  std::vector<symir::BlockBuilder::StmtID> rewrite(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) override;
-};
-
-/// x = E1 => if (B1) { x = E2 } else if (B2) { x = E3 } ... else { x = E`n` }
-/// where exactly one or no B1 evaluates to true, if one does evaluate true the corresponding branch contains x = E1, if non are true then the else branch contains x = E1
-struct DeadCodeFromAssign : Rule {
-  DeadCodeFromAssign(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
-    minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
-    Assert(minBranches >= 2, "AssToDeadCode must have atleast 2 branches");
-  }
-  bool match(const symir::Stmt *stmt) const override;
-  std::vector<symir::BlockBuilder::StmtID> rewrite(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) override;
-
-private:
-  int minBranches;
-  int maxBranches;
-  bool allowUB;
-};
-
-struct VectorizerDeadAssignFromCopy : Rule {
-  VectorizerDeadAssignFromCopy() : Rule("dead_assign") {}
-  bool match(const symir::Stmt *stmt) const override;
-  std::vector<symir::BlockBuilder::StmtID> rewrite(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) override;
-};
+// TODO ConstQuery and ConstEmbedder probably fit better in another file then here
 
 /// ==================== Classes to embed variables ====================
 /// Can Query for constants that can be replaced
