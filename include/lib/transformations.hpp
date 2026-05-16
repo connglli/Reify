@@ -40,7 +40,10 @@ public:
   /// Get default RewriteEngine with the default set of rules added
   static RewriteEngine Default() { 
     auto engine = RewriteEngine();
-    engine.addRule(std::make_unique<primitive::SimpleConstProbagation>(), 3);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaAdd>(), 3);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaSub>(), 3);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaMul>(), 3);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaDiv>(), 3);
     engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 4);
     engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 4);
     engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
