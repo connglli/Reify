@@ -32,6 +32,7 @@
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
 #include <climits>
+#include <cstdint>
 
 using namespace patternmatch;
 namespace transformations::primitive {
@@ -271,48 +272,260 @@ namespace transformations::primitive {
     return { blockBd->SymIfStmt(conds, sids) };
   }
 
-bool SimpleConstProbagation::match(const symir::Stmt *stmt) const {
-  return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
-}
+  bool ConstProbpagationViaAdd::match(const symir::Stmt *stmt) const {
+    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  }
+  
+  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaAdd::rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) {
+    Log::Get().Out() << "Running ConstProba" << std::endl;
+  
+    auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
+    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+  
+  
+    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
+      varInsertFun =
+        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+          std::vector<symir::BlockBuilder::TermID> termIds;
+          int target = t.GetCoef()->GetI32Value();
+          int v1, v2;
+          if (target > 0) {
+            v1 = Random::Get().Uniform(0, target)();
+          } else if (target < 0) {
+            v1 = Random::Get().Uniform(target, -1)();
+          } else {
+            v1 = Random::Get().Uniform(0, INT_MAX)();
+          }
+          v2 = target - v1;
+          Assert(v1 + v2 == target, "Faulty transformation");
+  
+          *data = thisFunBd->SymI32Const(v2);
+          return thisBlockBd->SymAddTerm(thisFunBd->SymI32Const(v1), var);
+        };
+  
+    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+      stmt,
+      make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
+      varInsertFun,
+      0.25
+    );
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
+    Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
+  
+    Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with " << var->GetName() << std::endl;
+  
+    symir::BlockBuilder::StmtID assignStmts = blockBd->SymAssStmt(
+      var,
+      blockBd->SymExpr(
+        symir::Expr::OP_ADD,
+        { blockBd->SymCstTerm(replacedCoef, nullptr) }
+      )
+    );
+  
+    return {assignStmts, newStmt};
+  }
+  
+  bool ConstProbpagationViaSub::match(const symir::Stmt *stmt) const {
+    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  }
+  
+  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaSub::rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) {
+    Log::Get().Out() << "Running ConstProba" << std::endl;
+  
+    auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
+    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+  
+  
+    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
+      varInsertFun =
+        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+          std::vector<symir::BlockBuilder::TermID> termIds;
+          int target = t.GetCoef()->GetI32Value();
+          int v1, v2;
+          if (target > 0) {
+            v1 = Random::Get().Uniform(0, target)();
+          } else if (target < 0) {
+            v1 = Random::Get().Uniform(target, -1)();
+          } else {
+            v1 = Random::Get().Uniform(0, INT_MAX)();
+          }
+          v2 = v1 - target;
+          Assert(v1 - v2 == target, "Faulty transformation");
+  
+          *data = thisFunBd->SymI32Const(v2);
+          return thisBlockBd->SymSubTerm(thisFunBd->SymI32Const(v1), var);
+        };
+  
+    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+      stmt,
+      make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
+      varInsertFun,
+      0.25
+    );
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
+    Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
+  
+    Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with " << var->GetName() << std::endl;
+  
+    symir::BlockBuilder::StmtID assignStmts = blockBd->SymAssStmt(
+      var,
+      blockBd->SymExpr(
+        symir::Expr::OP_ADD,
+        { blockBd->SymCstTerm(replacedCoef, nullptr) }
+      )
+    );
+  
+    return {assignStmts, newStmt};
+  }
+  
+  bool ConstProbpagationViaMul::match(const symir::Stmt *stmt) const {
+    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
+  }
+  
+  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaMul::rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) {
+    Log::Get().Out() << "Running ConstProba" << std::endl;
+  
+    auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
+    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+  
+  
+    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
+      varInsertFun =
+        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
+          std::vector<symir::BlockBuilder::TermID> termIds;
+          termIds.reserve(e.GetTerms().size() + 1);
+          bool hasReplaced = false;
+          for (auto term : e.GetTerms()) {
+            if (hasReplaced || term->GetOp() != symir::Term::OP_CST) {
+              termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(term));
+              continue;
+            }
 
-std::vector<symir::BlockBuilder::StmtID> SimpleConstProbagation::rewrite(
-  symir::FunctBuilder *funBd,
-  symir::BlockBuilder *blockBd,
-  const symir::Stmt *stmt
-) {
-  Log::Get().Out() << "Running ConstProba" << std::endl;
-
-  auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-  const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
-  std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
-    varInsertFun =
-      [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
-        *data = t.GetCoef();
-        return thisBlockBd->SymMulTerm(thisFunBd->SymI32Const(1), var);
-      };
-
-  symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
-    stmt,
-    make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
-    varInsertFun,
-    0.25
-  );
-  symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
-  Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
-  Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
-
-  Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with " << var->GetName() << std::endl;
-
-  symir::BlockBuilder::StmtID assignStmts = blockBd->SymAssStmt(
-    var,
-    blockBd->SymExpr(
-      symir::Expr::OP_ADD,
-      { blockBd->SymCstTerm(replacedCoef, nullptr) }
-    )
-  );
-
-  return {assignStmts, newStmt};
-}
+            hasReplaced = true;
+            int target = term->GetCoef()->GetI32Value();
+            int32_t mulVal, randVal, rest;
+            if (target > 0) {
+              randVal = Random::Get().Uniform(1, std::max(target / 2, 1))();
+              rest = target % randVal;
+              mulVal = target / randVal;
+            } else if (target == 0) {
+              randVal = 0;
+              rest = 0;
+              mulVal = 0;
+            } else {
+              randVal = Random::Get().Uniform(std::min(target / 2, -1), -1)();
+              rest = target % randVal;
+              mulVal = target / randVal;
+            }
+            Assert(target == 0 || randVal == 0 || mulVal == 0
+              || (abs(randVal * mulVal) <= abs(target) && abs(target) / target == abs(randVal * mulVal) / (randVal * mulVal)),
+              "Faulty transformation (target: %d, randVal: %d, mulVal: %d)", target, randVal, mulVal
+            );
+            Assert(randVal * mulVal + rest == target, "Faulty transformation");
+            if (e.GetOp() == symir::Expr::OP_SUB) rest = -rest;
+            *data = thisFunBd->SymI32Const(mulVal);
+            termIds.push_back(thisBlockBd->SymMulTerm(thisFunBd->SymI32Const(randVal), var));
+            termIds.push_back(thisBlockBd->SymCstTerm(thisFunBd->SymI32Const(rest), nullptr));
+          }
+          return thisBlockBd->SymExpr(e.GetOp(), termIds);
+        };
+  
+    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+      stmt,
+      make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
+      varInsertFun,
+      0.25
+    );
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
+    Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
+  
+    Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with " << var->GetName() << std::endl;
+  
+    symir::BlockBuilder::StmtID assignStmts = blockBd->SymAssStmt(
+      var,
+      blockBd->SymExpr(
+        symir::Expr::OP_ADD,
+        { blockBd->SymCstTerm(replacedCoef, nullptr) }
+      )
+    );
+  
+    return {assignStmts, newStmt};
+  }
+  
+  bool ConstProbpagationViaDiv::match(const symir::Stmt *stmt) const {
+    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
+  }
+  
+  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaDiv::rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) {
+    Log::Get().Out() << "Running ConstProbpagationViaDiv" << std::endl;
+  
+    auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
+    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+  
+  
+    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
+      varInsertFun =
+        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+          int target = t.GetCoef()->GetI32Value();
+          int v1, v2; 
+          if (target > 0) {
+            v2 = Random::Get().Uniform(1, INT_MAX / target)();
+          } else if (target < 0) {
+            // We do not match INT_MIN as target so we can avoid that special case
+            // We also want to avoid target * v2 = -INT_MIN
+            v2 = Random::Get().Uniform(static_cast<int32_t>((INT_MIN + 1) / -target), -1)();
+          } else {
+            v2 = Random::Get().Uniform(1, INT_MAX)();
+          }
+          Assert(v2 != 0, "Attempted to generate a Division be Zero");
+          v1 = target * v2;
+          Assert(v1 / v2 == target, "Faulty transformation");
+  
+          *data = thisFunBd->SymI32Const(v2);
+          return thisBlockBd->SymDivTerm(thisFunBd->SymI32Const(v1), var);
+        };
+  
+    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+      stmt,
+      make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
+      varInsertFun,
+      0.25
+    );
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
+    Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
+  
+    Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with " << var->GetName() << std::endl;
+  
+    symir::BlockBuilder::StmtID assignStmts = blockBd->SymAssStmt(
+      var,
+      blockBd->SymExpr(
+        symir::Expr::OP_ADD,
+        { blockBd->SymCstTerm(replacedCoef, nullptr) }
+      )
+    );
+  
+    return {assignStmts, newStmt};
+  }
 
 } // namespace 
 
