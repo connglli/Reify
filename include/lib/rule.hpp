@@ -27,6 +27,7 @@
 #define REIFY_RULE_HPP
 
 #include "lib/lang.hpp"
+#include <string>
 
 struct Rule {
   Rule(std::string locPrefix = "local_created_by_rule_without_proper_locPrefix") : locPrefix(locPrefix) {}
@@ -58,6 +59,9 @@ struct Rule {
     ) {
     if (!this->varCounterMap.contains(blockLabel)) this->varCounterMap[blockLabel] = 0;
     std::string locName = this->locPrefix + "_" + std::to_string(this->varCounterMap[blockLabel]++);
+    for (int i : shape) {
+      locName += "_" + std::to_string(i);
+    }
     Assert(funBd->FindParam(locName) == nullptr, "New Local %s should never be a Parameter", locName.c_str());
     const symir::VarDef *loc = funBd->FindLocal(locName);
     if (loc == nullptr) loc = funBd->SymVecLocal(locName, shape, {}, type, structName);
