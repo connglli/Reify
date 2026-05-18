@@ -694,9 +694,27 @@ SYMIR_TERMOP_LIST(XX)
   struct m_WithType : Pattern<const symir::VarUse *> {
     m_WithType(symir::SymIR::Type type) : type(type) {}
     inline bool match(const symir::VarUse *v) const override {
-      return v->GetType() == type;; 
+      return v->GetType() == type; 
     }
     symir::SymIR::Type type;
+  };
+
+  struct m_ScalarVar : Pattern<const symir::VarUse *> {
+    inline bool match(const symir::VarUse *v) const override {
+      return v->GetType() == symir::SymIR::Type::I32 && !v->IsVector(); 
+    }
+  };
+
+  struct m_VectorVar : Pattern<const symir::VarUse *> {
+    inline bool match(const symir::VarUse *v) const override {
+      return v->IsVector(); 
+    }
+  };
+
+  struct m_StructVar : Pattern<const symir::VarUse *> {
+    inline bool match(const symir::VarUse *v) const override {
+      return !v->IsVector() && v->GetDef()->GetStructName() != ""; 
+    }
   };
 
   // ==================== int ====================
