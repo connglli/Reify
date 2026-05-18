@@ -51,6 +51,17 @@ namespace transformations::vectorize {
       const symir::Stmt *stmt
     ) override;
   };
+
+  struct PartialUnrolling : Rule {
+    PartialUnrolling() : Rule("part_unroll") {}
+    bool match(const symir::Stmt *stmt) const override;
+    std::vector<symir::BlockBuilder::StmtID> rewrite(
+      symir::FunctBuilder *funBd,
+      symir::BlockBuilder *blockBd,
+      const symir::Stmt *stmt
+    ) override;
+  };
+
 }
 
 #endif //REIFY_VECTORIZE_HPP
