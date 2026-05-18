@@ -44,7 +44,7 @@ namespace transformations::vectorize {
     auto copier = symir::StmtCopier(funBd, blockBd);
     symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
     symir::BlockBuilder::StmtID deadStmt = blockBd->SymAssStmt(
-      this->getNewLocal(funBd, blockBd->GetLabel()),
+      this->getNewScaLocal(funBd, blockBd->GetLabel()),
       copier.CopyExpr(static_cast<const symir::AssStmt *>(stmt)->GetExpr())
     );
     return {deadStmt, origStmt};

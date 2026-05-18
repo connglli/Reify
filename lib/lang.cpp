@@ -1232,25 +1232,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     return dynamic_cast<StructParam *>(v);
   }
 
-  const UnInitLocal *FunctBuilder::SymUnInitLocal(const std::string &name, SymIR::Type type, bool isVolatile) {
-    Assert(isActive(), "The FunctBuilder is no longer active");
-    Assert(
-        !paramMap.contains(name), "Parameters with the same name \"%s\" is already defined",
-        name.c_str()
-    );
-    Assert(
-        !localMap.contains(name), "Locals with the same name \"%s\" is already defined",
-        name.c_str()
-    );
-    locals.push_back(std::make_unique<UnInitLocal>(name, type));
-    const auto v = locals.back().get();
-    if (isVolatile) {
-      v->SetVolatile();
-    }
-    localMap[name] = v;
-    return dynamic_cast<const UnInitLocal *>(v);
-  }
-
   const ScaLocal *FunctBuilder::SymScaLocal(
       const std::string &name, Coef *coef, SymIR::Type type, bool isVolatile
   ) {
@@ -1651,10 +1632,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
 
   void FunctCopier::Visit(const StructParam &p) {
     builder->SymStructParam(p.GetName(), p.GetStructName());
-  }
-
-  void FunctCopier::Visit(const UnInitLocal &l) {
-    builder->SymUnInitLocal(l.GetName(), l.GetType(), l.IsVolatile());
   }
 
   void FunctCopier::Visit(const ScaLocal &l) {

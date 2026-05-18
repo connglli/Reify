@@ -160,7 +160,7 @@ public:
       params.push_back(builder->SymScaParam(NameVar(i), symir::SymIR::Type::I32, false));
     }
 
-    auto retVal = builder->SymUnInitLocal(NameVar(numParams));
+    auto retVal = builder->SymScaLocal(NameVar(numParams), nullptr);
     this->targetVar = std::make_unique<symir::VarUse>(retVal);
 
     this->targetVal = Random::Get().Uniform(INT_MIN, INT_MAX)();

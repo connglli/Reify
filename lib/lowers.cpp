@@ -240,24 +240,14 @@ namespace symir {
     out << "(" << KW_PAR << " " << p.GetName() << " " << p.GetStructName() << ")";
   }
 
-  void SymSexpLower::Visit(const UnInitLocal &l) {
-    indent();
-    if (l.IsVolatile()) {
-      out << "(" << KW_VOL << " ";
-    } else {
-      out << "(" ;
-    }
-    out << KW_LOC << " " << l.GetName() << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
-  }
-
   void SymSexpLower::Visit(const ScaLocal &l) {
     indent();
+    out << "(";
     if (l.IsVolatile()) {
-      out << "(" << KW_VOL << " " << KW_LOC << " " << l.GetName() << " ";
-    } else {
-      out << "(" << KW_LOC << " " << l.GetName() << " ";
-    }
-    l.GetCoef()->Accept(*this);
+      out << KW_VOL << " ";
+    } 
+    out << KW_LOC << " " << l.GetName() << " ";
+    if (l.GetCoef() != nullptr) l.GetCoef()->Accept(*this);
     out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
@@ -731,23 +721,16 @@ namespace symir {
     out << "struct " << p.GetStructName() << " " << p.GetName();
   }
 
-  void SymCxLower::Visit(const UnInitLocal &l) {
-    indent();
-    if (l.IsVolatile()) {
-      out << "volatile" << " ";
-    }
-    Assert(l.GetType() == symir::SymIR::Type::I32, "InInitLocal currently only supports I32's");
-    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << ";" << std::endl;
-  }
-
   void SymCxLower::Visit(const ScaLocal &l) {
     indent();
     if (l.IsVolatile()) {
-      out << "volatile" << " " << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
-    } else {
-      out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+      out << "volatile" << " ";
+    } 
+    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
+    if (l.GetCoef() != nullptr) {
+      out << " = ";
+      l.GetCoef()->Accept(*this);
     }
-    l.GetCoef()->Accept(*this);
     out << ";" << std::endl;
   }
 
@@ -764,6 +747,10 @@ namespace symir {
     }
     for (auto len: l.GetVecShape()) {
       out << "[" << len << "]";
+    }
+    if (l.GetCoefs().size() == 0) {
+      out << ";";
+      return;
     }
     out << " = {";
     const auto &cs = l.GetCoefs();
@@ -787,8 +774,13 @@ namespace symir {
 
   void SymCxLower::Visit(const StructLocal &l) {
     indent();
-    out << "struct " << l.GetStructName() << " " << l.GetName() << " = {";
+    out << "struct " << l.GetStructName() << " " << l.GetName();
     const auto &cs = l.GetCoefs();
+    if (l.GetCoefs().size() == 0) {
+      out << ";";
+      return;
+    }
+    out << " = {";
     for (size_t i = 0; i < cs.size(); ++i) {
       cs[i]->Accept(*this);
       if (i != cs.size() - 1)
@@ -1098,15 +1090,11 @@ namespace symir {
     Panic("Structs are not supported in Java backend yet");
   }
 
-  void SymJavaBytecodeLower::Visit(const UnInitLocal &l) {
-    Panic("TODO: Implement java UnInitLocal");
-  }
-
   void SymJavaBytecodeLower::Visit(const ScaLocal &l) {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
-    l.GetCoef()->Accept(*this);
+    if (l.GetCoef() != nullptr) l.GetCoef()->Accept(*this);
     method->instList().addVar(jnif::Opcode::istore, locals[l.GetName()]);
   }
 
@@ -1114,7 +1102,7 @@ namespace symir {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
-    CreateArray(*method, l, l.GetCoefs());
+    if (l.GetCoefs().size() > 0) CreateArray(*method, l, l.GetCoefs());
     method->instList().addVar(jnif::Opcode::astore, locals[l.GetName()]);
   }
 

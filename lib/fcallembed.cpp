@@ -567,21 +567,11 @@ const symir::VarDef *FCallStrategy::getUnusedAssignVar(symir::FunctBuilder *funB
   );
   size_t argUsed = this->argUsedMatrix[stmtIndex * this->nrBlocks + blockIndex];
 
-  // How many argument variables exist in the current function
-  auto locals = funBd->GetLocals();
-  size_t argAvailable = 0;
-  for (size_t i = 0; i < locals.size(); i++) {
-    if (locals[i]->GetIRId() == symir::SymIR::SIR_LOCAL_UNINIT) {
-      argAvailable += 1;
-    }
+  const symir::VarDef *loc = funBd->FindVar("arg_" + std::to_string(argUsed));
+  if (loc == nullptr) {
+    loc = funBd->SymScaLocal("arg_" + std::to_string(argUsed), nullptr);
   }
 
-  const symir::VarDef *loc;
-  if (argUsed >= argAvailable) {
-    loc = funBd->SymUnInitLocal("arg_" + std::to_string(argUsed));
-  } else {
-    loc = funBd->FindVar("arg_" + std::to_string(argUsed));
-  }
   Assert(loc != nullptr, "creation or search for local has failed");
   Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
 
@@ -784,7 +774,7 @@ symir::BlockBuilder::TermID ModInterpGuardStrategy::addGuard(
 
   const symir::VarDef *loc = funBd->FindVar("guard_" + std::to_string(nthGuard));
   if (loc == nullptr) {
-    loc = funBd->SymUnInitLocal("guard_" + std::to_string(nthGuard));
+    loc = funBd->SymScaLocal("guard_" + std::to_string(nthGuard), nullptr);
   } 
 
   blockBd->SymCommitStmtAt(
@@ -1283,7 +1273,6 @@ void RandomFCallEmbedder::Visit(const symir::Goto &g)        { /* Do Nothing */ 
 void RandomFCallEmbedder::Visit(const symir::ScaParam &p)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::VecParam &p)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::StructParam &p) { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::UnInitLocal &l) { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::ScaLocal &l)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::VecLocal &l)    { /* Do Nothing */ }
 void RandomFCallEmbedder::Visit(const symir::StructLocal &l) { /* Do Nothing */ }
