@@ -99,7 +99,6 @@ namespace symir {
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
-    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;
@@ -138,7 +137,6 @@ namespace symir {
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
-    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;
@@ -256,7 +254,6 @@ namespace symir {
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
-    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;

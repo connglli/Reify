@@ -40,13 +40,13 @@ public:
   /// Get default RewriteEngine with the default set of rules added
   static RewriteEngine Default() { 
     auto engine = RewriteEngine();
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaAdd>(), 3);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaSub>(), 3);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaMul>(), 3);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaDiv>(), 3);
-    engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 4);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaAdd>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaSub>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaMul>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstProbpagationViaDiv>(), 1);
+    engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 2);
     engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 4);
-    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
+    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 2);
     engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
     return engine;
   }
@@ -110,7 +110,6 @@ protected:
   void Visit(const symir::ScaParam &p) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::VecParam &p) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::StructParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::UnInitLocal &l) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::ScaLocal &l) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::VecLocal &l) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::StructLocal &l) override { Panic("Not a subnode of any STMT"); }
@@ -146,7 +145,6 @@ protected:
   void Visit(const symir::ScaParam &p) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::VecParam &p) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::StructParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::UnInitLocal &l) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::ScaLocal &l) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::VecLocal &l) override { Panic("Not a subnode of any STMT"); }
   void Visit(const symir::StructLocal &l) override { Panic("Not a subnode of any STMT"); }

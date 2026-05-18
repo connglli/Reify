@@ -62,7 +62,6 @@ namespace symir {
   class Goto;
   class ScaParam;
   class VecParam;
-  class UnInitLocal;
   class ScaLocal;
   class VecLocal;
   class StructLocal; // Forward declaration
@@ -91,7 +90,6 @@ namespace symir {
     virtual void Visit(const ScaParam &p) = 0;
     virtual void Visit(const VecParam &p) = 0;
     virtual void Visit(const StructParam &p) = 0;
-    virtual void Visit(const UnInitLocal &l) = 0;
     virtual void Visit(const ScaLocal &l) = 0;
     virtual void Visit(const VecLocal &l) = 0;
     virtual void Visit(const StructLocal &l) = 0;
@@ -193,7 +191,6 @@ namespace symir {
       SIR_PARAM_SCA,
       SIR_PARAM_VEC,
       SIR_PARAM_STRUCT,
-      SIR_LOCAL_UNINIT,
       SIR_LOCAL_SCA,
       SIR_LOCAL_VEC,
       SIR_LOCAL_STRUCT,
@@ -1228,24 +1225,6 @@ namespace symir {
     ) : Stmt(irId), VarDef(std::move(name), shape, type, std::move(structName)) {}
   };
 
-  /// A UnInitLocal is a declaration of a local variable with no initial value within the function;
-  class UnInitLocal : public Local {
-  public:
-    explicit UnInitLocal(
-        std::string name, Type type = Type::I32, bool isVolatile = false
-    ) : Local(SIR_LOCAL_UNINIT, std::move(name), type) {
-      if (isVolatile) {
-        SetVolatile();
-      }
-    }
-
-    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
-
-    [[nodiscard]] const VarDef *GetDefinition() const override { return this; }
-
-    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
-  };
-
   /// A ScaLocal is a declaration of a local variable with an initial value within the function.
   class ScaLocal : public Local {
   public:
@@ -1255,8 +1234,8 @@ namespace symir {
       if (isVolatile) {
         SetVolatile();
       }
-      Assert(this->coef != nullptr, "The coef is given a nullptr");
       Assert(
+          this->coef == nullptr ||
           type == this->coef->GetType(), "The coef (%s) and the var (%s) are of different types",
           GetTypeSName(this->coef->GetType()).c_str(), GetTypeSName(type).c_str()
       );
@@ -1287,7 +1266,7 @@ namespace symir {
       const int expectedNumEls = GetVecNumEls(this->vecShape);
       if (this->GetBaseType() != SymIR::STRUCT) {
         Assert(
-            expectedNumEls == static_cast<int>(this->coefs.size()),
+            expectedNumEls == static_cast<int>(this->coefs.size()) || this->coefs.size() == 0,
             "The number of initial values (%lu) does not match the number of elements (%d) of "
             "the vector variable %s",
             this->coefs.size(), expectedNumEls, this->GetName().c_str()
@@ -1989,7 +1968,6 @@ protected:
     void Visit(const ScaParam &p) override    { Panic("Not a subnode of Block"); }
     void Visit(const VecParam &p) override    { Panic("Not a subnode of Block"); }
     void Visit(const StructParam &p) override { Panic("Not a subnode of Block"); }
-    void Visit(const UnInitLocal &l) override { Panic("Not a subnode of Block"); }
     void Visit(const ScaLocal &l) override    { Panic("Not a subnode of Block"); }
     void Visit(const VecLocal &l) override    { Panic("Not a subnode of Block"); }
     void Visit(const StructLocal &l) override { Panic("Not a subnode of Block"); }
@@ -2048,7 +2026,6 @@ protected:
     void Visit(const ScaParam &p) override    { Panic("Not a valid Stmt to be copied"); }
     void Visit(const VecParam &p) override    { Panic("Not a subnode of a Stmt"); }
     void Visit(const StructParam &p) override { Panic("Not a subnode of a Stmt"); }
-    void Visit(const UnInitLocal &l) override { Panic("Not a subnode of a Stmt"); }
     void Visit(const ScaLocal &l) override    { Panic("Not a subnode of a Stmt"); }
     void Visit(const VecLocal &l) override    { Panic("Not a subnode of a Stmt"); }
     void Visit(const StructLocal &l) override { Panic("Not a subnode of a Stmt"); }
@@ -2228,11 +2205,6 @@ protected:
     /// Define and commit a new StructParam
     const StructParam *SymStructParam(const std::string &name, const std::string &structName);
 
-    /// Define and commit a new UnInitLocal
-    const UnInitLocal *SymUnInitLocal(
-        const std::string &name, SymIR::Type type = SymIR::I32, bool isVolatile = false
-    );
-
     /// Define and commit a new ScaLocal
     const ScaLocal *SymScaLocal(
         const std::string &name, Coef *coef, SymIR::Type type = SymIR::I32, bool isVolatile = false
@@ -2347,7 +2319,6 @@ protected:
     void Visit(const ScaParam &p) override;
     void Visit(const VecParam &p) override;
     void Visit(const StructParam &p) override;
-    void Visit(const UnInitLocal &l) override;
     void Visit(const ScaLocal &l) override;
     void Visit(const VecLocal &l) override;
     void Visit(const StructLocal &l) override;

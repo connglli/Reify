@@ -83,7 +83,6 @@ private:
   void Visit(const symir::ScaParam &p) override;
   void Visit(const symir::VecParam &p) override;
   void Visit(const symir::StructParam &p) override;
-  void Visit(const symir::UnInitLocal &l) override;
   void Visit(const symir::ScaLocal &l) override;
   void Visit(const symir::VecLocal &l) override;
   void Visit(const symir::StructLocal &l) override;

@@ -703,10 +703,6 @@ void UBSan::Visit(const symir::StructParam &p) {
   });
 }
 
-void UBSan::Visit(const symir::UnInitLocal &l) {
-  Panic("No UnInitLocal should exist during function creation");
-}
-
 void UBSan::Visit(const symir::ScaLocal &l) {
   l.GetCoef()->Accept(*this);
   auto coefExpr = popExpression();

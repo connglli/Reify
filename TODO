@@ -12,7 +12,7 @@ Java:
 2. separation compilation units
 
 Interprocedural Dataflow: 
-1. Add lowering for new structures (For mod arithmetic and for/while/ifelse) Java and SYMIR as well as parsing for SYMIR
+1. Add lowering for new structures (For mod arithmetic and for/while/ifelse) Java and SYMIR as well as parsing for SYMIR (including Uninitialized Locals)
 3. turn FCallStrategy state like varMap, filtered{Variables, VarState, ...} etc into locals 
 
 General: 
