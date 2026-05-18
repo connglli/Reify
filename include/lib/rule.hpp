@@ -38,11 +38,29 @@ struct Rule {
     const symir::Stmt *stmt
   ) = 0;
 
-  /// get a new local that is not yet used in the block with label `blockLabel`
-  const symir::VarDef *getNewLocal(symir::FunctBuilder *funBd, std::string blockLabel) {
-    std::string locName = this->locPrefix + "_" + std::to_string(varCounterMap[blockLabel]++);
-    const symir::VarDef *loc = funBd->FindVar(locName);
-    if (loc == nullptr) loc = funBd->SymUnInitLocal(locName);
+  /// get a new scalar local that is not yet used in the block with label `blockLabel`
+  const symir::VarDef *getNewScaLocal(symir::FunctBuilder *funBd, std::string blockLabel, symir::SymIR::Type type = symir::SymIR::Type::I32) {
+    if (!this->varCounterMap.contains(blockLabel)) this->varCounterMap[blockLabel] = 0;
+    std::string locName = this->locPrefix + "_" + std::to_string(this->varCounterMap[blockLabel]++);
+    Assert(funBd->FindParam(locName) == nullptr, "New Local %s should never be a Parameter", locName.c_str());
+    const symir::VarDef *loc = funBd->FindLocal(locName);
+    if (loc == nullptr) loc = funBd->SymScaLocal(locName, nullptr);
+    return loc;
+  }
+
+  /// get a new vector local that is not yet used in the block with label `blockLabel`
+  const symir::VarDef *getNewVecLocal(
+      symir::FunctBuilder *funBd,
+      std::string blockLabel, 
+      const std::vector<int> &shape,
+      symir::SymIR::Type type = symir::SymIR::Type::I32,
+      std::string structName = ""
+    ) {
+    if (!this->varCounterMap.contains(blockLabel)) this->varCounterMap[blockLabel] = 0;
+    std::string locName = this->locPrefix + "_" + std::to_string(this->varCounterMap[blockLabel]++);
+    Assert(funBd->FindParam(locName) == nullptr, "New Local %s should never be a Parameter", locName.c_str());
+    const symir::VarDef *loc = funBd->FindLocal(locName);
+    if (loc == nullptr) loc = funBd->SymVecLocal(locName, shape, {}, type, structName);
     return loc;
   }
 
