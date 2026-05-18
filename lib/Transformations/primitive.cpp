@@ -285,7 +285,8 @@ namespace transformations::primitive {
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
-  
+
+    std::cout << "fun: " << funBd->GetName() << " block: " << blockBd->GetLabel() << " ConstProbaAddVarName: " << var->GetName() << std::endl;
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
@@ -525,6 +526,35 @@ namespace transformations::primitive {
     );
   
     return {assignStmts, newStmt};
+  }
+
+  bool Reg2Mem::match(const symir::Stmt *stmt) const {
+    return patternmatch::match(
+      stmt,
+      m_AssStmt(m_And(m_WithType(symir::SymIR::Type::I32), m_ScalarVar()), m_WildCard<const symir::Expr *>())
+    );
+  }
+
+  std::vector<symir::BlockBuilder::StmtID> Reg2Mem::rewrite(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::Stmt *stmt
+  ) {
+    const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
+    const symir::VarDef *memVar = this->getNewVecLocal(funBd, blockBd->GetLabel(), {1});
+    symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
+    std::vector<symir::Coef *> memAccess = {funBd->SymI32Const(0)};
+    const symir::BlockBuilder::StmtID memAssign = blockBd->SymAssStmt(memVar, c.CopyExpr(assStmt->GetExpr()), memAccess);
+
+    const symir::VarUse *v = assStmt->GetVar();
+    auto access = utils::copyAccess(funBd, v);
+    const symir::BlockBuilder::StmtID assignBack = blockBd->SymAssStmt(
+      v->GetDef(),
+      blockBd->SymAddExpr({ blockBd->SymMulTerm(funBd->SymI32Const(1), memVar, memAccess) }),
+      access
+    );
+    
+    return {memAssign, assignBack};
   }
 
 } // namespace 

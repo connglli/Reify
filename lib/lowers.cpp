@@ -749,7 +749,7 @@ namespace symir {
       out << "[" << len << "]";
     }
     if (l.GetCoefs().size() == 0) {
-      out << ";";
+      out << ";" << std::endl;
       return;
     }
     out << " = {";
@@ -777,7 +777,7 @@ namespace symir {
     out << "struct " << l.GetStructName() << " " << l.GetName();
     const auto &cs = l.GetCoefs();
     if (l.GetCoefs().size() == 0) {
-      out << ";";
+      out << ";" << std::endl;
       return;
     }
     out << " = {";
