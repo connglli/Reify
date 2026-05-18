@@ -151,6 +151,18 @@ namespace transformations::primitive {
     ) override;
   };
 
+  /// Adds an intermediate operation that moves a local to a stack ptr (array)
+  /// x = E1 => y[0] = E1; x = y[0]
+  struct Reg2Mem : Rule {
+    Reg2Mem() : Rule("reg_2_mem") {}
+    bool match(const symir::Stmt *stmt) const override;
+    std::vector<symir::BlockBuilder::StmtID> rewrite(
+      symir::FunctBuilder *funBd,
+      symir::BlockBuilder *blockBd,
+      const symir::Stmt *stmt
+    ) override;
+  };
+
 } // namespace 
 
 #endif //REIFY_PRIMITIVE_HPP
