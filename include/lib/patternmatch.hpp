@@ -28,7 +28,6 @@
 
 #include "lib/lang.hpp"
 #include <string>
-#include <utility>
 
 namespace patternmatch {
   template<typename Node>
@@ -256,7 +255,7 @@ namespace patternmatch {
   };
 
   template<typename Node, size_t N>
-  struct m_AnyNSeq: Pattern<std::vector<Node>> {
+  struct m_AnyNSeq : Pattern<std::vector<Node>> {
     template<typename... Args>
     m_AnyNSeq(const Args&... args) : patterns{args...} {}
 
@@ -273,6 +272,15 @@ namespace patternmatch {
     }
 
     std::array<std::reference_wrapper<const Pattern<Node>>, N> patterns;
+  };
+
+  template<typename Node>
+  struct m_Length : Pattern<std::vector<Node>> {
+    m_Length(const Pattern<size_t>& L) : L(L) {}
+    inline bool match(std::vector<Node> Vs) const override {
+      return L.match(Vs.size());
+    }
+    const Pattern<size_t> &L;
   };
 
   template<typename Node>

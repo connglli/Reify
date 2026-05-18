@@ -28,7 +28,6 @@
 #include "lib/dbgutils.hpp"
 #include "lib/jnifutils.hpp"
 #include "lib/lang.hpp"
-#include "lib/logger.hpp"
 
 namespace symir {
   std::ostream SymIRLower::devNull(nullptr);

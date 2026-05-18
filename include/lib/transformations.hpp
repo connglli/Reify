@@ -48,6 +48,7 @@ public:
     engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 2);
     engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 4);
     engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 2);
+    engine.addRule(std::make_unique<vectorize::PartialUnrolling>(), 3);
     engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
     return engine;
   }

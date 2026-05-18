@@ -52,6 +52,7 @@ namespace transformations::vectorize {
     ) override;
   };
 
+  /// https://llvm.org/docs/Vectorizers.html#partial-unrolling-during-vectorization
   struct PartialUnrolling : Rule {
     PartialUnrolling() : Rule("part_unroll") {}
     bool match(const symir::Stmt *stmt) const override;
