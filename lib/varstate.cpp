@@ -312,10 +312,6 @@ void VariableStateExtractor::Visit(const symir::StructParam &p) {
   });
 }
 
-void VariableStateExtractor::Visit(const symir::UnInitLocal &l) {
-  Panic("No ModExpr should exist during function creation");
-}
-
 void VariableStateExtractor::Visit(const symir::ScaLocal &l) {
   // we do not care for the coeffs term here
   auto varExpr = this->symexec->ubSan->CreateScaExpr(l.GetDefinition(), 0);

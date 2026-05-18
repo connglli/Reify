@@ -175,7 +175,7 @@ namespace transformations::primitive {
       access
     );
   
-    auto loopVar = this->getNewLocal(funBd, blockBd->GetLabel());
+    auto loopVar = this->getNewScaLocal(funBd, blockBd->GetLabel());
     symir::BlockBuilder::StmtID forSum = blockBd->SymForStmt(
       // loop variable i
       loopVar,
@@ -284,7 +284,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
@@ -342,7 +342,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
@@ -400,7 +400,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
@@ -410,7 +410,7 @@ namespace transformations::primitive {
           termIds.reserve(e.GetTerms().size() + 1);
           bool hasReplaced = false;
           for (auto term : e.GetTerms()) {
-            if (hasReplaced || term->GetOp() != symir::Term::OP_CST) {
+            if (hasReplaced || term->GetOp() != symir::Term::OP_CST || term->GetCoef()->GetI32Value() == INT_MIN) {
               termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(term));
               continue;
             }
@@ -446,7 +446,7 @@ namespace transformations::primitive {
   
     symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
       stmt,
-      make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
+      make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))),
       varInsertFun,
       0.25
     );
@@ -479,7 +479,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstProbpagationViaDiv" << std::endl;
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -506,7 +506,7 @@ namespace transformations::primitive {
   
     symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
       stmt,
-      make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
+      make_matcher(const symir::Term *, m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())),
       varInsertFun,
       0.25
     );
