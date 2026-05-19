@@ -42,6 +42,8 @@ Reify is capable of generating *leaf functions* that does not call other functio
 python scripts/rysmith.py --output generated --limit 512
 ```
 
+The script rotates through the recommended function-generation configurations (number of basic blocks per function, etc.) so that the 512 functions expose various shapes.
+
 The output directory (given by the `--output` option) includes multiple sub-directories, each for an individual function:
 
 - `func_<uuid>_<sno>`: Contains all artifacts for an individual leaf function, including:
@@ -84,19 +86,27 @@ python scripts/rysmith.py ... --extra '--unstable-graphdb /path/to/csmith_db.jso
 
 ### Whole Program Generation
 
-Use the following command to generate 512 whole programs based on a set of leaf functions previously generated (given by the `--input` option), in particular, their S expressions:
+**Use the following script to generate 512 whole programs from a set of previously generated leaf functions** (in particular, their S expressions, given by the `--input` option):
 
 ```bash
-./build/bin/rylink --input generated --limit 512 $(uuidgen)
+python scripts/rylink.py --input generated --limit 512
 ```
 
-The generated programs are placed in the `programs` subdirectory of `--input`. Each program has its own directory:
+The script rotates through the recommended program-generation configurations (number of functions per program) so that the 512 programs span a range of sizes.
+
+The generated programs are placed alongside the input functions in `--input`. Each program has its own directory:
 
 - `prog_<uuid>_<sno>`: Contains all artifacts for a whole program, including:
   - `main.c`: The entry point.
   - `chksum.c`: Checksum utilities.
   - `proto.h`: Prototypes of used leaf functions.
   - `func_*.c`: Individual function files.
+
+**Or use the following command to generate programs in a single invocation**:
+
+```bash
+./build/bin/rylink --input generated --limit 512 --Xfunction-depth 10 $(uuidgen)
+```
 
 ## 🔎 Fuzzing Compilers
 
