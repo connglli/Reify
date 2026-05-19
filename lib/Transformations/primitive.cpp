@@ -286,8 +286,6 @@ namespace transformations::primitive {
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
 
-    std::cout << "fun: " << funBd->GetName() << " block: " << blockBd->GetLabel() << " ConstProbaAddVarName: " << var->GetName() << std::endl;
-  
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
         [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
