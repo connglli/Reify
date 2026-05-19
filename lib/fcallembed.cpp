@@ -1118,7 +1118,7 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
     this->nrIterations = 0;
     this->filteredNrVariables = 0;
 
-    this->rewriteEngine.run(funBd, headBlockBd, 20);
+    this->rewriteEngine.run(funBd, headBlockBd, 100);
 
     std::vector<const symir::Term *> cstTerms = ConstQuery(funBd, headBlockBd).query();
     std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
@@ -1128,7 +1128,7 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
     }
     this->randomlyFilterVarState(funBd);
 
-    size_t nrReplaced = Random::Get().Binomial(cstTerms.size())();
+    size_t nrReplaced = Random::Get().Binomial(cstTerms.size() / 10 + 1)();
 
     std::map<const symir::Term *, symir::BlockBuilder::TermID> termMap;
     for (size_t i = 0; i < nrReplaced; i++) {
