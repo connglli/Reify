@@ -54,7 +54,7 @@ struct GlobalOptions {
   // The probability of generating an array variable
   double ArrayVariableProba = 0.2;
   // The maximum number of dimensions for an array variable
-  int MaxNumArrayDims = 3;
+  int MaxNumArrayDims = 2;
   // The maximum number of elements for each dimension of an array variable
   int MaxNumElsPerArrayDim = 3;
   // When enabled, some variables can be structs
@@ -107,8 +107,8 @@ struct GlobalOptions {
   int MaxNumExecStepsPerFun = 1000;
   // Empirically, if random initialisations are enabled, then the smt solver isn't able to generate
   // more initialisations for the same set of coefficients. I would recommend to either have a
-  // reasonably high number of NumInitsPerExec and set this to false, or set this to true and set
-  // NumInitsPerExec to 1
+  // reasonably high number of NumInitsPerExec and set this to false, or set NumInitsPerExec to 1
+  // and set this to true or false according to your needs.
   bool EnableRandomInits = false;
   // We don't want all initialisations to be 0, so this constraint takes care of that
   bool EnableInterestInits = true;
@@ -120,7 +120,7 @@ struct GlobalOptions {
   // There will be no out-edge interleaving.
   bool EnableConsistentExecs = false;
   // The number of different initialisation sets we want the solver to find for a given function
-  int NumInitsPerExec = 3;
+  int NumInitsPerExec = 2;
   // When enabled, inject obvious undefined behaviour in the unexecuted blocks
   // Otherwise, we inject some random values to their coefficients
   bool EnableUBInUnexecutedBbls = false;
@@ -351,7 +351,7 @@ struct GlobalOptions {
 
     if (args.count("Xnum-inits-per-exec")) {
       NumInitsPerExec = args["Xnum-inits-per-exec"].as<int>();
-      if (NumInitsPerExec > 5) {
+      if (NumInitsPerExec > 3) {
         std::cerr
             << "Warning: Too many initialisations per exec would make the generation much slower"
             << std::endl;

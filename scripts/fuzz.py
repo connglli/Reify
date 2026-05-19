@@ -157,7 +157,7 @@ def generate_function(
   except CalledProcessError as e:
     result = None, (f"exitcode: {e.returncode}; message: {e.stdout or '<no output>'}")
   except TimeoutExpired:
-    result = None, f"timeout"
+    result = None, "timeout"
   except Exception as e:
     result = None, f"unexpected error: {e}"
   if result[0] is None:
