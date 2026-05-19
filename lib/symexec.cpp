@@ -240,6 +240,7 @@ bool SymExec::solve(
     bitwuzla::Options opts;
     opts.set(bitwuzla::Option::PRODUCE_MODELS, true);
     opts.set(bitwuzla::Option::NTHREADS, GlobalOptions::Get().BitwuzlaNumThreads);
+    opts.set(bitwuzla::Option::BV_SOLVER, GlobalOptions::Get().BitwuzlaBvSolver);
     solver = std::make_unique<bitwuzla::Bitwuzla>(ubSan->GetTermManager(), opts);
     numAssertedConstraints = 0;
   }

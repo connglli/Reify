@@ -152,6 +152,15 @@ struct GlobalOptions {
   // on multi-core systems but may increase memory usage.
   uint64_t BitwuzlaNumThreads = 1;
 
+  // Bitwuzla bit-vector solver engine. One of:
+  //   - "bitblast" : classical eager bit-blasting (Bitwuzla's default).
+  //   - "prop"     : propagation-based local search. SAT-only (cannot prove
+  //                  UNSAT); faster on SAT-heavy queries like ours.
+  //   - "preprop"  : sequential portfolio of `bitblast` and `prop`. Empirically
+  //                  beats `bitblast` by ~12% throughput on rysmith while still
+  //                  retaining UNSAT-handling capability.
+  std::string BitwuzlaBvSolver = "preprop";
+
   ////////////////////////////////////////////////////////////
   ////// Helper Functions
   ////////////////////////////////////////////////////////////
@@ -190,6 +199,7 @@ struct GlobalOptions {
       ("Xlvn-gvn-proba", "Probability of forcing some values to be the equivalent as some others", cxxopts::value<double>())
       // Solver options
       ("Xbitwuzla-threads", "Number of threads for the Bitwuzla SMT solver (default: 1)", cxxopts::value<uint64_t>())
+      ("Xbitwuzla-bv-solver", "Bitwuzla bit-vector solver engine: bitblast, prop, or preprop (default: preprop)", cxxopts::value<std::string>())
       ;
     // clang-format on
   }
@@ -410,6 +420,16 @@ struct GlobalOptions {
       if (BitwuzlaNumThreads < 1) {
         std::cerr << "Error: The number of Bitwuzla threads (--Xbitwuzla-threads) must be at "
                      "least 1."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
+    if (args.count("Xbitwuzla-bv-solver")) {
+      BitwuzlaBvSolver = args["Xbitwuzla-bv-solver"].as<std::string>();
+      if (BitwuzlaBvSolver != "bitblast" && BitwuzlaBvSolver != "prop" &&
+          BitwuzlaBvSolver != "preprop") {
+        std::cerr << "Error: --Xbitwuzla-bv-solver must be one of: bitblast, prop, preprop"
                   << std::endl;
         exit(1);
       }
