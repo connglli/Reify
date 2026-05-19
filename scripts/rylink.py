@@ -60,9 +60,6 @@ def run_gen_loop(popts: ProgGenOptions, *, check: bool, shuffle: bool):
     f"extra={"'" + popts.extra + "'" if popts.extra else '<NONE>'}"
   )
   num_confs = len(PGEN_SUGGESTED_CONFIGS) if shuffle else 1
-  # If limit is 0, it means we want to generate programs without a limit. In this case, we can just keep generating 1000 programs each config, and round robin.
-  # Otherwise, we generate limit/numconfigs per config.
-  # Change the uuid for each gen.
   batch = 1000 if total_limit == 0 else max(1, total_limit // num_confs)
 
   generated = 0
