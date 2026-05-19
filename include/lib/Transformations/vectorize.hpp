@@ -52,9 +52,11 @@ namespace transformations::vectorize {
     ) override;
   };
 
-  /// https://llvm.org/docs/Vectorizers.html#partial-unrolling-during-vectorization
-  struct PartialUnrolling : Rule {
-    PartialUnrolling() : Rule("part_unroll") {}
+
+
+  /// https://llvm.org/docs/Vectorizers.html#reductions
+  struct Reduction : Rule {
+    Reduction() : Rule("reduc") {}
     bool match(const symir::Stmt *stmt) const override;
     std::vector<symir::BlockBuilder::StmtID> rewrite(
       symir::FunctBuilder *funBd,
@@ -62,7 +64,6 @@ namespace transformations::vectorize {
       const symir::Stmt *stmt
     ) override;
   };
-
 }
 
 #endif //REIFY_VECTORIZE_HPP

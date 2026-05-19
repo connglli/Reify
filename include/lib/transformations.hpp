@@ -40,16 +40,16 @@ public:
   /// Get default RewriteEngine with the default set of rules added
   static RewriteEngine Default() { 
     auto engine = RewriteEngine();
-    engine.addRule(std::make_unique<primitive::Reg2Mem>(), 3);
+    engine.addRule(std::make_unique<primitive::Reg2Mem>(), 1);
     engine.addRule(std::make_unique<primitive::ConstProbpagationViaAdd>(), 1);
     engine.addRule(std::make_unique<primitive::ConstProbpagationViaSub>(), 1);
     engine.addRule(std::make_unique<primitive::ConstProbpagationViaMul>(), 1);
     engine.addRule(std::make_unique<primitive::ConstProbpagationViaDiv>(), 1);
-    engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 2);
-    engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 4);
-    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 2);
-    engine.addRule(std::make_unique<vectorize::PartialUnrolling>(), 3);
-    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
+    engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 50);
+    engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 10);
+    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 5);
+    engine.addRule(std::make_unique<vectorize::Reduction>(), 6);
+    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 5);
     return engine;
   }
   void addRule(std::unique_ptr<Rule> rule, int weight);

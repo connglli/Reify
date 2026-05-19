@@ -56,20 +56,20 @@ namespace transformations::vectorize {
     return {deadStmt, origStmt};
   }
 
-  bool PartialUnrolling::match(const symir::Stmt *stmt) const {
+  bool Reduction::match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(m_WildCard<const symir::VarUse*>(), m_Expr(m_Length<const symir::Term *>(m_Range<size_t, size_t>(2, INT_MAX))))
     );
   }
 
-  std::vector<symir::BlockBuilder::StmtID> PartialUnrolling::rewrite(
+  std::vector<symir::BlockBuilder::StmtID> Reduction::rewrite(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::Stmt *stmt
   ) {
 
-    Log::Get().Out() << "Running PartialUnrolling" << std::endl;
+    Log::Get().Out() << "Running Reduction" << std::endl;
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
