@@ -214,6 +214,18 @@ struct GlobalOptions {
   }
 
   void HandleFuncArgs(const cxxopts::ParseResult &args) {
+    if (args.count("Xlower-coef-bound")) {
+      LowerBound = args["Xlower-coef-bound"].as<int>();
+    }
+    if (args.count("Xupper-coef-bound")) {
+      UpperBound = args["Xupper-coef-bound"].as<int>();
+    }
+    if (LowerBound > UpperBound) {
+      std::cerr << "Error: --Xlower-coef-bound (" << LowerBound
+                << ") must not exceed --Xupper-coef-bound (" << UpperBound << ")" << std::endl;
+      exit(1);
+    }
+
     if (args.count("Xnum-assigns-per-bbl")) {
       NumAssignsPerBBL = args["Xnum-assigns-per-bbl"].as<int>();
       if (NumAssignsPerBBL > 3) {
