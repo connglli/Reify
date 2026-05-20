@@ -27,10 +27,10 @@
 #define REIFY_UBBASE_HPP
 
 #include <bitwuzla/cpp/bitwuzla.h>
-#include <map>
 #include <memory>
 #include <stack>
 #include <string>
+#include <unordered_map>
 
 #include "lib/lang.hpp"
 
@@ -93,11 +93,11 @@ protected:
 
   // Context used in collecting constraints
   std::stack<bitwuzla::Term> exprStack{}; // The expression stack for evaluating the SymIR program
-  std::map<std::string, int> versions{};  // The SSA version table for each variable
+  std::unordered_map<std::string, int> versions{}; // The SSA version table for each variable
 
   // Term caches to ensure Bitwuzla terms are reused (Bitwuzla doesn't unify by name!)
-  std::map<std::string, bitwuzla::Term> coefTerms{};  // Cache of coefficient terms
-  std::map<std::string, bitwuzla::Term> paramTerms{}; // Cache of parameter/variable terms
+  std::unordered_map<std::string, bitwuzla::Term> coefTerms{};  // Cache of coefficient terms
+  std::unordered_map<std::string, bitwuzla::Term> paramTerms{}; // Cache of parameter/variable terms
 };
 
 #endif // REIFY_UBBASE_HPP
