@@ -121,6 +121,8 @@ struct GlobalOptions {
   bool EnableConsistentExecs = false;
   // The number of different initialisation sets we want the solver to find for a given function
   int NumInitsPerExec = 2;
+  // The minimum number of variables that must differ between consecutive initializations
+  int NumDiffInitVars = 1;
   // When enabled, inject obvious undefined behaviour in the unexecuted blocks
   // Otherwise, we inject some random values to their coefficients
   bool EnableUBInUnexecutedBbls = false;
@@ -192,6 +194,7 @@ struct GlobalOptions {
       ("Xnum-vars-per-fun", "The number of allowed variables (parameters and local variables) for each function", cxxopts::value<int>())
       ("Xnum-locals-per-fun", "The number of allowed local variables for each function", cxxopts::value<int>())
       ("Xnum-inits-per-exec", "Number of initialisation sets to find per execution", cxxopts::value<int>())
+      ("Xnum-diff-init-vars", "Minimum number of variables that must differ between consecutive initializations (default: 1)", cxxopts::value<int>())
       ("U,Xenable-ub-inject", "Enable the injection of undefined behaviors to those unexecuted basic blocks", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("Xinject-ub-proba", "Probability of the selection of unexecuted blocks to inject undefined behaviors", cxxopts::value<double>())
       ("Xsample-bg-proba", "Probability of sampling a base graph from the given graph database", cxxopts::value<double>())
@@ -445,6 +448,11 @@ struct GlobalOptions {
                   << std::endl;
         exit(1);
       }
+    }
+
+    if (args.count("Xnum-diff-init-vars")) {
+      NumDiffInitVars = args["Xnum-diff-init-vars"].as<int>();
+      ensurePositive(NumDiffInitVars, "Xnum-diff-init-vars");
     }
   }
 

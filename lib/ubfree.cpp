@@ -221,41 +221,88 @@ void UBSan::MakeInitWithRandomValue() {
 }
 
 void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
-  // There should be at lease NUM_VAR/2 variables which are not equal in both initialisations
-  std::vector<bitwuzla::Term> params;
-  auto zero = tm->mk_bv_zero(bvSort);
-  auto one = tm->mk_bv_one(bvSort);
+  const int K = GlobalOptions::Get().NumDiffInitVars;
 
-  for (int i = 0; i < fun.NumParams(); i++) {
-    const auto p = fun.GetParams()[i];
-    const auto &oldValue = init[i];
-    if (p->IsScalar()) {
-      if (p->GetType() == symir::SymIR::Type::STRUCT) {
-        const auto *sDef = fun.GetStruct(p->GetStructName());
-        int k = 0;
-        IterateStructElements(fun, sDef, [&](std::string elName) {
-          bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
-          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
-          auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
-          params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
-          k++;
-        });
+  if (K == 1) {
+    // Optimization: at least one different initialization is enough.
+    // We can use a simple OR constraint over DISTINCT terms, which is much faster.
+    std::vector<bitwuzla::Term> diffTerms;
+    for (int i = 0; i < fun.NumParams(); i++) {
+      const auto p = fun.GetParams()[i];
+      const auto &oldValue = init[i];
+      if (p->IsScalar()) {
+        if (p->GetType() == symir::SymIR::Type::STRUCT) {
+          const auto *sDef = fun.GetStruct(p->GetStructName());
+          int k = 0;
+          IterateStructElements(fun, sDef, [&](std::string elName) {
+            bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
+            auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
+            diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
+            k++;
+          });
+        } else {
+          bitwuzla::Term newValue = CreateScaExpr(p, 0);
+          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue());
+          diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
+        }
       } else {
-        bitwuzla::Term newValue = CreateScaExpr(p, 0);
-        auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue());
-        auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
-        params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
-      }
-    } else {
-      for (int j = 0; j < p->GetVecNumEls(); j++) {
-        bitwuzla::Term newValue = CreateVecElExpr(p, j, 0);
-        auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(j));
-        auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
-        params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
+        for (int j = 0; j < p->GetVecNumEls(); j++) {
+          bitwuzla::Term newValue = CreateVecElExpr(p, j, 0);
+          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(j));
+          diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
+        }
       }
     }
+
+    if (!diffTerms.empty()) {
+      if (diffTerms.size() == 1) {
+        addConstraint(diffTerms[0]);
+      } else {
+        addConstraint(tm->mk_term(bitwuzla::Kind::OR, diffTerms));
+      }
+    }
+  } else {
+    // General case: require at least K different initializations.
+    // We construct indicator variables and count them using AtMostKZeroes.
+    std::vector<bitwuzla::Term> params;
+    auto zero = tm->mk_bv_zero(bvSort);
+    auto one = tm->mk_bv_one(bvSort);
+
+    for (int i = 0; i < fun.NumParams(); i++) {
+      const auto p = fun.GetParams()[i];
+      const auto &oldValue = init[i];
+      if (p->IsScalar()) {
+        if (p->GetType() == symir::SymIR::Type::STRUCT) {
+          const auto *sDef = fun.GetStruct(p->GetStructName());
+          int k = 0;
+          IterateStructElements(fun, sDef, [&](std::string elName) {
+            bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
+            auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
+            auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
+            params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
+            k++;
+          });
+        } else {
+          bitwuzla::Term newValue = CreateScaExpr(p, 0);
+          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue());
+          auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
+          params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
+        }
+      } else {
+        for (int j = 0; j < p->GetVecNumEls(); j++) {
+          bitwuzla::Term newValue = CreateVecElExpr(p, j, 0);
+          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(j));
+          auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
+          params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
+        }
+      }
+    }
+
+    const int numParams = static_cast<int>(params.size());
+    // Require at least min(K, numParams) variables to be different,
+    // which means at most max(0, numParams - K) variables can be the same.
+    addConstraint(AtMostKZeroes(*tm, params, std::max(0, numParams - K)));
   }
-  addConstraint(AtMostKZeroes(*tm, params, std::min(3, static_cast<int>(params.size()) / 2)));
 }
 
 void UBSan::Visit(const symir::VarUse &v) {
