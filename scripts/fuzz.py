@@ -144,6 +144,8 @@ def generate_function(
       cmd += ["-s", str(opts.seed)]
     if opts.extra:
       cmd += shlex.split(opts.extra)
+    if timeout > 0:
+      cmd += ["--Xproc-timeout", str(timeout)]
     cmd += ["-o", str(opts.outdir), "-n", str(opts.sno), opts.uuid]
     cmdline.check_out(cmd, timeout=timeout)
     with arts.get_func_file().open("a") as fout:

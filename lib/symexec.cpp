@@ -36,6 +36,29 @@
 
 #include <chrono>
 
+// TimeTerminator is a custom Bitwuzla Terminator implementation that halts the
+// SMT solving process (check_sat) if the elapsed time exceeds a given millisecond limit.
+// This is used to implement path-solving time budgets to prevent the generator from hanging.
+class TimeTerminator : public bitwuzla::Terminator {
+public:
+  TimeTerminator(uint64_t limit_ms) :
+      limit_ms(limit_ms), start_time(std::chrono::steady_clock::now()) {}
+
+  virtual ~TimeTerminator() = default;
+
+  bool terminate() override {
+    if (limit_ms == 0)
+      return false;
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start_time).count();
+    return static_cast<uint64_t>(elapsed) >= limit_ms;
+  }
+
+private:
+  uint64_t limit_ms;
+  std::chrono::steady_clock::time_point start_time;
+};
+
 const int SymExec::PassCounterBblId =
     2147483647; // A large number to avoid conflicts with real basic block IDs
 const std::string SymExec::PassCounterBblLabel = NameLabel(SymExec::PassCounterBblId);
@@ -263,9 +286,26 @@ bool SymExec::solve(
     solver->assert_formula(constraints[numAssertedConstraints]);
   }
 
+  // Configure the time terminator for the SMT solver if a timeout is set.
+  // The solver will return UNKNOWN if the solving process is terminated due to timeout.
+  std::unique_ptr<TimeTerminator> terminator;
+  if (GlobalOptions::Get().ProcessTimeout > 0) {
+    // TODO: Use larger timeout for later initializations.
+    uint64_t limit_ms =
+        (GlobalOptions::Get().ProcessTimeout * 1000) / GlobalOptions::Get().NumInitsPerExec;
+    if (limit_ms > 0) {
+      terminator = std::make_unique<TimeTerminator>(limit_ms);
+      solver->configure_terminator(terminator.get());
+    }
+  }
+
   const auto t0 = std::chrono::steady_clock::now();
   auto result = solver->check_sat();
   const auto t1 = std::chrono::steady_clock::now();
+
+  if (terminator) {
+    solver->configure_terminator(nullptr);
+  }
   if (debug) {
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
     Log::Get().Out() << "Bitwuzla check_sat time: " << ms << "ms" << std::endl;

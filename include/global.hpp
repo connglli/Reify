@@ -164,6 +164,13 @@ struct GlobalOptions {
   std::string BitwuzlaBvSolver = "preprop";
 
   ////////////////////////////////////////////////////////////
+  ////// Other Parameters
+  ////////////////////////////////////////////////////////////
+
+  // Timeout for the process in seconds. Zero or negatives means no timeout.
+  uint64_t ProcessTimeout = 0;
+
+  ////////////////////////////////////////////////////////////
   ////// Helper Functions
   ////////////////////////////////////////////////////////////
 
@@ -203,6 +210,8 @@ struct GlobalOptions {
       // Solver options
       ("Xbitwuzla-threads", "Number of threads for the Bitwuzla SMT solver (default: 1)", cxxopts::value<uint64_t>())
       ("Xbitwuzla-bv-solver", "Bitwuzla bit-vector solver engine: bitblast, prop, or preprop (default: preprop)", cxxopts::value<std::string>())
+      // Other options
+      ("Xproc-timeout", "Timeout for the rysmith process in seconds (default: 0, no timeout)", cxxopts::value<uint64_t>())
       ;
     // clang-format on
   }
@@ -453,6 +462,10 @@ struct GlobalOptions {
     if (args.count("Xnum-diff-init-vars")) {
       NumDiffInitVars = args["Xnum-diff-init-vars"].as<int>();
       ensurePositive(NumDiffInitVars, "Xnum-diff-init-vars");
+    }
+
+    if (args.count("Xproc-timeout")) {
+      ProcessTimeout = args["Xproc-timeout"].as<uint64_t>();
     }
   }
 
