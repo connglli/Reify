@@ -472,8 +472,9 @@ void UBSan::Visit(const symir::Term &t) {
       break;
     case symir::Term::Op::OP_REM:
       addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
-      // Note: Remainder doesn't have overflow (same as division overflow would be INT_MIN % -1)
-      // But we'll add the constraint anyway for consistency
+      // INT_MIN % -1 is UB in C11: 6.5.5p6 defines `a % b` only when `a / b`
+      // is representable, and INT_MIN / -1 overflows. Reuse the SDIV overflow
+      // check to rule out the same operand pair.
       addConstraint(tm->mk_term(
           bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
       ));
@@ -483,7 +484,7 @@ void UBSan::Visit(const symir::Term &t) {
       termExpr = coefExpr;
       break;
     default:
-      Panic("Cannot reacher here");
+      Panic("Cannot reach here");
   }
 
   pushExpression(termExpr);
@@ -516,7 +517,7 @@ void UBSan::Visit(const symir::Expr &e) {
         result = tm->mk_term(bitwuzla::Kind::BV_SUB, {result, termExpr});
         break;
       default:
-        Panic("Cannot reacher here");
+        Panic("Cannot reach here");
     }
   }
   if (enableInterestCoefs) {
@@ -541,7 +542,7 @@ void UBSan::Visit(const symir::Cond &c) {
       pushExpression(tm->mk_term(bitwuzla::Kind::EQUAL, {expr, zero}));
       break;
     default:
-      Panic("Cannot reacher here");
+      Panic("Cannot reach here");
   }
 }
 

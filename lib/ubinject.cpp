@@ -336,32 +336,28 @@ void IntUBInject::Visit(const symir::Funct &f) {
 }
 
 void IntUBInject::ensureValidInitsForUses(const symir::Block *b) {
+  const auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
+  const auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
+  auto inRange = [&](const bitwuzla::Term &varExpr) {
+    auto sge = tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound});
+    auto sle = tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound});
+    return tm->mk_term(bitwuzla::Kind::AND, {sge, sle});
+  };
+
   for (const auto uv: b->GetUses()) {
-    bitwuzla::Term varExpr = tm->mk_bv_value_int64(bvSort, 0);
     if (uv->IsScalar()) {
       if (uv->GetDef()->GetType() == symir::SymIR::STRUCT) {
         const auto *sDef = currentFun->GetStruct(uv->GetDef()->GetStructName());
         for (const auto &field: sDef->GetFields()) {
-          varExpr = CreateStructFieldExpr(uv->GetDef(), field.name, 0);
-          bitwuzla::Term upperBound =
-              tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-          bitwuzla::Term lowerBound =
-              tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-          constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
-          constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
+          constraints.push_back(inRange(CreateStructFieldExpr(uv->GetDef(), field.name, 0)));
         }
-        continue;
       } else {
-        varExpr = CreateScaExpr(uv->GetDef(), 0);
+        constraints.push_back(inRange(CreateScaExpr(uv->GetDef(), 0)));
       }
     } else {
       // We only access the very last element. See Visit(const symir::VarUse &v).
-      varExpr = CreateVecElExpr(uv->GetDef(), uv->GetVecNumEls() - 1, 0);
+      constraints.push_back(inRange(CreateVecElExpr(uv->GetDef(), uv->GetVecNumEls() - 1, 0)));
     }
-    bitwuzla::Term upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-    bitwuzla::Term lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SLE, {varExpr, upperBound}));
-    constraints.push_back(tm->mk_term(bitwuzla::Kind::BV_SGE, {varExpr, lowerBound}));
   }
 }
 

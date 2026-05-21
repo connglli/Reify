@@ -207,7 +207,8 @@ private:
   std::stack<std::string> suffixStack{}; // The suffix stack for evaluating variable access
   std::string prevBbl = "", currBbl = "",
               nextBbl = ""; // The previous/current/next blocks been/being/to-be evaluated
-  std::map<std::string, std::string> verbbls{}; // The defined basic block for the current version
+  std::unordered_map<std::string, std::string> verbbls{
+  }; // The defined basic block for the current version
 
   // Flags controlling the behavior of the visitor
   bool enableInterestCoefs = true; // Whether to make coefficients interesting

@@ -45,8 +45,6 @@
   XX(STRUCT, struct)
 
 namespace symir {
-  using namespace symir;
-
   class SymIRLower : protected SymIRVisitor {
   public:
     static std::ostream devNull;
