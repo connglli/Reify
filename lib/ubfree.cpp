@@ -226,7 +226,6 @@ void UBSan::MakeInitWithRandomValue() {
 void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
   const int K = GlobalOptions::Get().NumDiffInitVars;
 
-<<<<<<< HEAD
   if (K == 1) {
     // Optimization: at least one different initialization is enough.
     // We can use a simple OR constraint over DISTINCT terms, which is much faster.
@@ -238,7 +237,7 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
         if (p->GetType() == symir::SymIR::Type::STRUCT) {
           const auto *sDef = fun.GetStruct(p->GetStructName());
           int k = 0;
-          IterateStructElements(fun, sDef, [&](std::string elName) {
+          ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
             bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
             auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
             diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
@@ -249,22 +248,6 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
           auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue());
           diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
         }
-=======
-  for (int i = 0; i < fun.NumParams(); i++) {
-    const auto p = fun.GetParams()[i];
-    const auto &oldValue = init[i];
-    if (p->IsScalar()) {
-      if (p->GetType() == symir::SymIR::Type::STRUCT) {
-        const auto *sDef = fun.GetStruct(p->GetStructName());
-        int k = 0;
-        ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
-          bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
-          auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
-          auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
-          params.push_back(tm->mk_term(bitwuzla::Kind::ITE, {isNotEqual, one, zero}));
-          k++;
-        });
->>>>>>> bb9e783 (VariableState: extract, and toJson implemented)
       } else {
         for (int j = 0; j < p->GetVecNumEls(); j++) {
           bitwuzla::Term newValue = CreateVecElExpr(p, j, 0);
@@ -295,7 +278,7 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
         if (p->GetType() == symir::SymIR::Type::STRUCT) {
           const auto *sDef = fun.GetStruct(p->GetStructName());
           int k = 0;
-          IterateStructElements(fun, sDef, [&](std::string elName) {
+          ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
             bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
             auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
             auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
