@@ -48,6 +48,7 @@ namespace transformations::vectorize {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -62,6 +63,7 @@ namespace transformations::vectorize {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;

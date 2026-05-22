@@ -32,37 +32,6 @@
 #include "lib/logger.hpp"
 #include "lib/transformations.hpp"
 
-class GuardStrategy {
-public:
-  virtual ~GuardStrategy() = default;
-  virtual symir::BlockBuilder::TermID addGuard(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    size_t nrVariables,
-    size_t nrIterations,
-    std::vector<const symir::VarDef *> variables,
-    std::vector<std::vector<symir::Coef *>> accesses,
-    std::vector<int32_t> varState,
-    const symir::Term * targetTerm,
-    size_t nthGuard
-  ) const = 0;
-};
-
-
-class ModInterpGuardStrategy : public GuardStrategy {
-  symir::BlockBuilder::TermID addGuard(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    size_t nrVariables,
-    size_t nrIterations,
-    std::vector<const symir::VarDef *> variables,
-    std::vector<std::vector<symir::Coef *>> accesses,
-    std::vector<int32_t> varState,
-    const symir::Term * targetTerm,
-    size_t nthGuard
-  ) const ;
-};
-
 class FCallStrategy {
 public: 
   virtual ~FCallStrategy() = default;
@@ -84,18 +53,12 @@ public:
   virtual void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) = 0;
 
 protected:
-  void setMaxNrBlocks(size_t nrBlocks);
-
   /// wrap checksum function/macro around the function call string
   std::string wrapChecksum(int32_t checksum, std::string call) const;
 
+  void setMaxNrBlocks(size_t nrBlocks);
+
   const symir::VarDef *getUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex);
-
-  void appendVarState(VariableStateQuery *varStateQuery, size_t blockIndex, size_t stmtIndex);
-
-  void randomlyFilterVarState(symir::FunctBuilder *funBd);
-
-  void smartlyFilterVarState(symir::FunctBuilder *funBd);
 
 protected:
   const symir::Funct *guest = nullptr;
@@ -106,16 +69,6 @@ protected:
   std::vector<size_t> argUsedMatrix{};
   size_t nrBlocks = 0;
   size_t nrStmts = 0;
-
-  std::map<size_t, std::string> varMap{};
-  std::vector<int32_t> varState{};
-  size_t nrVariables = 0;
-  size_t nrIterations = 0;
-
-  std::vector<int32_t> filteredVarState{};
-  std::vector<const symir::VarDef *> filteredVars{};
-  std::vector<std::vector<symir::Coef *>> filteredAccesses{};
-  size_t filteredNrVariables = 0;
 };
 
 class FCallEmbedder : protected symir::SymIRVisitor {
@@ -178,22 +131,23 @@ public:
 
 class PrimeInterpFCallStrategy : public FCallStrategy {
 public:
-  explicit PrimeInterpFCallStrategy() {};
+  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()){};
   void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
   void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
   std::string generateCall() override;
-  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override {};
+  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
   std::string getStrategyName() const override {return "PrimeInterpolation Stratgey"; }
 private:
   // maps variable index to UnInitVar name and correction value
+  std::map<const std::string, symir::BlockBuilder *> argBlocks{};
   std::map<size_t, std::pair<std::string, int32_t>> argVars{};
+  RewriteEngine rewriteEngine;
 };
 
 class RevOptFCallStrategy : public FCallStrategy {
 public:
-  explicit RevOptFCallStrategy(std::unique_ptr<GuardStrategy> guardGen) : 
-    rewriteEngine(RewriteEngine::Default()), guardGen(std::move(guardGen)) {
-  }
+  explicit RevOptFCallStrategy() : 
+    rewriteEngine(RewriteEngine::Default()) {}
   void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
   void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
   std::string generateCall() override;
@@ -204,7 +158,6 @@ private:
   std::map<const std::string, symir::BlockBuilder *> argBlocks{};
   std::map<size_t, std::pair<std::string, int32_t>> argVars{};
   RewriteEngine rewriteEngine;
-  std::unique_ptr<GuardStrategy> guardGen;
 };
 
 class RandomFCallEmbedder : public FCallEmbedder {

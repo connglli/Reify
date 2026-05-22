@@ -40,6 +40,20 @@ namespace transformations::primitive {
   // B1, B2, ... := Conditional Stmt
   // {A, ..., Z, a, ..., z} Variables
 
+  struct Guard : Rule {
+    Guard(int32_t prime = 46337) : Rule("guard"), prime(prime) {}
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) override;
+    int32_t prime;
+
+  };
+
   /// Additivly expands an expression with one more element
   /// E1 + C1 + E2 => E1 + C2 + C3 +E2
   /// where C2 + C3 = C1
@@ -48,6 +62,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -62,6 +77,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -79,6 +95,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -98,6 +115,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -112,6 +130,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -126,6 +145,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -140,6 +160,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -154,6 +175,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
@@ -167,6 +189,7 @@ namespace transformations::primitive {
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) override;
