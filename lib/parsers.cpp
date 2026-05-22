@@ -912,12 +912,12 @@ namespace symir {
       delete t;
     }
 
-    bblBd->SymCommitStmt(bblBd->SymAssStmt(varDef, *eid, vecAcc));
+    bblBd->CommitStmt(bblBd->SymAssStmt(varDef, *eid, vecAcc));
     delete eid;
     delete varToken;
   }
 
-  void SymSexpParser::buildReturn() { bblBd->SymCommitStmt(bblBd->SymReturn()); }
+  void SymSexpParser::buildReturn() { bblBd->CommitStmt(bblBd->SymReturn()); }
 
   void SymSexpParser::buildBranch() {
     const auto *cid = popArg<SymIRBuilder::CondID>();

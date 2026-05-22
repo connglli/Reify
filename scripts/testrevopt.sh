@@ -10,7 +10,7 @@ for i in {0..1024}; do
 	echo "seed: " $i;
 	uuid=$(uuidgen)
 	echo "generating.. " $uuid
-	./build/bin/revopt-fgen -v -m -n 0 -o $dir $uuid -s $i;
+	./build/bin/revopt-fgen -v -m -n 0 -r 100 -o $dir $uuid -s $i;
 	retVal=$?
 	echo "compiling.. " $uuid;
 	path="$dir/func_${uuid//"-"/"_"}_0";
