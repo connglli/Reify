@@ -45,10 +45,11 @@ namespace transformations::vectorize {
   struct DeadAssignFromCopy : Rule {
     DeadAssignFromCopy() : Rule("dead_assign") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
@@ -58,10 +59,11 @@ namespace transformations::vectorize {
   struct Reduction : Rule {
     Reduction() : Rule("reduc") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 }

@@ -75,9 +75,6 @@ private:
   void Visit(const symir::ModAssStmt &a) override;
   void Visit(const symir::AssStmt &a) override;
   void Visit(const symir::RetStmt &r) override;
-  void Visit(const symir::IfStmt &i) override;
-  void Visit(const symir::ForStmt &f) override;
-  void Visit(const symir::WhileStmt &w) override;
   void Visit(const symir::Branch &b) override;
   void Visit(const symir::Goto &g) override;
   void Visit(const symir::ScaParam &p) override;

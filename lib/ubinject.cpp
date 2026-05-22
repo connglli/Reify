@@ -286,18 +286,6 @@ void IntUBInject::Visit(const symir::RetStmt &r) {
   // Do nothing
 }
 
-void IntUBInject::Visit(const symir::IfStmt &i) {
-  Panic("No IfStmt should exist during function creation");
-}
-
-void IntUBInject::Visit(const symir::ForStmt &f) {
-  Panic("No ForStmt should exist during function creation");
-}
-
-void IntUBInject::Visit(const symir::WhileStmt &w) {
-  Panic("No WhileStmt should exist during function creation");
-}
-
 void IntUBInject::Visit(const symir::Branch &b) {
   b.GetCond()->Accept(*this);
   popExpression(); // We don't care about the condition of the branch
@@ -486,7 +474,7 @@ void IntUBInject::extractAndInitializeUses(
           }
         }
 
-        blkBd->SymCommitStmt(blkBd->SymAssStmt(
+        blkBd->CommitStmt(blkBd->SymAssStmt(
             nuvd,
             blkBd->SymAddExpr(
                 {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd, access),
@@ -495,7 +483,7 @@ void IntUBInject::extractAndInitializeUses(
             access
         ));
       } else {
-        blkBd->SymCommitStmt(blkBd->SymAssStmt(
+        blkBd->CommitStmt(blkBd->SymAssStmt(
             nuvd, blkBd->SymAddExpr(
                       {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd),
                        blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
@@ -507,7 +495,7 @@ void IntUBInject::extractAndInitializeUses(
       for (int d = 0; d < uv->GetVecNumDims(); d++) {
         access.push_back(funBd->SymI32Const(uv->GetVecDimLen(d) - 1));
       }
-      blkBd->SymCommitStmt(blkBd->SymAssStmt(
+      blkBd->CommitStmt(blkBd->SymAssStmt(
           nuvd,
           blkBd->SymAddExpr(
               {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd, access),

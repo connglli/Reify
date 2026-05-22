@@ -33,6 +33,9 @@
 
 namespace transformations::utils {
 
+  // TODO: Maybe apply Reservoir Sampling here to avoid copying the AST twice
+  // TODO: This has become extreamly hacky, need to find a better solution
+  /// Replaces a Expr/Cond or Term inside a given Stmt if matchFunction returns true
   template<typename Node>
   class StmtReplacer : public symir::StmtCopier {
   public:
@@ -40,8 +43,7 @@ namespace transformations::utils {
      symir::FunctBuilder *funBd,
      symir::BlockBuilder *blockBd
     ) : symir::StmtCopier(funBd, blockBd) {}
-    /// Copies Stmt with while also replacing any Subexpression that matches 'matchFunction' with the return value of 'replaceFunction'
-    StmtID CopyStmtWithReplacement(
+    void ReplaceStmt(
       const symir::Stmt *s, 
       std::function<bool(const Node *)> matchFunction,
       std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
@@ -52,6 +54,7 @@ namespace transformations::utils {
   
   protected:
     void Visit(const Node &e) override;
+    void Visit(const symir::Branch &b) override;
   private:
     bool match(const Node &e) {
       return !this->hasReplaced && this->rand() <= this->randThreshold && this->matchFunction(&e);
@@ -74,14 +77,35 @@ namespace transformations::utils {
   /// Copies the access vector of use
   std::vector<symir::Coef *> copyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use);
 
-  /// returns a symir CondID that corresponds to a condition that is trivially false (e.g. (1) == 0)
-  symir::BlockBuilder::CondID triviallyFalseCond(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
+  /// returns a symir CondID that corresponds to a condition that is trivially evaluates to 'condTarget' (e.g. (0) == 0 or (1) == 0)
+  symir::BlockBuilder::CondID triviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
 
-  /// returns a symir CondID that corresponds to a condition that is trivially true (e.g. (0) == 0)
-  symir::BlockBuilder::CondID triviallyTrueCond(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
+  /// returns a random valid assignment;
+  symir::BlockBuilder::StmtID trivialAssignment(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::VarDef *var,
+    std::vector<symir::Coef *> access
+  );
 
-  /// matches any Stmt that has pattern E as a subexpression
-  bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const patternmatch::Pattern<const symir::Expr *> &E);
+  /// Splits the given BlockBuilder into two blocks where the first (the given one mutated) contains all stmts up to and including stmt at
+  /// splitIdx and the second one (the returned one) contains all after
+  symir::BlockBuilder * splitBlockAt(
+    symir::FunctBuilder * funBd,
+    symir::BlockBuilder * blockBd,
+    std::string secondLabel,
+    size_t splitIdx
+  );
+
+  void insertBlockBd(std::vector<symir::BlockBuilder *> &currBlockBds, std::vector<symir::BlockBuilder *> newBlocks, size_t index);
+
+  std::string nameLabel(std::string functName, std::string prefix);
+
+  std::string nameVariable(std::string domBlockName, std::string prefix);
+
+  using namespace patternmatch;
+  bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E);
 
 }
+
 #endif //REIFY_TRANSFORMATION_UTILS_HPP

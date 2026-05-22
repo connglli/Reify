@@ -91,9 +91,6 @@ namespace symir {
     void Visit(const ModAssStmt &e) override;
     void Visit(const AssStmt &e) override;
     void Visit(const RetStmt &r) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
@@ -129,9 +126,6 @@ namespace symir {
     void Visit(const ModAssStmt &e) override;
     void Visit(const AssStmt &e) override;
     void Visit(const RetStmt &r) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
@@ -246,9 +240,6 @@ namespace symir {
     void Visit(const ModAssStmt &a) override;
     void Visit(const AssStmt &a) override;
     void Visit(const RetStmt &r) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;

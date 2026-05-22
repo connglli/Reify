@@ -182,18 +182,6 @@ namespace symir {
     out << "(" << KW_RET << ")" << std::endl;
   }
 
-  void SymSexpLower::Visit(const IfStmt &i) {
-    Panic("Rethink and implement the symir lower for IfStmt");
-  }
-
-  void SymSexpLower::Visit(const ForStmt &f) {
-    Panic("Rethink and implement the symir lower for ForStmt");
-  }
-
-  void SymSexpLower::Visit(const WhileStmt &w) {
-    Panic("Rethink and implement the symir lower for WhileStmt");
-  }
-
   void SymSexpLower::Visit(const Branch &b) {
     indent();
     out << "(" << KW_BRH << " " << b.GetTrueTarget() << " " << b.GetFalseTarget() << " ";
@@ -607,78 +595,6 @@ namespace symir {
     out << "}" << std::endl;
   }
 
-  void SymCxLower::Visit(const IfStmt &i) {
-    auto conds = i.GetConds();
-    auto bodies = i.GetBodies();
-    Assert(conds.size() > 0, "IfStmt must have atleast condition");
-
-    indent();
-    for (size_t i = 0; i < bodies.size(); i++) {
-      if (i == 0) {
-        out << "if (";
-        conds[i]->Accept(*this);
-        out << ") {" << std::endl;
-      } else if (i == bodies.size() - 1 && i == conds.size()) {
-        out << "else {" << std::endl;
-      } else {
-        out << "else if (";
-        conds[i]->Accept(*this);
-        out << ") {" << std::endl;
-      }
-
-      incIndent();
-      for (size_t j = 0; j < bodies[i].size(); j++) {
-        bodies[i][j]->Accept(*this);
-      }
-      decIndent();
-      indent();
-      if (i == bodies.size() - 1) out << "}" << std::endl;
-      else out << "} ";
-    }
-  }
-
-  void SymCxLower::Visit(const ForStmt &f) {
-    indent();
-    out << "for (";
-    const VarUse *use = f.GetVar();
-
-    use->Accept(*this);
-    out << " = ";
-    f.GetInit()->Accept(*this);
-    out << "; ";
-    f.GetCond()->Accept(*this);
-    out << "; ";
-    use->Accept(*this);
-    out << " += ";
-    f.GetIncrement()->Accept(*this);
-    out << ") {" << std::endl;
-
-    incIndent();
-    std::vector<const Stmt *> body = f.GetBody();
-    for (size_t i = 0; i < body.size(); i++) {
-      body[i]->Accept(*this);
-    }
-    decIndent();
-    indent();
-    out << "}" << std::endl;
-  }
-
-  void SymCxLower::Visit(const WhileStmt &w) {
-    indent();
-    out << "while (";
-    w.GetCond()->Accept(*this);
-    out << ") {" << std::endl;
-
-    incIndent();
-    std::vector<const Stmt *> body = w.GetBody();
-    for (size_t i = 0; i < body.size(); i++) {
-      body[i]->Accept(*this);
-    }
-    decIndent();
-    indent();
-    out << "}" << std::endl;
-  }
-
   void SymCxLower::Visit(const Branch &b) {
     indent();
     out << "if (";
@@ -1043,18 +959,6 @@ namespace symir {
 
     // Return the result of the checksum method
     method->instList().addZero(jnif::Opcode::ireturn);
-  }
-
-  void SymJavaBytecodeLower::Visit(const IfStmt &i) {
-    Panic("TODO: java lower for IfStmt");
-  }
-
-  void SymJavaBytecodeLower::Visit(const ForStmt &f) {
-    Panic("TODO: java lower for ForStmt");
-  }
-
-  void SymJavaBytecodeLower::Visit(const WhileStmt &w) {
-    Panic("TODO: java lower for WhileStmt");
   }
 
   void SymJavaBytecodeLower::Visit(const Branch &b) {

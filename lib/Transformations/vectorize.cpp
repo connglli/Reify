@@ -39,21 +39,25 @@ namespace transformations::vectorize {
     return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse*>(), m_WildCard<const symir::Expr *>()));
   }
   
-  std::vector<symir::BlockBuilder::StmtID> DeadAssignFromCopy::rewrite(
-      symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+  void DeadAssignFromCopy::rewrite(
+    symir::FunctBuilder *funBd,
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
     ) {
 
     Log::Get().Out() << "Running DeadAssignFromCopy" << std::endl;
 
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+
     auto copier = symir::StmtCopier(funBd, blockBd);
     symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
     symir::BlockBuilder::StmtID deadStmt = blockBd->SymAssStmt(
-      this->getNewScaLocal(funBd, blockBd->GetLabel()),
+      this->getNewScaLocal(funBd, blockBds[0]->GetLabel()),
       copier.CopyExpr(static_cast<const symir::AssStmt *>(stmt)->GetExpr())
     );
-    return {deadStmt, origStmt};
+    blockBd->ReplaceCommitStmt({ deadStmt, origStmt }, targetStmtIdx);
   }
 
   bool Reduction::match(const symir::Stmt *stmt) const {
@@ -63,34 +67,49 @@ namespace transformations::vectorize {
     );
   }
 
-  std::vector<symir::BlockBuilder::StmtID> Reduction::rewrite(
+  void Reduction::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
 
     Log::Get().Out() << "Running Reduction" << std::endl;
 
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
     std::vector<symir::Coef *> access = utils::copyAccess(funBd, var);
+    const symir::VarDef *varDef = var->GetDef();
     const symir::Expr *expr = assStmt->GetExpr();
     std::vector<const symir::Term *> terms = expr->GetTerms();
+    symir::Expr::Op exprOp = expr->GetOp();
     size_t nrTerms = expr->NumTerms();
-
 
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
 
     // create an array that can hold all terms;
-    const symir::VarDef *array = this->getNewVecLocal(funBd, blockBd->GetLabel(), { (int) nrTerms });
+    const symir::VarDef *array = this->getNewVecLocal(funBd, blockBds[0]->GetLabel(), { (int) nrTerms });
     Log::Get().Out() << "Creating array " << array->GetName() << " with " << nrTerms << " elements" << std::endl;
 
+
+    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+
+    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+
+    auto zero = funBd->SymI32Const(0);
+    auto one = funBd->SymI32Const(1);
+    static size_t uid = 0;
     // loop through all terms and create an array that holds all terms
-    std::vector<symir::BlockBuilder::StmtID> res;
-    res.reserve(2 + nrTerms);
+    std::vector<symir::BlockBuilder::StmtID> firstBlockAppend;
+    firstBlockAppend.reserve(2 + nrTerms);
     for (size_t i = 0; i < nrTerms; i++) {
       Log::Get().Out() << "Initalizing element " << i << " of " << array->GetName() << std::endl;
-      res.push_back(blockBd->SymAssStmt(
+      firstBlockAppend.push_back(blockBd->SymAssStmt(
         array,
         blockBd->SymAddExpr({ c.CopyTerm(terms[i]) } ),
         { funBd->SymI32Const(i) }
@@ -99,62 +118,89 @@ namespace transformations::vectorize {
     
     // Init original value to 0
     Log::Get().Out() << "Initalizing " << var->GetName() << " to 0" << std::endl;
-    auto zero = funBd->SymI32Const(0);
-    res.push_back(blockBd->SymAssStmt(
+    firstBlockAppend.push_back(blockBd->SymAssStmt(
       var->GetDef(),
-      blockBd->SymExpr(expr->GetOp(), {
+      blockBd->SymExpr(exprOp, {
         blockBd->SymCstTerm(zero, nullptr),
       }),
       access
     ));
 
-    // create a for loop that sums over the array
-    auto loopVar = this->getNewScaLocal(funBd, blockBd->GetLabel());
-    auto one = funBd->SymI32Const(1);
-    static size_t uid = 0;
-    res.push_back(blockBd->SymForStmt(
-      loopVar,
-      blockBd->SymCond(symir::Cond::OP_LTZ, 
-        blockBd->SymAddExpr({
-          blockBd->SymMulTerm(
-            one,
-            loopVar, {}
-          ),
-          blockBd->SymCstTerm(
-            funBd->SymI32Const(-nrTerms),
-            nullptr, {}
-          )
-        })
-      ),
-      // int i = 0
+    auto indVar = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    // indVar = 0
+    firstBlockAppend.push_back(blockBd->SymAssStmt(
+      indVar,
       blockBd->SymAddExpr({
         blockBd->SymCstTerm(
           zero,
           nullptr
         )
-      }),
-      // i += 1
-      blockBd->SymAddExpr({
-        blockBd->SymCstTerm(
+      })
+    ));
+
+
+    blockBd->ReplaceCommitStmt(firstBlockAppend, targetStmtIdx);
+    blockBd->SymGoto(loopCondLabel);
+    
+    // set now freed ptrs to zero to avoid Use after free;
+    stmt = nullptr;
+    assStmt = nullptr;
+    var = nullptr;
+    expr = nullptr;
+    terms = {};
+
+    // Build for loop Cond block:
+
+    symir::BlockBuilder *loopCondBd = funBd->OpenBlock(loopCondLabel);
+
+    // indVar - loopCount < 0
+    symir::BlockBuilder::CondID loopCond = loopCondBd->SymCond(symir::Cond::OP_LTZ, 
+      loopCondBd->SymAddExpr({
+        loopCondBd->SymMulTerm(
           one,
+          indVar
+        ),
+        loopCondBd->SymCstTerm(
+          funBd->SymI32Const(-nrTerms),
           nullptr
         )
+      })
+    );
+
+    loopCondBd->SymBranch(loopBodyLabel, finalLabel, loopCond);
+
+    // Build for loop Body Block:
+
+    symir::BlockBuilder *loopBodyBd = funBd->OpenBlock(loopBodyLabel);
+
+    // For Body
+    symir::BlockBuilder::StmtID arrSum = loopBodyBd->SymAssStmt(
+      varDef,
+      loopBodyBd->SymExpr(exprOp, {
+        loopBodyBd->SymMulTerm(one, varDef, access),
+        loopBodyBd->SymMulTerm(one, array, { 
+          funBd->SymCoef("__loopVarCoef" + std::to_string(uid++) + indVar->GetName(), indVar->GetName()) 
+        }) 
       }),
-      // v = v + a[i]
-      { 
-        blockBd->SymAssStmt(
-          var->GetDef(),
-          blockBd->SymExpr(expr->GetOp(), {
-            blockBd->SymMulTerm(one, var->GetDef(), access),
-            blockBd->SymMulTerm(one, array, { 
-              funBd->SymCoef("__loopVarCoef" + std::to_string(uid++) + loopVar->GetName(), loopVar->GetName()) 
-            }) 
-          }),
-          access
-        ) 
-      }
-    ));
-    return res;
+      access
+    );
+
+    // indVar = 1 + indVar
+    symir::BlockBuilder::StmtID incAss = loopBodyBd->SymAssStmt(
+      indVar,
+      loopBodyBd->SymAddExpr({
+        loopBodyBd->SymAddTerm(
+          one,
+          indVar
+        )
+      })
+    );
+
+    loopBodyBd->CommitStmt(arrSum);
+    loopBodyBd->CommitStmt(incAss);
+    loopBodyBd->SymGoto(loopCondLabel);
+
+    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
   }
 
 } // namespace

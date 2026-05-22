@@ -53,11 +53,7 @@ namespace symir {
   class Cond;
   class AssStmt;
   class ModAssStmt;
-  class ModAssStmt;
   class RetStmt;
-  class IfStmt;
-  class ForStmt;
-  class WhileStmt;
   class Branch;
   class Goto;
   class ScaParam;
@@ -82,9 +78,6 @@ namespace symir {
     virtual void Visit(const AssStmt &a) = 0;
     virtual void Visit(const ModAssStmt &a) = 0;
     virtual void Visit(const RetStmt &r) = 0;
-    virtual void Visit(const IfStmt &i) = 0;
-    virtual void Visit(const ForStmt &f) = 0;
-    virtual void Visit(const WhileStmt &w) = 0;
     virtual void Visit(const Branch &b) = 0;
     virtual void Visit(const Goto &g) = 0;
     virtual void Visit(const ScaParam &p) = 0;
@@ -905,135 +898,6 @@ namespace symir {
     std::vector<std::unique_ptr<VarUse>> vars;
   };
 
-  class IfStmt : public Stmt {
-  public:
-    explicit IfStmt(std::vector<std::unique_ptr<Cond>> conds, std::vector<std::vector<std::unique_ptr<Stmt>>> bodies) :
-      Stmt(SIR_STMT_IF), conds(std::move(conds)), bodies(std::move(bodies)) {
-        Assert(this->conds.size() > 0, "IfStmt must have atleast condition, but has %ld", this->conds.size());
-        Assert(
-          this->bodies.size() >= this->conds.size(),
-          "IfStmt must have atleast as many bodies as conditions (%ld >/= %ld)",
-          this->bodies.size(), this->conds.size()
-        );
-        Assert(
-          this->bodies.size() <= this->conds.size() + 1,
-          "IfStmt must have atmost one more body as conditions (%ld >/= %ld + 1)",
-          this->bodies.size(), this->conds.size()
-        );
-      }
-
-    [[nodiscard]] size_t NumConditions() const { return this->conds.size(); }
-
-    [[nodiscard]] std::vector<const Cond *> GetConds() const {
-      std::vector<const Cond *> c;
-      c.resize(this->conds.size());
-      for (size_t i = 0; i < this->conds.size(); i++) {
-        c[i] = this->conds[i].get();
-      }
-      return c;
-    }
-
-    [[nodiscard]] std::vector<std::vector<const Stmt *>> GetBodies() const {
-      std::vector<std::vector<const Stmt *>> b;
-      b.resize(this->bodies.size());
-      for (size_t i = 0; i < this->bodies.size(); i++) {
-        b[i].resize(this->bodies[i].size());
-        for (size_t j = 0; j < this->bodies[i].size(); j++) {
-          b[i][j] = this->bodies[i][j].get();
-        }
-      }
-      return b;
-    }
-
-    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
-
-    [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
-
-    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
-
-  private:
-    std::vector<std::unique_ptr<Cond>> conds;
-    std::vector<std::vector<std::unique_ptr<Stmt>>> bodies;
-  };
-
-  class ForStmt : public Stmt {
-  public:
-    explicit ForStmt(
-      std::unique_ptr<VarUse> var,
-      std::unique_ptr<Cond> cond,
-      std::unique_ptr<Expr> init,
-      std::unique_ptr<Expr> increment,
-      std::vector<std::unique_ptr<Stmt>> body
-    ) :
-      Stmt(SIR_STMT_FOR),
-      var(std::move(var)),
-      cond(std::move(cond)),
-      init(std::move(init)),
-      increment(std::move(increment)),
-      body(std::move(body)) {}
-
-    [[nodiscard]] size_t NumStmts() const { return this->body.size(); }
-
-    [[nodiscard]] const Expr *GetInit() const { return this->init.get(); }
-
-    [[nodiscard]] const Expr *GetIncrement() const { return this->increment.get(); }
-
-    [[nodiscard]] const VarUse *GetVar() const { return this->var.get(); }
-
-    [[nodiscard]] const VarDef *GetDefinition() const override { return this->var->GetDef(); };
-
-    [[nodiscard]] const Cond *GetCond() const { return this->cond.get(); }
-
-    [[nodiscard]] std::vector<const Stmt *> GetBody() const {
-      std::vector<const Stmt *> b;
-      b.resize(this->body.size());
-      for (size_t i = 0; i < this->body.size(); i++) {
-        b[i] = this->body[i].get();
-      }
-      return b;
-    }
-
-    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { Panic("TODO"); return {}; }
-
-    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
-
-  private:
-    std::unique_ptr<VarUse> var;
-    std::unique_ptr<Cond> cond;
-    std::unique_ptr<Expr> init;
-    std::unique_ptr<Expr> increment;
-    std::vector<std::unique_ptr<Stmt>> body;
-  };
-
-  class WhileStmt : public Stmt {
-  public:
-    explicit WhileStmt(std::unique_ptr<Cond> cond, std::vector<std::unique_ptr<Stmt>> body) :
-      Stmt(SIR_STMT_WHILE), cond(std::move(cond)), body(std::move(body)) {}
-
-    [[nodiscard]] size_t NumStmts() const { return this->body.size(); }
-
-    [[nodiscard]] const Cond *GetCond() const { return this->cond.get(); }
-
-    [[nodiscard]] std::vector<const Stmt *> GetBody() const {
-      std::vector<const Stmt *> b;
-      b.resize(this->body.size());
-      for (size_t i = 0; i < this->body.size(); i++) {
-        b[i] = this->body[i].get();
-      }
-      return b;
-    }
-
-    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { return {}; }
-
-    [[nodiscard]] const VarDef *GetDefinition() const override { return nullptr; }
-
-    void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
-
-  private:
-    std::unique_ptr<Cond> cond;
-    std::vector<std::unique_ptr<Stmt>> body;
-  };
-
   /// A Target indicates the target basic blocks of a basic block.
   class Target : public Stmt {
   public:
@@ -1705,7 +1569,7 @@ namespace symir {
   ///
   /// -----------------------------------------------------------
   ///   auto b = std::make_unique<BlockBuilder>("BB1")
-  ///   b->SymCommitStmt(b->SymAssStmt(
+  ///   b->CommitStmt(b->SymAssStmt(
   ///     v0, b->SymAddExpr({
   ///       b->SymMulTerm(b->GetParent()->SymCoef("c1", "12"), v1),
   ///       b->SymSubTerm(b->GetParent()->SymCoef("c2"), v1)
@@ -1775,27 +1639,6 @@ namespace symir {
     /// Create a RetStmt for the builder.
     StmtID SymReturn();
 
-    /// Create an IfStmts for the builder
-    StmtID SymIfStmt(std::vector<CondID> cids, std::vector<std::vector<StmtID>> sids);
-
-    /// Create an IfStmts for the builder
-    StmtID SymForStmt(const VarDef *var, CondID cid, ExprID initID, ExprID incrementID, std::vector<StmtID> sids, const std::vector<Coef *> &access = {});
-
-    /// Create an IfStmts for the builder
-    StmtID SymWhileStmt(CondID cid, std::vector<StmtID> sids);
-
-    /// Commits a Stmt to the builder
-    Stmt *SymCommitStmt(StmtID sid);
-
-    /// Commits a Stmt to the builder before the 'stmtIndex'th position
-    Stmt *SymCommitStmtAt(StmtID sid, int stmtIndex);
-
-    /// Commits a Stmt to the builder by replacing 'stmtIndex'
-    std::vector<Stmt *> SymReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex);
-
-    /// Commits a Stmt to the builder before the 'stmtIndex'th assignmet (TODO: There must be a better way of doing this (used for Prime Interp strat))
-    Stmt *SymCommitStmtAtAssign(StmtID sid, int assignStmtIndex);
-
     /// Create and commit a Branch target to the builder.
     /// After calling this function, the ::Build() should be called to commit the block
     /// and the builder cannot be used any more to create more SIRs.
@@ -1806,8 +1649,35 @@ namespace symir {
     /// and the builder cannot be used any more to create more SIRs.
     const Goto *SymGoto(const std::string &label);
 
-    /// Removes the target. This esentially resets the BlockBuilder to before SymGoto was called;
-    void UndoTarget() { this->target = nullptr; }
+    /// Commits a Stmt to the builder
+    Stmt *CommitStmt(StmtID sid);
+
+    /// Commits a Stmt to the builder before the 'stmtIndex'th position
+    Stmt *CommitStmtAt(StmtID sid, int stmtIndex);
+
+    /// Removes a range of commited Stmts
+    void RemoveCommittedStmts(size_t low, size_t upp) {
+      Assert(low <= upp && upp <= this->stmts.size(), "low or upp are out of bounds");
+      if (upp != 0) {
+        for (size_t i = upp - 1; i > low; i--) {
+          this->stmts.erase(this->stmts.begin() + i);
+        }
+      }
+      this->stmts.erase(this->stmts.begin() + low);
+    }
+
+    /// Commits a Stmt to the builder by replacing 'stmtIndex'
+    std::vector<Stmt *> ReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex);
+
+    /// Commits a Stmt to the builder before the 'stmtIndex'th assignmet (TODO: There must be a better way of doing this (used for Prime Interp strat))
+    Stmt *CommitStmtAtAssign(StmtID sid, int assignStmtIndex);
+
+    /// Removes the target. This essentially resets the BlockBuilder to before SymGoto was called;
+    void RemoveTarget() { this->target = nullptr; }
+
+    [[nodiscard]] bool HasTarget() const { return this->target != nullptr; }
+
+    [[nodiscard]] symir::Target *GetTarget() const { return this->target.get(); }
 
     /// Get the list of used variables in this block
     [[nodiscard]] std::vector<const VarUse *> GetUses(bool removeDefs = true) const {
@@ -1819,13 +1689,21 @@ namespace symir {
       return Block::GetDefinitions(stmts);
     }
 
-    [[nodiscard]] size_t GetNumberCommitedStmt() {
+    [[nodiscard]] size_t GetNumberOfCommitedStmt() {
       return this->stmts.size();
     }
 
     [[nodiscard]] const Stmt *GetCommitedStmt(size_t idx) {
       Assert(idx < this->stmts.size(), "Attempting to access out ouf bound commited stmt");
       return this->stmts[idx].get();
+    }
+
+    [[nodiscard]] const Stmt *GetCommitedStmtOrTarget(size_t idx) {
+      Assert(
+        idx <= this->stmts.size() && (this->target != nullptr || idx < this->stmts.size()),
+        "Attempting to access out ouf bound commited stmt"
+      );
+      return idx < this->stmts.size() ? this->stmts[idx].get() : this->target.get();
     }
 
     [[nodiscard]] const Stmt *GetUncommitedStmt(StmtID id) {
@@ -1960,9 +1838,6 @@ protected:
     void Visit(const AssStmt &a) override;
     void Visit(const ModAssStmt &a) override;
     void Visit(const RetStmt &r) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override    { Panic("Not a subnode of Block"); }
@@ -2017,9 +1892,6 @@ protected:
     void Visit(const Cond &c) override;
     void Visit(const AssStmt &a) override;
     void Visit(const ModAssStmt &a) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
     void Visit(const RetStmt &r) override     { Panic("Not a valid Stmt to be copied"); }
     void Visit(const Branch &b) override      { Panic("Not a valid Stmt to be copied"); }
     void Visit(const Goto &g) override        { Panic("Not a valid Stmt to be copied"); }
@@ -2311,9 +2183,6 @@ protected:
     void Visit(const AssStmt &a) override;
     void Visit(const ModAssStmt &a) override;
     void Visit(const RetStmt &r) override;
-    void Visit(const IfStmt &i) override;
-    void Visit(const ForStmt &f) override;
-    void Visit(const WhileStmt &w) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
     void Visit(const ScaParam &p) override;
