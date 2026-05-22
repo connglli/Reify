@@ -474,7 +474,7 @@ typeLoop:
       if (!argBlocks.contains(goto_target)) return;
       const std::string targetBlkLabel = argBlocks[goto_target]->GetLabel();
       symir::BlockBuilder *blkBd = symir::BlockCopier(funBd, blk).CopyAsBuilder();
-      blkBd->UndoTarget();
+      blkBd->RemoveTarget();
 
       Log::Get().Out() << "Setting goto target of block " << blk->GetLabel() 
                        << " from " << goto_target
@@ -490,7 +490,7 @@ typeLoop:
         && !argBlocks.contains(branch_target->GetFalseTarget())
       ) return;
       symir::BlockBuilder *blkBd = symir::BlockCopier(funBd, blk).CopyAsBuilder();
-      blkBd->UndoTarget();
+      blkBd->RemoveTarget();
       std::string trueLabel = branch_target->GetTrueTarget();
       std::string falseLabel = branch_target->GetFalseTarget();
       if (argBlocks.contains(trueLabel)) {
@@ -777,7 +777,7 @@ symir::BlockBuilder::TermID ModInterpGuardStrategy::addGuard(
     loc = funBd->SymScaLocal("guard_" + std::to_string(nthGuard), nullptr);
   } 
 
-  blockBd->SymCommitStmtAt(
+  blockBd->CommitStmtAt(
     blockBd->SymModAssStmt(
       loc,
       blockBd->SymModExpr(coeffs, variables, accesses, polynomial, prime),
@@ -910,7 +910,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
 
       const symir::VarDef *loc = this->getUnusedAssignVar(funBd, blockIndex, stmtIndex);
 
-      blockBd->SymCommitStmtAtAssign(
+      blockBd->CommitStmtAtAssign(
         blockBd->SymModAssStmt(
           loc,
           blockBd->SymModExpr(
@@ -1019,7 +1019,7 @@ void RevOptFCallStrategy::generatePreamble(
       int val = arg.IsScalar() ? arg.GetValue() : arg.GetValue(argIdx);
 
       Log::Get().Out() << loc->GetName() << " <- " << val << std::endl;
-      headerBlockBd->SymCommitStmt(
+      headerBlockBd->CommitStmt(
         headerBlockBd->SymAssStmt(
           loc, 
           headerBlockBd->SymAddExpr({
@@ -1084,8 +1084,9 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
   // needs variable state
   Log::Get().OpenSection("RevOptFCallStrategy::finalize for " + funBd->GetName());
 
+  // delete all header blocks that do not contain any stmt
   for (auto it = this->argBlocks.cbegin(); it != this->argBlocks.cend();) {
-    if (it->second->GetNumberCommitedStmt() == 0) {
+    if (it->second->GetNumberOfCommitedStmt() == 0) {
       it = this->argBlocks.erase(it);
     } else {
       ++it;
@@ -1106,55 +1107,22 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
   Assert(varStateQueries.size() > 0, "must have atleast on Variable State Query");
 
   this->varMap = varStateQueries[0]->GetVarMap();
-  for (auto const &[blkLabel, headBlockBd] : this->argBlocks) {
-    // if this head has not contain any arg replacements we can safly ignre it
-    // clear temporaries
-    this->argVars.clear();
-    this->varState.clear();
-    this->filteredVarState.clear();
-    this->filteredVars.clear();
-    this->filteredAccesses.clear();
-    this->nrVariables = 0;
-    this->nrIterations = 0;
-    this->filteredNrVariables = 0;
-
-    this->rewriteEngine.run(funBd, headBlockBd, 100);
-
-    std::vector<const symir::Term *> cstTerms = ConstQuery(funBd, headBlockBd).query();
-    std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
-
-    for (size_t i = 0; i < varStateQueries.size(); i++) {
-      this->appendVarState(varStateQueries[i], labelToIdx[blkLabel], 0);
-    }
-    this->randomlyFilterVarState(funBd);
-
-    size_t nrReplaced = Random::Get().Binomial(cstTerms.size() / 10 + 1)();
-
-    std::map<const symir::Term *, symir::BlockBuilder::TermID> termMap;
-    for (size_t i = 0; i < nrReplaced; i++) {
-      termMap[cstTerms[i]] = this->guardGen->addGuard(
-        funBd,
-        headBlockBd,
-        this->filteredNrVariables,
-        this->nrIterations,
-        this->filteredVars,
-        this->filteredAccesses,
-        this->filteredVarState,
-        cstTerms[i],
-        i
-      );
-    }
-
-    VariableEmbedder(funBd, headBlockBd).embed(termMap);
+  for (auto const &[blkLabel, headerBlockBd] : this->argBlocks) {
 
     // set the target of the header to the block
     const symir::Block* blk = funBd->FindBlock(blkLabel);
     Assert(blk != nullptr, "Unable to find block %s in %s", blkLabel.c_str(), funBd->GetName().c_str());
     Assert(blk->GetLabel() == blkLabel, "function builders internal Map must be broken (%s != %s)", blk->GetLabel().c_str(), blkLabel.c_str());
-    headBlockBd->SymGoto(blkLabel);
-    Log::Get().Out() << "Setting target of header block " << headBlockBd->GetLabel()
+    headerBlockBd->SymGoto(blkLabel);
+    Log::Get().Out() << "Setting target of header block " << headerBlockBd->GetLabel()
                      << " to " << blkLabel << std::endl;
-    funBd->CloseBlockAt(headBlockBd, blk);
+
+    std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
+    this->rewriteEngine.run(funBd, headerBlockBds, 100);
+
+    for (auto blockBd : headerBlockBds) {
+      funBd->CloseBlockAt(blockBd, blk);
+    }
   }
 
   // avoid causing problems by calling this function twice;
@@ -1258,10 +1226,6 @@ void RandomFCallEmbedder::Visit(const symir::AssStmt &a) {
   a.GetVar()->Accept(*this);
 }
 void RandomFCallEmbedder::Visit(const symir::RetStmt &r) { /* Do Nothing */ }
-
-void RandomFCallEmbedder::Visit(const symir::IfStmt &i) { Panic("Should not travel through an already linked function"); };
-void RandomFCallEmbedder::Visit(const symir::ForStmt &f) { Panic("Should not travel through an already linked function"); };
-void RandomFCallEmbedder::Visit(const symir::WhileStmt &w) { Panic("Should not travel through an already linked function"); };
 
 void RandomFCallEmbedder::Visit(const symir::Branch &b) {
  if (this->succeeded) {

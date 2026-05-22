@@ -361,62 +361,6 @@ namespace patternmatch {
 
   // ==================== Stmt ====================
 
-  struct m_AnyStmt : Pattern<const symir::Stmt *> {
-    m_AnyStmt(
-      const Pattern<const symir::VarUse *> &V,
-      const Pattern<std::vector<const symir::VarUse *>> &Vs,
-      const Pattern<const symir::Expr *> &E,
-      const Pattern<const symir::Cond *> &C,
-      const Pattern<std::vector<const symir::Cond *>> &Cs,
-      const Pattern<const symir::ModExpr *> &M,
-      const Pattern<std::vector<const symir::Stmt *>> &B,
-      const Pattern<std::vector<std::vector<const symir::Stmt *>>> &Bs
-    ) : V(V), Vs(Vs), E(E), C(C), Cs(Cs), M(M), B(B), Bs(Bs) {};
-
-    inline bool match(const symir::Stmt *s) const override {
-      switch (s->GetIRId()) {
-      case symir::SymIR::SIR_STMT_ASS: {
-        const symir::AssStmt *a = static_cast<const symir::AssStmt *>(s);
-        return V.match(a->GetVar()) && E.match(a->GetExpr());
-      } break;
-      case symir::SymIR::SIR_STMT_FOR: {
-        const symir::ForStmt *f = static_cast<const symir::ForStmt *>(s);
-        return V.match(f->GetVar())
-            && E.match(f->GetInit())
-            && C.match(f->GetCond())
-            && E.match(f->GetIncrement())
-            && B.match(f->GetBody());
-      } break;
-      case symir::SymIR::SIR_STMT_WHILE: {
-        const symir::WhileStmt *w = static_cast<const symir::WhileStmt *>(s);
-        return C.match(w->GetCond()) && B.match(w->GetBody());
-      } break;
-      case symir::SymIR::SIR_STMT_IF: {
-        const symir::IfStmt *i = static_cast<const symir::IfStmt *>(s);
-        return Cs.match(i->GetConds()) && Bs.match(i->GetBodies());
-      } break;
-      case symir::SymIR::SIR_STMT_MODASS: {
-        const symir::ModAssStmt *a = static_cast<const symir::ModAssStmt *>(s);
-        return V.match(a->GetVar()) && M.match(a->GetExpr());
-      } break;
-      case symir::SymIR::SIR_STMT_RET: {
-        const symir::RetStmt *r = static_cast<const symir::RetStmt *>(s);
-        return Vs.match(r->GetVars());
-      } break;
-      default : Panic("Unhandled Stmt inside pattern matching");
-      }
-    }
-
-    const Pattern<const symir::VarUse *> &V;
-    const Pattern<std::vector<const symir::VarUse *>> &Vs;
-    const Pattern<const symir::Expr *> &E;
-    const Pattern<const symir::Cond *> &C;
-    const Pattern<std::vector<const symir::Cond *>> &Cs;
-    const Pattern<const symir::ModExpr *> &M;
-    const Pattern<std::vector<const symir::Stmt *>> &B;
-    const Pattern<std::vector<std::vector<const symir::Stmt *>>> &Bs;
-  };
-
   struct m_AssStmt : Pattern<const symir::Stmt *> {
     m_AssStmt(const Pattern<const symir::VarUse *> &V, const Pattern<const symir::Expr *> &E) : V(V), E(E) {}
     inline bool match(const symir::Stmt *s) const override {
@@ -426,58 +370,6 @@ namespace patternmatch {
     }
     const Pattern<const symir::VarUse *> &V;
     const Pattern<const symir::Expr *> &E;
-  };
-
-  struct m_ForStmt : Pattern<const symir::Stmt *> {
-    m_ForStmt(
-      const Pattern<const symir::VarUse *> &V,
-      const Pattern<const symir::Expr *> &I,
-      const Pattern<const symir::Cond *> &C,
-      const Pattern<const symir::Expr *> &E,
-      const Pattern<std::vector<const symir::Stmt *>> &B
-    ) : V(V), I(I), C(C), E(E), B(B) {}
-    inline bool match(const symir::Stmt *s) const override {
-      if (s->GetIRId() != symir::SymIR::SIR_STMT_FOR) return false;
-      const symir::ForStmt *f = static_cast<const symir::ForStmt *>(s);
-      return V.match(f->GetVar())
-          && I.match(f->GetInit())
-          && C.match(f->GetCond())
-          && E.match(f->GetIncrement())
-          && B.match(f->GetBody());
-    }
-    const Pattern<const symir::VarUse *> &V;
-    const Pattern<const symir::Expr *> &I;
-    const Pattern<const symir::Cond *> &C;
-    const Pattern<const symir::Expr *> &E;
-    const Pattern<std::vector<const symir::Stmt *>> &B;
-  };
-
-  struct m_WhileStmt : Pattern<const symir::Stmt *> {
-    m_WhileStmt(
-      const Pattern<const symir::Cond *> &C,
-      const Pattern<std::vector<const symir::Stmt *>> &B
-    ) : C(C), B(B) {}
-    inline bool match(const symir::Stmt *s) const override {
-      if (s->GetIRId() != symir::SymIR::SIR_STMT_WHILE) return false;
-      const symir::WhileStmt *w = static_cast<const symir::WhileStmt *>(s);
-      return C.match(w->GetCond()) && B.match(w->GetBody());
-    }
-    const Pattern<const symir::Cond *> &C;
-    const Pattern<std::vector<const symir::Stmt *>> &B;
-  };
-
-  struct m_IfStmt : Pattern<const symir::Stmt *> {
-    m_IfStmt(
-      const Pattern<std::vector<const symir::Cond *>> &C,
-      const Pattern<std::vector<std::vector<const symir::Stmt *>>> &B
-    ) : C(C), B(B) {}
-    inline bool match(const symir::Stmt *s) const override {
-      if (s->GetIRId() != symir::SymIR::SIR_STMT_IF) return false;
-      const symir::IfStmt *i = static_cast<const symir::IfStmt *>(s);
-      return C.match(i->GetConds()) && B.match(i->GetBodies());
-    }
-    const Pattern<std::vector<const symir::Cond *>> &C;
-    const Pattern<std::vector<std::vector<const symir::Stmt *>>> &B;
   };
 
   struct m_ModAssStmt : Pattern<const symir::Stmt *> {
@@ -503,13 +395,13 @@ namespace patternmatch {
 
   // ==================== Target ====================
   
-  struct m_Branch : Pattern<const symir::Target *> {
+  struct m_Branch : Pattern<const symir::Stmt *> {
     m_Branch(
       const Pattern<const symir::Cond *> &C,
       const Pattern<const std::string> &T,
       const Pattern<const std::string> &F
     ) : C(C), T(T), F(F) {}
-    inline bool match(const symir::Target *t) const override {
+    inline bool match(const symir::Stmt *t) const override {
       if (t->GetIRId() != symir::SymIR::SIR_TGT_BRA) return false;
       const symir::Branch *b = static_cast<const symir::Branch *>(t);
       return C.match(b->GetCond())
@@ -521,9 +413,9 @@ namespace patternmatch {
     const Pattern<const std::string> &F;
   };
 
-  struct m_Goto : Pattern<const symir::Target *> {
+  struct m_Goto : Pattern<const symir::Stmt *> {
     m_Goto(const Pattern<const std::string> &T) : T(T) {}
-    inline bool match(const symir::Target *t) const override {
+    inline bool match(const symir::Stmt *t) const override {
       if (t->GetIRId() != symir::SymIR::SIR_TGT_GOTO) return false;
       const symir::Goto *g = static_cast<const symir::Goto *>(t);
       return T.match(g->GetTarget());

@@ -45,10 +45,11 @@ namespace transformations::primitive {
   /// where C2 + C3 = C1
   struct AdditionFromConst : Rule {
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
@@ -58,10 +59,11 @@ namespace transformations::primitive {
   struct ForSumFromConst : Rule {
     ForSumFromConst() : Rule("i") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
@@ -74,10 +76,11 @@ namespace transformations::primitive {
       Assert(minBranches >= 2, "AssToDeadCode must have atleast 2 branches");
     }
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   
   private:
@@ -89,65 +92,70 @@ namespace transformations::primitive {
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 + cpk) + E2
   /// where C3 + C2 = C1
-  struct ConstProbpagationViaAdd : Rule {
-    ConstProbpagationViaAdd() : Rule("const_proba_add") {}
+  struct ConstPropagationViaAdd : Rule {
+    ConstPropagationViaAdd() : Rule("const_proba_add") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 - cpk) + E2
   /// where C3 - C2 = C1
-  struct ConstProbpagationViaSub : Rule {
-    ConstProbpagationViaSub() : Rule("const_proba_sub") {}
+  struct ConstPropagationViaSub : Rule {
+    ConstPropagationViaSub() : Rule("const_proba_sub") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 * cpk) + C4 + E2
   /// where C3 * C2 + C4 = C1
-  struct ConstProbpagationViaMul : Rule {
-    ConstProbpagationViaMul() : Rule("const_proba_mul") {}
+  struct ConstPropagationViaMul : Rule {
+    ConstPropagationViaMul() : Rule("const_proba_mul") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 / cpk) + E2
   /// where C3 / C2 = C1
-  struct ConstProbpagationViaDiv : Rule {
-    ConstProbpagationViaDiv() : Rule("const_proba_div") {}
+  struct ConstPropagationViaDiv : Rule {
+    ConstPropagationViaDiv() : Rule("const_proba_div") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 % cpk) + E2
   /// where C3 % C2 = C1
-  struct ConstProbpagationViaRem : Rule {
-    ConstProbpagationViaRem() : Rule("const_proba_rem") {}
+  struct ConstPropagationViaRem : Rule {
+    ConstPropagationViaRem() : Rule("const_proba_rem") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 
@@ -156,10 +164,11 @@ namespace transformations::primitive {
   struct Reg2Mem : Rule {
     Reg2Mem() : Rule("reg_2_mem") {}
     bool match(const symir::Stmt *stmt) const override;
-    std::vector<symir::BlockBuilder::StmtID> rewrite(
+    void rewrite(
       symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd,
-      const symir::Stmt *stmt
+      std::vector<symir::BlockBuilder *> &blockBds,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
     ) override;
   };
 

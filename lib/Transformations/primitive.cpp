@@ -33,6 +33,7 @@
 #include "lib/random.hpp"
 #include <climits>
 #include <cstdint>
+#include <string>
 
 using namespace patternmatch;
 namespace transformations::primitive {
@@ -41,13 +42,17 @@ namespace transformations::primitive {
     return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
   
-  std::vector<symir::BlockBuilder::StmtID> AdditionFromConst::rewrite(
+  void AdditionFromConst::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
     Log::Get().Out() << "Running AdditionFromConst" << std::endl;
   
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     std::function<symir::BlockBuilder::ExprID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
       varInsertFun =
@@ -90,19 +95,19 @@ namespace transformations::primitive {
   
         return thisBlockBd->SymExpr(e.GetOp(), termIds);
       };
-    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    rep.ReplaceStmt(
       stmt,
       make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
       varInsertFun,
       0.25
     );
+
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
     Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
-  
+    
     Log::Get().Out() << "Replacing Const " << replacedCoef->GetI32Value() << " with addition" << std::endl;
-  
-    return {newStmt};
   }
   
   bool ForSumFromConst::match(const symir::Stmt *stmt) const {
@@ -115,13 +120,17 @@ namespace transformations::primitive {
       );
   }
   
-  std::vector<symir::BlockBuilder::StmtID> ForSumFromConst::rewrite(
+  void ForSumFromConst::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
-    Log::Get().Out() << "Running ConstToForSum" << std::endl;
+    Log::Get().Out() << "Running ForSumFromConst" << std::endl;
   
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const auto use = assStmt->GetVar();
     const auto def = use->GetDef();
@@ -153,6 +162,14 @@ namespace transformations::primitive {
   
     auto access = utils::copyAccess(funBd, use);
   
+    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+
+    // Split the current block into two at targetStmtIdx while appending to the upper block
+
+    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+
     symir::BlockBuilder::StmtID initAss = blockBd->SymAssStmt(
       def,
       blockBd->SymAddExpr({
@@ -164,64 +181,92 @@ namespace transformations::primitive {
       access
     );
   
-    symir::BlockBuilder::StmtID addAss = blockBd->SymAssStmt(
-      def,
+
+    auto indVar = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    // indVar = 0
+    symir::BlockBuilder::StmtID initIndVar = blockBd->SymAssStmt(
+      indVar,
       blockBd->SymAddExpr({
-        blockBd->SymAddTerm(
+        blockBd->SymCstTerm(
+          funBd->SymI32Const(0),
+          nullptr
+        )
+      })
+    );
+
+    blockBd->ReplaceCommitStmt({ initAss, initIndVar}, targetStmtIdx);
+    blockBd->SymGoto(loopCondLabel);
+
+
+    // Build for loop Cond block:
+
+    symir::BlockBuilder *loopCondBd = funBd->OpenBlock(loopCondLabel);
+
+    // indVar - loopCount < 0
+    symir::BlockBuilder::CondID loopCond = loopCondBd->SymCond(symir::Cond::OP_LTZ, 
+      loopCondBd->SymAddExpr({
+        loopCondBd->SymMulTerm(
+          funBd->SymI32Const(1),
+          indVar
+        ),
+        loopCondBd->SymCstTerm(
+          funBd->SymI32Const(-loopCount),
+          nullptr
+        )
+      })
+    );
+
+    loopCondBd->SymBranch(loopBodyLabel, finalLabel, loopCond);
+
+    // Build for loop Body Block:
+
+    symir::BlockBuilder *loopBodyBd = funBd->OpenBlock(loopBodyLabel);
+
+    // For Body
+    symir::BlockBuilder::StmtID addAss = loopBodyBd->SymAssStmt(
+      def,
+      loopBodyBd->SymAddExpr({
+        loopBodyBd->SymAddTerm(
           funBd->SymI32Const(randVal),
           def, access
         )
       }),
       access
     );
-  
-    auto loopVar = this->getNewScaLocal(funBd, blockBd->GetLabel());
-    symir::BlockBuilder::StmtID forSum = blockBd->SymForStmt(
-      // loop variable i
-      loopVar,
-      // loop condition (i - loopCount < 0)
-      blockBd->SymCond(symir::Cond::OP_LTZ, 
-        blockBd->SymAddExpr({
-          blockBd->SymMulTerm(
-            funBd->SymI32Const(1),
-            loopVar, {}
-          ),
-          blockBd->SymCstTerm(
-            funBd->SymI32Const(-loopCount),
-            nullptr, {}
-          )
-        })
-      ),
-      // int i = 0
-      blockBd->SymAddExpr({
-        blockBd->SymCstTerm(
-          funBd->SymI32Const(0),
-          nullptr
-        )
-      }),
-      // i += 1
-      blockBd->SymAddExpr({
-        blockBd->SymCstTerm(
+
+    // indVar = 1 + indVar
+    symir::BlockBuilder::StmtID incAss = loopBodyBd->SymAssStmt(
+      indVar,
+      loopBodyBd->SymAddExpr({
+        loopBodyBd->SymAddTerm(
           funBd->SymI32Const(1),
-          nullptr
+          indVar
         )
-      }),
-      {addAss}
+      })
     );
-  
-    return { initAss, forSum };
+
+    loopBodyBd->CommitStmt(addAss);
+    loopBodyBd->CommitStmt(incAss);
+    loopBodyBd->SymGoto(loopCondLabel);
+
+    // insert the new blocks after the current block
+    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
   }
   
   bool DeadCodeFromAssign::match(const symir::Stmt *stmt) const {
     return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse *>(), m_WildCard<const symir::Expr *>()));
   }
   
-  std::vector<symir::BlockBuilder::StmtID> DeadCodeFromAssign::rewrite(
+  void DeadCodeFromAssign::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
     Log::Get().Out() << "Running AssToDeadCode" << std::endl;
+
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
   
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const auto use = assStmt->GetVar();
@@ -229,62 +274,112 @@ namespace transformations::primitive {
     const auto expr = assStmt->GetExpr();
     auto access = utils::copyAccess(funBd, use);
   
-    symir::BlockBuilder::ExprID exprId = symir::StmtCopier(funBd, blockBd).CopyExpr(expr);
-  
     int nrBranches = Random::Get().Uniform(this->minBranches, this->maxBranches)();
     int trueBranch = Random::Get().Uniform(0, nrBranches - 1)();
   
     Log::Get().Out() << "Building " << nrBranches << " branches, True branch: " << trueBranch << std::endl;
-  
-    std::vector<symir::BlockBuilder::CondID> conds;
-    std::vector<std::vector<symir::BlockBuilder::StmtID>> sids;
-    conds.reserve(nrBranches - 1);
-    sids.reserve(nrBranches);
+
+    std::string finalLabel = utils::nameLabel(funBd->GetName(), "if_exit");
+    std::vector<std::string> condLabels;
+    condLabels.resize(nrBranches - 1); // else stmt has not cond and first cond is appended to blockBd, but for convinience we index from the index 1
+    std::vector<std::string> bodyLabels;
+    bodyLabels.resize(nrBranches);
+
     for (int i = 0; i < nrBranches; i++) {
-      if (i < nrBranches - 1) {
-        // not the else branch hence we create a condition
-        if (i == trueBranch) {
-          conds.push_back(utils::triviallyTrueCond(funBd, blockBd));
-        } else {
-          conds.push_back(utils::triviallyFalseCond(funBd, blockBd));
-        }
-      }
-      if (i == trueBranch) {
-        sids.push_back({ blockBd->SymAssStmt(def, exprId, access) });
-      } else {
-        // TODO: genrate more complex expression and take the allowUB member into account
-        sids.push_back({
-          blockBd->SymAssStmt(
-            def,
-            blockBd->SymAddExpr({
-              blockBd->SymCstTerm(
-                funBd->SymI32Const(Random::Get().Uniform(INT_MIN, INT_MAX)()),
-                nullptr
-              )
-            }),
-            access
-          ) 
-        });
-      }
-      
+      bodyLabels[i] = utils::nameLabel(funBd->GetName(), "if_body_" + std::to_string(i));
+      if (i == 0 || i == nrBranches - 1) continue;
+      condLabels[i] = utils::nameLabel(funBd->GetName(), "if_cond_" + std::to_string(i));
     }
+
+    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+
+    std::vector<symir::BlockBuilder *> condBlockBds;
+    condBlockBds.resize(nrBranches - 1); // else stmt has not cond and first cond is appended to blockBd, but for convinience we index from the index 1
+    std::vector<symir::BlockBuilder *> bodyBlockBds;
+    bodyBlockBds.resize(nrBranches);
+
+    // Build First Block
+    bodyBlockBds[0] = funBd->OpenBlock(bodyLabels[0]);
+    if (0 == trueBranch) {
+      bodyBlockBds[0]->CommitStmt(
+        bodyBlockBds[0]->SymAssStmt(
+          def,
+          symir::StmtCopier(funBd, bodyBlockBds[0]).CopyExpr(expr),
+          access
+        )
+      );
+    } else {
+      bodyBlockBds[0]->CommitStmt(utils::trivialAssignment(funBd, bodyBlockBds[0], def, access));
+    }
+    bodyBlockBds[0]->SymGoto(finalLabel);
+
+    // Then iterativly create all conditions and bodies excluding the last
+    for (int i = 1; i < nrBranches; i++) {
+      if (i != nrBranches - 1) {
+        condBlockBds[i] = funBd->OpenBlock(condLabels[i]);
+        condBlockBds[i]->SymBranch(
+          bodyLabels[i],
+          // last condition if false should point to the else body
+          i != nrBranches - 2 ? condLabels[i + 1] : bodyLabels[nrBranches - 1], 
+          utils::triviallyCondFor(i == trueBranch , funBd, condBlockBds[i])
+        );
+      }
+      bodyBlockBds[i] = funBd->OpenBlock(bodyLabels[i]);
+      if (i == trueBranch) {
+        bodyBlockBds[i]->CommitStmt(
+          bodyBlockBds[i]->SymAssStmt(
+            def,
+            symir::StmtCopier(funBd, bodyBlockBds[i]).CopyExpr(expr),
+            access
+          )
+        );
+      } else {
+        bodyBlockBds[i]->CommitStmt(utils::trivialAssignment(funBd, bodyBlockBds[i], def, access));
+      }
+      bodyBlockBds[i]->SymGoto(finalLabel);
+    }
+
+    blockBd->RemoveCommittedStmts(targetStmtIdx, targetStmtIdx);
+
+    // append first condition to blockBd
+    // Fails for nrBranches = 2
+    blockBd->SymBranch(
+      bodyLabels[0],
+      // condition if false should point to the else body if there is no else ifs
+      nrBranches > 2 ? condLabels[1] : bodyLabels[1], 
+      utils::triviallyCondFor(0 == trueBranch , funBd, blockBd)
+    ); 
+
+    // interleave the blocks;
+    std::vector<symir::BlockBuilder *> newBlocks;
+    newBlocks.reserve(1 + condBlockBds.size() + bodyBlockBds.size());
+    newBlocks.push_back(bodyBlockBds[0]);
+    for (int i = 1; i < nrBranches; i++) {
+      if (i != nrBranches - 1) newBlocks.push_back(condBlockBds[i]);
+      newBlocks.push_back(bodyBlockBds[i]);
+    }
+    newBlocks.push_back(secondBlockBd);
   
-    return { blockBd->SymIfStmt(conds, sids) };
+    utils::insertBlockBd(blockBds, newBlocks, targetBlockIdx + 1);
   }
 
-  bool ConstProbpagationViaAdd::match(const symir::Stmt *stmt) const {
+  bool ConstPropagationViaAdd::match(const symir::Stmt *stmt) const {
     return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
   
-  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaAdd::rewrite(
+  void ConstPropagationViaAdd::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
 
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
@@ -306,7 +401,7 @@ namespace transformations::primitive {
           return thisBlockBd->SymAddTerm(thisFunBd->SymI32Const(v1), var);
         };
   
-    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    rep.ReplaceStmt(
       stmt,
       make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
       varInsertFun,
@@ -326,22 +421,26 @@ namespace transformations::primitive {
       )
     );
   
-    return {assignStmts, newStmt};
+    blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
   
-  bool ConstProbpagationViaSub::match(const symir::Stmt *stmt) const {
+  bool ConstPropagationViaSub::match(const symir::Stmt *stmt) const {
     return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
   
-  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaSub::rewrite(
+  void ConstPropagationViaSub::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
@@ -364,7 +463,7 @@ namespace transformations::primitive {
           return thisBlockBd->SymSubTerm(thisFunBd->SymI32Const(v1), var);
         };
   
-    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    rep.ReplaceStmt(
       stmt,
       make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
       varInsertFun,
@@ -384,23 +483,29 @@ namespace transformations::primitive {
       )
     );
   
-    return {assignStmts, newStmt};
+    blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
   
-  bool ConstProbpagationViaMul::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
+  bool ConstPropagationViaMul::match(const symir::Stmt *stmt) const {
+    return utils::matchSubExprInAnyStmt(
+      stmt,
+      m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))
+    );
   }
   
-  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaMul::rewrite(
+  void ConstPropagationViaMul::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
-  
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
       varInsertFun =
@@ -443,7 +548,7 @@ namespace transformations::primitive {
           return thisBlockBd->SymExpr(e.GetOp(), termIds);
         };
   
-    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    rep.ReplaceStmt(
       stmt,
       make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))),
       varInsertFun,
@@ -463,22 +568,26 @@ namespace transformations::primitive {
       )
     );
   
-    return {assignStmts, newStmt};
+    blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
   
-  bool ConstProbpagationViaDiv::match(const symir::Stmt *stmt) const {
+  bool ConstPropagationViaDiv::match(const symir::Stmt *stmt) const {
     return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
   }
   
-  std::vector<symir::BlockBuilder::StmtID> ConstProbpagationViaDiv::rewrite(
+  void ConstPropagationViaDiv::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
-    Log::Get().Out() << "Running ConstProbpagationViaDiv" << std::endl;
+    Log::Get().Out() << "Running ConstPropagationViaDiv" << std::endl;
+
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBd->GetLabel());
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -503,7 +612,7 @@ namespace transformations::primitive {
           return thisBlockBd->SymDivTerm(thisFunBd->SymI32Const(v1), var);
         };
   
-    symir::BlockBuilder::StmtID newStmt = rep.CopyStmtWithReplacement(
+    rep.ReplaceStmt(
       stmt,
       make_matcher(const symir::Term *, m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())),
       varInsertFun,
@@ -523,7 +632,7 @@ namespace transformations::primitive {
       )
     );
   
-    return {assignStmts, newStmt};
+    blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
   bool Reg2Mem::match(const symir::Stmt *stmt) const {
@@ -533,13 +642,19 @@ namespace transformations::primitive {
     );
   }
 
-  std::vector<symir::BlockBuilder::StmtID> Reg2Mem::rewrite(
+  void Reg2Mem::rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) {
+    Log::Get().Out() << "Running Reg2Mem" << std::endl;
+
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
-    const symir::VarDef *memVar = this->getNewVecLocal(funBd, blockBd->GetLabel(), {1});
+    const symir::VarDef *memVar = this->getNewVecLocal(funBd, blockBds[0]->GetLabel(), {1});
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
     std::vector<symir::Coef *> memAccess = {funBd->SymI32Const(0)};
     const symir::BlockBuilder::StmtID memAssign = blockBd->SymAssStmt(memVar, c.CopyExpr(assStmt->GetExpr()), memAccess);
@@ -552,7 +667,7 @@ namespace transformations::primitive {
       access
     );
     
-    return {memAssign, assignBack};
+    blockBd->ReplaceCommitStmt({ memAssign, assignBack }, targetStmtIdx);
   }
 
 } // namespace 

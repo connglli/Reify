@@ -33,10 +33,11 @@ struct Rule {
   Rule(std::string locPrefix = "local_created_by_rule_without_proper_locPrefix") : locPrefix(locPrefix) {}
   virtual ~Rule() = default;
   virtual bool match(const symir::Stmt *stmt) const = 0;
-  virtual std::vector<symir::BlockBuilder::StmtID> rewrite(
+  virtual void rewrite(
     symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
+    std::vector<symir::BlockBuilder *> &blockBds,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
   ) = 0;
 
   /// get a new scalar local that is not yet used in the block with label `blockLabel`
