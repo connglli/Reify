@@ -27,6 +27,7 @@
 #define REIFY_RULE_HPP
 
 #include "lib/lang.hpp"
+#include "lib/varstate.hpp"
 #include <string>
 
 struct Rule {
@@ -36,6 +37,7 @@ struct Rule {
   virtual void rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) = 0;

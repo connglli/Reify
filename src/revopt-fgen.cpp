@@ -38,6 +38,7 @@
 #include "lib/transformations.hpp"
 #include "lib/lowers.hpp"
 #include "lib/chksum.hpp"
+#include "lib/varstate.hpp"
 
 struct DeoptFunGenOpts {
   std::string uuid, sno;
@@ -182,9 +183,12 @@ public:
       )
     );
 
+    
     auto revopt = RewriteEngine::Default();
     std::vector<symir::BlockBuilder *> blks = { bblBd };
-    revopt.run(builder.get(), blks, ruleCount);
+
+    VariableState varState{std::map<size_t, std::string>{}, std::vector<int32_t>{}, 0};
+    revopt.run(builder.get(), blks, varState, ruleCount);
     bblBd = blks[0];
 
     //auto cstTerms = ConstQuery(builder.get(), bblBd).query();

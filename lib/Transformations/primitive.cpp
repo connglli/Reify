@@ -38,6 +38,104 @@
 using namespace patternmatch;
 namespace transformations::primitive {
   
+  bool Guard::match(const symir::Stmt *stmt) const {
+    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  }
+
+  void Guard::rewrite(
+    symir::FunctBuilder *funBd,
+    std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
+  ) {
+    if (varState.nrVariables == 0) return;
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+
+    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
+    std::pair<int32_t, int32_t> targetPair;
+    rep.data = static_cast<void *>(&targetPair);
+    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
+      varInsertFun =
+        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+        
+        auto randTarget = Random::Get().Uniform(0, prime - 1);
+        utils::PrimeInterpolation interpolGen = utils::PrimeInterpolation(prime); 
+
+        int32_t target = t.GetCoef()->GetI32Value();
+
+        int32_t interpolTarget;
+        if (target == INT32_MIN) {
+          // avoid the div by 0 case of the else stmt
+          interpolTarget = 0;
+        } else {
+          interpolTarget = randTarget() % static_cast<int32_t>((-static_cast<int64_t>(INT32_MIN)) + target);
+        }
+        std::pair<int32_t, int32_t> *targetPair = static_cast<std::pair<int32_t, int32_t> *>(*data);
+        targetPair->first = target;
+        targetPair->second = interpolTarget;
+
+        return thisBlockBd->SymAddTerm(
+          funBd->SymI32Const(target - interpolTarget),
+          var
+        );
+      };
+    rep.ReplaceStmt(
+      stmt,
+      make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())),
+      varInsertFun,
+      0.25
+    );
+
+    int32_t interpolTarget = targetPair.second;
+
+    // Filter Varstate
+    utils::VarFilter filter = utils::VarFilter(funBd, varState);
+    filter.randomlyFilter();
+
+    utils::PrimeInterpolation interpolGen = utils::PrimeInterpolation(this->prime); 
+
+    size_t nrVars = filter.filteredVars.size();
+    size_t nrIters = filter.filteredVarState.size() / filter.filteredVars.size();
+    interpolGen.interpolate(
+      nrVars,
+      nrIters,
+      filter.filteredVarState,
+      interpolTarget
+    );
+    std::vector<int32_t> polynomial = interpolGen.getPolynomial();
+    std::vector<int32_t> coeffsVals = interpolGen.getCoeffs();
+    interpolGen.assertCorrectness(
+      nrVars,
+      nrIters,
+      filter.filteredVarState,
+      interpolTarget
+    );
+
+    // we need coeff object to hand to the builder
+    std::vector<symir::Coef *> coeffs{};
+    coeffs.reserve(coeffsVals.size());
+    for (const int32_t c : coeffsVals) {
+      coeffs.push_back(funBd->SymI32Const(c));
+    }
+    blockBd->CommitStmtAt(
+      blockBd->SymModAssStmt(
+        var,
+        blockBd->SymModExpr(
+          coeffs,
+          filter.filteredVars,
+          filter.filteredAccesses,
+          polynomial,
+          prime
+        ),
+        {}
+      ), 
+      targetStmtIdx
+    );
+  }
+
   bool AdditionFromConst::match(const symir::Stmt *stmt) const {
     return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
@@ -45,6 +143,7 @@ namespace transformations::primitive {
   void AdditionFromConst::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -102,7 +201,7 @@ namespace transformations::primitive {
       0.25
     );
 
-    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
 
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
     Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
@@ -123,6 +222,7 @@ namespace transformations::primitive {
   void ForSumFromConst::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -260,6 +360,7 @@ namespace transformations::primitive {
   void DeadCodeFromAssign::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -370,6 +471,7 @@ namespace transformations::primitive {
   void ConstPropagationViaAdd::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -384,7 +486,6 @@ namespace transformations::primitive {
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
         [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
-          std::vector<symir::BlockBuilder::TermID> termIds;
           int target = t.GetCoef()->GetI32Value();
           int v1, v2;
           if (target > 0) {
@@ -407,7 +508,7 @@ namespace transformations::primitive {
       varInsertFun,
       0.25
     );
-    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
     Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
   
@@ -431,6 +532,7 @@ namespace transformations::primitive {
   void ConstPropagationViaSub::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -469,7 +571,7 @@ namespace transformations::primitive {
       varInsertFun,
       0.25
     );
-    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
     Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
   
@@ -496,6 +598,7 @@ namespace transformations::primitive {
   void ConstPropagationViaMul::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -554,7 +657,7 @@ namespace transformations::primitive {
       varInsertFun,
       0.25
     );
-    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
     Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
   
@@ -578,6 +681,7 @@ namespace transformations::primitive {
   void ConstPropagationViaDiv::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {
@@ -618,7 +722,7 @@ namespace transformations::primitive {
       varInsertFun,
       0.25
     );
-    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.getExtractedDataRef());
+    symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
     Assert(replacedCoef->IsSolved(), "replacedCoef should never be unsolved");
   
@@ -645,6 +749,7 @@ namespace transformations::primitive {
   void Reg2Mem::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {

@@ -12,12 +12,10 @@ Java:
 2. separation compilation units
 
 Interprocedural Dataflow: 
-1. Remove IfElse/For and While stmt and replace them with blocks
-2. Adjust Rewrite Engine / Rules to work over list of blocks -> list of blocks rather then Block -> Block
+1. fix Random stmt selection (e.g. block -> Stmt vs over all stmts);
 3. More Vectorization, LoopUnrolling, licm, ... Rules
 4. Expand Term to handle Bitwise ops
 5. Add InstCombine Rules
-6. Make Guard a Rewrite Rule rather then a seperate Operation -> Also needs Rules to see variable State
 7. Add ability for Delta Debugging / Bisecting
 8. If/Else Guards
 9. Add lowering for new structures (For mod arithmetic) Java and SYMIR as well as parsing for SYMIR (including Uninitialized Locals)
