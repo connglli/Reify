@@ -27,11 +27,104 @@
 
 #include "lib/patternmatch.hpp"
 #include "lib/lang.hpp"
+#include "lib/varstate.hpp"
+
+#include <flint/ulong_extras.h>
+#include <flint/nmod.h>
+#include <flint/nmod_mat.h>
 
 #ifndef REIFY_TRANSFORMATION_UTILS_HPP
 #define REIFY_TRANSFORMATION_UTILS_HPP
 
 namespace transformations::utils {
+
+  class VarFilter {
+  public:
+    VarFilter(
+      symir::FunctBuilder *funBd,
+      VariableState &varState
+    ): funBd(funBd), varState(varState) {}
+    void randomlyFilter();
+    void smartlyFilter();
+    
+  public:
+    std::vector<int32_t> filteredVarState{};
+    std::vector<const symir::VarDef *> filteredVars{};
+    std::vector<std::vector<symir::Coef *>> filteredAccesses{};
+
+  private:
+    symir::FunctBuilder *funBd;
+    VariableState &varState;
+
+  };
+
+  class PrimeInterpolation {
+  public:
+    PrimeInterpolation(int32_t mod) {
+      Assert(mod <= 46337, "To avoid overflow mod must be less then 46337");
+      Assert(n_is_prime(mod), "PrimeInterpolation requires that mod is prime");
+      nmod_init(&this->mod, mod);
+    }
+  
+    void interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
+  
+    void interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
+  
+    std::vector<int32_t> getPolynomial() {
+      return std::vector(this->polynomial);
+    }
+  
+    std::vector<int32_t> getCoeffs() {
+      return std::vector(this->coeffs);
+    }
+  
+    /// Triggers an assert if the last interpolation does not correctly yield 'target' when evaluated over 'varState'
+    void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
+
+    /// Triggers an assert if the last interpolation does not correctly yield 'targets' when evaluated over 'varState'
+    void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
+
+  private:
+  
+    /// Find a new unused iteration according to varState
+    std::vector<int32_t> findUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState);
+    
+    /// see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+    void shuffel(const size_t n, int32_t *arr) {
+      for (size_t i = n - 1; i >= 1; i--) {
+        size_t r = rand() % (i + 1);
+        int32_t temp = arr[r];
+        arr[r] = arr[i];
+        arr[i] = temp;
+      }
+    }
+    
+    // This is a quite biased in its selection. TODO: Are the more uniform / fair algorithms for finding a random polynomial fast?
+    // Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
+    /// Samples a new random polynomial
+    void randomizePolynomial(
+      const size_t nrVariables,
+      const size_t nrMonomials
+    );
+
+    /// Returns the (mathematical) modulo of 'var' (e.g. 'var' mod 'this->mod.n')
+    ulong reduceMod(int32_t var) {
+      ulong res;
+      if (var < 0) {
+        NMOD_RED(res, static_cast<ulong>(-static_cast<int64_t>(var)), this->mod);
+        res = res != 0 ? this->mod.n - res : res;
+      } else {
+        NMOD_RED(res, static_cast<ulong>(var), this->mod);
+      }
+      Assert(res < this->mod.n, "reduceMod has produced 'res' not in Z_%ld", this->mod.n);
+      return res;
+    }
+
+  private:
+    nmod_t mod;
+    std::vector<int32_t> polynomial;
+    std::vector<int32_t> coeffs;
+  };
 
   // TODO: Maybe apply Reservoir Sampling here to avoid copying the AST twice
   // TODO: This has become extreamly hacky, need to find a better solution
@@ -50,8 +143,6 @@ namespace transformations::utils {
       double randThreshold = 1
     );
   
-    void *getExtractedDataRef() { return this->data; }
-  
   protected:
     void Visit(const Node &e) override;
     void Visit(const symir::Branch &b) override;
@@ -65,11 +156,13 @@ namespace transformations::utils {
     }
     double rand() { return this->randUniform(); }
   
+  public:
+    void *data = nullptr;
+
   private:
     std::function<bool(const Node *)> matchFunction;
     std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
     std::function<double()> randUniform;
-    void *data = nullptr;
     double randThreshold = 1;
     bool hasReplaced = false;
   };

@@ -85,7 +85,7 @@ void ProgPlus::Generate() {
       strat = std::make_unique<PrimeInterpFCallStrategy>();
     } break;
     case GlobalOptions::ReverseOptimization: {
-      strat = std::make_unique<RevOptFCallStrategy>(std::make_unique<ModInterpGuardStrategy>());
+      strat = std::make_unique<RevOptFCallStrategy>();
     } break;
     default: Panic("DataflowStrategy is set to an invalid value");
     }
