@@ -44,6 +44,7 @@ struct DeoptFunGenOpts {
   std::string output;
   bool main;
   bool verbose;
+  int ruleCount;
 
   static DeoptFunGenOpts Parse(int argc, char **argv) {
     cxxopts::Options options("Deopt", "Deopt: Using Reify's Deopt for leaf function generation\n");
@@ -51,6 +52,7 @@ struct DeoptFunGenOpts {
     options.add_options()
       ("uuid", "An UUID identifier as the primary identifier", cxxopts::value<std::string>())
       ("n,sno", "A sample number as the second identifier", cxxopts::value<std::string>())
+      ("r,rules", "How many times Rewrite rules should be applied", cxxopts::value<int>()->default_value("20"))
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -111,6 +113,8 @@ struct DeoptFunGenOpts {
       Random::Get().Seed(seed);
     }
 
+    const int ruleCount = args["rules"].as<int>();
+
     const bool main = args["main"].as<bool>();
 
     const bool verbose = args["verbose"].as<bool>();
@@ -120,7 +124,8 @@ struct DeoptFunGenOpts {
         .sno = sno,
         .output = output,
         .main = main,
-        .verbose = verbose
+        .verbose = verbose,
+        .ruleCount = ruleCount
     };
   }
 };
@@ -150,7 +155,7 @@ class DeoptFun {
 public:
   DeoptFun(std::string name, int numParams) : name(name), numParams(numParams) {}
 
-  void Generate() {
+  void Generate(int ruleCount) {
     Log::Get().OpenSection("Deopt function generation");
     auto builder = std::make_unique<symir::FunctBuilder>(name, symir::SymIR::I32);
 
@@ -165,7 +170,7 @@ public:
 
     this->targetVal = Random::Get().Uniform(INT_MIN, INT_MAX)();
     auto bblBd = builder->OpenBlock(NameLabel(0));
-    bblBd->SymCommitStmt(
+    bblBd->CommitStmt(
       bblBd->SymAssStmt(
         retVal->GetDefinition(),
         bblBd->SymAddExpr({
@@ -178,33 +183,37 @@ public:
     );
 
     auto revopt = RewriteEngine::Default();
-    revopt.run(builder.get(), bblBd, 20);
+    std::vector<symir::BlockBuilder *> blks = { bblBd };
+    revopt.run(builder.get(), blks, ruleCount);
+    bblBd = blks[0];
 
-    auto cstTerms = ConstQuery(builder.get(), bblBd).query();
-    Log::Get().Out() << "Embedding variables:" << std::endl;
-    for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
-      Log::Get().Out() 
-        << "  "
-        << params[i]->GetName() 
-        << " = " 
-        << cstTerms[i]->GetCoef()->GetI32Value() 
-        << std::endl;
-    }
+    //auto cstTerms = ConstQuery(builder.get(), bblBd).query();
+    //Log::Get().Out() << "Embedding variables:" << std::endl;
+    //for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
+    //  Log::Get().Out() 
+    //    << "  "
+    //    << params[i]->GetName() 
+    //    << " = " 
+    //    << cstTerms[i]->GetCoef()->GetI32Value() 
+    //    << std::endl;
+    //}
 
-    std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
-    std::map<const symir::Term *, symir::BlockBuilder::TermID> varMap;
-    this->args.resize(numParams);
-    for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
-      this->args[i] = cstTerms[i]->GetCoef()->GetI32Value();
-      varMap[cstTerms[i]] = bblBd->SymMulTerm(
-        builder->SymI32Const(1),
-        params[i], {}
-      );
-    }
-    VariableEmbedder(builder.get(), bblBd).embed(varMap);
+    //std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
+    //std::map<const symir::Term *, symir::BlockBuilder::TermID> varMap;
+    //this->args.resize(numParams);
+    //for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
+    //  this->args[i] = cstTerms[i]->GetCoef()->GetI32Value();
+    //  varMap[cstTerms[i]] = bblBd->SymMulTerm(
+    //    builder->SymI32Const(1),
+    //    params[i], {}
+    //  );
+    //}
+    //VariableEmbedder(builder.get(), bblBd).embed(varMap);
 
-    bblBd->SymCommitStmt(bblBd->SymReturn());
-    builder->CloseBlock(bblBd);
+    symir::BlockBuilder *lastBlock = *(blks.end() - 1);
+    Assert(!lastBlock->HasTarget(), "Last Block already has a target");
+    lastBlock->CommitStmt(lastBlock->SymReturn());
+    for (auto &blk : blks) builder->CloseBlock(blk);
 
     this->fun = builder->Build();
     Log::Get().CloseSection();
@@ -234,7 +243,7 @@ public:
     main << "int main() {" << std::endl;
     main << "  printf(\"%d\\n\", " << this->fun->GetName() << "(";
     for (int i = 0; i < numParams; i++) {
-      main << this->args[i];
+      main << 0; // this->args[i];
       if (i != numParams - 1) {
         main << ", ";
       }
@@ -259,6 +268,7 @@ int main(int argc, char **argv) {
 
   std::string uuid = cliOpts.uuid;
   std::string sno = cliOpts.sno;
+  int ruleCount = cliOpts.ruleCount;
   bool mainfun = cliOpts.main;
   bool verbose = cliOpts.verbose;
 
@@ -272,7 +282,7 @@ int main(int argc, char **argv) {
   }
 
   DeoptFun fun(arts.GetFunName(), 4);
-  fun.Generate();
+  fun.Generate(ruleCount);
 
   std::string funCode = fun.GenerateFunCode();
   std::ofstream functionFile(arts.GetFunPath());

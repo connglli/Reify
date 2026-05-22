@@ -38,51 +38,30 @@ public:
   /// Get empty RewriteEngine without any rules added
   static RewriteEngine Empty() { return RewriteEngine(); }
   /// Get default RewriteEngine with the default set of rules added
-  static RewriteEngine Default() { 
+  static RewriteEngine Default() {
     auto engine = RewriteEngine();
     engine.addRule(std::make_unique<primitive::Reg2Mem>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaAdd>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaSub>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaMul>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstProbpagationViaDiv>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaAdd>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaSub>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaMul>(), 1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaDiv>(), 1);
     engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 50);
     engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 10);
-    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 5);
-    engine.addRule(std::make_unique<vectorize::Reduction>(), 6);
-    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 5);
+    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
+    engine.addRule(std::make_unique<vectorize::Reduction>(), 10);
+    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
     return engine;
   }
   void addRule(std::unique_ptr<Rule> rule, int weight);
   /// normal run method used for random selection of rules based on the passed weight, attempts to runs `times` rules in total
-  void run(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, size_t times) const;
+  void run(symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds, size_t times) const;
 
 private:
   RewriteEngine() = default;
 
-  std::optional<symir::BlockBuilder::StmtID> runInSubStmt(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::Stmt *stmt
-  ) const;
-  std::optional<symir::BlockBuilder::StmtID> runInForStmt(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::ForStmt *forStmt
-  ) const;
-  std::optional<symir::BlockBuilder::StmtID> runInWhileStmt(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::WhileStmt *whileStmt
-  ) const;
-  std::optional<symir::BlockBuilder::StmtID> runInIfStmt(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::IfStmt *ifStmt
-  ) const;
   std::optional<Rule *> getRandomMatchingRule(const symir::Stmt *stmt) const;
 
 protected:
-
   std::vector<std::unique_ptr<Rule>> rules{};
   std::vector<int> weights{};
 };
@@ -103,9 +82,6 @@ protected:
   void Visit(const symir::Cond &c) override;
   void Visit(const symir::AssStmt &a) override;
   void Visit(const symir::ModAssStmt &a) override { return; };
-  void Visit(const symir::IfStmt &i) override;
-  void Visit(const symir::ForStmt &f) override;
-  void Visit(const symir::WhileStmt &w) override;
   void Visit(const symir::RetStmt &r) override { Panic("Not a valid embed target"); }
   void Visit(const symir::Branch &b) override { Panic("Not a valid embed target"); }
   void Visit(const symir::Goto &g) override { Panic("Not a valid embed target"); }
@@ -138,9 +114,6 @@ protected:
   void Visit(const symir::Cond &c) override;
   void Visit(const symir::AssStmt &a) override;
   void Visit(const symir::ModAssStmt &a) override;
-  void Visit(const symir::IfStmt &i) override;
-  void Visit(const symir::ForStmt &f) override;
-  void Visit(const symir::WhileStmt &w) override;
   void Visit(const symir::RetStmt &r) override { Panic("Not a valid embed target"); }
   void Visit(const symir::Branch &b) override { Panic("Not a valid embed target"); }
   void Visit(const symir::Goto &g) override { Panic("Not a valid embed target"); }

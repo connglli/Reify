@@ -136,7 +136,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   SymIRBuilder::TermID BlockBuilder::SymTerm(
       Term::Op op, Coef *coef, const VarDef *var, const std::vector<Coef *> &access
   ) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     Assert(op == Term::Op::OP_CST || var != nullptr, "var may only be nullptr if op is CST");
     Assert(op != Term::Op::OP_CST || var == nullptr, "var may must be nullptr if op is CST");
     TermID tid = numCreatedTerms++;
@@ -204,7 +204,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   SymIRBuilder::ExprID BlockBuilder::SymExpr(Expr::Op op, const std::vector<TermID> &termIds) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     ExprID eid = numCreatedExprs++;
     std::vector<std::unique_ptr<Term>> terms;
     for (const auto tid: termIds) {
@@ -247,7 +247,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   
 
   SymIRBuilder::ExprID BlockBuilder::SymCond(Cond::Op op, ExprID eid) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     CondID cid = numCreatedConds++;
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
@@ -258,7 +258,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
 
   BlockBuilder::StmtID
   BlockBuilder::SymAssStmt(const VarDef *var, ExprID eid, const std::vector<Coef *> &access) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = createdExprs.find(eid);
     Assert(it != createdExprs.end(), "Expr with ID \"%lu\" does not exist", eid);
 
@@ -404,7 +404,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   BlockBuilder::StmtID BlockBuilder::SymReturn() {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     std::vector<std::unique_ptr<VarUse>> uses;
 
     std::function<void(
@@ -452,145 +452,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     return sid;
   }
 
-  BlockBuilder::StmtID
-  BlockBuilder::SymIfStmt(std::vector<CondID> cids, std::vector<std::vector<StmtID>> sids) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
-    Assert(cids.size() > 0, "IfStmt must have atleast condition");
-    Assert(sids.size() >= cids.size(), "IfStmt must have atleast as many bodies as conditions");
-    Assert(sids.size() <= cids.size() + 1, "IfStmt must have atmost one more body as conditions");
-
-    std::vector<std::unique_ptr<Cond>> conds;
-    conds.resize(cids.size());
-    for (size_t i = 0; i < cids.size(); i++) {
-      auto it = this->createdConds.find(cids[i]);
-      Assert(it != createdConds.end(), "Cond with ID \"%lu\" does not exist", cids[i]);
-      conds[i] = std::move(it->second);
-    }
-
-    std::vector<std::vector<std::unique_ptr<Stmt>>> bodies;
-    bodies.resize(sids.size());
-    for (size_t i = 0; i < sids.size(); i++) {
-      bodies[i].resize(sids[i].size());
-      for (size_t j = 0; j < sids[i].size(); j++) {
-        auto it = this->createdStmts.find(sids[i][j]);
-        Assert(it != createdStmts.end(), "Stmt with ID \"%lu\" does not exist", sids[i][j]);
-        Assert(it->second->GetIRId() != SymIR::SIR_TGT_BRA || it->second->GetIRId() != SymIR::SIR_TGT_GOTO, "IfStmt cannot contain Goto or Branch");
-        bodies[i][j] = std::move(it->second);
-      }
-    }
-
-    StmtID sid = this->numCreatedStmts++;
-    this->createdStmts[sid] = std::make_unique<IfStmt>(std::move(conds), std::move(bodies));
-    return sid;
-  }
-
-  BlockBuilder::StmtID 
-  BlockBuilder::SymForStmt(const VarDef *var, CondID cid, ExprID initID, ExprID incrementID, std::vector<StmtID> sids, const std::vector<Coef *> &access) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
-
-    auto it = this->createdConds.find(cid);
-    Assert(it != this->createdConds.end(), "Cond with ID \"%lu\" does not exist", cid);
-
-    auto init = this->createdExprs.find(initID);
-    Assert(init != this->createdExprs.end(), "Expr with ID \"%lu\" does not exist", initID);
-
-    auto increment = this->createdExprs.find(incrementID);
-    Assert(increment != this->createdExprs.end(), "Expr with ID \"%lu\" does not exist", incrementID);
-
-    std::vector<std::unique_ptr<Stmt>> body;
-    body.resize(sids.size());
-    for (size_t i = 0; i < sids.size(); i++) {
-      auto it = this->createdStmts.find(sids[i]);
-      Assert(it != createdStmts.end(), "Stmt with ID \"%lu\" does not exist", sids[i]);
-      Assert(it->second->GetIRId() != SymIR::SIR_TGT_BRA || it->second->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt cannot contain Goto or Branch");
-      body[i] = std::move(it->second);
-    }
-
-    SymIR::Type currType = var->GetType();
-    SymIR::Type currBaseType = var->GetBaseType();
-    std::string currStruct =
-        (currType == SymIR::Type::STRUCT)
-            ? var->GetStructName()
-            : (currBaseType == SymIR::Type::STRUCT ? var->GetStructName() : "");
-    int32_t remainingDims = var->IsVector() ? var->GetVecNumDims() : 0;
-    Assert(remainingDims >= 0, "vector dim count cannot be negative");
-
-    for (const auto *c: access) {
-      if (remainingDims > 0) {
-        remainingDims--;
-        if (remainingDims == 0) {
-          currType = currBaseType;
-        }
-      } else if (currType == SymIR::Type::STRUCT) {
-        int32_t idx = c->GetI32Value();
-        Assert(idx >= 0, "struct index cannot be negative");
-        const auto *sDef = this->GetParent()->FindStruct(currStruct);
-        Assert(sDef, "Struct %s not found", currStruct.c_str());
-        const auto &field = sDef->GetField(idx);
-        currType = field.type;
-        currBaseType = field.baseType;
-        if (currType == SymIR::Type::STRUCT) {
-          currStruct = field.structName;
-        } else if (currType == SymIR::Type::ARRAY) {
-          remainingDims = field.shape.size();
-          if (currBaseType == SymIR::Type::STRUCT) {
-            currStruct = field.structName;
-          }
-        }
-      }
-    }
-    // After processing all accesses, if we still have an ARRAY type and no remaining dims,
-    // that means we've consumed all array dimensions and should use the base type
-    if (currType == SymIR::Type::ARRAY && remainingDims == 0) {
-      currType = currBaseType;
-    }
-
-    StmtID sid = this->numCreatedStmts++;
-    if (var->IsVector() || var->GetType() == SymIR::Type::STRUCT ||
-        var->GetType() == SymIR::Type::ARRAY) {
-      this->createdStmts[sid] = std::make_unique<ForStmt>(
-        std::make_unique<VarUse>(var, access, currType),
-        std::move(it->second),
-        std::move(init->second),
-        std::move(increment->second),
-        std::move(body)
-      );
-    } else {
-      this->createdStmts[sid] = std::make_unique<ForStmt>(
-        std::make_unique<VarUse>(var),
-        std::move(it->second),
-        std::move(init->second),
-        std::move(increment->second),
-        std::move(body)
-      );
-    }
-
-    return sid;
-  }
-
-  BlockBuilder::StmtID 
-  BlockBuilder::SymWhileStmt(CondID cid, std::vector<StmtID> sids) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
-
-    auto it = this->createdConds.find(cid);
-    Assert(it != this->createdConds.end(), "Cond with ID \"%lu\" does not exist", cid);
-
-    std::vector<std::unique_ptr<Stmt>> body;
-    body.resize(sids.size());
-    for (size_t i = 0; i < sids.size(); i++) {
-      auto it = this->createdStmts.find(sids[i]);
-      Assert(it != createdStmts.end(), "Stmt with ID \"%lu\" does not exist", sids[i]);
-      Assert(it->second->GetIRId() != SymIR::SIR_TGT_BRA || it->second->GetIRId() != SymIR::SIR_TGT_GOTO, "WhileStmt cannot contain Goto or Branch");
-      body[i] = std::move(it->second);
-    }
-
-    StmtID sid = this->numCreatedStmts++;
-    this->createdStmts[sid] = std::make_unique<WhileStmt>(std::move(it->second), std::move(body));
-    return sid;
-  }
-
-  Stmt *BlockBuilder::SymCommitStmt(StmtID sid) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+  Stmt *BlockBuilder::CommitStmt(StmtID sid) {
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = this->createdStmts.find(sid);
     Assert(it != this->createdStmts.end(), "Stmt with ID \"%lu\" does not exist", sid);
     this->stmts.push_back(std::move(it->second));
@@ -598,8 +461,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     return this->stmts.back().get();
   }
 
-  Stmt *BlockBuilder::SymCommitStmtAt(StmtID sid, int stmtIndex) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+  Stmt *BlockBuilder::CommitStmtAt(StmtID sid, int stmtIndex) {
+    //Assert(isActive(), "The BlockBuilder is no longer active");
     auto it = this->createdStmts.find(sid);
     Assert(it != this->createdStmts.end(), "Stmt with ID \"%lu\" does not exist", sid);
     this->stmts.insert(this->stmts.begin() + stmtIndex, std::move(it->second));
@@ -607,7 +470,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     return this->stmts[stmtIndex].get();
   }
 
-  Stmt *BlockBuilder::SymCommitStmtAtAssign(StmtID sid, int assignStmtIndex) {
+  Stmt *BlockBuilder::CommitStmtAtAssign(StmtID sid, int assignStmtIndex) {
     // find the 'assignStmtIndex'th assignment stmt
     size_t index;
     if (assignStmtIndex < 0) {
@@ -632,8 +495,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     return this->stmts[index].get();
   }
 
-  std::vector<Stmt *>  BlockBuilder::SymReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex) {
-    Assert(isActive(), "The BlockBuilder is no longer active");
+  std::vector<Stmt *> BlockBuilder::ReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex) {
+    //Assert(isActive(), "The BlockBuilder is no longer active");
 
     int currIndex = stmtIndex;
     for (size_t i = 0; i < sids.size(); i++) {
@@ -810,83 +673,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     pushStmt(this->builder->SymReturn());
   }
 
-  void BlockCopier::Visit(const IfStmt &i) {
-    const auto conds = i.GetConds();
-    const auto bodies = i.GetBodies();
-
-    std::vector<CondID> cids;
-    cids.resize(conds.size());
-    for (size_t i = 0; i < conds.size(); i++) {
-      conds[i]->Accept(*this);
-      cids[i] = popCond();
-    }
-
-    std::vector<std::vector<StmtID>> sids;
-    sids.resize(bodies.size());
-    for (size_t i = 0; i < bodies.size(); i++) {
-      sids[i].resize(bodies[i].size());
-      for (size_t j = 0; j < bodies[i].size(); j++) {
-        Assert(bodies[i][j]->GetIRId() != SymIR::SIR_TGT_BRA || bodies[i][j]->GetIRId() != SymIR::SIR_TGT_GOTO, "IfStmt contains Goto or Branch");
-        bodies[i][j]->Accept(*this);
-        sids[i][j] = popStmt();
-      }
-    }
-
-    pushStmt(this->builder->SymIfStmt(cids, sids));
-  }
-
-  void BlockCopier::Visit(const ForStmt &f) {
-    const VarUse *use = f.GetVar();
-    const Expr *init = f.GetInit();
-    const Expr *increment = f.GetIncrement();
-    const auto cond = f.GetCond();
-    const auto body = f.GetBody();
-
-    use->Accept(*this);
-    std::vector<Coef *> access{};
-    for (size_t i = 0; i < use->GetAccess().size(); i++) {
-      access.insert(access.begin(), popCoef());
-    }
-
-
-    cond->Accept(*this);
-    CondID cid = popCond();
-
-    init->Accept(*this);
-    ExprID initID = popExpr();
-
-    increment->Accept(*this);
-    ExprID incrementID = popExpr();
-
-    std::vector<StmtID> sids;
-    sids.resize(body.size());
-    for (size_t i = 0; i < body.size(); i++) {
-      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-      body[i]->Accept(*this);
-      sids[i] = popStmt();
-    }
-
-    pushStmt(this->builder->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
-  }
-
-  void BlockCopier::Visit(const WhileStmt &w) {
-    const auto cond = w.GetCond();
-    const auto body = w.GetBody();
-
-    cond->Accept(*this);
-    CondID cid = popCond();
-
-    std::vector<StmtID> sids;
-    sids.resize(body.size());
-    for (size_t i = 0; i < body.size(); i++) {
-      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-      body[i]->Accept(*this);
-      sids[i] = popStmt();
-    }
-
-    pushStmt(this->builder->SymWhileStmt(cid, sids));
-  }
-
   void BlockCopier::Visit(const Branch &b) {
     b.GetCond()->Accept(*this);
     auto condId = popCond();
@@ -910,7 +696,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       s->Accept(*this);
       if (s == b.GetTarget()) continue; // target is not pushed to stmtStack
       StmtID sid = popStmt();
-      this->builder->SymCommitStmt(sid);
+      this->builder->CommitStmt(sid);
     }
   }
 
@@ -1054,83 +840,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     }
 
     pushStmt(this->blockBd->SymModAssStmt(var, modExprId, access));
-  }
-
-  void StmtCopier::Visit(const IfStmt &i) {
-    const auto conds = i.GetConds();
-    const auto bodies = i.GetBodies();
-
-    std::vector<CondID> cids;
-    cids.resize(conds.size());
-    for (size_t i = 0; i < conds.size(); i++) {
-      conds[i]->Accept(*this);
-      cids[i] = popCond();
-    }
-
-    std::vector<std::vector<StmtID>> sids;
-    sids.resize(bodies.size());
-    for (size_t i = 0; i < bodies.size(); i++) {
-      sids[i].resize(bodies[i].size());
-      for (size_t j = 0; j < bodies[i].size(); j++) {
-        Assert(bodies[i][j]->GetIRId() != SymIR::SIR_TGT_BRA || bodies[i][j]->GetIRId() != SymIR::SIR_TGT_GOTO, "IfStmt contains Goto or Branch");
-        bodies[i][j]->Accept(*this);
-        sids[i][j] = popStmt();
-      }
-    }
-
-    pushStmt(this->blockBd->SymIfStmt(cids, sids));
-  }
-
-  void StmtCopier::Visit(const ForStmt &f) {
-    const VarUse *use = f.GetVar();
-    const Expr *init = f.GetInit();
-    const Expr *increment = f.GetIncrement();
-    const auto cond = f.GetCond();
-    const auto body = f.GetBody();
-
-    use->Accept(*this);
-    std::vector<Coef *> access{};
-    for (size_t i = 0; i < use->GetAccess().size(); i++) {
-      access.insert(access.begin(), popCoef());
-    }
-
-
-    cond->Accept(*this);
-    CondID cid = popCond();
-
-    init->Accept(*this);
-    ExprID initID = popExpr();
-
-    increment->Accept(*this);
-    ExprID incrementID = popExpr();
-
-    std::vector<StmtID> sids;
-    sids.resize(body.size());
-    for (size_t i = 0; i < body.size(); i++) {
-      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-      body[i]->Accept(*this);
-      sids[i] = popStmt();
-    }
-
-    pushStmt(this->blockBd->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
-  }
-
-  void StmtCopier::Visit(const WhileStmt &w) {
-    const auto cond = w.GetCond();
-    const auto body = w.GetBody();
-
-    cond->Accept(*this);
-    CondID cid = popCond();
-
-    std::vector<StmtID> sids;
-    sids.resize(body.size());
-    for (size_t i = 0; i < body.size(); i++) {
-      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-      body[i]->Accept(*this);
-      sids[i] = popStmt();
-    }
-
-    pushStmt(this->blockBd->SymWhileStmt(cid, sids));
   }
 
   const StructDef *
@@ -1535,84 +1244,6 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
 
   void FunctCopier::Visit(const RetStmt &r) { pushStmt(currentBlock->SymReturn()); }
 
-
-  void FunctCopier::Visit(const IfStmt &i) {
-    const auto conds = i.GetConds();
-    const auto bodies = i.GetBodies();
-
-    std::vector<CondID> cids;
-    cids.resize(conds.size());
-    for (size_t i = 0; i < conds.size(); i++) {
-      conds[i]->Accept(*this);
-      cids[i] = popCond();
-    }
-
-    std::vector<std::vector<StmtID>> sids;
-    sids.resize(bodies.size());
-    for (size_t i = 0; i < bodies.size(); i++) {
-      sids[i].resize(bodies[i].size());
-      for (size_t j = 0; j < bodies[i].size(); j++) {
-        Assert(bodies[i][j]->GetIRId() != SymIR::SIR_TGT_BRA || bodies[i][j]->GetIRId() != SymIR::SIR_TGT_GOTO, "IfStmt contains Goto or Branch");
-        bodies[i][j]->Accept(*this);
-        sids[i][j] = popStmt();
-      }
-    }
-
-    pushStmt(this->currentBlock->SymIfStmt(cids, sids));
-  }
-
-  void FunctCopier::Visit(const ForStmt &f) {
-    const VarUse *use = f.GetVar();
-    const Expr *init = f.GetInit();
-    const Expr *increment = f.GetIncrement();
-    const auto cond = f.GetCond();
-    const auto body = f.GetBody();
-
-    use->Accept(*this);
-    std::vector<Coef *> access{};
-    for (size_t i = 0; i < use->GetAccess().size(); i++) {
-      access.insert(access.begin(), popCoef());
-    }
-
-    cond->Accept(*this);
-    CondID cid = popCond();
-
-    init->Accept(*this);
-    ExprID initID = popExpr();
-
-    increment->Accept(*this);
-    ExprID incrementID = popExpr();
-
-    std::vector<StmtID> sids;
-    sids.resize(body.size());
-    for (size_t i = 0; i < body.size(); i++) {
-      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-      body[i]->Accept(*this);
-      sids[i] = popStmt();
-    }
-
-    pushStmt(this->currentBlock->SymForStmt(use->GetDef(), cid, initID, incrementID, sids, access));
-  };
-
-  void FunctCopier::Visit(const WhileStmt &w) {
-    const auto cond = w.GetCond();
-    const auto body = w.GetBody();
-
-    cond->Accept(*this);
-    CondID cid = popCond();
-
-    std::vector<StmtID> sids;
-    sids.resize(body.size());
-    for (size_t i = 0; i < body.size(); i++) {
-      Assert(body[i]->GetIRId() != SymIR::SIR_TGT_BRA || body[i]->GetIRId() != SymIR::SIR_TGT_GOTO, "ForStmt contains Goto or Branch");
-      body[i]->Accept(*this);
-      sids[i] = popStmt();
-    }
-
-    pushStmt(this->currentBlock->SymWhileStmt(cid, sids));
-
-  };
-
   void FunctCopier::Visit(const Branch &b) {
     b.GetCond()->Accept(*this);
     auto condId = popCond();
@@ -1675,7 +1306,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       s->Accept(*this);
       if (s == b.GetTarget()) continue; // target is not pushed to stmtStack
       StmtID sid = popStmt();
-      this->currentBlock->SymCommitStmt(sid);
+      this->currentBlock->CommitStmt(sid);
     }
     if (beforeBlockCloseHook) {
       beforeBlockCloseHook(builder.get(), currentBlock);
