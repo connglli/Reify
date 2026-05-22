@@ -51,7 +51,6 @@ protected:
 
 };
 
-
 class VariableStateExtractor : public VariableStateBase, symir::SymIRVisitor {
 public:
   nlohmann::json toJson();
@@ -95,12 +94,16 @@ private:
   std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
 };
 
+struct VariableState {
+  std::map<size_t, std::string> varMap;
+  std::vector<int32_t> varState;
+  size_t nrVariables;
+};
 
 class VariableStateQuery : public VariableStateBase {
 public:
   void fromJson(nlohmann::json json);
-  std::pair<size_t, std::vector<int32_t>> query(size_t blockIndex, size_t stmtIndex);
-  std::map<size_t, std::string> GetVarMap() { return this->varNamesMap; }
+  VariableState query(size_t blockIndex, size_t stmtIndex);
 
 private:
   std::map<size_t, std::string> varNamesMap;

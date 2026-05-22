@@ -42,6 +42,7 @@ namespace transformations::vectorize {
   void DeadAssignFromCopy::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
     ) {
@@ -70,6 +71,7 @@ namespace transformations::vectorize {
   void Reduction::rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) {

@@ -40,6 +40,7 @@ public:
   /// Get default RewriteEngine with the default set of rules added
   static RewriteEngine Default() {
     auto engine = RewriteEngine();
+    engine.addRule(std::make_unique<primitive::Guard>(), 10);
     engine.addRule(std::make_unique<primitive::Reg2Mem>(), 1);
     engine.addRule(std::make_unique<primitive::ConstPropagationViaAdd>(), 1);
     engine.addRule(std::make_unique<primitive::ConstPropagationViaSub>(), 1);
@@ -54,7 +55,21 @@ public:
   }
   void addRule(std::unique_ptr<Rule> rule, int weight);
   /// normal run method used for random selection of rules based on the passed weight, attempts to runs `times` rules in total
-  void run(symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds, size_t times) const;
+  void run(
+    symir::FunctBuilder *funBd,
+    std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
+    size_t times
+  ) const;
+
+  /// Runs a Rules as a Pass e.g. run it over all stmts in all blocks
+  void runAsPass(
+    symir::FunctBuilder *funBd,
+    std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
+    Rule &rule
+  ) const;
+
 
 private:
   RewriteEngine() = default;
@@ -64,75 +79,6 @@ private:
 protected:
   std::vector<std::unique_ptr<Rule>> rules{};
   std::vector<int> weights{};
-};
-
-// TODO ConstQuery and ConstEmbedder probably fit better in another file then here
-
-/// ==================== Classes to embed variables ====================
-/// Can Query for constants that can be replaced
-struct ConstQuery : symir::SymIRVisitor {
-  ConstQuery(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) : funBd(funBd), blockBd(blockBd) {}
-  std::vector<const symir::Term *> query();
-protected:
-  void Visit(const symir::VarUse &v) override;
-  void Visit(const symir::Coef &c) override { return; }
-  void Visit(const symir::Term &t) override;
-  void Visit(const symir::Expr &e) override;
-  void Visit(const symir::ModExpr &e) override { return; }
-  void Visit(const symir::Cond &c) override;
-  void Visit(const symir::AssStmt &a) override;
-  void Visit(const symir::ModAssStmt &a) override { return; };
-  void Visit(const symir::RetStmt &r) override { Panic("Not a valid embed target"); }
-  void Visit(const symir::Branch &b) override { Panic("Not a valid embed target"); }
-  void Visit(const symir::Goto &g) override { Panic("Not a valid embed target"); }
-  void Visit(const symir::ScaParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::VecParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::ScaLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::VecLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructDef &s) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::Block &b) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::Funct &f) override { Panic("Not a subnode of any STMT"); }
-private:
-  symir::FunctBuilder *funBd;
-  symir::BlockBuilder *blockBd;
-  std::vector<const symir::Term *> terms;
-};
-
-struct VariableEmbedder: symir::SymIRVisitor, private symir::SymIRCopier<symir::BlockBuilder::StmtID, void> {
-  VariableEmbedder(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) : funBd(funBd), blockBd(blockBd) {}
-  void embed(std::map<const symir::Term *, symir::BlockBuilder::TermID> varMap);
-
-
-protected:
-  void Visit(const symir::VarUse &v) override;
-  void Visit(const symir::Coef &c) override;
-  void Visit(const symir::Term &t) override;
-  void Visit(const symir::Expr &e) override;
-  void Visit(const symir::ModExpr &e) override;
-  void Visit(const symir::Cond &c) override;
-  void Visit(const symir::AssStmt &a) override;
-  void Visit(const symir::ModAssStmt &a) override;
-  void Visit(const symir::RetStmt &r) override { Panic("Not a valid embed target"); }
-  void Visit(const symir::Branch &b) override { Panic("Not a valid embed target"); }
-  void Visit(const symir::Goto &g) override { Panic("Not a valid embed target"); }
-  void Visit(const symir::ScaParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::VecParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructParam &p) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::ScaLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::VecLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructLocal &l) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::StructDef &s) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::Block &b) override { Panic("Not a subnode of any STMT"); }
-  void Visit(const symir::Funct &f) override { Panic("Not a subnode of any STMT"); }
-private:
-  StmtID Copy() override { Panic("Not intended to be used"); };
-  void CopyAsBuilder() override { Panic("Not intended to be used"); }
-  symir::FunctBuilder *funBd;
-  symir::BlockBuilder *blockBd;
-  std::map<const symir::Term *, symir::BlockBuilder::TermID> varMap;
-
 };
 
 #endif //REIFY_TRANSFORMATIONS_HPP

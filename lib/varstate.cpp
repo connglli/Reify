@@ -408,7 +408,7 @@ void VariableStateQuery::fromJson(nlohmann::json mapObj) {
   }
 }
 
-std::pair<size_t, std::vector<int32_t>> VariableStateQuery::query(size_t blockIndex, size_t stmtIndex) {
+VariableState VariableStateQuery::query(size_t blockIndex, size_t stmtIndex) {
   std::vector<int32_t> varState = std::vector(this->init);
 
   size_t varsCount = varState.size();
@@ -437,5 +437,5 @@ std::pair<size_t, std::vector<int32_t>> VariableStateQuery::query(size_t blockIn
   // cut the temporary top variable state before returning
   varState.resize(varState.size() - varsCount);
   Assert(varState.size() != 0, "unable to find variable state at block %ld, stmt %ld", blockIndex, stmtIndex);
-  return std::make_pair(varsCount, varState);
+  return (struct VariableState) { this->varNamesMap, varState, varsCount };
 }
