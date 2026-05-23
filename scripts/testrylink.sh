@@ -18,7 +18,7 @@ generate() {
 	for (( i=$seed_start; i<=$(($seed_start + $nr)); i++ )); do
 	uuid="id$i"
 	echo "generating.. " $uuid
-	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i --Xdataflow-strategy 1 > /dev/null;
+	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i > /dev/null;
 	retVal=$?
 	if [ $retVal -ne 0 ]; then
 		echo "found failing generation for seed" $i
