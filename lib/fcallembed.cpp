@@ -247,7 +247,7 @@ std::string LiteralFCallStrategy::generateCall() {
 }
 
 // ==================== PrimeInterpFCallStrategy Implementations ====================
-void PrimeInterpFCallStrategy::generatePreamble(
+void AbstractArgBlockStrategy::generatePreamble(
   std::vector<VariableStateQuery *> varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
@@ -255,10 +255,8 @@ void PrimeInterpFCallStrategy::generatePreamble(
 ) {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
-  Assert(this->fina, "fina is not initialized");
-  Assert(blockIndex < funBd->GetBlocks().size(), "index %ld is Out of bound for blocks", blockIndex);
 
-  Log::Get().OpenSection("RevOptFCallStrategy::generatePreable");
+  Log::Get().OpenSection("Generating Preamble");
 
   if (this->nrBlocks == 0) this->setMaxNrBlocks(funBd->GetBlocks().size());
 
@@ -306,7 +304,7 @@ void PrimeInterpFCallStrategy::generatePreamble(
   Log::Get().CloseSection();
 }
 
-std::string PrimeInterpFCallStrategy::generateCall() {
+std::string AbstractArgBlockStrategy::generateCall() {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
   Assert(this->fina, "fina is not initialized");
@@ -415,108 +413,6 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
   // avoid causing problems by calling this function twice;
   this->argBlocks.clear();
   Log::Get().CloseSection();
-}
-
-void RevOptFCallStrategy::generatePreamble(
-  std::vector<VariableStateQuery *> varStateQueries,
-  symir::FunctBuilder *funBd,
-  size_t blockIndex,
-  size_t stmtIndex
-) {
-  Assert(this->guest, "guest is not initialized");
-  Assert(this->init, "init is not initialized");
-  Assert(this->fina, "fina is not initialized");
-  Assert(blockIndex < funBd->GetBlocks().size(), "index %ld is Out of bound for blocks", blockIndex);
-
-  Log::Get().OpenSection("RevOptFCallStrategy::generatePreable");
-
-  if (this->nrBlocks == 0) this->setMaxNrBlocks(funBd->GetBlocks().size());
-
-  const symir::Block *targetBlock= funBd->GetBlocks()[blockIndex];
-  const std::string targetLabel = targetBlock->GetLabel();
-  Log::Get().Out() << "targeting block: " << targetLabel << "at stmt: " << stmtIndex << std::endl;
-  symir::BlockBuilder *headerBlockBd;
-  if (!argBlocks.contains(targetLabel)) {
-    Log::Get().Out() << "Creating new block " << targetBlock->GetLabel() + "_header" << std::endl;
-    this->argBlocks[targetLabel] = funBd->OpenBlock(targetBlock->GetLabel() + "_header");
-  } else {
-    Log::Get().Out() << "Reusing block " << targetBlock->GetLabel() + "_header" << std::endl;
-  }
-  headerBlockBd = this->argBlocks[targetBlock->GetLabel()];
-
-  auto randDouble = Random::Get().UniformReal();
-  size_t flattIndex = 0;
-  for (size_t initIdx = 0; initIdx < this->init->size(); initIdx++) {
-    const auto &arg = (*this->init)[initIdx];
-    for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
-      flattIndex += 1;
-      if (randDouble() <= 1 - GlobalOptions::Get().InitReplaceProba) continue;
-
-      Log::Get().Out() << "Replacing the flattend " << flattIndex << "-th argument" << std::endl;
-
-      const symir::VarDef *loc = this->getUnusedAssignVar(funBd, blockIndex, 0);
-      int val = arg.IsScalar() ? arg.GetValue() : arg.GetValue(argIdx);
-
-      Log::Get().Out() << loc->GetName() << " <- " << val << std::endl;
-      headerBlockBd->CommitStmt(
-        headerBlockBd->SymAssStmt(
-          loc, 
-          headerBlockBd->SymAddExpr({
-            headerBlockBd->SymCstTerm(
-              funBd->SymI32Const(val),
-              nullptr
-            )
-          })
-        )
-      );
-      this->argVars[flattIndex - 1] = std::make_pair(loc->GetName(), 0);
-      Log::Get().Out() << std::endl;
-    }
-  }
-  Log::Get().CloseSection();
-}
-
-std::string RevOptFCallStrategy::generateCall() {
-  Assert(this->guest, "guest is not initialized");
-  Assert(this->init, "init is not initialized");
-  Assert(this->fina, "fina is not initialized");
-
-  int32_t checksum = StatelessChecksum::Compute(*this->fina);
-  std::ostringstream fcall;
-  fcall << this->guest->GetName() 
-        << "(";
-
-  const auto &params = this->guest->GetParams();
-  size_t flattenedIndex = 0;
-  for (int32_t i = 0; i < static_cast<int32_t>(init->size()); ++i) {
-    const auto &p = params[i];
-    const auto &arg = (*this->init)[i];
-
-    std::map<size_t, std::pair<std::string, int32_t> *> replacers;
-    for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
-      if (this->argVars.contains(flattenedIndex)) {
-        replacers[argIdx] = &this->argVars[i];
-      }
-      flattenedIndex += 1;
-    }
-    fcall << arg.GetTypeCastStr(p)
-          << arg.ToCxStrWithReplaced(replacers);
-
-    if (i < static_cast<int32_t>(this->init->size()) - 1) {
-      fcall << ", ";
-    }
-  }
-  this->argVars.clear();
-  fcall << ")";
-  std::string chk_call = this->wrapChecksum(checksum, fcall.str());
-  // To avoid UBs, we'd use an upper type to save the result: long long here
-  long long diff = static_cast<long long>(this->emplaceTargetValue)
-                 - static_cast<long long>(checksum);
-  if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
-    return "(" + chk_call + " + " + std::to_string(diff) + ")";
-  } else {
-    return "(int) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
-  }
 }
 
 void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
