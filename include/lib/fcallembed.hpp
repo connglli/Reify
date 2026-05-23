@@ -118,6 +118,7 @@ protected:
   size_t current_block, current_stmt;
 };
 
+// Strategy That embedds function calls with Literal Arguments e.g. foo(1, 2, 3);
 class LiteralFCallStrategy : public FCallStrategy {
 public:
   explicit LiteralFCallStrategy() {};
@@ -128,35 +129,36 @@ public:
   std::string getStrategyName() const override {return "Literal Strategy"; }
 };
 
-
-class PrimeInterpFCallStrategy : public FCallStrategy {
-public:
-  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()){};
+// Abstract Strategy That embedds function calls with random variable that are assigned in a block prior e.g. foo(1, arg_0, 3);
+// How that block is handles is decided by inheritors of this class in the finalize method
+class AbstractArgBlockStrategy : public FCallStrategy {
   void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
   void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
   std::string generateCall() override;
-  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
-  std::string getStrategyName() const override {return "PrimeInterpolation Stratgey"; }
-private:
+protected:
   // maps variable index to UnInitVar name and correction value
   std::map<const std::string, symir::BlockBuilder *> argBlocks{};
   std::map<size_t, std::pair<std::string, int32_t>> argVars{};
+};
+
+class PrimeInterpFCallStrategy : public AbstractArgBlockStrategy {
+public:
+  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()){};
+
+  void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
+  std::string getStrategyName() const override {return "PrimeInterpolation Stratgey"; }
+private:
   RewriteEngine rewriteEngine;
 };
 
-class RevOptFCallStrategy : public FCallStrategy {
+class RevOptFCallStrategy : public AbstractArgBlockStrategy {
 public:
-  explicit RevOptFCallStrategy() : 
-    rewriteEngine(RewriteEngine::Default()) {}
-  void generatePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void generatePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
-  std::string generateCall() override;
+  explicit RevOptFCallStrategy() : rewriteEngine(RewriteEngine::Default()) {}
+
   void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
   std::string getStrategyName() const override {return "RevOptFCallStrategy Stratgey"; }
 private:
   // maps variable index to UnInitVar name and correction value
-  std::map<const std::string, symir::BlockBuilder *> argBlocks{};
-  std::map<size_t, std::pair<std::string, int32_t>> argVars{};
   RewriteEngine rewriteEngine;
 };
 
