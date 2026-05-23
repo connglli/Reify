@@ -55,21 +55,30 @@ void RewriteEngine::run(
 
   for (size_t t = 0; t < times; t++) {
 
-    size_t nrBlocks = blockBds.size();
-    size_t randBlock = Random::Get().Uniform(0, static_cast<int>(nrBlocks)-1)();
-    symir::BlockBuilder * blockBd = blockBds[randBlock];
+    size_t stmtIdx, blockIdx;
+    {
+      size_t nrStmts = 0;
+      for (size_t i = 0; i < blockBds.size(); i++) {
+        nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
+        if (blockBds[i]->HasTarget()) nrStmts += 1;
+      }
 
-    size_t nrStmts = blockBd->GetNumberOfCommitedStmt();
-    if (blockBd->HasTarget()) nrStmts += 1;
-    // TODO: there has to be a better way to do this
-    if (nrStmts == 0) {
-      // retry picking a new block;
-      times -= 1;
-      continue;
+  
+      size_t randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
+      size_t i;
+      for (i = 0; i < blockBds.size(); i++) {
+        size_t nrStmts = 0;
+        nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
+        if (blockBds[i]->HasTarget()) nrStmts += 1;
+        if (nrStmts > randStmt) break;
+        randStmt -= nrStmts;
+      }
+
+      blockIdx = i;
+      stmtIdx = randStmt;
     }
-    size_t randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(randStmt);
 
+    const symir::Stmt *stmt = blockBds[blockIdx]->GetCommitedStmtOrTarget(stmtIdx);
     // TODO: Allow Rules/Matching over multiple Stmts
     std::optional rule = this->getRandomMatchingRule(stmt);
     if (rule.has_value()) {
@@ -77,8 +86,8 @@ void RewriteEngine::run(
         funBd,
         blockBds,
         varState,
-        randBlock,
-        randStmt
+        blockIdx,
+        stmtIdx 
       );
       Assert(blockBds.size() > 0, "rewrite deleted all blocks!");
     }
