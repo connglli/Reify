@@ -192,9 +192,14 @@ namespace transformations::utils {
 
   void insertBlockBd(std::vector<symir::BlockBuilder *> &currBlockBds, std::vector<symir::BlockBuilder *> newBlocks, size_t index);
 
-  std::string nameLabel(std::string functName, std::string prefix);
+  std::string nameLabel(const std::string functName, const std::string prefix);
 
-  std::string nameVariable(std::string domBlockName, std::string prefix);
+  std::string nameVariable(const std::string functName, const std::string domBlockName, const std::string prefix);
+  std::string nameVariable(const std::string functName, const std::string domBlockName, const std::string prefix, size_t size);
+
+  const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
+  const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix, size_t size);
+
 
   using namespace patternmatch;
   bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E);

@@ -48,12 +48,12 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     if (varState.nrVariables == 0) return;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     std::pair<int32_t, int32_t> targetPair;
     rep.data = static_cast<void *>(&targetPair);
@@ -146,7 +146,7 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running AdditionFromConst" << std::endl;
   
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -225,7 +225,7 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running ForSumFromConst" << std::endl;
   
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -282,7 +282,7 @@ namespace transformations::primitive {
     );
   
 
-    auto indVar = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     // indVar = 0
     symir::BlockBuilder::StmtID initIndVar = blockBd->SymAssStmt(
       indVar,
@@ -363,7 +363,7 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running AssToDeadCode" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -474,14 +474,14 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
@@ -535,14 +535,14 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
@@ -601,14 +601,14 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running ConstProba" << std::endl;
   
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
       varInsertFun =
@@ -684,14 +684,14 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running ConstPropagationViaDiv" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -752,14 +752,14 @@ namespace transformations::primitive {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
     Log::Get().Out() << "Running Reg2Mem" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
-    const symir::VarDef *memVar = this->getNewVecLocal(funBd, blockBds[0]->GetLabel(), {1});
+    const symir::VarDef *memVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, 1);
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
     std::vector<symir::Coef *> memAccess = {funBd->SymI32Const(0)};
     const symir::BlockBuilder::StmtID memAssign = blockBd->SymAssStmt(memVar, c.CopyExpr(assStmt->GetExpr()), memAccess);
