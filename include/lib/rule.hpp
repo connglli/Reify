@@ -28,10 +28,9 @@
 
 #include "lib/lang.hpp"
 #include "lib/varstate.hpp"
-#include <string>
 
 struct Rule {
-  Rule(std::string locPrefix = "local_created_by_rule_without_proper_locPrefix") : locPrefix(locPrefix) {}
+  Rule() {}
   virtual ~Rule() = default;
   virtual bool match(const symir::Stmt *stmt) const = 0;
   virtual void rewrite(
@@ -40,40 +39,7 @@ struct Rule {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) = 0;
-
-  /// get a new scalar local that is not yet used in the block with label `blockLabel`
-  const symir::VarDef *getNewScaLocal(symir::FunctBuilder *funBd, std::string blockLabel, symir::SymIR::Type type = symir::SymIR::Type::I32) {
-    if (!this->varCounterMap.contains(blockLabel)) this->varCounterMap[blockLabel] = 0;
-    std::string locName = this->locPrefix + "_" + std::to_string(this->varCounterMap[blockLabel]++);
-    Assert(funBd->FindParam(locName) == nullptr, "New Local %s should never be a Parameter", locName.c_str());
-    const symir::VarDef *loc = funBd->FindLocal(locName);
-    if (loc == nullptr) loc = funBd->SymScaLocal(locName, nullptr);
-    return loc;
-  }
-
-  /// get a new vector local that is not yet used in the block with label `blockLabel`
-  const symir::VarDef *getNewVecLocal(
-      symir::FunctBuilder *funBd,
-      std::string blockLabel, 
-      const std::vector<int> &shape,
-      symir::SymIR::Type type = symir::SymIR::Type::I32,
-      std::string structName = ""
-    ) {
-    if (!this->varCounterMap.contains(blockLabel)) this->varCounterMap[blockLabel] = 0;
-    std::string locName = this->locPrefix + "_" + std::to_string(this->varCounterMap[blockLabel]++);
-    for (int i : shape) {
-      locName += "_" + std::to_string(i);
-    }
-    Assert(funBd->FindParam(locName) == nullptr, "New Local %s should never be a Parameter", locName.c_str());
-    const symir::VarDef *loc = funBd->FindLocal(locName);
-    if (loc == nullptr) loc = funBd->SymVecLocal(locName, shape, {}, type, structName);
-    return loc;
-  }
-
-protected:
-  std::string locPrefix;
-  std::map<std::string, size_t> varCounterMap;
+  ) const = 0;
 };
 
 #endif // REIFY_RULE_HPP

@@ -41,7 +41,7 @@ namespace transformations::primitive {
   // {A, ..., Z, a, ..., z} Variables
 
   struct Guard : Rule {
-    Guard(int32_t prime = 46337) : Rule("guard"), prime(prime) {}
+    Guard(int32_t prime = 46337) : prime(prime) {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -49,8 +49,9 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
     int32_t prime;
+    const std::string varPrefix = "guard";
 
   };
 
@@ -65,14 +66,13 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
   };
 
   /// create a For Loop from an assignment of a Const
   /// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; }, 
   /// where C3 * C4 + C2 = C1
   struct ForSumFromConst : Rule {
-    ForSumFromConst() : Rule("i") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -80,7 +80,8 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "i";
   };
 
   /// Creates If/else stmts from Assignments
@@ -98,9 +99,7 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
-  
-  private:
+    ) const override;
     int minBranches;
     int maxBranches;
     bool allowUB;
@@ -110,7 +109,6 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 + cpk) + E2
   /// where C3 + C2 = C1
   struct ConstPropagationViaAdd : Rule {
-    ConstPropagationViaAdd() : Rule("const_proba_add") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -118,14 +116,14 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "const_proba_add";
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 - cpk) + E2
   /// where C3 - C2 = C1
   struct ConstPropagationViaSub : Rule {
-    ConstPropagationViaSub() : Rule("const_proba_sub") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -133,14 +131,14 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "const_proba_sub";
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 * cpk) + C4 + E2
   /// where C3 * C2 + C4 = C1
   struct ConstPropagationViaMul : Rule {
-    ConstPropagationViaMul() : Rule("const_proba_mul") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -148,14 +146,14 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "const_proba_mul";
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 / cpk) + E2
   /// where C3 / C2 = C1
   struct ConstPropagationViaDiv : Rule {
-    ConstPropagationViaDiv() : Rule("const_proba_div") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -163,28 +161,28 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "const_proba_div";
   };
 
   /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 % cpk) + E2
   /// where C3 % C2 = C1
   struct ConstPropagationViaRem : Rule {
-    ConstPropagationViaRem() : Rule("const_proba_rem") {}
-    bool match(const symir::Stmt *stmt) const override;
+    bool match(const symir::Stmt *stmt) const override { Panic("ConstProbagationViaRem is Unimplemented"); };
     void rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "const_proba_rem";
   };
 
   /// Adds an intermediate operation that moves a local to a stack ptr (array)
   /// x = E1 => y[0] = E1; x = y[0]
   struct Reg2Mem : Rule {
-    Reg2Mem() : Rule("reg_2_mem") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -192,7 +190,8 @@ namespace transformations::primitive {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "reg_2_mem";
   };
 
 } // namespace 

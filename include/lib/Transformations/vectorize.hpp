@@ -43,7 +43,6 @@ namespace transformations::vectorize {
   /// Copies an assignment into a new variable
   /// x = E1 => dx = E1; x = E1
   struct DeadAssignFromCopy : Rule {
-    DeadAssignFromCopy() : Rule("dead_assign") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -51,14 +50,14 @@ namespace transformations::vectorize {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "dead_assign";
   };
 
 
 
   /// https://llvm.org/docs/Vectorizers.html#reductions
   struct Reduction : Rule {
-    Reduction() : Rule("reduc") {}
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
       symir::FunctBuilder *funBd,
@@ -66,7 +65,9 @@ namespace transformations::vectorize {
       VariableState &varState,
       size_t targetBlockIdx,
       size_t targetStmtIdx
-    ) override;
+    ) const override;
+    const std::string varPrefix = "reduc";
+    const std::string indVarPrefix = "i";
   };
 }
 

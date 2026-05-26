@@ -45,7 +45,7 @@ namespace transformations::vectorize {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-    ) {
+    ) const {
 
     Log::Get().Out() << "Running DeadAssignFromCopy" << std::endl;
 
@@ -55,7 +55,7 @@ namespace transformations::vectorize {
     auto copier = symir::StmtCopier(funBd, blockBd);
     symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
     symir::BlockBuilder::StmtID deadStmt = blockBd->SymAssStmt(
-      this->getNewScaLocal(funBd, blockBds[0]->GetLabel()),
+      utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix),
       copier.CopyExpr(static_cast<const symir::AssStmt *>(stmt)->GetExpr())
     );
     blockBd->ReplaceCommitStmt({ deadStmt, origStmt }, targetStmtIdx);
@@ -74,7 +74,7 @@ namespace transformations::vectorize {
     VariableState &varState,
     size_t targetBlockIdx,
     size_t targetStmtIdx
-  ) {
+  ) const {
 
     Log::Get().Out() << "Running Reduction" << std::endl;
 
@@ -93,7 +93,7 @@ namespace transformations::vectorize {
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
 
     // create an array that can hold all terms;
-    const symir::VarDef *array = this->getNewVecLocal(funBd, blockBds[0]->GetLabel(), { (int) nrTerms });
+    const symir::VarDef *array = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, nrTerms);
     Log::Get().Out() << "Creating array " << array->GetName() << " with " << nrTerms << " elements" << std::endl;
 
 
@@ -128,7 +128,7 @@ namespace transformations::vectorize {
       access
     ));
 
-    auto indVar = this->getNewScaLocal(funBd, blockBds[0]->GetLabel());
+    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
     // indVar = 0
     firstBlockAppend.push_back(blockBd->SymAssStmt(
       indVar,
