@@ -32,9 +32,13 @@ compile_and_run() {
 	for (( i=$seed_start; i<=$(($seed_start + $nr)); i++ )); do
 		uuid="id$i"
 		path="${dir}/prog_${uuid}_0"
+
 		echo "compiling.. " $path;
-		$CC $CC_FLAGS $path/*.c -o $path/main.out;
+
+		$CC $CC_FLAGS $path/*.c -o $path/main.out &> /dev/null;
+
 		echo "running.. " $path;
+
 		./$path/main.out;
 		retVal=$?
 		if [ $retVal -ne 0 ]; then

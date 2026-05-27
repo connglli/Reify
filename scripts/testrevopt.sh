@@ -2,7 +2,7 @@
 
 set -e
 
-dir=$1
+dir=${1%/}
 
 # small 1 thread fuzzing that terminates on any error (other than hangs) useful for debugging rylink.
 # Iterates over seeds for easy reproduce
