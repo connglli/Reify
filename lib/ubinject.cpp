@@ -151,6 +151,9 @@ void IntUBInject::Visit(const symir::Term &t) {
     t.GetVar()->Accept(*this);
     varExpr = popExpression();
   }
+
+  auto zero = tm->mk_bv_zero(bvSort);
+  auto thirtyTwo = tm->mk_bv_value(bvSort, "32", 10);
   switch (t.GetOp()) {
     case symir::Term::OP_CST:
       pushExpression(coefExpr);
@@ -170,16 +173,58 @@ void IntUBInject::Visit(const symir::Term &t) {
 
     case symir::Term::OP_DIV:
       constraints.push_back(
-          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
+          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
       ); // We disallow division by zero
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_REM:
       constraints.push_back(
-          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
+          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
       ); // We disallow division by zero
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_NOT:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_NEG, {varExpr}));
+      break;
+
+    case symir::Term::OP_AND:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_AND, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_XOR:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_XOR, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_OR:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_OR, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_SHL:
+      // 0 <= coefExpr && coefExpr < 32
+      constraints.push_back(
+        tm->mk_term(
+          bitwuzla::Kind::AND, {
+            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})
+          }
+        )
+      );
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SHL, {varExpr, coefExpr}));
+      break;
+
+    case symir::Term::OP_SHR:
+      // 0 <= coefExpr && coefExpr < 32
+      constraints.push_back(
+        tm->mk_term(
+          bitwuzla::Kind::AND, {
+            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})
+          }
+        )
+      );
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SHR, {varExpr, coefExpr}));
       break;
 
     default:
