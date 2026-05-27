@@ -442,6 +442,7 @@ void UBSan::Visit(const symir::Term &t) {
 
   bitwuzla::Term termExpr = tm->mk_bv_zero(bvSort);
   auto zero = tm->mk_bv_zero(bvSort);
+  auto one = tm->mk_bv_one(bvSort);
 
   switch (t.GetOp()) {
     case symir::Term::Op::OP_ADD:
@@ -451,6 +452,7 @@ void UBSan::Visit(const symir::Term &t) {
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_ADD, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_SUB:
       // Prevent signed subtraction overflow
       addConstraint(tm->mk_term(
@@ -458,6 +460,7 @@ void UBSan::Visit(const symir::Term &t) {
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SUB, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_MUL:
       // Prevent signed multiplication overflow
       addConstraint(tm->mk_term(
@@ -465,6 +468,7 @@ void UBSan::Visit(const symir::Term &t) {
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_MUL, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_DIV:
       addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
       // Prevent signed division overflow (INT_MIN / -1)
@@ -473,6 +477,7 @@ void UBSan::Visit(const symir::Term &t) {
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_REM:
       addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
       // INT_MIN % -1 is UB in C11: 6.5.5p6 defines `a % b` only when `a / b`
@@ -483,9 +488,76 @@ void UBSan::Visit(const symir::Term &t) {
       ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr});
       break;
+
+    case symir::Term::Op::OP_AND:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_AND, {coefExpr, varExpr});
+      break;
+
+    case symir::Term::Op::OP_XOR:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_XOR, {coefExpr, varExpr});
+      break;
+      
+    case symir::Term::Op::OP_OR:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_OR, {coefExpr, varExpr});
+      break;
+
+    case symir::Term::Op::OP_SHL:
+      // 0 <= coefExpr && coefExpr < 31 (since we are signed shifting by 31 exactly will lead to an overflow for
+      // all lhs values other then 0, for now we ban 31 outright)
+      addConstraint(
+        tm->mk_term(
+          bitwuzla::Kind::AND, {
+            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "31", 10)})
+          }
+        )
+      );
+      // In C11: 6.5.7p4 declares for E1 << E2: If E1 is signed and nonnegative, 
+      // and E1 * 2 ^ E2 is representable, then that is the resulting value;
+      // otherwise its UB
+      
+      // Non-Negative
+      addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
+      // E1 * (1 << E2) does not overflow
+      // TODO: 1 << 31 is a overflow that passes this!!!
+      addConstraint(
+        tm->mk_term(bitwuzla::Kind::NOT, {
+          tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {
+            varExpr,
+            tm->mk_term(bitwuzla::Kind::BV_SHL, { one, coefExpr })
+          })
+        })
+      );
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_SHL, {varExpr, coefExpr});
+      break;
+      
+    case symir::Term::Op::OP_SHR:
+      // 0 <= coefExpr && coefExpr < 32
+      addConstraint(
+        tm->mk_term(
+          bitwuzla::Kind::AND, {
+            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "32", 10)})
+          }
+        )
+      );
+      // In C11: 6.5.7p5: declars for E1 >> E2: If E1 is signed and nonnegative,
+      // the value of the result is the integral part of the quorient of E1 / 2 ^ E2.
+      // If it is negative its implementation-defined (Hence we avoid negative also for now)
+      
+      // Non-Negative
+      addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_SHR, {varExpr, coefExpr});
+      break;
+
+    case symir::Term::Op::OP_NOT:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_NOT, { varExpr });
+      break;
+
     case symir::Term::Op::OP_CST:
       termExpr = coefExpr;
       break;
+
     default:
       Panic("Cannot reach here");
   }
