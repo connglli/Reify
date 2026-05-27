@@ -569,10 +569,12 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     }
   };
   void BlockCopier::Visit(const Term &t) {
-    t.GetCoef()->Accept(*this);
+    Term::Op op = t.GetOp();
+    const symir::Coef *coef = t.GetCoef();
+    if (coef != nullptr) t.GetCoef()->Accept(*this);
     const VarDef *var = nullptr;
     std::vector<Coef *> access{};
-    if (t.GetOp() != Term::Op::OP_CST) {
+    if (op != Term::Op::OP_CST) {
       const auto name = t.GetVar()->GetName();
       var = this->funBd->FindVar(name);
       Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
@@ -581,8 +583,8 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
         access.insert(access.begin(), popCoef());
       }
     }
-    pushTerm(this->builder->SymTerm(t.GetOp(), popCoef(), var, access));
-  };
+    pushTerm(this->builder->SymTerm(op, coef != nullptr ? popCoef() : nullptr, var, access));
+  }
 
   void BlockCopier::Visit(const Expr &e) {
     const auto &terms = e.GetTerms();
@@ -742,7 +744,9 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     }
   };
   void StmtCopier::Visit(const Term &t) {
-    t.GetCoef()->Accept(*this);
+    Term::Op op = t.GetOp();
+    const symir::Coef *coef = t.GetCoef();
+    if (coef != nullptr) t.GetCoef()->Accept(*this);
     const VarDef *var = nullptr;
     std::vector<Coef *> access{};
     if (t.GetOp() != Term::Op::OP_CST) {
@@ -754,7 +758,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
         access.insert(access.begin(), popCoef());
       }
     }
-    pushTerm(this->blockBd->SymTerm(t.GetOp(), popCoef(), var, access));
+    pushTerm(this->blockBd->SymTerm(t.GetOp(), coef != nullptr ? popCoef() : nullptr, var, access));
   };
 
   void StmtCopier::Visit(const Expr &e) {
@@ -1140,10 +1144,12 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
   }
 
   void FunctCopier::Visit(const Term &t) {
-    t.GetCoef()->Accept(*this);
+    Term::Op op = t.GetOp();
+    const symir::Coef *coef = t.GetCoef();
+    if (coef != nullptr) t.GetCoef()->Accept(*this);
     const VarDef *var = nullptr;
     std::vector<Coef *> access{};
-    if (t.GetOp() != Term::Op::OP_CST) {
+    if (op != Term::Op::OP_CST) {
       const auto name = t.GetVar()->GetName();
       var = builder->FindVar(name);
       Assert(var != nullptr, "Variable \"%s\" does not exist", name.c_str());
@@ -1152,7 +1158,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
         access.insert(access.begin(), popCoef());
       }
     }
-    pushTerm(currentBlock->SymTerm(t.GetOp(), popCoef(), var, access));
+    pushTerm(currentBlock->SymTerm(op, coef != nullptr ? popCoef() : nullptr, var, access));
   }
 
   void FunctCopier::Visit(const ModExpr &e) {

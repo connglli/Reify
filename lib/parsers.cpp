@@ -23,9 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <algorithm>
-
 #include "lib/parsers.hpp"
+#include <algorithm>
 
 // clang-format off
 namespace symir {
@@ -541,13 +540,15 @@ namespace symir {
         "variable of the term",
         varToken->FullInfo().c_str()
     );
-    const auto *coefToken = popArg<SymSexpLexer::Token>();
-    Assert(
-        coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
-        "The 1st child (%s) of the term node is not an identifier, while it should be the "
-        "coefficient of the term",
-        coefToken->FullInfo().c_str()
-    );
+    const auto *coefToken = op != Term::Op::OP_NOT ? popArg<SymSexpLexer::Token>() : nullptr;
+    if (coefToken != nullptr) {
+      Assert(
+          coefToken->kind == SymSexpLexer::Token::Kind::TK_IDENT,
+          "The 1st child (%s) of the term node is not an identifier, while it should be the "
+          "coefficient of the term",
+          coefToken->FullInfo().c_str()
+      );
+    }
     auto *numTerms = popArg<int>();
     (*numTerms)++;
     const auto varDef = varToken != nullptr ? funBd->FindVar(varToken->ToStr()) : nullptr;
@@ -608,13 +609,16 @@ namespace symir {
       delete t;
     }
 
-    pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(op, buildCoef(coefToken, termType), varDef, vecAcc)
+    pushArg<SymIRBuilder::TermID>(
+      bblBd->SymTerm(op, (coefToken != nullptr ? buildCoef(coefToken, termType) : nullptr), varDef, vecAcc)
     );
     pushArg<int>(*numTerms);
     if (varToken != nullptr) {
       delete varToken;
     }
-    delete coefToken;
+    if (coefToken != nullptr) {
+      delete coefToken;
+    }
     delete numTerms;
   }
 

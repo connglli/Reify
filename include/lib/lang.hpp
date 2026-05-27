@@ -564,8 +564,13 @@ namespace symir {
 
     Term(const Op op, Coef *coef, std::unique_ptr<VarUse> var) :
         SymIR(SIR_TERM), op(op), coef(std::move(coef)), var(std::move(var)) {
+      SymIR::Type type;
       if (op == OP_CST) {
         Assert(this->var == nullptr, "CST can only be used without a variable");
+        type = this->coef->GetType();
+      } else if (op == OP_NOT) {
+        Assert(this->var != nullptr, "No var to use: a nullptr is given for the variable");
+        type = this->var->GetType();
       } else {
         Assert(this->var != nullptr, "No var to use: a nullptr is given for the variable");
         Assert(
@@ -573,8 +578,9 @@ namespace symir {
             "The coef (%s) and the var (%s) are of different types",
             GetTypeSName(this->coef->GetType()).c_str(), GetTypeSName(this->var->GetType()).c_str()
         );
+        type = this->var->GetType();
       }
-      setType(this->coef->GetType());
+      setType(type);
     }
 
     [[nodiscard]] Op GetOp() const { return op; }
