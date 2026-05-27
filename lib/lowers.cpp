@@ -101,11 +101,32 @@ namespace symir {
   }
 
   void SymSexpLower::Visit(const Term &t) {
-    out << "(" << Term::GetOpShort(t.GetOp()) << " ";
-    t.GetCoef()->Accept(*this);
-    if (t.GetOp() != Term::Op::OP_CST) {
+    auto op = t.GetOp();
+    out << "(" << Term::GetOpShort(op) << " ";
+    switch (op) {
+    case Term::OP_NOT: {
+      t.GetVar()->Accept(*this);
+    } break;
+
+    case Term::OP_CST: {
+      t.GetCoef()->Accept(*this);
+    } break;
+
+    case Term::OP_SHL:
+    case Term::OP_SHR:
+    case Term::OP_ADD:
+    case Term::OP_SUB:
+    case Term::OP_MUL:
+    case Term::OP_DIV:
+    case Term::OP_REM:
+    case Term::OP_AND:
+    case Term::OP_XOR:
+    case Term::OP_OR: {
+      t.GetCoef()->Accept(*this);
       out << " ";
       t.GetVar()->Accept(*this);
+    } break;
+    default: Panic("Cannot reach here");
     }
     out << ")";
   }
