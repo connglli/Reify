@@ -535,7 +535,7 @@ void RandomFCallEmbedder::Visit(const symir::Coef &c) {
   if (this->succeeded) {
     return;
   }
-  t.GetCoef()->Accept(*this);
+  if (t.GetCoef() != nullptr) t.GetCoef()->Accept(*this);
   if (this->succeeded) {
     return;
   }
