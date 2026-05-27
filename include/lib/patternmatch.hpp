@@ -180,6 +180,20 @@ namespace patternmatch {
   };
 
   template<typename Node>
+  struct m_AtleastN : Pattern<std::vector<Node>> {
+    m_AtleastN(const Pattern<Node> &P, size_t N) : P(P), N(N) {}
+    inline bool match(std::vector<Node> Vs) const override {
+      size_t count = 0;
+      for (Node &V : Vs) {
+        count += P.match(V) ? 1 : 0;
+      }
+      return count >= N;
+    }
+    const Pattern<Node> &P;
+    size_t N;
+  };
+
+  template<typename Node>
     struct m_FirstN : Pattern<std::vector<Node>> {
       m_FirstN(size_t N, const Pattern<Node> &P) : N(N), P(P) {}
 
@@ -281,19 +295,6 @@ namespace patternmatch {
       return L.match(Vs.size());
     }
     const Pattern<size_t> &L;
-  };
-
-  template<typename Node>
-  struct m_AnyTwoSeq : Pattern<std::vector<Node>> {
-    m_AnyTwoSeq(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
-    inline bool match(std::vector<Node> Vs) const override {
-      for (size_t i = 0; i < Vs.size() - 1; i++) {
-        if (N1.match(Vs[i]) && N2.match(Vs[i + 1])) return true;
-      }
-      return false;
-    }
-    const Pattern<Node> &N1;
-    const Pattern<Node> &N2;
   };
 
   template<typename Node>

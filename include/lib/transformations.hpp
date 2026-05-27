@@ -50,6 +50,7 @@ public:
     engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 10);
     engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
     engine.addRule(std::make_unique<vectorize::Reduction>(), 10);
+    engine.addRule(std::make_unique<vectorize::Induction>(), 10);
     engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
     return engine;
   }

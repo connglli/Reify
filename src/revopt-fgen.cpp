@@ -191,29 +191,6 @@ public:
     revopt.run(builder.get(), blks, varState, ruleCount);
     bblBd = blks[0];
 
-    //auto cstTerms = ConstQuery(builder.get(), bblBd).query();
-    //Log::Get().Out() << "Embedding variables:" << std::endl;
-    //for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
-    //  Log::Get().Out() 
-    //    << "  "
-    //    << params[i]->GetName() 
-    //    << " = " 
-    //    << cstTerms[i]->GetCoef()->GetI32Value() 
-    //    << std::endl;
-    //}
-
-    //std::ranges::shuffle(cstTerms, Random::Get().GetRNG());
-    //std::map<const symir::Term *, symir::BlockBuilder::TermID> varMap;
-    //this->args.resize(numParams);
-    //for (size_t i = 0; i < cstTerms.size() && i < params.size(); i++) {
-    //  this->args[i] = cstTerms[i]->GetCoef()->GetI32Value();
-    //  varMap[cstTerms[i]] = bblBd->SymMulTerm(
-    //    builder->SymI32Const(1),
-    //    params[i], {}
-    //  );
-    //}
-    //VariableEmbedder(builder.get(), bblBd).embed(varMap);
-
     symir::BlockBuilder *lastBlock = *(blks.end() - 1);
     Assert(!lastBlock->HasTarget(), "Last Block already has a target");
     lastBlock->CommitStmt(lastBlock->SymReturn());

@@ -181,10 +181,182 @@ namespace transformations::vectorize {
       loopBodyBd->SymExpr(exprOp, {
         loopBodyBd->SymMulTerm(one, varDef, access),
         loopBodyBd->SymMulTerm(one, array, { 
-          funBd->SymCoef("__loopVarCoef" + std::to_string(uid++) + indVar->GetName(), indVar->GetName()) 
+          funBd->SymCoef("__reduction_loopVarCoef" + std::to_string(uid++) + indVar->GetName(), indVar->GetName()) 
         }) 
       }),
       access
+    );
+
+    // indVar = 1 + indVar
+    symir::BlockBuilder::StmtID incAss = loopBodyBd->SymAssStmt(
+      indVar,
+      loopBodyBd->SymAddExpr({
+        loopBodyBd->SymAddTerm(
+          one,
+          indVar
+        )
+      })
+    );
+
+    loopBodyBd->CommitStmt(arrSum);
+    loopBodyBd->CommitStmt(incAss);
+    loopBodyBd->SymGoto(loopCondLabel);
+
+    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
+  }
+
+  bool Induction::match(const symir::Stmt *stmt) const {
+    return patternmatch::match(
+      stmt,
+      m_AssStmt(
+        m_WildCard<const symir::VarUse*>(), 
+        m_Expr(m_AtleastN(m_CstTerm(
+          m_And(
+            m_Range<const symir::Coef *, int32_t>(-1024, 1024),
+            m_Not<const symir::Coef *>(m_Eq<const symir::Coef*, int32_t>(0))
+          ),
+          m_NoVar()
+        ), 2))
+      )
+    );
+  }
+
+  void Induction::rewrite(
+    symir::FunctBuilder *funBd,
+    std::vector<symir::BlockBuilder *> &blockBds,
+    VariableState &varState,
+    size_t targetBlockIdx,
+    size_t targetStmtIdx
+  ) const {
+
+    Log::Get().Out() << "Running Induction" << std::endl;
+
+    symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
+    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+
+    const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
+    const symir::VarUse *var = assStmt->GetVar();
+    std::vector<symir::Coef *> access = utils::copyAccess(funBd, var);
+    const symir::VarDef *varDef = var->GetDef();
+    const symir::Expr *expr = assStmt->GetExpr();
+    std::vector<const symir::Term *> terms = expr->GetTerms();
+    symir::Expr::Op exprOp = expr->GetOp();
+    size_t nrTerms = expr->NumTerms();
+
+    int maxCstTerm = 0;
+    for (size_t i = 0; i < nrTerms; i++) {
+      if (terms[i]->GetOp() != symir::Term::OP_CST) continue;
+      int val = abs(terms[i]->GetCoef()->GetI32Value());
+      if (!(val <= 1024)) continue;
+      if (val > maxCstTerm) maxCstTerm = val;
+    }
+
+    symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
+
+    // create an array that can hold all terms;
+    const symir::VarDef *array = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, maxCstTerm + 1);
+    Log::Get().Out() << "Creating array " << array->GetName() << " with " << nrTerms << " elements" << std::endl;
+
+
+    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+
+    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+
+    auto zero = funBd->SymI32Const(0);
+    auto one = funBd->SymI32Const(1);
+    auto n_one = funBd->SymI32Const(-1);
+
+    // create the new assign stmt at the start of the second half
+
+    symir::StmtCopier sc = symir::StmtCopier(funBd, secondBlockBd);
+    std::vector<symir::BlockBuilder::TermID> newTerms;
+    newTerms.resize(nrTerms);
+    for (size_t i = 0; i < nrTerms; i++) {
+      int val;
+      if (
+        terms[i]->GetOp() == symir::Term::OP_CST
+        && (val = terms[i]->GetCoef()->GetI32Value())
+        && (-1024 <= val && val <= 1024)
+      ) {
+        if (val >= 0) newTerms[i] = secondBlockBd->SymMulTerm(one, array, { funBd->SymI32Const(abs(val)) });
+        else newTerms[i] = secondBlockBd->SymMulTerm(n_one, array, { funBd->SymI32Const(abs(val)) });
+      } else {
+        newTerms[i] = sc.CopyTerm(terms[i]);
+      }
+    }
+
+    secondBlockBd->CommitStmtAt(
+      secondBlockBd->SymAssStmt(
+        varDef,
+        secondBlockBd->SymExpr(
+          exprOp,
+          newTerms
+        ),
+        access
+      ),
+      0
+    );
+
+    static size_t uid = 0;
+
+    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
+    // indVar = 0
+    blockBd->ReplaceCommitStmt({
+      blockBd->SymAssStmt(
+        indVar,
+        blockBd->SymAddExpr({
+          blockBd->SymCstTerm(
+            zero,
+            nullptr
+          )
+        }))
+      },
+      targetStmtIdx
+    );
+
+    blockBd->SymGoto(loopCondLabel);
+    
+    // set now freed ptrs to zero to avoid Use after free;
+    stmt = nullptr;
+    assStmt = nullptr;
+    var = nullptr;
+    expr = nullptr;
+    terms = {};
+
+    // Build for loop Cond block:
+
+    symir::BlockBuilder *loopCondBd = funBd->OpenBlock(loopCondLabel);
+
+    // indVar - maxCstTerm < 0
+    symir::BlockBuilder::CondID loopCond = loopCondBd->SymCond(symir::Cond::OP_LTZ, 
+      loopCondBd->SymAddExpr({
+        loopCondBd->SymMulTerm(
+          one,
+          indVar
+        ),
+        loopCondBd->SymCstTerm(
+          funBd->SymI32Const(-(maxCstTerm + 1)),
+          nullptr
+        )
+      })
+    );
+
+    loopCondBd->SymBranch(loopBodyLabel, finalLabel, loopCond);
+
+    // Build for loop Body Block:
+
+    symir::BlockBuilder *loopBodyBd = funBd->OpenBlock(loopBodyLabel);
+
+    // For Body
+    symir::Coef *indVarCoef = funBd->SymCoef("__induction_loopVarCoef" + std::to_string(uid++) + indVar->GetName(), indVar->GetName());
+    symir::BlockBuilder::StmtID arrSum = loopBodyBd->SymAssStmt(
+      array,
+      loopBodyBd->SymExpr(exprOp, {
+        loopBodyBd->SymMulTerm(one, indVar)
+      }),
+      { indVarCoef }
     );
 
     // indVar = 1 + indVar
