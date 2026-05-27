@@ -69,6 +69,20 @@ namespace transformations::vectorize {
     const std::string varPrefix = "reduc";
     const std::string indVarPrefix = "i";
   };
+
+  /// https://llvm.org/docs/Vectorizers.html#inductions
+  struct Induction: Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "induc";
+    const std::string indVarPrefix = "i";
+  };
 }
 
 #endif //REIFY_VECTORIZE_HPP
