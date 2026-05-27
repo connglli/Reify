@@ -519,7 +519,13 @@ namespace symir {
   XX(SUB, Sub, sub, -)                                                                             \
   XX(MUL, Mul, mul, *)                                                                             \
   XX(DIV, Div, div, /)                                                                             \
-  XX(REM, Rem, rem, %)
+  XX(REM, Rem, rem, %)                                                                             \
+  XX(NOT, Not, not, ~)                                                                             \
+  XX(AND, And, and, &)                                                                             \
+  XX(XOR, Xor, xor, ^)                                                                             \
+  XX(OR, Or, or, |)                                                                                \
+  XX(SHL, Shl, shl, <<)                                                                            \
+  XX(SHR, Shr, shr, >>)                                                                            \
 
     enum Op {
 
