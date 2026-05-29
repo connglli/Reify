@@ -49,9 +49,10 @@ public:
     engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 50);
     engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 10);
     engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
+    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
     engine.addRule(std::make_unique<vectorize::Reduction>(), 10);
     engine.addRule(std::make_unique<vectorize::Induction>(), 10);
-    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
+    engine.addRule(std::make_unique<vectorize::WithAliasCheck>(), 1);
     return engine;
   }
   void addRule(std::unique_ptr<Rule> rule, int weight);
