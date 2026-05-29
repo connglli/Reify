@@ -83,6 +83,28 @@ namespace transformations::vectorize {
     const std::string varPrefix = "induc";
     const std::string indVarPrefix = "i";
   };
+
+  /// Trying to create Runtime Checks of Pointers
+  /// https://llvm.org/docs/Vectorizers.html#runtime-checks-of-pointers
+  /// x = c1 + ... + c2 + ... + c3 + ...
+  /// ==>
+  /// int a[X] = { ..., c1, ..., c2, ..., c3 };
+  /// for (int i = 0; i < v0; i += 1) {
+  ///   a[i] = a[i + v1];
+  /// }
+  /// x = a[k1] + ... + a[k2] + ... + a[k3] + ...
+  struct WithAliasCheck : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "aliasCheck";
+    const std::string indVarPrefix = "i";
+  };
 }
 
 #endif //REIFY_VECTORIZE_HPP

@@ -55,6 +55,7 @@ namespace transformations::primitive {
 
   };
 
+
   /// Additivly expands an expression with one more element
   /// E1 + C1 + E2 => E1 + C2 + C3 +E2
   /// where C2 + C3 = C1
