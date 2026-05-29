@@ -53,7 +53,7 @@ struct DeoptFunGenOpts {
     options.add_options()
       ("uuid", "An UUID identifier as the primary identifier", cxxopts::value<std::string>())
       ("n,sno", "A sample number as the second identifier", cxxopts::value<std::string>())
-      ("r,rules", "How many times Rewrite rules should be applied", cxxopts::value<int>()->default_value("20"))
+      ("r,rules", "How many times Rewrite rules should be applied", cxxopts::value<int>()->default_value("80"))
       ("o,output", "The directory saving the generated functions and mappings", cxxopts::value<std::string>())
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -184,7 +184,9 @@ public:
     );
 
     
-    auto revopt = RewriteEngine::Default();
+    //auto revopt = RewriteEngine::Default();
+    auto revopt = RewriteEngine::Empty();
+    revopt.addRule(std::make_unique<transformations::primitive::AggressiveAdditionFromConst>(), 1);
     std::vector<symir::BlockBuilder *> blks = { bblBd };
 
     VariableState varState{std::map<size_t, std::string>{}, std::vector<int32_t>{}, 0};

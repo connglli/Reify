@@ -27,6 +27,7 @@
 #define REIFY_PATTERNMATCH_HPP
 
 #include "lib/lang.hpp"
+#include <cstdint>
 #include <string>
 
 namespace patternmatch {
@@ -517,6 +518,14 @@ SYMIR_TERMOP_LIST(XX)
     }
   };
 
+  struct m_Value : Pattern<const symir::Coef *> {
+    m_Value(const Pattern<int> &N) : N(N) {}
+    inline bool match(const symir::Coef *c) const override {
+      return c->IsSolved() && N.match(c->GetI32Value());
+    }
+    const Pattern<int> &N;
+  };
+
   template<>
   struct m_Eq<const symir::Coef *, int32_t> : Pattern<const symir::Coef *> {
     m_Eq(int32_t val) : val(val) {}
@@ -625,6 +634,14 @@ SYMIR_TERMOP_LIST(XX)
       return i == val;
     }
     int val;
+  };
+
+  struct m_UnsetBits : Pattern<int> {
+    m_UnsetBits(uint32_t mask) : mask(mask) {}
+    inline bool match(int i) const override {
+      return !(((uint32_t) i) & mask);
+    }
+    uint32_t mask;
   };
 
   // ==================== string ====================
