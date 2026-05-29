@@ -40,19 +40,27 @@ public:
   /// Get default RewriteEngine with the default set of rules added
   static RewriteEngine Default() {
     auto engine = RewriteEngine();
-    engine.addRule(std::make_unique<primitive::Guard>(), 10);
-    engine.addRule(std::make_unique<primitive::Reg2Mem>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstPropagationViaAdd>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstPropagationViaSub>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstPropagationViaMul>(), 1);
-    engine.addRule(std::make_unique<primitive::ConstPropagationViaDiv>(), 1);
-    engine.addRule(std::make_unique<primitive::AdditionFromConst>(), 50);
-    engine.addRule(std::make_unique<primitive::ForSumFromConst>(), 10);
-    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(), 1);
-    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(), 1);
-    engine.addRule(std::make_unique<vectorize::Reduction>(), 10);
-    engine.addRule(std::make_unique<vectorize::Induction>(), 10);
-    engine.addRule(std::make_unique<vectorize::WithAliasCheck>(), 1);
+    engine.addRule(std::make_unique<primitive::Guard>(),                             20);
+    engine.addRule(std::make_unique<primitive::Reg2Mem>(),                            2);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaAdd>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaSub>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaMul>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaDiv>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaNot>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaAnd>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaXor>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaOr>(),              1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaShl>(),             1);
+    engine.addRule(std::make_unique<primitive::ConstPropagationViaShr>(),             1);
+    engine.addRule(std::make_unique<primitive::AdditionFromConst>(),                100);
+    engine.addRule(std::make_unique<primitive::AggressiveAdditionFromConst>(),       50);
+    engine.addRule(std::make_unique<primitive::InsertConstZeroAdditions>(),          10);
+    engine.addRule(std::make_unique<primitive::ForSumFromConst>(),                   20);
+    engine.addRule(std::make_unique<primitive::DeadCodeFromAssign>(),                 1);
+    engine.addRule(std::make_unique<vectorize::DeadAssignFromCopy>(),                 2);
+    engine.addRule(std::make_unique<vectorize::Reduction>(),                         20);
+    engine.addRule(std::make_unique<vectorize::Induction>(),                         20);
+    engine.addRule(std::make_unique<vectorize::WithAliasCheck>(),                    5);
     return engine;
   }
   void addRule(std::unique_ptr<Rule> rule, int weight);

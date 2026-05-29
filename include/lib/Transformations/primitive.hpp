@@ -70,6 +70,36 @@ namespace transformations::primitive {
     ) const override;
   };
 
+  /// Additivly expands an expression with one more element 
+  /// but only for expressions that have some number of Const additions as prefix
+  /// This allows for a larger range of random values to be choosen since we are aware of the intermediate state.
+  /// C1 + E2 => C2 + C3 +E2
+  /// where C2 + C3 = C1
+  struct AggressiveAdditionFromConst : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+  };
+
+  // Inserts C + -C at the beginning of expressions
+  // E1 => C1 + C2 + E1
+  // where C1 = -C2
+  struct InsertConstZeroAdditions : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+  };
+
   /// create a For Loop from an assignment of a Const
   /// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; }, 
   /// where C3 * C4 + C2 = C1
@@ -91,7 +121,7 @@ namespace transformations::primitive {
   struct DeadCodeFromAssign : Rule {
     DeadCodeFromAssign(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
       minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
-      Assert(minBranches >= 2, "AssToDeadCode must have atleast 2 branches");
+      Assert(minBranches >= 2, "DeadCodeFromAssign must have atleast 2 branches");
     }
     bool match(const symir::Stmt *stmt) const override;
     void rewrite(
@@ -179,6 +209,96 @@ namespace transformations::primitive {
       size_t targetStmtIdx
     ) const override;
     const std::string varPrefix = "const_proba_rem";
+  };
+
+  /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
+  /// E1 + C1 + E2 => cpk = C2; E1 + ~cpk + E2
+  /// where C2 = ~C1
+  struct ConstPropagationViaNot : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "const_proba_not";
+  };
+
+  /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
+  /// E1 + C1 + E2 => cpk = C2; E1 + (C3 & cpk) + E2
+  /// where (C3 & C2) = C1
+  struct ConstPropagationViaAnd : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "const_proba_and";
+  };
+
+  /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
+  /// E1 + C1 + E2 => cpk = C2; E1 + (C3 ^ cpk) + E2
+  /// where C3 ^ C2 = C1
+  struct ConstPropagationViaXor : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "const_proba_xor";
+  };
+
+  /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
+  /// E1 + C1 + E2 => cpk = C2; E1 + (C3 | cpk) + E2
+  /// where C3 | C2 = C1
+  struct ConstPropagationViaOr : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "const_proba_or";
+  };
+
+  /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
+  /// E1 + C1 + E2 => cpk = C2; E1 + (C3 << cpk) + E2
+  /// where C3 << C2 = C1
+  struct ConstPropagationViaShl : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "const_proba_shl";
+  };
+
+  /// Extracts a Constant from an expression replacing it with a Variable that is assigned earlier with the extracted Constant
+  /// E1 + C1 + E2 => cpk = C2; E1 + (C3 >> cpk) + E2
+  /// where C3 >> C2 = C1
+  struct ConstPropagationViaShr : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    const std::string varPrefix = "const_proba_shr";
   };
 
   /// Adds an intermediate operation that moves a local to a stack ptr (array)
