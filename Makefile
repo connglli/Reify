@@ -17,7 +17,7 @@ ifeq ($(FOUND_BITWUZLA),n)
 $(error Bitwuzla not found! Please install it!)
 endif
 
-FOUND_FLINT := $(shell pkg-config --exists bitwuzla && echo y || echo n)
+FOUND_FLINT := $(shell pkg-config --exists flint && echo y || echo n)
 ifeq ($(FOUND_FLINT),n)
 $(error Flint not found! Please install it!)
 endif
