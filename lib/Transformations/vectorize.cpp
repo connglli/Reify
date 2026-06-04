@@ -110,22 +110,22 @@ namespace transformations::vectorize {
     static size_t uid = 0;
     // loop through all terms and create an array that holds all terms
     std::vector<symir::BlockBuilder::StmtID> firstBlockAppend;
-    firstBlockAppend.reserve(2 + nrTerms);
-    for (size_t i = 0; i < nrTerms; i++) {
-      Log::Get().Out() << "Initalizing element " << i << " of " << array->GetName() << std::endl;
+    firstBlockAppend.reserve(1 + nrTerms);
+    for (size_t i = 1; i < nrTerms; i++) {
+      Log::Get().Out() << "Initalizing element " << i - 1 << " of " << array->GetName() << std::endl;
       firstBlockAppend.push_back(blockBd->SymAssStmt(
         array,
         blockBd->SymAddExpr({ c.CopyTerm(terms[i]) } ),
-        { funBd->SymI32Const(i) }
+        { funBd->SymI32Const(i - 1) }
       ));
     }
     
-    // Init original value to 0
-    Log::Get().Out() << "Initalizing " << var->GetName() << " to 0" << std::endl;
+    // Init original value to the first term
+    Log::Get().Out() << "Initalizing " << var->GetName() << std::endl;
     firstBlockAppend.push_back(blockBd->SymAssStmt(
       var->GetDef(),
       blockBd->SymExpr(exprOp, {
-        blockBd->SymCstTerm(zero, nullptr),
+        c.CopyTerm(terms[0])
       }),
       access
     ));
@@ -165,7 +165,7 @@ namespace transformations::vectorize {
           indVar
         ),
         loopCondBd->SymCstTerm(
-          funBd->SymI32Const(-nrTerms),
+          funBd->SymI32Const(-(nrTerms - 1)),
           nullptr
         )
       })

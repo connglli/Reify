@@ -31,7 +31,6 @@
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
 #include "lib/random.hpp"
-#include <bitset>
 #include <climits>
 #include <cstdint>
 #include <string>
@@ -57,7 +56,8 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     std::pair<int32_t, int32_t> targetPair;
-    rep.data = static_cast<void *>(&targetPair);
+    rep.data = &targetPair;
+
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
         [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
@@ -160,7 +160,9 @@ namespace transformations::primitive {
           std::vector<symir::BlockBuilder::TermID> termIds;
           termIds.reserve(e.GetTerms().size() + 1);
           bool hasReplaced = false;
-          for (auto term : e.GetTerms()) {
+          auto terms = e.GetTerms();
+          for (size_t i = 0; i < terms.size(); i++) {
+            auto term = terms[i];
             if (!hasReplaced && term->GetOp() == symir::Term::OP_CST) {
               hasReplaced = true;
               *data = term->GetCoef();
@@ -170,13 +172,27 @@ namespace transformations::primitive {
               // if Sk is the prefix sum up to the target Term then
               // |Sk op v1| < |Sk op target| and since Sk op target does not overflow neither does |Sk op v1|
               int v1, v2;
-              if (target >= 0) {
-                v1 = Random::Get().Uniform(0, target)();
-              } else {
-                v1 = Random::Get().Uniform(target, -1)();
+              if (target > 0) v1 = Random::Get().Uniform(e.GetOp() == symir::Expr::OP_SUB ? 1 : 0, target)(); 
+              else if (target == 0) v1 = 0;
+              else v1 = Random::Get().Uniform(target, -1)();
+
+              switch (e.GetOp()) {
+              case symir::Expr::OP_ADD: {
+                v2 = target - v1;
+                Assert(v1 + v2 == target, "Faulty Transformation");
+              }; break;
+              case symir::Expr::OP_SUB: {
+                v2 = v1 - target;
+                if (i != 0) { 
+                  v2 = -v2;
+                  Assert(-v1 - v2 == -target, "Faulty Transformation");
+                } else {
+                  Assert(v1 - v2 == target, "Faulty Transformation");
+
+                }
+              }; break;
+              default: { Panic("should not reach here"); }
               }
-              v2 = target - v1;
-              if (e.GetOp() == symir::Expr::OP_SUB) v2 = -v2;
   
               termIds.push_back(thisBlockBd->SymTerm(
                 symir::Term::OP_CST,
@@ -283,7 +299,7 @@ namespace transformations::primitive {
       stmt,
       m_AssStmt(
         m_WildCard<const symir::VarUse *>(),
-        m_WildCard<const symir::Expr *>()
+        m_AddExpr(m_WildCard<std::vector<const symir::Term *>>())
       )
     );
   }
@@ -314,7 +330,7 @@ namespace transformations::primitive {
           ));
           termIds.push_back(thisBlockBd->SymTerm(
             symir::Term::OP_CST,
-            thisFunBd->SymI32Const(e.GetOp() == symir::Expr::OP_ADD ? -val : val),
+            thisFunBd->SymI32Const(-val),
             nullptr, {}
           ));
           for (auto term : e.GetTerms()) {
@@ -324,7 +340,7 @@ namespace transformations::primitive {
         };
     rep.ReplaceStmt(
       stmt,
-      make_matcher(const symir::Expr *, m_WildCard<const symir::Expr *>()),
+      make_matcher(const symir::Expr *, m_AddExpr(m_WildCard<std::vector<const symir::Term *>>())),
       varInsertFun,
       1
     );
@@ -726,7 +742,7 @@ namespace transformations::primitive {
     size_t targetBlockIdx,
     size_t targetStmtIdx
   ) const {
-    Log::Get().Out() << "Running ConstProba" << std::endl;
+    Log::Get().Out() << "Running ConstPropagationViaMul" << std::endl;
   
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);

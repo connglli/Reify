@@ -168,6 +168,19 @@ namespace patternmatch {
   };
 
   template<typename Node>
+  struct m_AnyAfter : Pattern<std::vector<Node>> {
+    m_AnyAfter(size_t N, const Pattern<Node> &P) : N(N), P(P) {}
+    inline bool match(std::vector<Node> Vs) const override {
+      for (size_t i = N; i < Vs.size(); i++) {
+        if (P.match(Vs[i])) return true;
+      }
+      return false;
+    }
+    size_t N;
+    const Pattern<Node> &P;
+  };
+
+  template<typename Node>
   struct m_All : Pattern<std::vector<Node>> {
     m_All(const Pattern<Node> &N) : N(N) {}
     inline bool match(std::vector<Node> Vs) const override {
@@ -299,11 +312,24 @@ namespace patternmatch {
   };
 
   template<typename Node>
+  struct m_AnyTwoSeq : Pattern<std::vector<Node>> {
+    m_AnyTwoSeq(const Pattern<Node> &N1, const Pattern<Node> &N2) : N1(N1), N2(N2) {}
+    inline bool match(std::vector<Node> Vs) const override {
+      for (size_t i = 0; i < Vs.size() - 1; i++) {
+        if (N1.match(Vs[i]) && N2.match(Vs[i + 1])) return true;
+      }
+      return false;
+    }
+    const Pattern<Node> &N1;
+    const Pattern<Node> &N2;
+  };
+
+  template<typename Node>
   struct m_AnyThreeSeq : Pattern<std::vector<Node>> {
-    m_AnyThreeSeq(const Pattern<Node> &N1, const Pattern<Node> &N2,const Pattern<Node> &N3) : N1(N1), N2(N2), N3(N3) {}
+    m_AnyThreeSeq(const Pattern<Node> &N1, const Pattern<Node> &N2, const Pattern<Node> &N3) : N1(N1), N2(N2), N3(N3) {}
     inline bool match(std::vector<Node> Vs) const override {
       for (size_t i = 0; i < Vs.size() - 2; i++) {
-        if (N1.match(Vs[i]) && N2.match(Vs[i + 1]) && N3.match(Vs[i + 2]) ) return true;
+        if (N1.match(Vs[i]) && N2.match(Vs[i + 1]) && N3.match(Vs[i + 2])) return true;
       }
       return false;
     }
@@ -316,8 +342,8 @@ namespace patternmatch {
   struct m_AnyFourSeq : Pattern<std::vector<Node>> {
     m_AnyFourSeq(const Pattern<Node> &N1, const Pattern<Node> &N2, const Pattern<Node> &N3, const Pattern<Node> &N4) : N1(N1), N2(N2), N3(N3), N4(N4) {}
     inline bool match(std::vector<Node> Vs) const override {
-      for (size_t i = 0; i < Vs.size() - 2; i++) {
-        if (N1.match(Vs[i]) && N2.match(Vs[i + 1]) && N3.match(Vs[i + 2]) ) return true;
+      for (size_t i = 0; i < Vs.size() - 3; i++) {
+        if (N1.match(Vs[i]) && N2.match(Vs[i + 1]) && N3.match(Vs[i + 2]) && N4.match(Vs[i + 3])) return true;
       }
       return false;
     }
@@ -510,12 +536,47 @@ SYMIR_TERMOP_LIST(XX)
     const Pattern<const symir::VarUse *> &V;
   };
 
+  /// checks if a term trivially just contains the variable (e.g. 1 * x or 0 +- x etc)
+  struct m_VarTerm : Pattern<const symir::Term *> {
+    m_VarTerm(const symir::VarUse **v = nullptr) : v(v) {}
+    inline bool match (const symir::Term *t) const override {
+      switch (t->GetOp()) {
+      case symir::Term::OP_ADD: {
+        symir::Coef *c = t->GetCoef();
+        if (v != nullptr) *v = t->GetVar();
+        return c->IsSolved() && c->GetI32Value() == 0;
+      } break;
+      case symir::Term::OP_MUL: {
+        symir::Coef *c = t->GetCoef();
+        if (v != nullptr) *v = t->GetVar();
+        return c->IsSolved() && c->GetI32Value() == 1;
+      } break;
+      case symir::Term::OP_AND: {
+        symir::Coef *c = t->GetCoef();
+        if (v != nullptr) *v = t->GetVar();
+        return c->IsSolved() && c->GetI32Value() == -1;
+      } break;
+      case symir::Term::OP_OR:
+      case symir::Term::OP_SHR: {
+        symir::Coef *c = t->GetCoef();
+        if (v != nullptr) *v = t->GetVar();
+        return c->IsSolved() && c->GetI32Value() == 0;
+      } break;
+      default: return false;
+      }
+    }
+    const symir::VarUse **v;
+  };
+
   // ==================== Coef ====================
 
   struct m_Solved : Pattern<const symir::Coef *> {
-    inline bool match(const symir::Coef *c) const override {
-      return c->IsSolved();
+    m_Solved(const symir::Coef **c = nullptr) : c(c) {}
+    inline bool match(const symir::Coef *C) const override {
+      if (c != nullptr) *c = C;
+      return C->IsSolved();
     }
+    const symir::Coef **c;
   };
 
   struct m_Value : Pattern<const symir::Coef *> {
@@ -589,51 +650,86 @@ SYMIR_TERMOP_LIST(XX)
     inline bool match(const symir::VarUse *v) const override { return v == nullptr; }
   };
 
-  struct m_AnyVar : Pattern<const symir::VarUse *> {
-    inline bool match(const symir::VarUse *v) const override { return v != nullptr; }
+  struct m_Var : Pattern<const symir::VarUse *> {
+    m_Var(const symir::VarUse **v = nullptr) : v(v) {}
+    inline bool match(const symir::VarUse *V) const override { 
+      if (v != nullptr) *v = V;
+      return V != nullptr; 
+    }
+    const symir::VarUse **v;
+  };
+
+  struct m_SpecificVar : Pattern<const symir::VarUse *> {
+    m_SpecificVar(const symir::VarUse *v) : v(v) {}
+    inline bool match(const symir::VarUse *V) const override { 
+      if (v->GetDef() != V->GetDef()) return false;
+      auto givenAccess = v->GetAccess();
+      auto matchingAccess = V->GetAccess();
+      if (givenAccess.size() != matchingAccess.size()) return false;
+      for (size_t i = 0; i < givenAccess.size(); i++) {
+        if (givenAccess[i] != matchingAccess[i]) return false;
+      }
+      return true;
+    }
+    const symir::VarUse *v;
   };
 
   struct m_WithName : Pattern<const symir::VarUse *> {
-    m_WithName(const std::string name) : name(name) {}
-    inline bool match(const symir::VarUse *v) const override {
-      return v->GetName() == name;; 
+    m_WithName(const std::string name, const symir::VarUse **v = nullptr) : v(v), name(name) {}
+    inline bool match(const symir::VarUse *V) const override {
+      if (v != nullptr) *v = V;
+      return V->GetName() == name;; 
     }
+    const symir::VarUse **v;
     const std::string name;
   };
 
   struct m_WithType : Pattern<const symir::VarUse *> {
-    m_WithType(symir::SymIR::Type type) : type(type) {}
-    inline bool match(const symir::VarUse *v) const override {
-      return v->GetType() == type; 
+    m_WithType(symir::SymIR::Type type, const symir::VarUse **v = nullptr) : v(v), type(type) {}
+    inline bool match(const symir::VarUse *V) const override {
+      if (v != nullptr) *v = V;
+      return V->GetType() == type; 
     }
+    const symir::VarUse **v;
     symir::SymIR::Type type;
   };
 
   struct m_ScalarVar : Pattern<const symir::VarUse *> {
-    inline bool match(const symir::VarUse *v) const override {
-      return v->GetType() == symir::SymIR::Type::I32 && !v->IsVector(); 
+    m_ScalarVar(const symir::VarUse **v = nullptr) : v(v) {}
+    inline bool match(const symir::VarUse *V) const override {
+      if (v != nullptr) *v = V;
+      return V->GetType() == symir::SymIR::Type::I32 && !V->IsVector(); 
     }
+    const symir::VarUse **v;
   };
 
   struct m_VectorVar : Pattern<const symir::VarUse *> {
-    inline bool match(const symir::VarUse *v) const override {
-      return v->IsVector(); 
+    m_VectorVar(const symir::VarUse **v = nullptr) : v(v) {}
+    inline bool match(const symir::VarUse *V) const override {
+      if (v != nullptr) *v = V;
+      return V->IsVector(); 
     }
+    const symir::VarUse **v;
   };
 
   struct m_StructVar : Pattern<const symir::VarUse *> {
+    m_StructVar(const symir::VarUse **v = nullptr) : v(v) {}
     inline bool match(const symir::VarUse *v) const override {
       return !v->IsVector() && v->GetDef()->GetStructName() != ""; 
     }
+    const symir::VarUse **v;
   };
 
   // ==================== int ====================
+
+
   struct m_Int : Pattern<int> {
-    m_Int(int val) : val(val) {}
+    m_Int(int *val = nullptr) : val(val) {}
     inline bool match(int i) const override {
-      return i == val;
+      if (val != nullptr) *val = i;
+      return true;
     }
-    int val;
+    int *val;
   };
 
   struct m_UnsetBits : Pattern<int> {
@@ -647,11 +743,12 @@ SYMIR_TERMOP_LIST(XX)
   // ==================== string ====================
 
   struct m_String : Pattern<const std::string> {
-    m_String(const std::string val) : val(val) {}
+    m_String(std::string *val = nullptr) : val(val) {}
     inline bool match(const std::string s) const override {
-      return s == val;
+      if (val != nullptr) *val = std::string(s);
+      return true;
     }
-    const std::string val;
+    std::string *val;
   };
 
   template<typename Node>
