@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 dir=$1
 nrTests=1024
 
@@ -18,11 +16,16 @@ generate() {
 	for (( i=$seed_start; i<=$(($seed_start + $nr)); i++ )); do
 	uuid="id$i"
 	echo "generating.. " $uuid
-	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i > /dev/null;
+	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i > /dev/null 2> /tmp/rylink_out_$uuid
 	retVal=$?
+	content=$(<"/tmp/rylink_out_$uuid")
+	if [ -n "$content" ]; then 
+		echo "Error message of" $uuid ": " $content
+	fi
 	if [ $retVal -ne 0 ]; then
 		echo "found failing generation for seed" $i
 	fi
+	rm "/tmp/rylink_out_$uuid"
 	done
 }
 

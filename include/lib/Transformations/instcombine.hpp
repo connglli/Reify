@@ -61,6 +61,67 @@ namespace transformations::instcombine {
     std::string varPrefix = "fold_add_like_commutative";
   };
 
+  // targeting the LLVM transformation: (A + RHS) + RHS => A + (RHS << 1) I
+  // E1 + (RHS << 1) => E1 + RHS + RHS 
+  struct AddTwiceToShl: Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    std::string varPrefix = "factorize_math_with_shl";
+  };
+
+  // targeting the LLVM transformation: ((A ^ B) + (A & B)) => (A | B)
+  // And
+  // targeting the LLVM transformation: ((A & B) + (A ^ B)) => (A | B)
+  //  Here to conform with SymIR A is const and deal with precidence
+  //  e.g. the actual transformation will be
+  //  E1 + (C | B) + E2 => A = (C & B) + (C ^ B); E1 + A + E2
+  struct OrToAddAndXor: Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    std::string varPrefix = "or_to_add_and_xor";
+  };
+
+// Other targets if more a needed:
+
+  // targeting the LLVM transformation: (~B + A) + 1 => A - B
+
+  // targeting the LLVM transformation: (A + ~B) + C => A - B + (C-1)
+
+  // targeting the LLVM transformation: X % C0 + (( X / C0 ) % C1) * C0 => X % (C0 * C1)
+
+  // check 
+
+  // (add (or A, B) (and A, B)) --> (add A, B)
+  // (add (and A, B) (or A, B)) --> (add A, B)
+
+  // (sub (or A, B) (and A, B)) --> (xor A, B)
+  // (sub (add A, B) (or A, B)) --> (and A, B)
+  // (sub (or A, B), (xor A, B)) --> (and A, B)
+  // (sub (add A, B) (and A, B)) --> (or A, B)
+  // (sub (xor A, B) (or A, B)) --> neg (and A, B)
+  
+  // (add A (or A, -A)) --> (and (add A, -1) A)
+  // (add A (or -A, A)) --> (and (add A, -1) A)
+  // (add (or A, -A) A) --> (and (add A, -1) A)
+  // (add (or -A, A) A) --> (and (add A, -1) A)
+  
+  // ((X | Y) - X) --> (~X & Y)
+
+  // if (C1 & C2) == C2 then (X & C1) - (X & C2) -> X & (C1 ^ C2)
+  
+  // (A | ~B) | ~C --> A | ~(B & C)
 }
 
 #endif //REIFY_INSTCOMBINE_HPP

@@ -214,8 +214,8 @@ namespace transformations::vectorize {
         m_WildCard<const symir::VarUse*>(), 
         m_Expr(m_AtleastN(m_CstTerm(
           m_And(
-            m_Range<const symir::Coef *, int32_t>(-1024, 1024),
-            m_Not<const symir::Coef *>(m_Eq<const symir::Coef*, int32_t>(0))
+            m_Range<symir::Coef *, int32_t>(-1024, 1024),
+            m_Not<symir::Coef *>(m_Eq<symir::Coef*, int32_t>(0))
           ),
           m_NoVar()
         ), 2))
