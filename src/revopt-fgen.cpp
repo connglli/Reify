@@ -184,9 +184,9 @@ public:
     );
 
     
-    //auto revopt = RewriteEngine::Default();
-    auto revopt = RewriteEngine::Empty();
-    revopt.addRule(std::make_unique<transformations::primitive::AggressiveAdditionFromConst>(), 1);
+    auto revopt = RewriteEngine::Default();
+    //auto revopt = RewriteEngine::Empty();
+    //revopt.addRule(std::make_unique<transformations::primitive::AggressiveAdditionFromConst>(), 1);
     std::vector<symir::BlockBuilder *> blks = { bblBd };
 
     VariableState varState{std::map<size_t, std::string>{}, std::vector<int32_t>{}, 0};

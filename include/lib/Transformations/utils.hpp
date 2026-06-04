@@ -28,7 +28,9 @@
 #include "lib/patternmatch.hpp"
 #include "lib/lang.hpp"
 #include "lib/varstate.hpp"
+#include "lib/random.hpp"
 
+#include <climits>
 #include <flint/ulong_extras.h>
 #include <flint/nmod.h>
 #include <flint/nmod_mat.h>
@@ -178,8 +180,18 @@ namespace transformations::utils {
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
-    std::vector<symir::Coef *> access
+    std::vector<symir::Coef *> access = {}
   );
+
+  /// returns a term that is equal to just the value in the passed variable, access
+  symir::BlockBuilder::StmtID variableTerm(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::VarDef *var,
+    std::vector<symir::Coef *> access = {}
+  );
+
+  symir::Expr::Op randomExprOp();
 
   /// Splits the given BlockBuilder into two blocks where the first (the given one mutated) contains all stmts up to and including stmt at
   /// splitIdx and the second one (the returned one) contains all after
@@ -200,6 +212,8 @@ namespace transformations::utils {
   const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
   const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix, size_t size);
 
+  bool noAddOverflow(int32_t a, int32_t b);
+  bool noSubOverflow(int32_t a, int32_t b);
 
   using namespace patternmatch;
   bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E);
