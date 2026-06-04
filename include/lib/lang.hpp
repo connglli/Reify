@@ -715,8 +715,8 @@ namespace symir {
       }
     }
 
-    [[nodiscard]] std::vector<const Coef*> GetCoeffs() const {
-      std::vector<const Coef*> r;
+    [[nodiscard]] std::vector<Coef*> GetCoeffs() const {
+      std::vector<Coef*> r;
       for (const auto &c: this->coeffs) {
         r.push_back(c);
       }
