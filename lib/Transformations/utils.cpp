@@ -596,6 +596,37 @@ namespace transformations::utils {
     );
   }
 
+  symir::BlockBuilder::StmtID variableTerm(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
+    const symir::VarDef *var,
+    std::vector<symir::Coef *> access
+  ) {
+    switch (Random::Get().Uniform(0, 4)()) {
+      case 0: { // symir::Term::OP_ADD
+        return blockBd->SymAddTerm(funBd->SymI32Const(0), var, access);
+      } break;
+      case 1: { // symir::Term::OP_MUL:
+        return blockBd->SymMulTerm(funBd->SymI32Const(1), var, access);
+      } break;
+      case 2: { // symir::Term::OP_AND:
+        return blockBd->SymAndTerm(funBd->SymI32Const(-1), var, access);
+      } break;
+      case 3: { // symir::Term::OP_OR:
+        return blockBd->SymOrTerm(funBd->SymI32Const(0), var, access);
+      } break;
+      case 4: { // symir::Term::OP_SHR:
+        return blockBd->SymShrTerm(funBd->SymI32Const(0), var, access);
+      } break;
+      default: Panic("Not reachable");
+      }
+  }
+
+  symir::Expr::Op randomExprOp() {
+    static auto r = Random::Get().Uniform(0, symir::Expr::Op::NUM_OPS - 1);
+    return static_cast<symir::Expr::Op>(r());
+  }
+
   symir::BlockBuilder * splitBlockAt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
@@ -682,6 +713,16 @@ namespace transformations::utils {
     const symir::VarDef *var = funBd->FindLocal(name);
     if (var == nullptr) var = funBd->SymVecLocal(name, { (int) size }, {} );
     return var;
+  }
+
+  bool noAddOverflow(int32_t a, int32_t b) {
+    int64_t longDiff = (static_cast<int64_t>(a) + static_cast<int64_t>(b));
+    return (static_cast<int64_t>(INT_MIN) <= longDiff) && (longDiff <= static_cast<int64_t>(INT_MAX));
+  }
+
+  bool noSubOverflow(int32_t a, int32_t b) {
+    int64_t longDiff = (static_cast<int64_t>(a) - static_cast<int64_t>(b));
+    return (static_cast<int64_t>(INT_MIN) <= longDiff) && (longDiff <= static_cast<int64_t>(INT_MAX));
   }
 
   using namespace patternmatch;
