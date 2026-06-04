@@ -731,7 +731,7 @@ namespace transformations::primitive {
   bool ConstPropagationViaMul::match(const symir::Stmt *stmt) const {
     return utils::matchSubExprInAnyStmt(
       stmt,
-      m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))
+      m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))
     );
   }
   
@@ -798,7 +798,7 @@ namespace transformations::primitive {
   
     rep.ReplaceStmt(
       stmt,
-      make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))),
+      make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))),
       varInsertFun,
       0.25
     );
@@ -818,7 +818,7 @@ namespace transformations::primitive {
   }
   
   bool ConstPropagationViaDiv::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
+    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
   }
   
   void ConstPropagationViaDiv::rewrite(
@@ -864,7 +864,7 @@ namespace transformations::primitive {
   
     rep.ReplaceStmt(
       stmt,
-      make_matcher(const symir::Term *, m_CstTerm(m_Not(m_Eq<const symir::Coef *, int32_t>(INT_MIN)), m_NoVar())),
+      make_matcher(const symir::Term *, m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar())),
       varInsertFun,
       0.25
     );

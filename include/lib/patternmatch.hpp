@@ -475,7 +475,7 @@ SYMIR_CONDOP_LIST(XX)
   // ==================== ModExpr ====================
   struct m_ModExpr : Pattern<const symir::ModExpr *> {
     m_ModExpr(
-      const Pattern<std::vector<const symir::Coef *>> &C,
+      const Pattern<std::vector<symir::Coef *>> &C,
       const Pattern<std::vector<const symir::VarUse *>> &V,
       const Pattern<std::vector<int>> &P,
       const Pattern<int> &M
@@ -486,7 +486,7 @@ SYMIR_CONDOP_LIST(XX)
           && P.match(e->GetPolynomial())
           && M.match(e->GetMod());
     }
-    const Pattern<std::vector<const symir::Coef *>> &C;
+    const Pattern<std::vector<symir::Coef *>> &C;
     const Pattern<std::vector<const symir::VarUse *>> &V;
     const Pattern<std::vector<int>> &P;
     const Pattern<int> &M;
@@ -517,22 +517,22 @@ SYMIR_EXPROP_LIST(XX)
 
 #define XX(val, capt, smal, sym)                                                                     \
   struct m_##capt##Term : Pattern<const symir::Term *> {                                                 \
-    m_##capt##Term(const Pattern<const symir::Coef *> &C, const Pattern<const symir::VarUse *> &V) : C(C), V(V) {}      \
+    m_##capt##Term(const Pattern<symir::Coef *> &C, const Pattern<const symir::VarUse *> &V) : C(C), V(V) {}      \
     inline bool match(const symir::Term *t) const override {                                                      \
       return t->GetOp() == symir::Term::OP_##val && C.match(t->GetCoef()) && V.match(t->GetVar()); \
     }                                                                                                \
-    const Pattern<const symir::Coef *> &C;                                                                   \
+    const Pattern<symir::Coef *> &C;                                                                   \
     const Pattern<const symir::VarUse *> &V;                                                                 \
   };
 SYMIR_TERMOP_LIST(XX)
 #undef XX
 
   struct m_Term : Pattern<const symir::Term *> {
-    m_Term(const Pattern<const symir::Coef *> &C, const Pattern<const symir::VarUse *> &V) : C(C), V(V) {}
+    m_Term(const Pattern<symir::Coef *> &C, const Pattern<const symir::VarUse *> &V) : C(C), V(V) {}
     inline bool match(const symir::Term *t) const override {
       return C.match(t->GetCoef()) && V.match(t->GetVar());
     }
-    const Pattern<const symir::Coef *> &C;
+    const Pattern<symir::Coef *> &C;
     const Pattern<const symir::VarUse *> &V;
   };
 
@@ -570,72 +570,72 @@ SYMIR_TERMOP_LIST(XX)
 
   // ==================== Coef ====================
 
-  struct m_Solved : Pattern<const symir::Coef *> {
-    m_Solved(const symir::Coef **c = nullptr) : c(c) {}
-    inline bool match(const symir::Coef *C) const override {
+  struct m_Solved : Pattern<symir::Coef *> {
+    m_Solved(symir::Coef **c = nullptr) : c(c) {}
+    inline bool match(symir::Coef *C) const override {
       if (c != nullptr) *c = C;
       return C->IsSolved();
     }
-    const symir::Coef **c;
+    symir::Coef **c;
   };
 
-  struct m_Value : Pattern<const symir::Coef *> {
+  struct m_Value : Pattern<symir::Coef *> {
     m_Value(const Pattern<int> &N) : N(N) {}
-    inline bool match(const symir::Coef *c) const override {
+    inline bool match(symir::Coef *c) const override {
       return c->IsSolved() && N.match(c->GetI32Value());
     }
     const Pattern<int> &N;
   };
 
   template<>
-  struct m_Eq<const symir::Coef *, int32_t> : Pattern<const symir::Coef *> {
+  struct m_Eq<symir::Coef *, int32_t> : Pattern<symir::Coef *> {
     m_Eq(int32_t val) : val(val) {}
-    inline bool match(const symir::Coef *c) const override {
+    inline bool match(symir::Coef *c) const override {
       return c->IsSolved() && c->GetI32Value() == val;
     }
     int32_t val;
   };
 
   template<>
-  struct m_Lt<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+  struct m_Lt<symir::Coef *, int32_t>: Pattern<symir::Coef *> {
     m_Lt(int32_t val) : val(val) {}
-    inline bool match(const symir::Coef * c) const override {
+    inline bool match(symir::Coef * c) const override {
       return c->IsSolved() && c->GetI32Value() < val;
     }
     int32_t val;
   };
 
   template<>
-  struct m_Lte<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+  struct m_Lte<symir::Coef *, int32_t>: Pattern<symir::Coef *> {
     m_Lte(int32_t val) : val(val) {}
-    inline bool match(const symir::Coef * c) const override {
+    inline bool match(symir::Coef * c) const override {
       return c->IsSolved() && c->GetI32Value() <= val;
     }
     int32_t val;
   };
 
   template<>
-  struct m_Gt<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+  struct m_Gt<symir::Coef *, int32_t>: Pattern<symir::Coef *> {
     m_Gt(int32_t val) : val(val) {}
-    inline bool match(const symir::Coef * c) const override {
+    inline bool match(symir::Coef * c) const override {
       return c->IsSolved() && c->GetI32Value() > val;
     }
     int32_t val;
   };
 
   template<>
-  struct m_Gte<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+  struct m_Gte<symir::Coef *, int32_t>: Pattern<symir::Coef *> {
     m_Gte(int32_t val) : val(val) {}
-    inline bool match(const symir::Coef * c) const override {
+    inline bool match(symir::Coef * c) const override {
       return c->IsSolved() && c->GetI32Value() >= val;
     }
     int32_t val;
   };
 
   template<>
-  struct m_Range<const symir::Coef *, int32_t>: Pattern<const symir::Coef *> {
+  struct m_Range<symir::Coef *, int32_t>: Pattern<symir::Coef *> {
     m_Range(int32_t low, int32_t upp) : low(low), upp(upp) {}
-    inline bool match(const symir::Coef *c) const override {
+    inline bool match(symir::Coef *c) const override {
       if (!c->IsSolved()) return false;
       int32_t n = c->GetI32Value();
       return low <= n && n <= upp;
