@@ -1,9 +1,5 @@
 # Reify
 
-> [!WARNING]
-> Bitwuzla does not perform as good as Z3 in our project. We are working on diagnosing the issue.
-> For the legacy version, checkout the `legacy` branch.
-
 Reify is a random program generator based on *semantic reification*.
 It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
 Using Reify, 59 bugs have been discovered and reported in GCC and LLVM.
@@ -13,7 +9,8 @@ We are extending it to support additional primitive and aggregate types.
 We are also experimenting with generating Java bytecode and eBPF bytecode.
 Even in their early stages, these experimental attempts have already revealed one JIT compiler bug in OpenJ9 and two bugs in Linux's eBPF runtime.
 
-Additionally, we are replacing the SymIR representation with a full-fledged IR called [symlang](https://github.com/connglli/symlang).
+Additionally, we are experiment with a full-fledged SymIR called [symlang](https://github.com/connglli/symlang),
+based on which Reify has a re-implementation with richer feature support such as pointers, vectors, and intrinsics.
 
 ## 🚀 Quick Start
 
