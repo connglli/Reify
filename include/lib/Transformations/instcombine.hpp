@@ -29,6 +29,8 @@
 #ifndef REIFY_INSTCOMBINE_HPP
 #define REIFY_INSTCOMBINE_HPP
 
+#include <lib/rule.hpp>
+
   // Notation:
   // C1, C2, ... := constants/Literals
   // E1, E2, ... := (Sub)Expression
@@ -37,6 +39,28 @@
   // {A, ..., Z, a, ..., z} Variables
 
 namespace transformations::instcombine {
+
+  // targeting the LLVM transformation: (A + C) + (B & ~C) => A + (B | C)
+  // Note A + (B | C) => (A + C) + (B & ~C) may be unsafe with counter example:
+  // A = -999955844
+  // B = 1073766401
+  // C = -1608775916
+  // (A + C) overflows, but A + (B | C) does not
+  // Hence alternative inverse transformation is needed:
+  // C1 + (C2 & B) => A = C1 - ~C2; (C + A) + (~C & B) + E2
+  // where C = ~C2
+  struct FoldAddLikeCommutative : Rule {
+    bool match(const symir::Stmt *stmt) const override;
+    void rewrite(
+      symir::FunctBuilder *funBd,
+      std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState,
+      size_t targetBlockIdx,
+      size_t targetStmtIdx
+    ) const override;
+    std::string varPrefix = "fold_add_like_commutative";
+  };
+
 }
 
 #endif //REIFY_INSTCOMBINE_HPP

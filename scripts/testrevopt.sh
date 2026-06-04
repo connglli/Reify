@@ -15,7 +15,7 @@ for i in {0..1024}; do
 	echo "compiling.. " $uuid;
 	path="$dir/func_${uuid//"-"/"_"}_0";
 	echo $path;
-	clang -O0 $path/*.c -o $path/main.out;
+	clang -O0 -fsanitize=undefined $path/*.c -o $path/main.out;
 	echo "running.. " $uuid;
 	./$path/main.out;
 	retVal=$?
