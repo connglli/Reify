@@ -18,6 +18,7 @@ Prerequisites:
 
 + C++20 compatible compiler (GCC 10+ or Clang 10+)
 + Bitwuzla (install: https://github.com/bitwuzla/bitwuzla)
++ Flint (install: https://flintlib.org)
 + Python 3 (for running the test suite)
 
 Start fuzzing C compilers:
