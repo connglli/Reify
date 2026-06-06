@@ -63,8 +63,12 @@ public:
     engine.addRule(std::make_unique<vectorize::Induction>(),                    20);
     engine.addRule(std::make_unique<vectorize::WithAliasCheck>(),                5);
     engine.addRule(std::make_unique<instcombine::FoldAddLikeCommutative>(),    100);
-    engine.addRule(std::make_unique<instcombine::AddTwiceToShl>(),             100);
+    engine.addRule(std::make_unique<instcombine::ShlToAddTwice>(),             100);
     engine.addRule(std::make_unique<instcombine::OrToAddAndXor>(),             100);
+    engine.addRule(std::make_unique<instcombine::AddToAddOrAnd>(),             100);
+    engine.addRule(std::make_unique<instcombine::AndToSubOrXor>(),             100);
+    engine.addRule(std::make_unique<instcombine::XorToSubOrAnd>(),             100);
+    engine.addRule(std::make_unique<instcombine::AndToSubAndAnd>(),            100);
     return engine;
   }
   void addRule(std::unique_ptr<Rule> rule, int weight);
