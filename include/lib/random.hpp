@@ -26,8 +26,10 @@
 #ifndef REIFY_RANDOM_HPP
 #define REIFY_RANDOM_HPP
 
+#include "lib/dbgutils.hpp"
 #include <functional>
 #include <random>
+#include <stack>
 
 class Random {
 
@@ -42,37 +44,44 @@ public:
 
   void Seed(int s);
 
+  void PushSeed(int s);
+
+  void PopSeed();
+
   template<typename Int = int>
   [[nodiscard]] std::function<Int()> Uniform(Int min = 0, Int max = RAND_MAX) {
+    Assert(this->rng.size() > 0, "rng stack should never be empty");
     auto dist = std::uniform_int_distribution<Int>(min, max);
     return [dist, this]() mutable -> Int {
-      Int x = dist(this->rng);
+      Int x = dist(this->rng.top());
       return x;
     };
   }
 
   template<typename Int = int>
   [[nodiscard]] std::function<Int()> Binomial(Int n, double p = 0.5) {
+    Assert(this->rng.size() > 0, "rng stack should never be empty");
     auto dist = std::binomial_distribution<Int>(n, p);
     return [dist, this]() mutable -> Int {
-      Int x = dist(this->rng);
+      Int x = dist(this->rng.top());
       return x;
     };
   }
 
   template<typename Real = double>
   [[nodiscard]] std::function<Real()> UniformReal(Real min = 0., Real max = 1.) {
+    Assert(this->rng.size() > 0, "rng stack should never be empty");
     auto dist = std::uniform_real_distribution<Real>(min, max);
     return [dist, this]() mutable -> Real {
-      Real x = dist(this->rng);
+      Real x = dist(this->rng.top());
       return x;
     };
   }
 
 private:
-  Random() : rng(std::random_device()()) {}
+	Random() { rng.push(std::mt19937(std::random_device{}())); }
 
-  std::mt19937 rng;
+  std::stack<std::mt19937> rng;
 };
 
 
