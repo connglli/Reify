@@ -467,7 +467,16 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
     }
 
     std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
-    this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, 100);
+    // TODO: conditionally disable the engine based on delta debugging state
+    if (1) {
+      // We choose a separate seed for each engine run. This makes each run truly independent of the others.
+      // Hence two runs of the same seed may run the engine differently (e.g. less rule applications) while not
+      // changing the rest of the execution via out of sync random number generator state.
+      int rule_seed = Random::Get().Uniform()();
+      Random::Get().PushSeed(rule_seed);
+      this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, 100);
+      Random::Get().PopSeed();
+    }
 
     for (auto blockBd : headerBlockBds) {
       funBd->CloseBlockAt(blockBd, blk);
