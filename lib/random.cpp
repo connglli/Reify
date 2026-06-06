@@ -30,4 +30,16 @@ Random &Random::Get() {
   return random_;
 }
 
-void Random::Seed(int s) { rng = std::mt19937(s); }
+void Random::Seed(int s) {
+	for (size_t i = 0; i < rng.size(); i++) rng.pop();
+	rng.push(std::mt19937(s));
+}
+
+  void Random::PushSeed(int s) {
+		rng.push(std::mt19937(s));
+  }
+
+  void Random::PopSeed() {
+		assert(rng.size() > 1);
+		rng.pop();
+  }
