@@ -32,8 +32,20 @@ RuleInfo &RuleInfo::Get() {
   return ruleinfo;
 }
 
-void RuleInfo::Seed(int seed) {
-  this->seed = seed;
+void RuleInfo::GlobalSeed(int seed) {
+  this->globalSeed = seed;
+}
+
+void RuleInfo::ProgSeed(int seed) {
+  this->progSeed = seed;
+}
+
+void RuleInfo::Clear() {
+  this->functions.clear();
+}
+
+void RuleInfo::Sno(int sno) {
+  this->sno = sno;
 }
 
 void RuleInfo::NewFunction(std::string functionName) {
@@ -60,7 +72,9 @@ void RuleInfo::AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIn
 std::string RuleInfo::ToJson() {
   size_t nrBlocks = 0;
   nlohmann::json ruleInfo = nlohmann::json::object();
-  ruleInfo["seed"] = this->seed;
+  ruleInfo["globalSeed"] = this->globalSeed;
+  ruleInfo["progSeed"] = this->progSeed;
+  ruleInfo["sno"] = this->sno;
   ruleInfo["numberFunctions"] = this->functions.size();
   ruleInfo["functions"] = nlohmann::json::array();
   for (size_t i = 0; i < this->functions.size(); i++) {
