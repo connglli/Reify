@@ -23,49 +23,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef REIFY_RULEINFO_HPP
-#define REIFY_RULEINFO_HPP
+#ifndef REIFY_REDUCEINFO_HPP
+#define REIFY_REDUCEINFO_HPP
 
+#include <map>
 #include <string>
-#include <vector>
-class RuleInfo {
+class ReduceInfo {
 
 public:
-  static RuleInfo &Get();
+  static ReduceInfo &Get();
 
 public:
-  void Seed(int seed);
-  void NewFunction(std::string functionName);
-  void NewBlock(std::string headerBlockLabel, int seed, size_t targetRuleCount);
-  void AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIndex);
-  std::string ToJson();
+  size_t GetRuleCount(std::string functionName, std::string headBlockLabel);
+  void FromJson(std::string path);
 
 private:
-  struct Rule {
-    size_t blockIndex;
-    size_t stmtIndex;
-    std::string ruleName;
-  };
-
-  struct Block {
-    std::string headerBlockLabel;
-    int blockSeed;
-    size_t targetRuleCount;
-    std::vector<Rule> rules;
-  };
-
-  struct Function {
-    std::string functionName;
-    std::vector<Block> blocks;
-  };
+  ReduceInfo() : ruleCountMap({}) {}
 
 private:
-  RuleInfo() : functions({}) {}
-
-private:
-  int seed;
-  std::vector<Function> functions;
+  std::map<std::pair<std::string, std::string>, size_t> ruleCountMap;
 
 };
 
-#endif // REIFY_RULEINFO_HPP
+#endif // REIFY_REDUCEINFO_HPP
