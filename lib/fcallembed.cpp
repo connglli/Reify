@@ -35,6 +35,7 @@
 #include "lib/fcallembed.hpp"
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
+#include "lib/ruleinfo.hpp"
 #include "lib/transformations.hpp"
 #include "lib/varstate.hpp"
 
@@ -415,9 +416,9 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
   Log::Get().CloseSection();
 }
 
-void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
+void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
   // needs variable state
-  Log::Get().OpenSection("RevOptFCallStrategy::finalize for " + funBd->GetName());
+  Log::Get().OpenSection("RewriteFCallStrategy::finalize for " + funBd->GetName());
 
   // delete all header blocks that do not contain any stmt
   for (auto it = this->argBlocks.cbegin(); it != this->argBlocks.cend();) {
@@ -467,14 +468,15 @@ void RevOptFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQue
     }
 
     std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
+    int rule_seed = Random::Get().Uniform()();
+    RuleInfo::Get().NewBlock(headerBlockBd->GetLabel(), rule_seed, GlobalOptions::Get().ruleCount);
     // TODO: conditionally disable the engine based on delta debugging state
     if (1) {
       // We choose a separate seed for each engine run. This makes each run truly independent of the others.
       // Hence two runs of the same seed may run the engine differently (e.g. less rule applications) while not
       // changing the rest of the execution via out of sync random number generator state.
-      int rule_seed = Random::Get().Uniform()();
       Random::Get().PushSeed(rule_seed);
-      this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, 100);
+      this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, GlobalOptions::Get().ruleCount);
       Random::Get().PopSeed();
     }
 

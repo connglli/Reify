@@ -51,6 +51,7 @@ namespace transformations::vectorize {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "dead_assign";
   };
 
@@ -66,6 +67,7 @@ namespace transformations::vectorize {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "reduc";
     const std::string indVarPrefix = "i";
   };
@@ -80,6 +82,7 @@ namespace transformations::vectorize {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "induc";
     const std::string indVarPrefix = "i";
   };
@@ -102,6 +105,7 @@ namespace transformations::vectorize {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "aliasCheck";
     const std::string indVarPrefix = "i";
   };

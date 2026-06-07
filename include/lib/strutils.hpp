@@ -31,6 +31,17 @@
 #include <string>
 #include <vector>
 
+constexpr std::string ClassName(const std::string &prettyFunction) {
+  size_t colons = prettyFunction.rfind("::");
+  if (colons == std::string::npos) return "::";
+  size_t begin = prettyFunction.substr(0, colons).rfind(" ") + 1;
+  size_t end = colons - begin;
+
+  return prettyFunction.substr(begin, end);
+}
+
+#define __CLASS_NAME__ ClassName(__PRETTY_FUNCTION__);
+
 static std::vector<std::string>
 SplitStr(const std::string &s, const std::string &delim, bool escapeEmpty = false) {
   std::vector<std::string> tokens;

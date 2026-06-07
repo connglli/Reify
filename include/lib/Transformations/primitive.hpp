@@ -50,6 +50,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     int32_t prime;
     const std::string varPrefix = "guard";
 
@@ -68,6 +69,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
   };
 
   /// Additivly expands an expression with one more element 
@@ -84,6 +86,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
   };
 
   // Inserts C + -C at the beginning of expressions
@@ -98,6 +101,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
   };
 
   /// create a For Loop from an assignment of a Const
@@ -113,6 +117,7 @@ namespace transformations::primitive {
       size_t targetStmtIdx
     ) const override;
     const std::string varPrefix = "i";
+    std::string RuleName() override { return __CLASS_NAME__ };
   };
 
   /// Creates If/else stmts from Assignments
@@ -131,6 +136,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     int minBranches;
     int maxBranches;
     bool allowUB;
@@ -148,6 +154,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_add";
   };
 
@@ -163,6 +170,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_sub";
   };
 
@@ -178,6 +186,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_mul";
   };
 
@@ -193,6 +202,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_div";
   };
 
@@ -208,6 +218,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_rem";
   };
 
@@ -223,6 +234,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_not";
   };
 
@@ -238,6 +250,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_and";
   };
 
@@ -253,6 +266,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_xor";
   };
 
@@ -268,6 +282,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_or";
   };
 
@@ -283,6 +298,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_shl";
   };
 
@@ -298,6 +314,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "const_proba_shr";
   };
 
@@ -312,6 +329,7 @@ namespace transformations::primitive {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "reg_2_mem";
   };
 

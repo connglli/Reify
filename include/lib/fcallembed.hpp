@@ -151,12 +151,12 @@ private:
   RewriteEngine rewriteEngine;
 };
 
-class RevOptFCallStrategy : public AbstractArgBlockStrategy {
+class RewriteFCallStrategy : public AbstractArgBlockStrategy {
 public:
-  explicit RevOptFCallStrategy() : rewriteEngine(RewriteEngine::Default()) {}
+  explicit RewriteFCallStrategy() : rewriteEngine(RewriteEngine::Default()) {}
 
   void finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
-  std::string getStrategyName() const override {return "RevOptFCallStrategy Stratgey"; }
+  std::string getStrategyName() const override {return "RewriteFCallStrategy Stratgey"; }
 private:
   // maps variable index to UnInitVar name and correction value
   RewriteEngine rewriteEngine;

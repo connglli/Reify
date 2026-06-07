@@ -141,7 +141,7 @@ struct GlobalOptions {
   enum DataflowStrategy {
     Literal,
     PrimeFieldInterpolation,
-    ReverseOptimization
+    Rewrite,
   };
 
   // Probability of replacing a coefficient with a call to another function
@@ -154,7 +154,11 @@ struct GlobalOptions {
   // Probablility of including a variable in the dataflow expression
   double VariableTakeProba = 0.7;
   // strategy to introduce dataflow between function
-  enum DataflowStrategy DataflowStrategy = ReverseOptimization;
+  enum DataflowStrategy DataflowStrategy = Rewrite;
+  // Outputs a json file with detailed information about all Transformation Rules that are run
+  bool ruleInfo;
+  // Number of Rules to apply to each block in the Rewrite stragety
+  int ruleCount;
 
   ////////////////////////////////////////////////////////////
   ////// Solver Parameters
@@ -233,9 +237,11 @@ struct GlobalOptions {
       // Program generation
       ("Xcoeff-replace-proba", "Probability of replacing a coefficient with a function call", cxxopts::value<double>())
       ("Xfunction-depth", "The number of functions to knit together per program", cxxopts::value<int>())
-      ("Xdataflow-strategy", "strategy to introduce dataflow between function {0=literal, 1=Prime interpolating, 2=Reverse Optimizations}", cxxopts::value<int>())
+      ("Xdataflow-strategy", "strategy to introduce dataflow between function {0=literal, 1=Prime interpolating, 2=Rewrite}", cxxopts::value<int>())
       ("Xinit-replace-proba", "Probablility of replacing an argument literal with a variable for dataflow", cxxopts::value<double>())
-      ("Xvar-take-proba", "Probablility of including a variable in the dataflow expression", cxxopts::value<double>());
+      ("Xvar-take-proba", "Probablility of including a variable in the dataflow expression", cxxopts::value<double>())
+      ("Xrule-count", "Number of Rules to apply to each block in the Rewrite stragety", cxxopts::value<int>()->default_value("100"))
+      ("Xrule-info", "Outputs a json file with detailed information about all Transformation Rules that are run", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     // clang-format on
   }
 
@@ -508,7 +514,7 @@ struct GlobalOptions {
       switch (args["Xdataflow-strategy"].as<int>()) {
       case 0: DataflowStrategy = Literal; break;
       case 1: DataflowStrategy = PrimeFieldInterpolation; break;
-      case 2: DataflowStrategy = ReverseOptimization; break;
+      case 2: DataflowStrategy = Rewrite; break;
       default: {
         std::cerr << "Error: Invalid DataflowStrategy. It must be one of {0=literal, 1=Prime interpolating}"
                   << std::endl;
@@ -516,6 +522,10 @@ struct GlobalOptions {
       }
       }
     }
+
+    ruleInfo = args["Xrule-info"].as<bool>();
+
+    ruleCount = args["Xrule-count"].as<int>();
 
     if (args.count("Xinit-replace-proba")) {
       InitReplaceProba = args["Xinit-replace-proba"].as<double>();

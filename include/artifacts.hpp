@@ -37,6 +37,7 @@
 #define FILENAME_MAIN_C "main.c"
 #define FILENAME_MAPPING_JSONL "inout.jsonl"
 #define FILENAME_VARSTATE_JSONL "varstate.jsonl"
+#define FILENAME_RULEINFO_C "ruleinfo.jsonl"
 #define FILENAME_SEXPRESSION "func.sexp"
 #define FILENAME_FUNC_LOGGING "func.log"
 #define FILENAME_PROG_LOGGING "prog.log"
@@ -152,6 +153,8 @@ struct ProgArts {
       return this->GetTestDir() / FILENAME_PROG_LOGGING;
     }
   }
+
+  fs::path GetRuleInfoPath() const { return GetTestDir() / FILENAME_RULEINFO_C; }
 };
 
 #endif // REIFY_ARTIFACTS_HPP
