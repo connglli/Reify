@@ -47,6 +47,7 @@ void ReduceInfo::FromJson(std::string path) {
     // currently this is a single line json;
     std::getline(filestream, line);
     nlohmann::json reduceInfo = nlohmann::json::parse(line);
+    this->sno = reduceInfo["sno"];
     Assert(reduceInfo["numberFunctions"] == reduceInfo["functions"].size(), "Malformed Json");
     for (size_t i = 0; i < reduceInfo["numberFunctions"]; i++) {
       nlohmann::json functionObj = reduceInfo["functions"][i];
