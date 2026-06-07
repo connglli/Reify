@@ -28,6 +28,7 @@
 #include <flint/nmod_mat.h>
 #include <lib/random.hpp>
 #include <lib/samputils.hpp>
+#include <lib/reduceinfo.hpp>
 #include <utility>
 
 #include "global.hpp"
@@ -452,7 +453,7 @@ void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQu
     Log::Get().Out() << "Setting target of header block " << headerBlockBd->GetLabel()
                      << " to " << blkLabel << std::endl;
 
-    // Get the Variable State or the original function
+    // Get the Variable State of the original function
     struct VariableState totalVariableState;
     totalVariableState.nrVariables = 0;
     for (auto &varStateQuery : varStateQueries) {
@@ -469,14 +470,18 @@ void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQu
 
     std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
     int rule_seed = Random::Get().Uniform()();
-    RuleInfo::Get().NewBlock(headerBlockBd->GetLabel(), rule_seed, GlobalOptions::Get().ruleCount);
-    // TODO: conditionally disable the engine based on delta debugging state
-    if (1) {
+
+    size_t ruleCount = GlobalOptions::Get().reduceMode
+      ? ReduceInfo::Get().GetRuleCount(funBd->GetName(), headerBlockBd->GetLabel()) 
+      : GlobalOptions::Get().ruleCount;
+
+    RuleInfo::Get().NewBlock(headerBlockBd->GetLabel(), rule_seed, ruleCount);
+    if (ruleCount > 0) {
       // We choose a separate seed for each engine run. This makes each run truly independent of the others.
       // Hence two runs of the same seed may run the engine differently (e.g. less rule applications) while not
       // changing the rest of the execution via out of sync random number generator state.
       Random::Get().PushSeed(rule_seed);
-      this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, GlobalOptions::Get().ruleCount);
+      this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, ruleCount);
       Random::Get().PopSeed();
     }
 

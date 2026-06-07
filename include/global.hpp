@@ -159,6 +159,9 @@ struct GlobalOptions {
   bool ruleInfo;
   // Number of Rules to apply to each block in the Rewrite stragety
   int ruleCount;
+  // Path to the ReduceMode file is active if path != "". See ryreduce
+  bool reduceMode;
+  std::string reduceModePath;
 
   ////////////////////////////////////////////////////////////
   ////// Solver Parameters
@@ -241,7 +244,8 @@ struct GlobalOptions {
       ("Xinit-replace-proba", "Probablility of replacing an argument literal with a variable for dataflow", cxxopts::value<double>())
       ("Xvar-take-proba", "Probablility of including a variable in the dataflow expression", cxxopts::value<double>())
       ("Xrule-count", "Number of Rules to apply to each block in the Rewrite stragety", cxxopts::value<int>()->default_value("100"))
-      ("Xrule-info", "Outputs a json file with detailed information about all Transformation Rules that are run", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
+      ("Xrule-info", "Outputs a json file with detailed information about all Transformation Rules that are run", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xreduce-mode", "Path to the ReduceMode file is active if path != "". See ryreduce", cxxopts::value<std::string>()->default_value(""));
     // clang-format on
   }
 
@@ -526,6 +530,9 @@ struct GlobalOptions {
     ruleInfo = args["Xrule-info"].as<bool>();
 
     ruleCount = args["Xrule-count"].as<int>();
+
+    reduceMode = args.count("Xreduce-mode") > 0;
+    reduceModePath = args["Xreduce-mode"].as<std::string>();
 
     if (args.count("Xinit-replace-proba")) {
       InitReplaceProba = args["Xinit-replace-proba"].as<double>();
