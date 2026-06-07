@@ -58,6 +58,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "fold_add_like_commutative";
   };
 
@@ -72,6 +73,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "factorize_math_with_shl";
   };
 
@@ -90,6 +92,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "or_to_add_and_xor";
   };
 
@@ -106,6 +109,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "add_to_add_or_and";
   };
 
@@ -120,6 +124,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "add_to_add_or_and";
   };
 
@@ -134,6 +139,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "add_to_add_or_and";
   };
 
@@ -148,6 +154,7 @@ namespace transformations::instcombine {
       size_t targetBlockIdx,
       size_t targetStmtIdx
     ) const override;
+    std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "add_to_add_or_and";
   };
 

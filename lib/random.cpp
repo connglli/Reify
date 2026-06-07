@@ -32,6 +32,7 @@ Random &Random::Get() {
 
 void Random::Seed(int s) {
 	for (size_t i = 0; i < rng.size(); i++) rng.pop();
+  this->startingSeed = s;
 	rng.push(std::mt19937(s));
 }
 
