@@ -754,9 +754,11 @@ namespace transformations::primitive {
       varInsertFun =
         [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
-          termIds.reserve(e.GetTerms().size() + 1);
+          auto terms = e.GetTerms();
+          termIds.reserve(terms.size() + 1);
           bool hasReplaced = false;
-          for (auto term : e.GetTerms()) {
+          for (size_t i = 0; i < terms.size(); i++) {
+            auto &term = terms[i];
             if (hasReplaced || term->GetOp() != symir::Term::OP_CST || term->GetCoef()->GetI32Value() == INT_MIN) {
               termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(term));
               continue;
@@ -783,7 +785,9 @@ namespace transformations::primitive {
               "Faulty transformation (target: %d, randVal: %d, mulVal: %d)", target, randVal, mulVal
             );
             Assert(randVal * mulVal + rest == target, "Faulty transformation");
-            if (e.GetOp() == symir::Expr::OP_SUB) rest = -rest;
+            if (e.GetOp() == symir::Expr::OP_SUB && i == 0) {
+              rest = -rest;
+            }
             Log::Get().Out() 
               << "Replacing Const " << target
               << " with " << randVal << " * " << mulVal

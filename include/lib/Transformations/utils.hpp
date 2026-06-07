@@ -93,8 +93,9 @@ namespace transformations::utils {
     
     /// see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
     void shuffel(const size_t n, int32_t *arr) {
-      for (size_t i = n - 1; i >= 1; i--) {
-        size_t r = rand() % (i + 1);
+      for (int i_ = n - 1; i_ >= 1; i_--) {
+        size_t r = static_cast<size_t>(Random::Get().Uniform(0, i_)());
+        size_t i = static_cast<size_t>(i_);
         int32_t temp = arr[r];
         arr[r] = arr[i];
         arr[i] = temp;

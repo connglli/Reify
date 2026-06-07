@@ -34,7 +34,10 @@ public:
   static RuleInfo &Get();
 
 public:
-  void Seed(int seed);
+  void GlobalSeed(int seed);
+  void ProgSeed(int seed);
+  void Clear();
+  void Sno(int sno);
   void NewFunction(std::string functionName);
   void NewBlock(std::string headerBlockLabel, int seed, size_t targetRuleCount);
   void AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIndex);
@@ -63,7 +66,9 @@ private:
   RuleInfo() : functions({}) {}
 
 private:
-  int seed;
+  int globalSeed;
+  int progSeed;
+  int sno;
   std::vector<Function> functions;
 
 };
