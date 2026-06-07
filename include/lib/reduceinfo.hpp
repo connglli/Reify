@@ -34,6 +34,7 @@ public:
   static ReduceInfo &Get();
 
 public:
+  int Sno() { return this->sno; };
   size_t GetRuleCount(std::string functionName, std::string headBlockLabel);
   void FromJson(std::string path);
 
@@ -41,6 +42,7 @@ private:
   ReduceInfo() : ruleCountMap({}) {}
 
 private:
+  int sno = -1;
   std::map<std::pair<std::string, std::string>, size_t> ruleCountMap;
 
 };

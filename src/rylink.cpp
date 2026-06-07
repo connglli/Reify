@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
     ReduceInfo::Get().FromJson(GlobalOptions::Get().reduceModePath);
   }
 
-  RuleInfo::Get().Seed(Random::Get().GetInitialSeed());
+  RuleInfo::Get().GlobalSeed(Random::Get().GetInitialSeed());
   Log::Get().Out() << "Seed: " << Random::Get().GetInitialSeed() << std::endl;
 
   // Read all function files from the input directory
@@ -159,9 +159,19 @@ int main(int argc, char *argv[]) {
   std::sort(allFunPaths.begin(), allFunPaths.end());
 
   for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
+    int prog_seed = Random::Get().Uniform()();
+    // we skip this sampNo if its not our target inside the ReduceInfo
+    if (GlobalOptions::Get().reduceMode && ReduceInfo::Get().Sno() != sampNo) continue;
+
+    // Independend RNG for each program otherwise we could not skip sampNo's
+    Random::Get().PushSeed(prog_seed);
+
     ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
 
     Log::Get().Out() << "[" << sampNo << "] Generating ... " << std::endl;
+    RuleInfo::Get().Clear();
+    RuleInfo::Get().Sno(sampNo);
+    RuleInfo::Get().ProgSeed(prog_seed);
 
     // Randomly select FUNCTION_DEPTH functions for the new program
     std::set<int> selFunInds;
@@ -190,6 +200,8 @@ int main(int argc, char *argv[]) {
     } else {
       Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
     }
+
+
     // Now we construct our new program
     auto prog = std::make_unique<ProgPlus>(progUuid, sampNo, selFunPaths);
     prog->Generate();
@@ -211,6 +223,7 @@ int main(int argc, char *argv[]) {
       ruleInfoFile.close();
     }
 
+    Random::Get().PopSeed();
   }
   // clean up flints global cache (To avoid valgrind errors)
   flint_cleanup_master();

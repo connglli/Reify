@@ -1,7 +1,7 @@
 #!/bin/bash
 
 dir=$1
-nrTests=1024
+nrTests=16384
 
 #make clean
 #make -j 8
@@ -15,7 +15,7 @@ generate() {
 	nr=$2
 	for (( i=$seed_start; i<=$(($seed_start + $nr)); i++ )); do
 	uuid="id$i"
-	echo "generating.. " $uuid
+	#echo "generating.. " $uuid
 	./build/bin/rylink --verbose --debug -i $dir -l 1 $uuid -s $i > /dev/null 2> /tmp/rylink_out_$uuid
 	retVal=$?
 	content=$(<"/tmp/rylink_out_$uuid")
@@ -36,13 +36,13 @@ compile_and_run() {
 		uuid="id$i"
 		path="${dir}/prog_${uuid}_0"
 
-		echo "compiling.. " $path;
+		#echo "compiling.. " $path;
 
 		$CC $CC_FLAGS $path/*.c -o $path/main.out &> /dev/null;
 
-		echo "running.. " $path;
+		#echo "running.. " $path;
 
-		./$path/main.out;
+		./$path/main.out > /dev/null;
 		retVal=$?
 		if [ $retVal -ne 0 ]; then
 			echo "found failing testcase for seed" $i
