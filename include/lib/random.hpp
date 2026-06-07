@@ -40,7 +40,12 @@ public:
   Random(const Random &) = delete;
   Random &operator=(const Random &) = delete;
 
-  [[nodiscard]] auto &GetRNG() { return rng; }
+  [[nodiscard]] auto &GetRNG() { 
+    Assert(this->rng.size() > 0, "rng stack should never be empty");
+    return rng.top(); 
+  }
+
+  [[nodiscard]] int GetInitialSeed() { return this->startingSeed; };
 
   void Seed(int s);
 
@@ -79,9 +84,13 @@ public:
   }
 
 private:
-	Random() { rng.push(std::mt19937(std::random_device{}())); }
+  Random() { 
+    this->startingSeed = std::random_device()();
+    rng.push(std::mt19937(startingSeed)); 
+  }
 
   std::stack<std::mt19937> rng;
+  int startingSeed;
 };
 
 

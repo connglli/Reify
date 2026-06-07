@@ -33,6 +33,7 @@
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 #include "lib/fcallembed.hpp"
+#include "lib/ruleinfo.hpp"
 #include "lib/varstate.hpp"
 
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
@@ -74,8 +75,9 @@ void ProgPlus::Generate() {
     Log::Get().OpenSection("Host function (" + std::to_string(i) + "): " + host->GetName());
     Log::Get().Out() << "num_replaceable=" << numCoeffs << std::endl;
 
-    auto emb = RandomFCallEmbedder(host);
+    RuleInfo::Get().NewFunction(host->GetName());
 
+    auto emb = RandomFCallEmbedder(host);
     std::unique_ptr<FCallStrategy> strat;
     switch (GlobalOptions::Get().DataflowStrategy) {
     case GlobalOptions::Literal: {
@@ -84,13 +86,12 @@ void ProgPlus::Generate() {
     case GlobalOptions::PrimeFieldInterpolation: {
       strat = std::make_unique<PrimeInterpFCallStrategy>();
     } break;
-    case GlobalOptions::ReverseOptimization: {
-      strat = std::make_unique<RevOptFCallStrategy>();
+    case GlobalOptions::Rewrite: {
+      strat = std::make_unique<RewriteFCallStrategy>();
     } break;
     default: Panic("DataflowStrategy is set to an invalid value");
     }
     emb.setStrategy(std::move(strat));
-
 
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
@@ -138,6 +139,7 @@ void ProgPlus::Generate() {
     functions[i] = emb.finalize();
     Log::Get().CloseSection();
   }
+
 }
 
 void ProgPlus::GenerateCode(const ProgArts &arts) const {
