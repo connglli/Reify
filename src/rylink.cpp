@@ -35,6 +35,7 @@
 #include "lib/program.hpp"
 #include "lib/random.hpp"
 #include "lib/ruleinfo.hpp"
+#include "lib/reduceinfo.hpp"
 
 namespace fs = std::filesystem;
 
@@ -132,6 +133,10 @@ int main(int argc, char *argv[]) {
   bool verbose = cliOpts.verbose;
   if (enableDebug) {
     Log::Get().SetCout();
+  }
+
+  if (GlobalOptions::Get().reduceMode) {
+    ReduceInfo::Get().FromJson(GlobalOptions::Get().reduceModePath);
   }
 
   RuleInfo::Get().Seed(Random::Get().GetInitialSeed());

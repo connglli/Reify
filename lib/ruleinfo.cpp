@@ -68,7 +68,7 @@ std::string RuleInfo::ToJson() {
     nrBlocks += function.blocks.size();
     nlohmann::json functionObj = nlohmann::json::object();
     functionObj["name"] = function.functionName;
-    functionObj["numberblocks"] = function.blocks.size();
+    functionObj["numberBlocks"] = function.blocks.size();
     functionObj["blocks"] = nlohmann::json::array();
     for (size_t j = 0; j < function.blocks.size(); j++) {
       auto &block = function.blocks[j];
