@@ -173,6 +173,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts) const {
 
   // Generate the main function
   std::ofstream mainFile(arts.GetMainPath());
+  mainFile << "// " << Random::Get().GetInitialSeed() << std::endl;
   mainFile << "#include <stdio.h>" << std::endl;
   mainFile << "#include \"" << FILENAME_PROTOTYPES_H << "\"" << std::endl;
   mainFile << "int main() {" << std::endl;
