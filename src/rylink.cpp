@@ -23,6 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <fstream>
 #include <set>
 #include <string>
 #include <flint/flint.h>
@@ -33,6 +34,7 @@
 #include "lib/logger.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
+#include "lib/ruleinfo.hpp"
 
 namespace fs = std::filesystem;
 
@@ -132,6 +134,9 @@ int main(int argc, char *argv[]) {
     Log::Get().SetCout();
   }
 
+  RuleInfo::Get().Seed(Random::Get().GetInitialSeed());
+  Log::Get().Out() << "Seed: " << Random::Get().GetInitialSeed() << std::endl;
+
   // Read all function files from the input directory
   std::vector<std::string> allFunPaths;
   // Open the directory and read all files
@@ -194,6 +199,13 @@ int main(int argc, char *argv[]) {
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
     prog->GenerateCode(arts);
+
+    if (GlobalOptions::Get().ruleInfo) {
+      std::ofstream ruleInfoFile = std::ofstream(arts.GetRuleInfoPath());
+      ruleInfoFile << RuleInfo::Get().ToJson() << std::endl;
+      ruleInfoFile.close();
+    }
+
   }
   // clean up flints global cache (To avoid valgrind errors)
   flint_cleanup_master();

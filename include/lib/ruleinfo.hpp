@@ -23,25 +23,53 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef REIFY_RULE_HPP
-#define REIFY_RULE_HPP
+#ifndef REIFY_RULEINFO_HPP
+#define REIFY_RULEINFO_HPP
 
-#include "lib/lang.hpp"
-#include "lib/varstate.hpp"
-#include "lib/strutils.hpp"
+// need to store per function per block {
+// List of { Rules, index }
+// }
 
-struct Rule {
-  Rule() {}
-  virtual ~Rule() = default;
-  virtual bool match(const symir::Stmt *stmt) const = 0;
-  virtual void rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
-  ) const = 0;
-  virtual std::string RuleName() = 0;
+#include <string>
+#include <vector>
+class RuleInfo {
+
+public:
+  static RuleInfo &Get();
+
+public:
+  void Seed(int seed);
+  void NewFunction(std::string functionName);
+  void NewBlock(std::string headerBlockLabel, int seed, size_t targetRuleCount);
+  void AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIndex);
+  std::string ToJson();
+
+private:
+  struct Rule {
+    size_t blockIndex;
+    size_t stmtIndex;
+    std::string ruleName;
+  };
+
+  struct Block {
+    std::string headerBlockLabel;
+    int blockSeed;
+    size_t targetRuleCount;
+    std::vector<Rule> rules;
+  };
+
+  struct Function {
+    std::string functionName;
+    std::vector<Block> blocks;
+  };
+
+private:
+  RuleInfo() : functions({}) {}
+
+private:
+  int seed;
+  std::vector<Function> functions;
+
 };
 
-#endif // REIFY_RULE_HPP
+#endif // REIFY_RULEINFO_HPP

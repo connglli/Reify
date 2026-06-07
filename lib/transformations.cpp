@@ -35,6 +35,7 @@
 #include "lib/lang.hpp"
 #include "lib/random.hpp"
 #include "lib/logger.hpp"
+#include "lib/ruleinfo.hpp"
 
 using namespace patternmatch;
 
@@ -54,42 +55,46 @@ void RewriteEngine::run(
                    << " times with " << this->rules.size() << " rules" << std::endl;
 
   for (size_t t = 0; t < times; t++) {
-
-    size_t stmtIdx, blockIdx;
-    {
-      size_t nrStmts = 0;
-      for (size_t i = 0; i < blockBds.size(); i++) {
-        nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
-        if (blockBds[i]->HasTarget()) nrStmts += 1;
-      }
+    for (size_t i = 0; i < 3; i++) {
+      size_t stmtIdx, blockIdx;
+      {
+        size_t nrStmts = 0;
+        for (size_t i = 0; i < blockBds.size(); i++) {
+          nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
+          if (blockBds[i]->HasTarget()) nrStmts += 1;
+        }
 
   
-      size_t randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
-      size_t i;
-      for (i = 0; i < blockBds.size(); i++) {
-        size_t nrStmts = 0;
-        nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
-        if (blockBds[i]->HasTarget()) nrStmts += 1;
-        if (nrStmts > randStmt) break;
-        randStmt -= nrStmts;
+        size_t randStmt = Random::Get().Uniform(0, static_cast<int>(nrStmts)-1)();
+        size_t i;
+        for (i = 0; i < blockBds.size(); i++) {
+          size_t nrStmts = 0;
+          nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
+          if (blockBds[i]->HasTarget()) nrStmts += 1;
+          if (nrStmts > randStmt) break;
+          randStmt -= nrStmts;
+        }
+
+        blockIdx = i;
+        stmtIdx = randStmt;
       }
 
-      blockIdx = i;
-      stmtIdx = randStmt;
-    }
-
-    const symir::Stmt *stmt = blockBds[blockIdx]->GetCommitedStmtOrTarget(stmtIdx);
-    // TODO: Allow Rules/Matching over multiple Stmts
-    std::optional rule = this->getRandomMatchingRule(stmt);
-    if (rule.has_value()) {
-      rule.value()->rewrite(
-        funBd,
-        blockBds,
-        varState,
-        blockIdx,
-        stmtIdx 
-      );
-      Assert(blockBds.size() > 0, "rewrite deleted all blocks!");
+      const symir::Stmt *stmt = blockBds[blockIdx]->GetCommitedStmtOrTarget(stmtIdx);
+      // TODO: Allow Rules/Matching over multiple Stmts
+      std::optional rule = this->getRandomMatchingRule(stmt);
+      if (rule.has_value()) {
+        RuleInfo::Get().AppendRule(rule.value()->RuleName(), blockIdx, stmtIdx);
+        rule.value()->rewrite(
+          funBd,
+          blockBds,
+          varState,
+          blockIdx,
+          stmtIdx 
+        );
+        Assert(blockBds.size() > 0, "rewrite deleted all blocks!");
+        break;
+      }
+      // If we failed to find a rule we retry with a new stmt up to 3 times
     }
   }
   Log::Get().CloseSection();
