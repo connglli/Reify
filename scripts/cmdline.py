@@ -72,7 +72,12 @@ def get_out(cmd: List[str], *, timeout=None, cwd=None):
   )
   return proc.stdout
 
+def get_ret(cmd: List[str], *, timeout=None, cwd=None) -> int:
+  proc = run_proc(
+    cmd, stdout=PIPE, stderr=STDOUT, timeout=timeout, check=False, cwd=cwd
+  )
+  return proc.returncode
 
 def check_out(cmd: List[str], *, timeout=None, cwd=None):
   proc = run_proc(cmd, stdout=PIPE, stderr=STDOUT, timeout=timeout, check=True, cwd=cwd)
-  return proc.stdout
+  return proc.stderr
