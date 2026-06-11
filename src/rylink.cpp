@@ -43,6 +43,7 @@ struct ProgGenOpts {
   std::string uuid;
   std::string input;
   int limits;
+  int sno;
   bool debug;
   bool verbose;
 
@@ -53,6 +54,7 @@ struct ProgGenOpts {
       ("uuid", "An UUID identifier", cxxopts::value<std::string>())
       ("i,input", "The directory saving the seed functions and mappings", cxxopts::value<std::string>())
       ("l,limit", "The number of new programs to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
+      ("n,sno", "The desired sample number must be less then limit", cxxopts::value<int>()->default_value("-1"))
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
@@ -107,6 +109,8 @@ struct ProgGenOpts {
       exit(1);
     }
 
+    const int sno = args["sno"].as<int>();
+
     if (const int seed = args["seed"].as<int>(); seed >= 0) {
       Random::Get().Seed(seed);
     }
@@ -117,7 +121,7 @@ struct ProgGenOpts {
 
     GlobalOptions::Get().HandleProgArgs(args);
 
-    return { .uuid = uuid, .input = input, .limits = limit, .debug = debug, .verbose = verbose };
+    return { .uuid = uuid, .input = input, .limits = limit, .sno = sno, .debug = debug, .verbose = verbose };
   }
 };
 
@@ -162,6 +166,8 @@ int main(int argc, char *argv[]) {
     int prog_seed = Random::Get().Uniform()();
     // we skip this sampNo if its not our target inside the ReduceInfo
     if (GlobalOptions::Get().reduceMode && ReduceInfo::Get().Sno() != sampNo) continue;
+    // we skip this sampNo if its not our target passed by cli
+    if (!GlobalOptions::Get().reduceMode && cliOpts.sno != -1 && cliOpts.sno != sampNo) continue;
 
     // Independend RNG for each program otherwise we could not skip sampNo's
     Random::Get().PushSeed(prog_seed);
