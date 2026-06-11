@@ -9,7 +9,7 @@ We are extending it to support additional primitive and aggregate types.
 We are also experimenting with generating Java bytecode and eBPF bytecode.
 Even in their early stages, these experimental attempts have already revealed one JIT compiler bug in OpenJ9 and two bugs in Linux's eBPF runtime.
 
-Additionally, we are experiment with a full-fledged SymIR called [symlang](https://github.com/connglli/symlang),
+Additionally, we are experiment with a full-fledged SymIR called [RefractIR](https://github.com/connglli/RefractIR),
 based on which Reify has a re-implementation with richer feature support such as pointers, vectors, and intrinsics.
 
 ## 🚀 Quick Start
