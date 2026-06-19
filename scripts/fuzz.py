@@ -34,6 +34,7 @@ import shutil
 import signal
 import sys
 import time
+
 from argparse import ArgumentParser
 from collections import namedtuple
 from dataclasses import dataclass
@@ -585,6 +586,7 @@ class WorkerConf:
   wdir: Path  # Working directory for the worker
   switch_limit: int  # Number of functions before switching to program generation
   prog_limit: int  # Limit for the number of generated programs per switch
+  save_funcs: bool  # Whenever to save all functions
   ref_cc: Optional[str] = None  # Reference compiler command for differential testing
   diff_opt: bool = False  # Whether to enable differential testing over optimization levels
   cflag_pool: Optional[List[str]] = None  # Pool of compiler flags for swarm testing
@@ -653,7 +655,7 @@ class Worker:
         popts.uuid = next_uuid()
         popts.seed = rand_int()
         popts.config = random.choice(PGEN_SUGGESTED_CONFIGS)
-        self.run_prog(popts, ropts.test_tmo)
+        self.run_prog(popts, ropts.test_tmo, fopts)
         self.log("Removing useless functions and programs")
         self.remove_useless_funcs(fopts)
         self.remove_useless_progs(popts)
@@ -678,7 +680,7 @@ class Worker:
     self.test(arts.get_test_dir(), binary=binary, timeout=test_tmo)
     return True  # Generated and tested
 
-  def run_prog(self, opts: ProgGenOptions, test_tmo: int):
+  def run_prog(self, opts: ProgGenOptions, test_tmo: int, fopts: FuncGenOptions):
     self.log(
       f"Generating programs: {', '.join([str(x[0]) + '=' + str(x[1]) for x in opts.to_dict().items()])}"
     )
@@ -690,7 +692,7 @@ class Worker:
     for index, arts in enumerate(all_arts):
       self.log(f"{index}: Testing the compiler with the generated program: {arts.get_test_dir()}")
       binary = arts.get_test_dir() / "main.out"
-      self.test(arts.get_test_dir(), binary=binary, timeout=test_tmo)
+      self.test(arts.get_test_dir(), binary=binary, timeout=test_tmo, fopts=fopts)
 
   def remove_useless_funcs(self, opts: FuncGenOptions):
     for i in range(opts.sno + 1):
@@ -706,7 +708,7 @@ class Worker:
         ignore_errors=True,
       )
 
-  def test(self, test_dir: Path, *, binary: Path, timeout: int):
+  def test(self, test_dir: Path, *, binary: Path, timeout: int, fopts: Optional[FuncGenOptions] = None):
     extra_cc_opts = ""
     if self.wconf.cflag_pool:
       num_flags = random.randint(1, 5)
@@ -733,13 +735,13 @@ class Worker:
         f"INTERNAL COMPILER ERROR (exitcode={test_res.exitcode}): {test_res.errmsg}",
         color="green",
       )
-      self.store_bug(test_res, test_dir, self.ice_dir)
+      self.store_bug(test_res, test_dir, self.ice_dir, fopts)
     elif test_res.is_compilation_timeout():
       self.log(f"COMPILER HANG (exitcode={test_res.exitcode}): {test_res.errmsg}", color="blue")
-      self.store_bug(test_res, test_dir, self.hang_dir)
+      self.store_bug(test_res, test_dir, self.hang_dir, fopts)
     elif test_res.is_wrong_code():
       self.log(f"WRONG CODE (exitcode={test_res.exitcode}): {test_res.errmsg}", color="green")
-      self.store_bug(test_res, test_dir, self.wrc_dir)
+      self.store_bug(test_res, test_dir, self.wrc_dir, fopts)
     elif test_res.is_execution_timeout():
       self.log(f"The generated program timed out (skip): {test_res.errmsg}")
       shutil.rmtree(test_dir, ignore_errors=True)
@@ -756,10 +758,20 @@ class Worker:
         f"Unknown test result: type={test_res.type.name}, exitcode={test_res.exitcode}, errmsg={test_res.errmsg}"
       )
 
-  def store_bug(self, res: TestRes, test_dir: Path, bug_dir: Path):
+  def store_bug(self, res: TestRes, test_dir: Path, bug_dir: Path, fopts: Optional[FuncGenOptions]):
     shutil.move(str(test_dir), str(bug_dir / test_dir.name))
     with (bug_dir / "result.jsonl").open("a") as fou:
       fou.write(json.dumps(res.to_dict(), ensure_ascii=False) + "\n")
+    if (self.wconf.save_funcs and fopts != None):
+      for i in range(fopts.sno + 1):
+        fdir: Path = configs.FunArts(fopts.uuid, i, gen_dir=fopts.outdir).get_test_dir();
+        if not fdir.exists(): continue;
+        shutil.copytree(
+          fdir,
+          str(bug_dir / test_dir.name / "leaf_funcs" / fdir.name)
+        )
+
+
 
   def notify(self, msg: str):
     self.msgq.put(f"Worker@{self.wid}: {msg}")
@@ -821,6 +833,7 @@ def run_fuzz_main(
   plimit: int,
   ref_cc: Optional[str] = None,
   diff_opt: bool = False,
+  save_funcs: bool = False,
   cflag_pool: Optional[List[str]] = None,
 ):
   class SignalInterrupt(Exception):
@@ -861,6 +874,7 @@ def run_fuzz_main(
           wdir=wdir,
           switch_limit=slimit,
           prog_limit=plimit,
+          save_funcs=save_funcs,
           ref_cc=ref_cc,
           diff_opt=diff_opt,
           cflag_pool=cflag_pool,
@@ -950,6 +964,12 @@ def main():
     help="Enable differential testing over different optimization levels (e.g., O0 vs O3)",
   )
   parser.add_argument(
+    "--save-funcs",
+    action="store_true",
+    default=False,
+    help="When a Bug is found in a whole program saves the set of unmodifined functions aswell (default: False)",
+  )
+  parser.add_argument(
     "--swarm-cflags",
     type=str,
     choices=["gcc", "clang"],
@@ -1027,6 +1047,8 @@ def main():
     )
     prog_limit = MAX_I32
 
+  save_funcs: bool = args.save_funcs
+
   if switch_limit >= prog_limit:
     mlog("Warning: Program limit is recommended to be larger than switching limit.")
 
@@ -1089,6 +1111,7 @@ def main():
     plimit=prog_limit,
     outdir=outdir,
     ref_cc=ref_compiler,
+    save_funcs=save_funcs,
     cflag_pool=cflag_pool,
     diff_opt=args.diff_opt,
   )
