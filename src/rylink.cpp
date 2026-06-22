@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
   // Read all function files from the input directory
   std::vector<std::string> allFunPaths;
   // Open the directory and read all files
-  for (const auto &entry: fs::recursive_directory_iterator(inputDir)) {
+  for (const auto &entry: fs::directory_iterator(inputDir)) {
     if (FunArts::IsTestDir(entry.path())) {
       allFunPaths.push_back(entry.path());
     }
