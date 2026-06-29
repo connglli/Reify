@@ -35,6 +35,7 @@
 #include "lib/fcallembed.hpp"
 #include "lib/ruleinfo.hpp"
 #include "lib/varstate.hpp"
+#include "lib/Transformations/utils.hpp"
 
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
@@ -66,6 +67,8 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
 
 void ProgPlus::Generate() {
   const int numFuns = static_cast<int>(functions.size());
+  transformations::utils::clearNameLabel();
+  transformations::utils::clearNameVariable();
 
   // Now replace the mappings in the functions with the calls to the other functions
   for (int i = 0; i < numFuns - 1; ++i) {
