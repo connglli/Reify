@@ -45,7 +45,8 @@ void FunPlus::Generate(bool allowDeadCode) {
 
   // Generate the sketch of our control flow graph
   cfg.Generate(allowDeadCode);
-  for (int i = 0; i < Random::Get().Uniform(0, maxNumLoops)(); i++) {
+  int numLoops = Random::Get().Uniform(0, maxNumLoops)();
+  for (int i = 0; i < numLoops; i++) {
     cfg.GenerateReduLoop(maxNumBblsPerLoop, allowDeadCode);
   }
   cfg.Print();
@@ -84,7 +85,8 @@ void FunPlus::Generate(bool allowDeadCode) {
       }
     } else if (isArray) {
       std::vector<int> shape;
-      for (int j = 0; j < randArrayDim(); j++) {
+      int dim = randArrayDim();
+      for (int j = 0; j < dim; j++) {
         shape.push_back(randArrayLen());
       }
       builder->SymVecParam(NameVar(i), shape, symir::SymIR::Type::I32, "", isVolatile);
@@ -155,7 +157,8 @@ void FunPlus::Generate(bool allowDeadCode) {
       }
     } else if (isArray) {
       std::vector<int> shape;
-      for (int j = 0; j < randArrayDim(); j++) {
+      int dim = randArrayDim();
+      for (int j = 0; j < dim; j++) {
         shape.push_back(randArrayLen());
       }
       std::vector<symir::Coef *> inits;
