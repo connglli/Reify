@@ -680,26 +680,31 @@ namespace transformations::utils {
     }
   }
 
+  static std::map<std::pair<std::string, std::string>, size_t> labelNameCount;
+
   std::string nameLabel(std::string functName, std::string prefix) {
-    static std::map<std::pair<std::string, std::string>, size_t> nameCount;
     std::pair namePair = std::make_pair(functName, prefix);
-    if (!nameCount.contains(namePair)) nameCount[namePair] = 0;
-    return prefix + "_" + std::to_string(nameCount[namePair]++);
+    if (!labelNameCount.contains(namePair)) labelNameCount[namePair] = 0;
+    return prefix + "_" + std::to_string(labelNameCount[namePair]++);
   }
 
+  void clearNameLabel() { labelNameCount.clear(); }
+
+  static std::map<std::tuple<std::string, std::string, std::string, size_t>, size_t> varNameCount;
+
   std::string nameVariable(std::string functName, std::string domBlockName, std::string prefix) {
-    static std::map<std::tuple<std::string, std::string, std::string, size_t>, size_t> nameCount;
     std::tuple nametuple = std::make_tuple(functName, domBlockName, prefix, 1);
-    if (!nameCount.contains(nametuple)) nameCount[nametuple] = 0;
-    return prefix + "_" + std::to_string(nameCount[nametuple]++);
+    if (!varNameCount.contains(nametuple)) varNameCount[nametuple] = 0;
+    return prefix + "_" + std::to_string(varNameCount[nametuple]++);
   }
 
   std::string nameVariable(std::string functName, std::string domBlockName, std::string prefix, size_t size) {
-    static std::map<std::tuple<std::string, std::string, std::string, size_t>, size_t> nameCount;
     std::tuple nametuple = std::make_tuple(functName, domBlockName, prefix, size);
-    if (!nameCount.contains(nametuple)) nameCount[nametuple] = 0;
-    return prefix + "_" + std::to_string(size) + "_" + std::to_string(nameCount[nametuple]++);
+    if (!varNameCount.contains(nametuple)) varNameCount[nametuple] = 0;
+    return prefix + "_" + std::to_string(size) + "_" + std::to_string(varNameCount[nametuple]++);
   }
+
+  void clearNameVariable() { varNameCount.clear(); }
 
   const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix) {
     std::string name = nameVariable(funBd->GetName(), domBlockName, prefix);
