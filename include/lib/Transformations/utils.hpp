@@ -207,8 +207,12 @@ namespace transformations::utils {
 
   std::string nameLabel(const std::string functName, const std::string prefix);
 
+  void clearNameLabel();
+
   std::string nameVariable(const std::string functName, const std::string domBlockName, const std::string prefix);
   std::string nameVariable(const std::string functName, const std::string domBlockName, const std::string prefix, size_t size);
+
+  void clearNameVariable();
 
   const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
   const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix, size_t size);
