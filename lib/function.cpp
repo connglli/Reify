@@ -684,6 +684,16 @@ std::string FunPlus::GenerateMappingCode(const SymExec &exec) const {
       mapObj["fin"].push_back(arg.ToJson());
     }
     mapObj["chk"] = StatelessChecksum::Compute(fina);
+
+    auto ubSite = exec.GetUBSite();
+    if (ubSite.has_value()) {
+      nlohmann::json ubObj = nlohmann::json::object();
+      ubObj["block"] = ubSite->blockLabel;
+      ubObj["stmt_idx"] = ubSite->stmtIndex;
+      ubObj["kind"] = ubkind_to_string(ubSite->kind);
+      mapObj["ubsite"] = ubObj;
+    }
+
     mapping << mapObj.dump() << std::endl;
   }
   return mapping.str();

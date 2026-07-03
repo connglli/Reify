@@ -30,13 +30,14 @@
 #include <bitwuzla/cpp/bitwuzla.h>
 #include <unordered_set>
 
-#include <memory>
+#include <optional>
 #include "global.hpp"
 #include "lib/argument.hpp"
 #include "lib/lang.hpp"
 #include "lib/logger.hpp"
 #include "lib/naming.hpp"
 #include "lib/ubbase.hpp"
+#include "lib/ubcomm.hpp"
 
 /// UBSan is a visitor that collects constraints to ensure that the
 /// execution of a function is free of undefined behavior like overflow .
@@ -88,7 +89,15 @@ public:
     prevBbl = "___entry_bbl";
     currBbl = "";
     nextBbl = "";
+    currentStmtIdx = -1;
   }
+
+  // Set the UB injection site. It transforms the UB-free execution
+  // into a UB-ensuring execution. The UB occurs at exactly the specified location.
+  void SetUBSite(std::optional<UBSite> site) { ubSite = site; }
+
+  // Get the registered UB site
+  [[nodiscard]] std::optional<UBSite> GetUBSite() const { return ubSite; }
 
   // Collect constraints that can make the execution UB free
   void Collect() { fun.Accept(*this); }
@@ -185,6 +194,15 @@ private:
   // Generate constraints to make the coefficients interesting
   void makeCoefsInteresting(const std::vector<symir::Coef *> &coefs);
 
+  // Test if the current statement is the UB injection site for the given UB kind
+  [[nodiscard]] bool shouldInject(UBKind kind) const {
+    if (!ubSite.has_value()) {
+      return false;
+    }
+    return currBbl == ubSite->blockLabel && currentStmtIdx == ubSite->stmtIndex &&
+           ubSite->kind == kind;
+  }
+
 private:
   const symir::Funct &fun;            // The function that we're analyzing
   std::vector<std::string> execution; // The execution path of the function
@@ -212,6 +230,10 @@ private:
 
   // Flags controlling the behavior of the visitor
   bool enableInterestCoefs = true; // Whether to make coefficients interesting
+
+  std::optional<UBSite> ubSite;         // The UB site to inject
+  int currentStmtIdx = -1;              // The index of the statement currently being visited
+  bool ubInjectedInCurrentStmt = false; // Whether UB was already injected in the current statement
 };
 
 

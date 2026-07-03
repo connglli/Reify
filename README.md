@@ -50,7 +50,7 @@ The output directory (given by the `--output` option) includes multiple sub-dire
   - `main.c`: A driver program to test the function (compilable with `func.c`).
   - `func.log`: Generation logs.
 
-**Or use the following command to generate an individual leaf function**:
+**Or use the following command to generate an individual, UB-free leaf function**:
 
 ```bash
 timeout 3s ./build/bin/rysmith -A -U -m -S --output generated --Xbitwuzla-threads 4 --sno 0 $(uuidgen)
@@ -60,6 +60,14 @@ Note that generating leaf functions may
 (1) take a long time due to complicated constraints or
 (2) fail due to unsatisfiable constraints.
 This is why the above command is prefixed with `timeout 3s`.
+
+**Experimental: Leaf functions can be UB-ensuring too, which is called the `ryubs` mode**:
+
+```bash
+timeout 3s ./build/bin/rysmith -A -U -m -S --mode ryubs --output generated --Xbitwuzla-threads 4 --sno 0 $(uuidgen)
+```
+
+In this mode, the generated leaf function is guaranteed to trigger at least one specific UB.
 
 **Experimental: Leaf functions can be generated from existing control flow graphs (CFGs). This feature is experimental.**
 

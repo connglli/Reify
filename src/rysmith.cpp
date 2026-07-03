@@ -44,6 +44,7 @@ struct FunGenOpts {
   bool sexpression;
   bool javaclass;
   bool verbose;
+  std::string mode;
 
   static FunGenOpts Parse(int argc, char **argv) {
     cxxopts::Options options("rysmith", "rysmith: Reify for leaf function generation\n");
@@ -57,6 +58,7 @@ struct FunGenOpts {
       ("m,main", "Generate a main function with all mappings", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("S,sexpression", "Also generate the S Expression of the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("J,unstable-javaclass", "Also generate a Java class (bytecode) identical to the generated function", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("mode", "The generation mode: normal or ryubs", cxxopts::value<std::string>()->default_value("normal"))
       ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -144,6 +146,16 @@ struct FunGenOpts {
 
     const bool verbose = args["verbose"].as<bool>();
 
+    std::string mode = "normal";
+    if (args.count("mode")) {
+      mode = args["mode"].as<std::string>();
+      if (mode != "normal" && mode != "ryubs") {
+        std::cerr << "Error: The mode option (--mode) must be either 'normal' or 'ryubs'."
+                  << std::endl;
+        exit(1);
+      }
+    }
+
     return {
         .uuid = uuid,
         .sno = sno,
@@ -152,7 +164,8 @@ struct FunGenOpts {
         .main = main,
         .sexpression = sexpression,
         .javaclass = javaclass,
-        .verbose = verbose
+        .verbose = verbose,
+        .mode = mode
     };
   }
 };
@@ -199,6 +212,16 @@ int main(int argc, char **argv) {
     );
     // Try solving the execution following the path
     exec = std::make_unique<SymExec>(fun, execPath);
+    // If we are in ryubs mode, we randomly select a UB candidate statement to be the UB site
+    if (cliOpts.mode == "ryubs") {
+      auto candidates = exec->GetUBCandidates();
+      if (candidates.empty()) {
+        std::cerr << "Warning: No UB candidate statements found on execution path!" << std::endl;
+      } else {
+        int idx = Random::Get().Uniform(0, (int) candidates.size() - 1)();
+        exec->SetUBSite(candidates[idx]);
+      }
+    }
     int numSolved = exec->Solve(
         GlobalOptions::Get().NumInitsPerExec, GlobalOptions::Get().EnableInterestInits,
         GlobalOptions::Get().EnableRandomInits, GlobalOptions::Get().EnableInterestCoefs,

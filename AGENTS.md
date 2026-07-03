@@ -37,7 +37,7 @@ But Reify is a random program generator. If we only do what makes the solver hap
 - **Keep symbolic shift amounts in a small set of values.** The bigger the set, the more the solver has to try.
 - **Keep symbolic indexing as simple as possible.** Prefer concrete indices, or pin a symbolic index to a single value. Avoid general array-theory reasoning unless we really need it.
 - **Don't widen bit-widths without a reason.** A wider type makes every operation cost more inside the solver. Use the smallest width that still triggers the bug class we care about.
-- **Every partial op needs a guard.** Operations like division, remainder, and shift have inputs that cause UB. They must ship with constraints that rule those inputs out.
+- **Every partial op needs a guard.** Operations like division, remainder, and shift have inputs that cause UB. They must ship with constraints that rule those inputs out. In `ryubs` mode, we intentionally target one such guard constraint (or an overflow check) on the execution path and negate it, while leaving all other guards active, to guarantee that specific UB is triggered.
 - **A new op has to pay rent.** Before adding one, ask: can we already get the same bugs by combining existing ops along a more interesting CFG or path? If yes, do not add the op.
 
 ### Symbolic Execution: keep constraints simple

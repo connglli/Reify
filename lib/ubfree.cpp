@@ -129,8 +129,16 @@ void UBSan::ensureInRange(const bitwuzla::Term &t) {
 
   auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
   auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
-  addConstraint(tm->mk_term(bitwuzla::Kind::BV_SGE, {t, lowerBound}));
-  addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {t, upperBound}));
+
+  if (shouldInject(UBKind::VALUE_OUT_OF_RANGE) && !ubInjectedInCurrentStmt) {
+    auto lt = tm->mk_term(bitwuzla::Kind::BV_SLT, {t, lowerBound});
+    auto gt = tm->mk_term(bitwuzla::Kind::BV_SGT, {t, upperBound});
+    addConstraint(tm->mk_term(bitwuzla::Kind::OR, {lt, gt}));
+    ubInjectedInCurrentStmt = true;
+  } else {
+    addConstraint(tm->mk_term(bitwuzla::Kind::BV_SGE, {t, lowerBound}));
+    addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {t, upperBound}));
+  }
 }
 
 UBSan::Stats UBSan::GetStats() const {
@@ -340,19 +348,28 @@ void UBSan::Visit(const symir::VarUse &v) {
 
       // Concretize
       int elLoc = 0;
-      if (idxExpr.is_value()) {
-        const int32_t idxVal = BvValueToI32(idxExpr);
-        if (idxVal < 0 || idxVal >= dimLen) {
-          // Constant out-of-bounds access is UB; fail fast.
-          addConstraint(tm->mk_false());
-          elLoc = 0;
-        } else {
-          elLoc = idxVal;
-        }
+      if (shouldInject(UBKind::ARRAY_OUT_OF_BOUND) && !ubInjectedInCurrentStmt) {
+        auto zeroTerm = tm->mk_bv_zero(bvSort);
+        auto ltZero = tm->mk_term(bitwuzla::Kind::BV_SLT, {idxExpr, zeroTerm});
+        auto geDim = tm->mk_term(bitwuzla::Kind::BV_SGE, {idxExpr, dimLenTerm});
+        addConstraint(tm->mk_term(bitwuzla::Kind::OR, {ltZero, geDim}));
+        ubInjectedInCurrentStmt = true;
+        elLoc = 0; // Use a valid index at compile-time to avoid internal crash
       } else {
-        elLoc = Random::Get().Uniform(0, dimLen - 1)();
-        auto elLocTerm = tm->mk_bv_value_int64(bvSort, elLoc);
-        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {idxExpr, elLocTerm}));
+        if (idxExpr.is_value()) {
+          const int32_t idxVal = BvValueToI32(idxExpr);
+          if (idxVal < 0 || idxVal >= dimLen) {
+            // Constant out-of-bounds access is UB; fail fast.
+            addConstraint(tm->mk_false());
+            elLoc = 0;
+          } else {
+            elLoc = idxVal;
+          }
+        } else {
+          elLoc = Random::Get().Uniform(0, dimLen - 1)();
+          auto elLocTerm = tm->mk_bv_value_int64(bvSort, elLoc);
+          addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {idxExpr, elLocTerm}));
+        }
       }
 
       pendingArrayShape.push_back(dimLen);
@@ -442,42 +459,84 @@ void UBSan::Visit(const symir::Term &t) {
 
   switch (t.GetOp()) {
     case symir::Term::Op::OP_ADD:
-      // Prevent signed addition overflow
-      addConstraint(tm->mk_term(
-          bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {coefExpr, varExpr})}
-      ));
+      // Prevent signed addition overflow, or require it if we target this site
+      if (shouldInject(UBKind::SIGNED_ADD_OVERFLOW) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {coefExpr, varExpr}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(
+            bitwuzla::Kind::NOT,
+            {tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {coefExpr, varExpr})}
+        ));
+      }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_ADD, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_SUB:
-      // Prevent signed subtraction overflow
-      addConstraint(tm->mk_term(
-          bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {coefExpr, varExpr})}
-      ));
+      // Prevent signed subtraction overflow, or require it if we target this site
+      if (shouldInject(UBKind::SIGNED_SUB_OVERFLOW) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {coefExpr, varExpr}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(
+            bitwuzla::Kind::NOT,
+            {tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {coefExpr, varExpr})}
+        ));
+      }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SUB, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_MUL:
-      // Prevent signed multiplication overflow
-      addConstraint(tm->mk_term(
-          bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {coefExpr, varExpr})}
-      ));
+      // Prevent signed multiplication overflow, or require it if we target this site
+      if (shouldInject(UBKind::SIGNED_MUL_OVERFLOW) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {coefExpr, varExpr}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(
+            bitwuzla::Kind::NOT,
+            {tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {coefExpr, varExpr})}
+        ));
+      }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_MUL, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_DIV:
-      addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
+      // Division by zero
+      if (shouldInject(UBKind::DIVISION_BY_ZERO) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {varExpr, zero}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
+      }
       // Prevent signed division overflow (INT_MIN / -1)
-      addConstraint(tm->mk_term(
-          bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
-      ));
+      if (shouldInject(UBKind::SIGNED_DIV_OVERFLOW) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(
+            bitwuzla::Kind::NOT,
+            {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
+        ));
+      }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_REM:
-      addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
+      // Remainder by zero
+      if (shouldInject(UBKind::REMAINDER_BY_ZERO) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::EQUAL, {varExpr, zero}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero}));
+      }
       // INT_MIN % -1 is UB in C11: 6.5.5p6 defines `a % b` only when `a / b`
       // is representable, and INT_MIN / -1 overflows. Reuse the SDIV overflow
       // check to rule out the same operand pair.
-      addConstraint(tm->mk_term(
-          bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
-      ));
+      if (shouldInject(UBKind::REMAINDER_OVERFLOW) && !ubInjectedInCurrentStmt) {
+        addConstraint(tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr}));
+        ubInjectedInCurrentStmt = true;
+      } else {
+        addConstraint(tm->mk_term(
+            bitwuzla::Kind::NOT,
+            {tm->mk_term(bitwuzla::Kind::BV_SDIV_OVERFLOW, {coefExpr, varExpr})}
+        ));
+      }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr});
       break;
     case symir::Term::Op::OP_CST:
@@ -503,17 +562,29 @@ void UBSan::Visit(const symir::Expr &e) {
     }
     switch (e.GetOp()) {
       case symir::Expr::Op::OP_ADD:
-        // Prevent signed addition overflow
-        addConstraint(tm->mk_term(
-            bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {result, termExpr})}
-        ));
+        // Prevent signed addition overflow, or require it if we target this site
+        if (shouldInject(UBKind::SIGNED_ADD_OVERFLOW) && !ubInjectedInCurrentStmt) {
+          addConstraint(tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {result, termExpr}));
+          ubInjectedInCurrentStmt = true;
+        } else {
+          addConstraint(tm->mk_term(
+              bitwuzla::Kind::NOT,
+              {tm->mk_term(bitwuzla::Kind::BV_SADD_OVERFLOW, {result, termExpr})}
+          ));
+        }
         result = tm->mk_term(bitwuzla::Kind::BV_ADD, {result, termExpr});
         break;
       case symir::Expr::Op::OP_SUB:
-        // Prevent signed subtraction overflow
-        addConstraint(tm->mk_term(
-            bitwuzla::Kind::NOT, {tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {result, termExpr})}
-        ));
+        // Prevent signed subtraction overflow, or require it if we target this site
+        if (shouldInject(UBKind::SIGNED_SUB_OVERFLOW) && !ubInjectedInCurrentStmt) {
+          addConstraint(tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {result, termExpr}));
+          ubInjectedInCurrentStmt = true;
+        } else {
+          addConstraint(tm->mk_term(
+              bitwuzla::Kind::NOT,
+              {tm->mk_term(bitwuzla::Kind::BV_SSUB_OVERFLOW, {result, termExpr})}
+          ));
+        }
         result = tm->mk_term(bitwuzla::Kind::BV_SUB, {result, termExpr});
         break;
       default:
@@ -722,9 +793,13 @@ void UBSan::Visit(const symir::StructDef &s) {
 }
 
 void UBSan::Visit(const symir::Block &b) {
+  int oldIdx = currentStmtIdx;
+  currentStmtIdx = 0;
   for (const auto &stmt: b.GetStmts()) {
     stmt->Accept(*this);
+    currentStmtIdx++;
   }
+  currentStmtIdx = oldIdx;
 }
 
 void UBSan::Visit(const symir::Funct &f) {

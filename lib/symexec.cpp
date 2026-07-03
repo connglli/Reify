@@ -32,6 +32,7 @@
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
+#include "lib/ubcomm.hpp"
 #include "lib/ubinject.hpp"
 
 #include <chrono>
@@ -208,8 +209,9 @@ bool SymExec::solve(
 
   // Generate or re-generate the constraints for the function execution
   if (inits.size() <= 1) {
-    Log::Get().Out() << "Generating or re-generating UB-free constraints" << std::endl;
+    Log::Get().Out() << "Generating or re-generating UB-free/UB-ensuring constraints" << std::endl;
     ubSan->Reset();
+    ubSan->SetUBSite(ubSite);
 
     // Let each parameter (coefficient or constant) interesting initially
     if (withInterestInit) {
@@ -524,4 +526,9 @@ void SymExec::insertRandomValueIntoUnsolvedSymbols() {
     Log::Get().Out() << "Define symbols: sym=" << sym->GetName() << ", val=" << val
                      << " (for unexecuted basic blocks)" << std::endl;
   }
+}
+
+std::vector<UBSite> SymExec::GetUBCandidates() const {
+  UBCandCollector collector(*fun, executionByLabels);
+  return collector.Collect();
 }

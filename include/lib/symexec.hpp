@@ -43,6 +43,17 @@ public:
 
   ~SymExec();
 
+  // Set a UBSite for this execution, which transforms the UB-free execution into
+  // a UB-ensuring execution. The UB occurs at exactly the specified location.
+  void SetUBSite(std::optional<UBSite> site) { ubSite = site; }
+
+  // Get the registered UBSite for this execution, if any.
+  // If no UBSite is registered, this execution is UB-free.
+  [[nodiscard]] std::optional<UBSite> GetUBSite() const { return ubSite; }
+
+  // Get all candidate UBSites for this execution, if any.
+  [[nodiscard]] std::vector<UBSite> GetUBCandidates() const;
+
   // Get the function generator, i.e., owner of this execution
   [[nodiscard]] const FunPlus *GetOwner() const { return owner; }
 
@@ -105,6 +116,9 @@ private:
   // Execution path of the function
   std::vector<int> execution;
   std::vector<std::string> executionByLabels;
+  // UB site making the above execution UB-ensuring.
+  // If not set, this execution is UB-free.
+  std::optional<UBSite> ubSite;
 
   // Constraints collector for signed overflow
   std::unique_ptr<UBSan> ubSan; // TODO: Add more UB types in the future
