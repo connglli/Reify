@@ -30,6 +30,7 @@
 #include <ranges>
 #include "global.hpp"
 #include "lib/logger.hpp"
+#include "lib/randfill.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
@@ -528,17 +529,7 @@ void SymExec::insertUBsIntoUnexecutedBbls() {
 
 void SymExec::insertRandomValueIntoUnsolvedSymbols() {
   // For now, we just define all symbols in the function with a random value
-  const auto rand =
-      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
-  for (const auto &sym: fun->GetSymbols()) {
-    if (sym->IsSolved()) {
-      continue; // If the symbol is already defined, we don't need to smash it
-    }
-    const int val = rand();
-    sym->SetValue(std::to_string(val));
-    Log::Get().Out() << "Define symbols: sym=" << sym->GetName() << ", val=" << val
-                     << " (for unexecuted basic blocks)" << std::endl;
-  }
+  RandFill(fun, GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound).Fill();
 }
 
 std::string SymExec::getVarStateJson() {
