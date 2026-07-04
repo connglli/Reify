@@ -130,15 +130,8 @@ void UBSan::ensureInRange(const bitwuzla::Term &t) {
   auto lowerBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().LowerBound);
   auto upperBound = tm->mk_bv_value_int64(bvSort, GlobalOptions::Get().UpperBound);
 
-  if (shouldInject(UBKind::VALUE_OUT_OF_RANGE) && !ubInjectedInCurrentStmt) {
-    auto lt = tm->mk_term(bitwuzla::Kind::BV_SLT, {t, lowerBound});
-    auto gt = tm->mk_term(bitwuzla::Kind::BV_SGT, {t, upperBound});
-    addConstraint(tm->mk_term(bitwuzla::Kind::OR, {lt, gt}));
-    ubInjectedInCurrentStmt = true;
-  } else {
-    addConstraint(tm->mk_term(bitwuzla::Kind::BV_SGE, {t, lowerBound}));
-    addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {t, upperBound}));
-  }
+  addConstraint(tm->mk_term(bitwuzla::Kind::BV_SGE, {t, lowerBound}));
+  addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {t, upperBound}));
 }
 
 UBSan::Stats UBSan::GetStats() const {
@@ -796,6 +789,7 @@ void UBSan::Visit(const symir::Block &b) {
   int oldIdx = currentStmtIdx;
   currentStmtIdx = 0;
   for (const auto &stmt: b.GetStmts()) {
+    ubInjectedInCurrentStmt = false;
     stmt->Accept(*this);
     currentStmtIdx++;
   }

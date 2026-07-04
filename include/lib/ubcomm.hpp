@@ -37,7 +37,6 @@ enum class UBKind {
   SIGNED_SUB_OVERFLOW,
   SIGNED_MUL_OVERFLOW,
   ARRAY_OUT_OF_BOUND,
-  VALUE_OUT_OF_RANGE,
   DIVISION_BY_ZERO,
   SIGNED_DIV_OVERFLOW,
   REMAINDER_BY_ZERO,
@@ -55,8 +54,6 @@ inline std::string ubkind_to_string(UBKind kind) {
       return "signed_mul_overflow";
     case UBKind::ARRAY_OUT_OF_BOUND:
       return "array_out_of_bound";
-    case UBKind::VALUE_OUT_OF_RANGE:
-      return "value_out_of_range";
     case UBKind::DIVISION_BY_ZERO:
       return "division_by_zero";
     case UBKind::SIGNED_DIV_OVERFLOW:
@@ -99,8 +96,44 @@ public:
   }
 
   void Visit(const symir::VarUse &v) override {
-    if (!v.IsScalar()) {
-      hasArrayUse = true;
+    const auto *varDef = v.GetDef();
+    if (!varDef)
+      return;
+
+    symir::SymIR::Type currType = varDef->GetType();
+    symir::SymIR::Type currBaseType = varDef->GetBaseType();
+    std::string currStruct =
+        (currType == symir::SymIR::Type::STRUCT)
+            ? varDef->GetStructName()
+            : (currBaseType == symir::SymIR::Type::STRUCT ? varDef->GetStructName() : "");
+    std::vector<int> currShape = varDef->GetVecShape();
+    size_t currentShapeIdx = 0;
+
+    const auto &access = v.GetAccess();
+    for (size_t i = 0; i < access.size(); ++i) {
+      if (currentShapeIdx < currShape.size()) {
+        // Array access
+        hasArrayUse = true;
+        currentShapeIdx++;
+      } else if (currType == symir::SymIR::Type::STRUCT && !currStruct.empty()) {
+        // Struct access
+        const auto *cstTerm = dynamic_cast<const symir::Term *>(access[i]);
+        if (cstTerm && cstTerm->GetOp() == symir::Term::Op::OP_CST) {
+          std::string fieldName = "f" + cstTerm->GetCoef()->GetName();
+          const auto *structDef = fun.GetStruct(currStruct);
+          if (structDef) {
+            int fieldIdx = structDef->GetFieldIndex(fieldName);
+            if (fieldIdx != -1) {
+              const auto &field = structDef->GetField(fieldIdx);
+              currType = field.type;
+              currBaseType = field.baseType;
+              currStruct = field.structName;
+              currShape = field.shape;
+              currentShapeIdx = 0;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -134,7 +167,11 @@ public:
     }
   }
 
-  void Visit(const symir::Cond &c) override {}
+  void Visit(const symir::Cond &c) override {
+    if (c.GetExpr() != nullptr) {
+      c.GetExpr()->Accept(*this);
+    }
+  }
 
   void Visit(const symir::AssStmt &a) override {
     hasAdd = false;
@@ -146,6 +183,7 @@ public:
 
     a.GetVar()->Accept(*this);
     a.GetExpr()->Accept(*this);
+
 
     if (hasAdd) {
       candidates.push_back({currBbl, currentStmtIdx, UBKind::SIGNED_ADD_OVERFLOW});
@@ -171,7 +209,11 @@ public:
 
   void Visit(const symir::RetStmt &r) override {}
 
-  void Visit(const symir::Branch &b) override {}
+  void Visit(const symir::Branch &b) override {
+    if (b.GetCond() != nullptr) {
+      b.GetCond()->Accept(*this);
+    }
+  }
 
   void Visit(const symir::Goto &g) override {}
 

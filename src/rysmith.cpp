@@ -216,7 +216,10 @@ int main(int argc, char **argv) {
     if (cliOpts.mode == "ryubs") {
       auto candidates = exec->GetUBCandidates();
       if (candidates.empty()) {
-        std::cerr << "Warning: No UB candidate statements found on execution path!" << std::endl;
+        std::cerr << "Warning: No UB candidate statements found on execution path! "
+                  << "Retrying with a new path..." << std::endl;
+        exec = nullptr;
+        continue;
       } else {
         int idx = Random::Get().Uniform(0, (int) candidates.size() - 1)();
         exec->SetUBSite(candidates[idx]);
