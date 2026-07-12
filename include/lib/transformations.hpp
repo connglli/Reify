@@ -26,6 +26,7 @@
 #ifndef REIFY_TRANSFORMATIONS_HPP
 #define REIFY_TRANSFORMATIONS_HPP
 
+#include "lib/Transformations/obscure.hpp"
 #include "lib/Transformations/primitive.hpp"
 #include "lib/Transformations/instcombine.hpp"
 #include "lib/Transformations/vectorize.hpp"
@@ -41,7 +42,8 @@ public:
   static RewriteEngine Default() {
     auto engine = RewriteEngine();
                 // Rule                                                  // Weight
-    engine.addRule(std::make_unique<primitive::Guard>(),                        50);
+    engine.addRule(std::make_unique<obscure::PrimeInterp>(),                    50);
+    engine.addRule(std::make_unique<obscure::Conditional>(),                    10);
     engine.addRule(std::make_unique<primitive::Reg2Mem>(),                       2);
     engine.addRule(std::make_unique<primitive::ConstPropagationViaAdd>(),        1);
     engine.addRule(std::make_unique<primitive::ConstPropagationViaSub>(),        1);
