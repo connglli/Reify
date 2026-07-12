@@ -33,14 +33,14 @@
 #include <climits>
 #include <utility>
 
-namespace {
+namespace transformations::utils {
   /// given a flattend intex recover the access vector needed to create a VarUse Object
   std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
     Assert(var != nullptr, "Variable is nullptr");
     if (var->GetType() == symir::SymIR::Type::I32) {
       Assert(
         flattenedIndex == 0,
-        "Trying to index int32_to %s which is an (I32, %s) with %ld",
+        "Trying to index into %s which is an (I32, %s) with %ld",
         var->GetName().c_str(),
         var->GetBaseType() == symir::SymIR::Type::I32 ? "i32" : (var->GetBaseType() == symir::SymIR::Type::ARRAY ? "ARRAY" : "STRUCT"),
         flattenedIndex
@@ -122,9 +122,7 @@ typeLoop:
     return access;
   }
 
-}; // namespace
-  
-namespace transformations::utils {
+
   void VarFilter::randomlyFilter() {
     auto randDouble = Random::Get().UniformReal();
     size_t nrVariables = this->varState.nrVariables;
@@ -184,10 +182,6 @@ namespace transformations::utils {
     }
   }
 
-  void VarFilter::smartlyFilter() {
-    Panic("TODO");
-  }
-
   void PrimeInterpolation::interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
     Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets (%d) must be in Z_%ld", target, this->mod.n);
     Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
@@ -206,6 +200,7 @@ namespace transformations::utils {
     for (size_t row = 0; row < nrIterations; row++) {
       nmod_mat_set_entry(B, row, 0, target);
     }
+
     // Fill the last element of B with a unique new target value to avoid the const polynomial
     nmod_mat_set_entry(B, nrIterations, 0, nmod_add(static_cast<ulong>(target), 1, this->mod));
 
@@ -596,7 +591,7 @@ namespace transformations::utils {
     );
   }
 
-  symir::BlockBuilder::StmtID variableTerm(
+  symir::BlockBuilder::TermID variableTerm(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
@@ -633,17 +628,18 @@ namespace transformations::utils {
     ::std::string secondLabel,
     size_t splitIdx
   ) {
-    Assert(splitIdx < blockBd->GetNumberOfCommitedStmt(), "splitIdx out of bounds for block %s", blockBd->GetLabel().c_str());
+    Assert(
+      splitIdx <= blockBd->GetNumberOfCommitedStmt(),
+      "splitIdx out of bounds for block %s", blockBd->GetLabel().c_str()
+    );
 
     symir::BlockBuilder *secondBlockBd = funBd->OpenBlock(secondLabel);
     symir::StmtCopier secondCopier = symir::StmtCopier(funBd, secondBlockBd);
 
-    for (size_t i = 0; i < blockBd->GetNumberOfCommitedStmt(); i++) {
-      if (i > splitIdx) {
-        secondBlockBd->CommitStmt(
-            secondCopier.CopyStmt(blockBd->GetCommitedStmt(i))
-        );
-      }
+    for (size_t i = splitIdx + 1; i < blockBd->GetNumberOfCommitedStmt(); i++) {
+      secondBlockBd->CommitStmt(
+          secondCopier.CopyStmt(blockBd->GetCommitedStmt(i))
+      );
     }
 
     symir::Target *target = blockBd->GetTarget();
@@ -661,7 +657,7 @@ namespace transformations::utils {
       blockBd->RemoveTarget();
     }
 
-    if (splitIdx < blockBd->GetNumberOfCommitedStmt() - 1) {
+    if (splitIdx < blockBd->GetNumberOfCommitedStmt() - 1 && blockBd->GetNumberOfCommitedStmt() != 0) {
       blockBd->RemoveCommittedStmts(splitIdx + 1, blockBd->GetNumberOfCommitedStmt());
     }
 

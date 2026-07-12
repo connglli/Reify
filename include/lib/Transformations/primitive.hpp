@@ -40,23 +40,6 @@ namespace transformations::primitive {
   // B1, B2, ... := Conditional Stmt
   // {A, ..., Z, a, ..., z} Variables
 
-  struct Guard : Rule {
-    Guard(int32_t prime = 46337) : prime(prime) {}
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
-    ) const override;
-    std::string RuleName() override { return __CLASS_NAME__ };
-    int32_t prime;
-    const std::string varPrefix = "guard";
-
-  };
-
-
   /// Additivly expands an expression with one more element
   /// E1 + C1 + E2 => E1 + C2 + C3 +E2
   /// where C2 + C3 = C1

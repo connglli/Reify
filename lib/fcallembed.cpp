@@ -404,7 +404,7 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
     }
 
     std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
-    transformations::primitive::Guard rule = transformations::primitive::Guard();
+    transformations::obscure::PrimeInterp rule = transformations::obscure::PrimeInterp();
     this->rewriteEngine.runAsPass(funBd, headerBlockBds, totalVariableState, rule);
 
     for (auto blockBd : headerBlockBds) {
