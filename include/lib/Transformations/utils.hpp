@@ -30,7 +30,6 @@
 #include "lib/varstate.hpp"
 #include "lib/random.hpp"
 
-#include <climits>
 #include <flint/ulong_extras.h>
 #include <flint/nmod.h>
 #include <flint/nmod_mat.h>
@@ -40,6 +39,8 @@
 
 namespace transformations::utils {
 
+  std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex);
+
   class VarFilter {
   public:
     VarFilter(
@@ -47,7 +48,7 @@ namespace transformations::utils {
       VariableState &varState
     ): funBd(funBd), varState(varState) {}
     void randomlyFilter();
-    void smartlyFilter();
+    void uniqueFilter();
     
   public:
     std::vector<int32_t> filteredVarState{};
@@ -185,7 +186,7 @@ namespace transformations::utils {
   );
 
   /// returns a term that is equal to just the value in the passed variable, access
-  symir::BlockBuilder::StmtID variableTerm(
+  symir::BlockBuilder::TermID variableTerm(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
