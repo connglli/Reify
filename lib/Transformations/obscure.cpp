@@ -112,7 +112,9 @@ namespace transformations::obscure {
           falseVal = sortedTmpVarState[0] + 1;
         }
         falseVal = val + 1;
-        randIterationIdx = (randIterationIdx + 1) % sortedTmpVarState.size();
+        for (size_t i = 0; i < sortedTmpVarState.size() && sortedTmpVarState[randIterationIdx] == val; i++) {
+          randIterationIdx = (randIterationIdx + 1) % sortedTmpVarState.size();
+        }
       }
     }
 
