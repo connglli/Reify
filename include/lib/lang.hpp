@@ -1681,7 +1681,7 @@ namespace symir {
     /// Commits a Stmt to the builder by replacing 'stmtIndex'
     std::vector<Stmt *> ReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex);
 
-    /// Commits a Stmt to the builder before the 'stmtIndex'th assignmet (TODO: There must be a better way of doing this (used for Prime Interp strat))
+    /// Commits a Stmt to the builder before the 'stmtIndex'th assignmet
     Stmt *CommitStmtAtAssign(StmtID sid, int assignStmtIndex);
 
     /// Removes the target. This essentially resets the BlockBuilder to before SymGoto was called;
