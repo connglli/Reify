@@ -103,7 +103,7 @@ namespace transformations::utils {
       }
     }
     
-    // This is a quite biased in its selection. TODO: Are the more uniform / fair algorithms for finding a random polynomial fast?
+    // This is a quite biased in its selection.
     // Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
     /// Samples a new random polynomial
     void randomizePolynomial(
@@ -130,8 +130,6 @@ namespace transformations::utils {
     std::vector<int32_t> coeffs;
   };
 
-  // TODO: Maybe apply Reservoir Sampling here to avoid copying the AST twice
-  // TODO: This has become extreamly hacky, need to find a better solution
   /// Replaces a Expr/Cond or Term inside a given Stmt if matchFunction returns true
   template<typename Node>
   class StmtReplacer : public symir::StmtCopier {

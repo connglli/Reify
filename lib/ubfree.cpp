@@ -519,7 +519,6 @@ void UBSan::Visit(const symir::Term &t) {
       // Non-Negative
       addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
       // E1 * (1 << E2) does not overflow
-      // TODO: 1 << 31 is a overflow that passes this!!!
       addConstraint(
         tm->mk_term(bitwuzla::Kind::NOT, {
           tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {

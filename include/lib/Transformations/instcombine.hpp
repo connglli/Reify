@@ -157,29 +157,6 @@ namespace transformations::instcombine {
     std::string RuleName() override { return __CLASS_NAME__ };
     std::string varPrefix = "add_to_add_or_and";
   };
-
-// Other targets if more a needed:
-
-
-  // Overflows for A = INT_MAX, B = INT_MAX
-  // ((add A, B) - (or A, B)) --> (A & B)
-  // Overflows for A = INT_MAX, B = INT_MAX
-  // (sub (add A, B) (and A, B)) --> (or A, B)
-
-  // TODO: check for UB if ok then add
-  
-  // (~B + A) + 1 => A - B
-  // (A + ~B) + C => A - B + (C-1)
-  // X % C0 + (( X / C0 ) % C1) * C0 => X % (C0 * C1)
-
-  // (add A (or A, -A)) --> (and (add A, -1) A)
-  // (add A (or -A, A)) --> (and (add A, -1) A)
-  // (add (or A, -A) A) --> (and (add A, -1) A)
-  // (add (or -A, A) A) --> (and (add A, -1) A)
-  
-  // ((X | Y) - X) --> (~X & Y)
-  
-  // (A | ~B) | ~C --> A | ~(B & C)
 }
 
 #endif //REIFY_INSTCOMBINE_HPP

@@ -18,8 +18,3 @@ Interprocedural Dataflow:
       Hence it would be smarted to solved this during fuzz time rather then later
 3. If/Else Guards
 4. Add lowering for new structures (For mod arithmetic, new terms) Java and SYMIR as well as parsing for SYMIR (including Uninitialized Locals)
-
-General: 
-1. Bug in fuzzer python causes mass wrong flanging of whole programs when finding one faulty function
-2. Add a GraphViz Lowering for 1) debugging and 2) graphs for the report
-3. Deal with shift-count-overflow and shift-count-negative warnings created by rysmith's offpath symbols
