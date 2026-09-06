@@ -1,6 +1,7 @@
 # Reify
 
-> Note: Reify is transitioning into [RefractIR](https://github.com/connglli/RefractIR). Please consider using RefractIR's Reify instead of this Reify.
+> [!NOTE]
+> Reify is transitioning into [RefractIR](https://github.com/connglli/RefractIR). Please consider using RefractIR's Reify instead of this Reify.
 
 Reify is a random program generator based on *semantic reification*.
 It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
