@@ -1,5 +1,7 @@
 # Reify
 
+> Note: Reify is transitioning into [RefractIR](https://github.com/connglli/RefractIR). Please consider using RefractIR's Reify instead of this Reify.
+
 Reify is a random program generator based on *semantic reification*.
 It generates C functions and programs free of undefined behaviors (UBs), making it suitable for testing C compilers and, potentially, other language virtual machines.
 Using Reify, 59 bugs have been discovered and reported in GCC and LLVM.
@@ -9,7 +11,7 @@ We are extending it to support additional primitive and aggregate types.
 We are also experimenting with generating Java bytecode and eBPF bytecode.
 Even in their early stages, these experimental attempts have already revealed one JIT compiler bug in OpenJ9 and two bugs in Linux's eBPF runtime.
 
-Additionally, we are experiment with a full-fledged SymIR called [RefractIR](https://github.com/connglli/RefractIR),
+Additionally, we are experimenting with a full-fledged SymIR called [RefractIR](https://github.com/connglli/RefractIR),
 based on which Reify has a re-implementation with richer feature support such as pointers, vectors, and intrinsics.
 
 ## 🚀 Quick Start
