@@ -34,9 +34,9 @@ class SymExec; // Bit of a hacky forward declaration
 
 class VariableStateBase {
 public:
-  std::vector<size_t> getPathBlocksIndices();
-  std::vector<std::string> getPathBlocksLabels();
-  size_t getNrPathBlocks() {return this->executionState.size(); }
+  std::vector<size_t> GetPathBlocksIndices();
+  std::vector<std::string> GetPathBlocksLabels();
+  size_t GetNrPathBlocks() {return this->executionState.size(); }
 
   struct BlockState {
     // first: Index, second: Label
@@ -53,13 +53,13 @@ protected:
 
 class VariableStateExtractor : public VariableStateBase, symir::SymIRVisitor {
 public:
-  nlohmann::json toJson();
-  void extract(SymExec *symexec);
+  nlohmann::json ToJson();
+  void Extract(SymExec *symexec);
   std::map<std::string, size_t> GetVarMap() { return this->varNamesMap; }
 
 private:
-  void pushTerm(bitwuzla::Term term) { this->termStack.push(std::move(term)); }
-  bitwuzla::Term popTerm() {
+  void PushTerm(bitwuzla::Term term) { this->termStack.push(std::move(term)); }
+  bitwuzla::Term PopTerm() {
     auto term = this->termStack.top();
     this->termStack.pop();
     return term;
@@ -102,17 +102,17 @@ struct VariableState {
 
 class VariableStateQuery : public VariableStateBase {
 public:
-  void fromJson(nlohmann::json json);
-  VariableState query(size_t blockIndex, size_t stmtIndex);
+  void FromJson(nlohmann::json json);
+  VariableState Query(size_t blockIndex, size_t stmtIndex);
 
 private:
   std::map<size_t, std::string> varNamesMap;
 };
 
 namespace varstate {
-  std::vector<std::unique_ptr<VariableStateQuery>> allFromJsonFile(std::string filepath);
-  std::string allToJsonFile(std::vector<VariableStateExtractor> extractors);
-  void print32_t_state(size_t nr_variables, std::vector<int32_t> states);
+  std::vector<std::unique_ptr<VariableStateQuery>> AllFromJsonFile(std::string filepath);
+  std::string AllToJsonFile(std::vector<VariableStateExtractor> extractors);
+  void PrintState(size_t nr_variables, std::vector<int32_t> states);
 }
 
 #endif // REIFY_VARSTATE_HPP

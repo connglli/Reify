@@ -39,12 +39,12 @@
 
 using namespace patternmatch;
 
-void RewriteEngine::addRule(std::unique_ptr<Rule> rule, int weight) {
+void RewriteEngine::AddRule(std::unique_ptr<Rule> rule, int weight) {
   rules.push_back(std::move(rule));
   weights.push_back(weight);
 }
 
-void RewriteEngine::run(
+void RewriteEngine::Run(
   symir::FunctBuilder *funBd,
   std::vector<symir::BlockBuilder *> &blockBds,
   VariableState &varState,
@@ -81,10 +81,10 @@ void RewriteEngine::run(
 
       const symir::Stmt *stmt = blockBds[blockIdx]->GetCommitedStmtOrTarget(stmtIdx);
       // TODO: Allow Rules/Matching over multiple Stmts
-      std::optional rule = this->getRandomMatchingRule(stmt);
+      std::optional rule = this->GetRandomMatchingRule(stmt);
       if (rule.has_value()) {
         RuleInfo::Get().AppendRule(rule.value()->RuleName(), blockIdx, stmtIdx);
-        rule.value()->rewrite(
+        rule.value()->Rewrite(
           funBd,
           blockBds,
           varState,
@@ -101,7 +101,7 @@ void RewriteEngine::run(
 }
 
 
-void RewriteEngine::runAsPass(
+void RewriteEngine::RunAsPass(
   symir::FunctBuilder *funBd,
   std::vector<symir::BlockBuilder *> &blockBds,
   VariableState &varState,
@@ -114,8 +114,8 @@ void RewriteEngine::runAsPass(
     size_t nrStmt = blockBd->GetNumberOfCommitedStmt();
     if (blockBd->HasTarget()) nrStmt += 1;
     for (int i = nrStmt - 1; i >= 0; i--) {
-      if (rule.match(blockBd->GetCommitedStmtOrTarget(i))) {
-        rule.rewrite(
+      if (rule.Match(blockBd->GetCommitedStmtOrTarget(i))) {
+        rule.Rewrite(
           funBd,
           blockBds,
           varState,
@@ -127,11 +127,11 @@ void RewriteEngine::runAsPass(
   Log::Get().CloseSection();
 }
 
-std::optional<Rule *> RewriteEngine::getRandomMatchingRule(const symir::Stmt *stmt) const {
+std::optional<Rule *> RewriteEngine::GetRandomMatchingRule(const symir::Stmt *stmt) const {
   std::vector<size_t> matchingRules;
   int totalWeight = 0;
   for (size_t i = 0; i < this->rules.size(); i++) {
-    if (!this->rules[i]->match(stmt)) continue;
+    if (!this->rules[i]->Match(stmt)) continue;
     matchingRules.push_back(i);
     totalWeight += this->weights[i];
   }

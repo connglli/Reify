@@ -59,7 +59,7 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
     this->functions.push_back(std::move(func));
     auto mapping = FunPlus::ParseMappingCode(arts.GetMapPath());
     this->mappings.push_back(std::move(mapping));
-    this->varStates.push_back(varstate::allFromJsonFile(arts.GetVarStatePath()));
+    this->varStates.push_back(varstate::AllFromJsonFile(arts.GetVarStatePath()));
 
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
   }
@@ -67,8 +67,8 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
 
 void ProgPlus::Generate() {
   const int numFuns = static_cast<int>(functions.size());
-  transformations::utils::clearNameLabel();
-  transformations::utils::clearNameVariable();
+  transformations::utils::ClearNameLabel();
+  transformations::utils::ClearNameVariable();
 
   // Now replace the mappings in the functions with the calls to the other functions
   for (int i = 0; i < numFuns - 1; ++i) {
@@ -94,7 +94,7 @@ void ProgPlus::Generate() {
     } break;
     default: Panic("DataflowStrategy is set to an invalid value");
     }
-    emb.setStrategy(std::move(strat));
+    emb.SetStrategy(std::move(strat));
 
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
@@ -117,8 +117,8 @@ void ProgPlus::Generate() {
       int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
-      emb.setVarStateQueries(this->getVarStateQuerys(i));
-      emb.createPathBlockWhitelist();
+      emb.SetVarStateQueries(this->GetVarStateQuerys(i));
+      emb.CreatePathBlockWhitelist();
 
       Log::Get().OpenSection("Embedding " + guest->GetName());
       Log::Get().Out() << "Initials: ";
@@ -127,7 +127,7 @@ void ProgPlus::Generate() {
       }
       Log::Get().Out() << (*init).back().ToCxStr() << std::endl;
 
-      if (emb.embedGuest(guest, init, fina)) {
+      if (emb.EmbedGuest(guest, init, fina)) {
         Log::Get().Out() << "Embed: " << k << "/" << randNum 
                          << " Success: " << "func#" << j << ": "
                          << guest->GetName() << std::endl;
@@ -139,7 +139,7 @@ void ProgPlus::Generate() {
       Log::Get().CloseSection();
     }
 
-    functions[i] = emb.finalize();
+    functions[i] = emb.Finalize();
     Log::Get().CloseSection();
   }
 
