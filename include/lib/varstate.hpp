@@ -26,9 +26,9 @@
 #ifndef REIFY_VARSTATE_HPP
 #define REIFY_VARSTATE_HPP
 
-#include "lib/lang.hpp"
-#include "json.hpp"
 #include <bitwuzla/cpp/bitwuzla.h>
+#include "json.hpp"
+#include "lib/lang.hpp"
 
 class SymExec; // Bit of a hacky forward declaration
 
@@ -36,7 +36,8 @@ class VariableStateBase {
 public:
   std::vector<size_t> GetPathBlocksIndices();
   std::vector<std::string> GetPathBlocksLabels();
-  size_t GetNrPathBlocks() {return this->executionState.size(); }
+
+  size_t GetNrPathBlocks() { return this->executionState.size(); }
 
   struct BlockState {
     // first: Index, second: Label
@@ -48,17 +49,18 @@ public:
 protected:
   std::vector<int32_t> init;
   std::vector<BlockState> executionState;
-
 };
 
 class VariableStateExtractor : public VariableStateBase, symir::SymIRVisitor {
 public:
   nlohmann::json ToJson();
   void Extract(SymExec *symexec);
+
   std::map<std::string, size_t> GetVarMap() { return this->varNamesMap; }
 
 private:
   void PushTerm(bitwuzla::Term term) { this->termStack.push(std::move(term)); }
+
   bitwuzla::Term PopTerm() {
     auto term = this->termStack.top();
     this->termStack.pop();
@@ -90,7 +92,7 @@ private:
   std::map<std::string, size_t> varNamesMap;
   SymExec *symexec;
   size_t currBlock;
-  std::map<std::string, int32_t> versions{};  // The SSA version table for each variable
+  std::map<std::string, int32_t> versions{}; // The SSA version table for each variable
   std::stack<bitwuzla::Term> termStack{}; // The expression stack for evaluating the SymIR program
 };
 
@@ -113,6 +115,6 @@ namespace varstate {
   std::vector<std::unique_ptr<VariableStateQuery>> AllFromJsonFile(std::string filepath);
   std::string AllToJsonFile(std::vector<VariableStateExtractor> extractors);
   void PrintState(size_t nr_variables, std::vector<int32_t> states);
-}
+} // namespace varstate
 
 #endif // REIFY_VARSTATE_HPP
