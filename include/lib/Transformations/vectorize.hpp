@@ -43,8 +43,8 @@ namespace transformations::vectorize {
   /// Copies an assignment into a new variable
   /// x = E1 => dx = E1; x = E1
   struct DeadAssignFromCopy : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -59,8 +59,8 @@ namespace transformations::vectorize {
 
   /// https://llvm.org/docs/Vectorizers.html#reductions
   struct Reduction : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -74,8 +74,8 @@ namespace transformations::vectorize {
 
   /// https://llvm.org/docs/Vectorizers.html#inductions
   struct Induction: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -97,8 +97,8 @@ namespace transformations::vectorize {
   /// }
   /// x = a[k1] + ... + a[k2] + ... + a[k3] + ...
   struct WithAliasCheck : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,

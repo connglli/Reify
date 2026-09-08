@@ -42,8 +42,8 @@ namespace transformations::obscure {
 
   struct PrimeInterp : Rule {
     PrimeInterp(int32_t prime = 46337) : prime(prime) {}
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -58,8 +58,8 @@ namespace transformations::obscure {
 
   struct Conditional : Rule {
     Conditional() {}
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,

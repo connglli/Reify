@@ -34,11 +34,11 @@
 using namespace patternmatch;
 namespace transformations::obscure {
 
-  bool Conditional::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool Conditional::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
 
-  void Conditional::rewrite(
+  void Conditional::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -49,7 +49,7 @@ namespace transformations::obscure {
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
     bool isTarget = blockBd->GetNumberOfCommitedStmt() == targetStmtIdx;
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     int32_t target;
     rep.data = &target;
@@ -63,7 +63,7 @@ namespace transformations::obscure {
         int32_t *targetPair = static_cast<int32_t *>(*data);
         *targetPair = target;
 
-        return utils::variableTerm(funBd, blockBd, var);
+        return utils::VariableTerm(funBd, blockBd, var);
       };
     rep.ReplaceStmt(
       stmt,
@@ -85,7 +85,7 @@ namespace transformations::obscure {
       varState.varMap[randVariableIdx].c_str(),
       funBd->GetName().c_str()
     );
-    auto access = utils::unflattenAccess(funBd, local_var, randVariableIdx - variableStartIdx);
+    auto access = utils::UnflattenAccess(funBd, local_var, randVariableIdx - variableStartIdx);
 
 
     size_t nrIters = varState.varState.size() / varState.nrVariables;
@@ -119,12 +119,12 @@ namespace transformations::obscure {
     }
 
 
-    std::string bodyLabel = utils::nameLabel(funBd->GetName(), "if_true_" + this->varPrefix);
-    std::string condLabel = utils::nameLabel(funBd->GetName(), "if_cond_" + this->varPrefix);
-    std::string elseBodyLabel = utils::nameLabel(funBd->GetName(), "if_false_" + this->varPrefix);
-    std::string exitLabel = utils::nameLabel(funBd->GetName(), "if_exit_" + this->varPrefix);
+    std::string bodyLabel = utils::NameLabel(funBd->GetName(), "if_true_" + this->varPrefix);
+    std::string condLabel = utils::NameLabel(funBd->GetName(), "if_cond_" + this->varPrefix);
+    std::string elseBodyLabel = utils::NameLabel(funBd->GetName(), "if_false_" + this->varPrefix);
+    std::string exitLabel = utils::NameLabel(funBd->GetName(), "if_exit_" + this->varPrefix);
 
-    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, exitLabel, targetStmtIdx);
+    symir::BlockBuilder *secondBlockBd = utils::SsplitBlockAt(funBd, blockBd, exitLabel, targetStmtIdx);
     symir::StmtCopier secondCopier = symir::StmtCopier(funBd, secondBlockBd);
     if (!isTarget) {
       secondBlockBd->CommitStmtAt(secondCopier.CopyStmt(stmt), 0);
@@ -137,7 +137,7 @@ namespace transformations::obscure {
       bodyBd->SymAssStmt(
         var,
         bodyBd->SymExpr(
-          utils::randomExprOp(),
+          utils::RandomExprOp(),
           { bodyBd->SymCstTerm(funBd->SymI32Const(Random::Get().Uniform(INT_MIN, INT_MAX)()), nullptr) }
         )
       )
@@ -149,7 +149,7 @@ namespace transformations::obscure {
     elseBodyBd->CommitStmt(
       elseBodyBd->SymAssStmt(
         var,
-        elseBodyBd->SymExpr(utils::randomExprOp(), { elseBodyBd->SymCstTerm(funBd->SymI32Const(target), nullptr) })
+        elseBodyBd->SymExpr(utils::RandomExprOp(), { elseBodyBd->SymCstTerm(funBd->SymI32Const(target), nullptr) })
       )
     );
     elseBodyBd->SymGoto(exitLabel);
@@ -158,8 +158,8 @@ namespace transformations::obscure {
       blockBd->SymBranch(condLabel, elseBodyLabel,
         blockBd->SymCond(
           symir::Cond::OP_GTZ,
-          blockBd->SymExpr(utils::randomExprOp(), {
-            utils::variableTerm(funBd, blockBd, local_var, access) 
+          blockBd->SymExpr(utils::RandomExprOp(), {
+            utils::VariableTerm(funBd, blockBd, local_var, access) 
           })
         )
       );
@@ -167,8 +167,8 @@ namespace transformations::obscure {
       blockBd->SymBranch(elseBodyLabel, condLabel,
         blockBd->SymCond(
           symir::Cond::OP_GTZ,
-          blockBd->SymExpr(utils::randomExprOp(), {
-            utils::variableTerm(funBd, blockBd, local_var, access) 
+          blockBd->SymExpr(utils::RandomExprOp(), {
+            utils::VariableTerm(funBd, blockBd, local_var, access) 
           })
         )
       );
@@ -179,21 +179,21 @@ namespace transformations::obscure {
       condBd->SymCond(
         symir::Cond::OP_EQZ,
         condBd->SymSubExpr({
-          utils::variableTerm(funBd, condBd, local_var, access),
+          utils::VariableTerm(funBd, condBd, local_var, access),
           condBd->SymCstTerm(funBd->SymI32Const(falseVal), nullptr)
         })
       )
     );
 
 
-    utils::insertBlockBd(blockBds, {condBd, bodyBd, elseBodyBd, secondBlockBd}, targetBlockIdx + 1);
+    utils::InsertBlockBd(blockBds, {condBd, bodyBd, elseBodyBd, secondBlockBd}, targetBlockIdx + 1);
   }
 
-  bool PrimeInterp::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool PrimeInterp::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
 
-  void PrimeInterp::rewrite(
+  void PrimeInterp::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -204,7 +204,7 @@ namespace transformations::obscure {
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     std::pair<int32_t, int32_t> targetPair;
     rep.data = &targetPair;
@@ -245,23 +245,23 @@ namespace transformations::obscure {
 
     // Filter Varstate
     utils::VarFilter filter = utils::VarFilter(funBd, varState);
-    filter.randomlyFilter();
+    filter.RandomlyFilter();
 
     utils::PrimeInterpolation interpolGen = utils::PrimeInterpolation(this->prime); 
 
     size_t nrVars = filter.filteredVars.size();
     size_t nrIters = filter.filteredVarState.size() / filter.filteredVars.size();
 
-    interpolGen.interpolate(
+    interpolGen.Interpolate(
       nrVars,
       nrIters,
       filter.filteredVarState,
       interpolTarget
     );
 
-    std::vector<int32_t> polynomial = interpolGen.getPolynomial();
-    std::vector<int32_t> coeffsVals = interpolGen.getCoeffs();
-    interpolGen.assertCorrectness(
+    std::vector<int32_t> polynomial = interpolGen.GetPolynomial();
+    std::vector<int32_t> coeffsVals = interpolGen.GetCoeffs();
+    interpolGen.AssertCorrectness(
       nrVars,
       nrIters,
       filter.filteredVarState,

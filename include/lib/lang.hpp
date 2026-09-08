@@ -176,9 +176,6 @@ namespace symir {
       SIR_STMT_ASS,
       SIR_STMT_MODASS,
       SIR_STMT_RET,
-      SIR_STMT_IF,
-      SIR_STMT_FOR,
-      SIR_STMT_WHILE,
       SIR_TGT_BRA,
       SIR_TGT_GOTO,
       SIR_PARAM_SCA,
@@ -2224,7 +2221,7 @@ protected:
 
   // Helper Function
 
-  size_t intSizeOfSymIRType(
+  size_t IntSizeOfSymIRType(
     std::vector<const symir::StructDef *> structs,
     symir::SymIR::Type type,
     symir::SymIR::Type baseType,
