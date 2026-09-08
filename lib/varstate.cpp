@@ -35,7 +35,7 @@
 #include <utility>
 
 namespace varstate {
-  std::vector<std::unique_ptr<VariableStateQuery>> allFromJsonFile(std::string filepath) {
+  std::vector<std::unique_ptr<VariableStateQuery>> AllFromJsonFile(std::string filepath) {
     std::ifstream filestream(filepath);
     Assert(filestream.is_open(), "Error: failed to open file: %s", filepath.c_str());
 
@@ -49,21 +49,21 @@ namespace varstate {
     size_t i = 0;
     for (const auto& [k, varStateJson] : mapObj.items()) {
       res[i] = std::make_unique<VariableStateQuery>();
-      res[i]->fromJson(varStateJson);
+      res[i]->FromJson(varStateJson);
       i += 1;
     }
     return res;
   }
 
-  std::string allToJsonFile(std::vector<VariableStateExtractor> extractors) {
+  std::string AllToJsonFile(std::vector<VariableStateExtractor> extractors) {
     nlohmann::json varMap = nlohmann::json::object();
     for (size_t i = 0; i < extractors.size(); i++) {
-      varMap["solve_" + std::to_string(i)] = extractors[i].toJson();
+      varMap["solve_" + std::to_string(i)] = extractors[i].ToJson();
     }
     return varMap.dump();
   }
 
-  void print_state(size_t nr_variables, std::vector<int32_t> states) {
+  void PrintState(size_t nr_variables, std::vector<int32_t> states) {
     for (size_t i = 0; i < states.size(); i++) {
       std::cout << states[i];
       if (i != 0 && i % nr_variables == 0) std::cout << std::endl;
@@ -74,7 +74,7 @@ namespace varstate {
 
 // ==================== VariableStateBase Implementation ====================
 
-std::vector<size_t> VariableStateBase::getPathBlocksIndices() {
+std::vector<size_t> VariableStateBase::GetPathBlocksIndices() {
   std::vector<size_t> path;
   path.reserve(this->executionState.size());
   for (const auto& es : executionState) {
@@ -83,7 +83,7 @@ std::vector<size_t> VariableStateBase::getPathBlocksIndices() {
   return path;
 }
 
-std::vector<std::string> VariableStateBase::getPathBlocksLabels() {
+std::vector<std::string> VariableStateBase::GetPathBlocksLabels() {
   std::vector<std::string> path;
   path.reserve(this->executionState.size());
   for (const auto& es : executionState) {
@@ -94,7 +94,7 @@ std::vector<std::string> VariableStateBase::getPathBlocksLabels() {
 
 // ==================== VariableStateExtractor Implementation ====================
 
-nlohmann::json VariableStateExtractor::toJson() {
+nlohmann::json VariableStateExtractor::ToJson() {
   nlohmann::json initArr = nlohmann::json::array();
   for (size_t i = 0; i < this->init.size(); i++) {
     initArr[i] = this->init[i];
@@ -124,7 +124,7 @@ nlohmann::json VariableStateExtractor::toJson() {
   return mapObj;
 }
 
-void VariableStateExtractor::extract(SymExec *symexec) {
+void VariableStateExtractor::Extract(SymExec *symexec) {
   this->symexec = symexec;
   this->executionState.resize(symexec->execution.size());
   for (size_t i = 0; i < symexec->execution.size(); i++) {
@@ -156,7 +156,7 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
 
   for (size_t i = 0; i < access.size(); ++i) {
     access[i]->Accept(*this);
-    auto idxExpr = popTerm();
+    auto idxExpr = PopTerm();
     std::optional<int32_t> idxValOpt = symexec->extractTermFromModel(idxExpr);
     Assert(idxValOpt.has_value(), "Onpath index expression is not solved");
     int32_t idxVal = idxValOpt.value();
@@ -175,7 +175,7 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
       if (currentShapeIdx == currShape.size()) {
         const int32_t flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
         solverSuffix << "_el" << flatLoc;
-        flattenedIdx += flatLoc * static_cast<int32_t>(symir::intSizeOfSymIRType(
+        flattenedIdx += flatLoc * static_cast<int32_t>(symir::IntSizeOfSymIRType(
           this->symexec->fun->GetStructs(),
           currBaseType, currBaseType, {},
           currStruct
@@ -200,7 +200,7 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
       // adding the size of all fields < fIdx to flattIndex
       for (int32_t j = 0; j < fIdx; j++) {
         const auto &field = sDef->GetField(j);
-        flattenedIdx += static_cast<int32_t>(symir::intSizeOfSymIRType(
+        flattenedIdx += static_cast<int32_t>(symir::IntSizeOfSymIRType(
           this->symexec->fun->GetStructs(),
           field.type,
           field.baseType,
@@ -252,7 +252,7 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
 void VariableStateExtractor::Visit(const symir::Coef &c) {
   Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit int32_teger variables are supported for now!");
   auto coefExpr = symexec->ubSan->CreateCoefExpr(c);
-  pushTerm(coefExpr);
+  PushTerm(coefExpr);
 }
 
 void VariableStateExtractor::Visit(const symir::Term &t) { /* Do Nothing */; }
@@ -357,7 +357,7 @@ void VariableStateExtractor::Visit(const symir::Funct &f) {
 
 // ==================== VariableStateQuery Implementation ====================
 
-void VariableStateQuery::fromJson(nlohmann::json mapObj) {
+void VariableStateQuery::FromJson(nlohmann::json mapObj) {
   this->init.clear();
   this->varNamesMap.clear();
   this->executionState.clear();
@@ -408,7 +408,7 @@ void VariableStateQuery::fromJson(nlohmann::json mapObj) {
   }
 }
 
-VariableState VariableStateQuery::query(size_t blockIndex, size_t stmtIndex) {
+VariableState VariableStateQuery::Query(size_t blockIndex, size_t stmtIndex) {
   std::vector<int32_t> varState = std::vector(this->init);
 
   size_t varsCount = varState.size();
