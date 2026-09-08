@@ -35,7 +35,7 @@
 
 namespace transformations::utils {
   /// given a flattend intex recover the access vector needed to create a VarUse Object
-  std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
+  std::vector<symir::Coef *> UnflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex) {
     Assert(var != nullptr, "Variable is nullptr");
     if (var->GetType() == symir::SymIR::Type::I32) {
       Assert(
@@ -64,7 +64,7 @@ typeLoop:
     while (type != symir::SymIR::I32) {
       switch (type) {
       case symir::SymIR::ARRAY: {
-        size_t type_size = symir::intSizeOfSymIRType(funBuilder->GetStructs(), baseType, baseType, {}, structName);
+        size_t type_size = symir::IntSizeOfSymIRType(funBuilder->GetStructs(), baseType, baseType, {}, structName);
         for (const int32_t dimSize: shape) {
           type_size *= dimSize;
         }
@@ -91,7 +91,7 @@ typeLoop:
               structName = field.structName;
             }
           }
-          size_t field_size = intSizeOfSymIRType(funBuilder->GetStructs(), type, baseType, shape, structName);
+          size_t field_size = IntSizeOfSymIRType(funBuilder->GetStructs(), type, baseType, shape, structName);
           if (field_size > remainingIndex) {
             accessVals.push_back(fieldIdx);
             goto typeLoop;
@@ -123,7 +123,7 @@ typeLoop:
   }
 
 
-  void VarFilter::randomlyFilter() {
+  void VarFilter::RandomlyFilter() {
     auto randDouble = Random::Get().UniformReal();
     size_t nrVariables = this->varState.nrVariables;
     size_t nrIterations = this->varState.varState.size() / nrVariables;
@@ -144,7 +144,7 @@ typeLoop:
         funBd->GetName().c_str()
       );
       this->filteredVars.push_back(var);
-      this->filteredAccesses.push_back(unflattenAccess(funBd, var, i - lastVarStartIndex));
+      this->filteredAccesses.push_back(UnflattenAccess(funBd, var, i - lastVarStartIndex));
     }
     Log::Get().Out() << "Using Variables (" << this->filteredVars.size() << "): ";
     for (size_t i = 0; i < this->filteredVars.size(); i++) {
@@ -182,7 +182,7 @@ typeLoop:
     }
   }
 
-  void PrimeInterpolation::interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
+  void PrimeInterpolation::Interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
     Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets (%d) must be in Z_%ld", target, this->mod.n);
     Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
     Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
@@ -207,7 +207,7 @@ typeLoop:
 
     int32_t res;
     for (size_t i = 0; i < 5; i++) { // retry up to 5 times incase the system is unsolvable should rarly happen
-      this->randomizePolynomial(nrVariables, nrIterations);
+      this->RandomizePolynomial(nrVariables, nrIterations);
   
       Log::Get().Out() << "Polynomial (" << this->polynomial.size() << "): ";
       for (size_t i = 0; i < this->polynomial.size(); i++) {
@@ -220,7 +220,7 @@ typeLoop:
         for (size_t col = 0; col < nrIterations; col++) {
           ulong term = 1;
           for (uint32_t vari = 0; vari < nrVariables; vari++) {
-            int32_t var = this->reduceMod(varState[row * nrVariables + vari]);
+            int32_t var = this->ReduceMod(varState[row * nrVariables + vari]);
             ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + vari]);
             term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
           }
@@ -231,12 +231,12 @@ typeLoop:
 
       // fill the last row of the A matrix with unique new numbers to avoid the const polynomial
       std::vector<int32_t> unique_iter =
-        this->findUniqueIteration(nrVariables, nrIterations, varState);
+        this->FindUniqueIteration(nrVariables, nrIterations, varState);
       for (size_t col = 0; col < nrIterations; col ++) {
         ulong term = 1;
         Assert(col * nrVariables < nrIterations * nrVariables, "Array access out of bounds");
         for (uint32_t i = 0; i < nrVariables; i++) {
-          int32_t var = this->reduceMod(unique_iter[i]);
+          int32_t var = this->ReduceMod(unique_iter[i]);
           ulong deg = static_cast<ulong>(this->polynomial[col * nrVariables + i]);
           term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
         }
@@ -282,7 +282,7 @@ typeLoop:
     Log::Get().CloseSection();
   }
 
-  void PrimeInterpolation::interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets) {
+  void PrimeInterpolation::Interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets) {
     Assert(targets.size() == nrIterations, "Must have a target value for each iteration");
     Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
 
@@ -293,7 +293,7 @@ typeLoop:
     }
     Assert(has_unique, "target must have atleast on unique element");
   
-    this->randomizePolynomial(nrVariables, nrIterations - 1);
+    this->RandomizePolynomial(nrVariables, nrIterations - 1);
   
     nmod_mat_t A;
     nmod_mat_t B;
@@ -307,7 +307,7 @@ typeLoop:
       for (size_t col = 0; col < nrIterations - 1; col ++) {
         ulong term = 1;
         for (size_t vari = 0; vari < nrVariables; vari++) {
-          int32_t var = this->reduceMod(varState[row * nrVariables + vari]);
+          int32_t var = this->ReduceMod(varState[row * nrVariables + vari]);
           ulong deg = static_cast<int32_t>(this->polynomial[col * nrVariables + vari]);
           term = nmod_mul(term, nmod_pow_ui(var, deg, this->mod), this->mod);
         }
@@ -337,7 +337,7 @@ typeLoop:
     nmod_mat_clear(X);
   }
 
-  void PrimeInterpolation::assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
+  void PrimeInterpolation::AssertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target) {
     Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets (%d) must be in Z_%ld", target, this->mod.n);
     Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
     Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
@@ -351,7 +351,7 @@ typeLoop:
         Assert(0 <= this->coeffs[m] && this->coeffs[m] < static_cast<int32_t>(this->mod.n), "Coef (%d) not in Z_%ld", this->coeffs[m], this->mod.n);
         int32_t term = this->coeffs[m];
         for (size_t j = 0; j < nrVariables; j++) {
-          ulong var = this->reduceMod(varState[i * nrVariables + j]);
+          ulong var = this->ReduceMod(varState[i * nrVariables + j]);
           Assert(
             0 <= this->polynomial[m * nrVariables + j] && this->polynomial[m * nrVariables + j] < static_cast<int32_t>(this->mod.n),
             "Coef (%d) not in Z_%ld", this->polynomial[m * nrVariables + j], this->mod.n
@@ -370,7 +370,7 @@ typeLoop:
     }
   }
 
-  void PrimeInterpolation::assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets) {
+  void PrimeInterpolation::AssertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets) {
     bool has_unique = false;
     for (const int32_t target: targets) {
       Assert(0 <= target && target < static_cast<int32_t>(this->mod.n), "targets must be in Z_%d", static_cast<int32_t>(this->mod.n));
@@ -389,7 +389,7 @@ typeLoop:
         Assert(0 <= this->coeffs[m] && this->coeffs[m] < static_cast<int32_t>(this->mod.n), "Coef (%d) not in Z_%ld", this->coeffs[m], this->mod.n);
         int32_t term = this->coeffs[m];
         for (size_t j = 0; j < nrVariables; j++) {
-          ulong var = this->reduceMod(varState[i * nrVariables + j]);
+          ulong var = this->ReduceMod(varState[i * nrVariables + j]);
           Assert(
             0 <= this->polynomial[m * nrVariables + j] && this->polynomial[m * nrVariables + j] < static_cast<int32_t>(this->mod.n),
             "Coef (%d) not in Z_%ld", this->polynomial[m * nrVariables + j], this->mod.n
@@ -408,7 +408,7 @@ typeLoop:
     }
   }
 
-  std::vector<int32_t> PrimeInterpolation::findUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState) {
+  std::vector<int32_t> PrimeInterpolation::FindUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState) {
     std::vector<int32_t> unique;
     std::vector<int32_t> currVarState;
     unique.reserve(nrVariables);
@@ -417,7 +417,7 @@ typeLoop:
       // Copy and sort to make it easy to find new unique value
       for (size_t j = 0; j < nrIterations; j++) {
         int32_t var = varState[j * nrVariables + i];
-        currVarState[j] = this->reduceMod(var);
+        currVarState[j] = this->ReduceMod(var);
       }
       std::sort(currVarState.begin(), currVarState.end());
   
@@ -446,7 +446,7 @@ typeLoop:
     return unique;
   }
 
-  void PrimeInterpolation::randomizePolynomial(
+  void PrimeInterpolation::RandomizePolynomial(
     const size_t nrVariables,
     const size_t nrMonomials
   ) {
@@ -463,7 +463,7 @@ typeLoop:
         if (upper == 0) break;
       }
       monomial[nrVariables - 1] = upper;
-      this->shuffel(nrVariables, monomial);
+      this->Shuffel(nrVariables, monomial);
     }
   }
 
@@ -524,30 +524,30 @@ typeLoop:
   }
 
   template<> void StmtReplacer<symir::Expr>::Visit(const symir::Expr &e) {
-    if (this->match(e)) {
-      pushExpr(this->replace(e));
+    if (this->Match(e)) {
+      pushExpr(this->Replace(e));
     } else {
       StmtCopier::Visit(e);
     }
   }
   
   template<> void StmtReplacer<symir::Term>::Visit(const symir::Term &t) {
-    if (this->match(t)) {
-      pushTerm(this->replace(t));
+    if (this->Match(t)) {
+      pushTerm(this->Replace(t));
     } else {
       StmtCopier::Visit(t);
     }
   }
   
   template<> void StmtReplacer<symir::Cond>::Visit(const symir::Cond &c) {
-    if (this->match(c)) {
-      pushCond(this->replace(c));
+    if (this->Match(c)) {
+      pushCond(this->Replace(c));
     } else {
       StmtCopier::Visit(c);
     }
   }
 
-  std::vector<symir::Coef *> copyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use) {
+  std::vector<symir::Coef *> CopyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use) {
     std::vector<symir::Coef *> access;
     access.reserve(use->GetAccess().size());
     for (const auto &coef : use->GetAccess()) {
@@ -564,7 +564,7 @@ typeLoop:
     return access;
   }
 
-  symir::BlockBuilder::CondID triviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) {
+  symir::BlockBuilder::CondID TriviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) {
     return blockBd->SymCond(
       symir::Cond::OP_EQZ,
       blockBd->SymAddExpr({
@@ -573,7 +573,7 @@ typeLoop:
     );
   }
 
-  symir::BlockBuilder::StmtID trivialAssignment(
+  symir::BlockBuilder::StmtID TrivialAssignment(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
@@ -591,7 +591,7 @@ typeLoop:
     );
   }
 
-  symir::BlockBuilder::TermID variableTerm(
+  symir::BlockBuilder::TermID VariableTerm(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
@@ -617,12 +617,12 @@ typeLoop:
       }
   }
 
-  symir::Expr::Op randomExprOp() {
+  symir::Expr::Op RandomExprOp() {
     static auto r = Random::Get().Uniform(0, symir::Expr::Op::NUM_OPS - 1);
     return static_cast<symir::Expr::Op>(r());
   }
 
-  symir::BlockBuilder * splitBlockAt(
+  symir::BlockBuilder * SsplitBlockAt(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     ::std::string secondLabel,
@@ -665,7 +665,7 @@ typeLoop:
   }
 
   // TODO: This could be optimized if perf. becomes an issue
-  void insertBlockBd(
+  void InsertBlockBd(
     std::vector<symir::BlockBuilder *> &currBlockBds,
     std::vector<symir::BlockBuilder *> newBlocks,
     size_t index
@@ -678,56 +678,56 @@ typeLoop:
 
   static std::map<std::pair<std::string, std::string>, size_t> labelNameCount;
 
-  std::string nameLabel(std::string functName, std::string prefix) {
+  std::string NameLabel(std::string functName, std::string prefix) {
     std::pair namePair = std::make_pair(functName, prefix);
     if (!labelNameCount.contains(namePair)) labelNameCount[namePair] = 0;
     return prefix + "_" + std::to_string(labelNameCount[namePair]++);
   }
 
-  void clearNameLabel() { labelNameCount.clear(); }
+  void ClearNameLabel() { labelNameCount.clear(); }
 
   static std::map<std::tuple<std::string, std::string, std::string, size_t>, size_t> varNameCount;
 
-  std::string nameVariable(std::string functName, std::string domBlockName, std::string prefix) {
+  std::string NameVariable(std::string functName, std::string domBlockName, std::string prefix) {
     std::tuple nametuple = std::make_tuple(functName, domBlockName, prefix, 1);
     if (!varNameCount.contains(nametuple)) varNameCount[nametuple] = 0;
     return prefix + "_" + std::to_string(varNameCount[nametuple]++);
   }
 
-  std::string nameVariable(std::string functName, std::string domBlockName, std::string prefix, size_t size) {
+  std::string NameVariable(std::string functName, std::string domBlockName, std::string prefix, size_t size) {
     std::tuple nametuple = std::make_tuple(functName, domBlockName, prefix, size);
     if (!varNameCount.contains(nametuple)) varNameCount[nametuple] = 0;
     return prefix + "_" + std::to_string(size) + "_" + std::to_string(varNameCount[nametuple]++);
   }
 
-  void clearNameVariable() { varNameCount.clear(); }
+  void ClearNameVariable() { varNameCount.clear(); }
 
-  const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix) {
-    std::string name = nameVariable(funBd->GetName(), domBlockName, prefix);
+  const symir::VarDef *GetVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix) {
+    std::string name = NameVariable(funBd->GetName(), domBlockName, prefix);
     const symir::VarDef *var = funBd->FindLocal(name);
     if (var == nullptr) var = funBd->SymScaLocal(name, nullptr);
     return var;
   }
 
-  const symir::VarDef *getVariable(symir::FunctBuilder *funBd, std::string domBlockName, std::string prefix, size_t size) {
-    std::string name = nameVariable(funBd->GetName(), domBlockName, prefix, size);
+  const symir::VarDef *GetVariable(symir::FunctBuilder *funBd, std::string domBlockName, std::string prefix, size_t size) {
+    std::string name = NameVariable(funBd->GetName(), domBlockName, prefix, size);
     const symir::VarDef *var = funBd->FindLocal(name);
     if (var == nullptr) var = funBd->SymVecLocal(name, { (int) size }, {} );
     return var;
   }
 
-  bool noAddOverflow(int32_t a, int32_t b) {
+  bool NoAddOverflow(int32_t a, int32_t b) {
     int64_t longDiff = (static_cast<int64_t>(a) + static_cast<int64_t>(b));
     return (static_cast<int64_t>(INT_MIN) <= longDiff) && (longDiff <= static_cast<int64_t>(INT_MAX));
   }
 
-  bool noSubOverflow(int32_t a, int32_t b) {
+  bool NoSubOverflow(int32_t a, int32_t b) {
     int64_t longDiff = (static_cast<int64_t>(a) - static_cast<int64_t>(b));
     return (static_cast<int64_t>(INT_MIN) <= longDiff) && (longDiff <= static_cast<int64_t>(INT_MAX));
   }
 
   using namespace patternmatch;
-  bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E) {
+  bool MatchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E) {
     return patternmatch::match(
       stmt, 
       m_Or<const symir::Stmt *>(

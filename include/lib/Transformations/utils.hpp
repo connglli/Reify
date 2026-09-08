@@ -39,7 +39,7 @@
 
 namespace transformations::utils {
 
-  std::vector<symir::Coef *> unflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex);
+  std::vector<symir::Coef *> UnflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex);
 
   class VarFilter {
   public:
@@ -47,8 +47,8 @@ namespace transformations::utils {
       symir::FunctBuilder *funBd,
       VariableState &varState
     ): funBd(funBd), varState(varState) {}
-    void randomlyFilter();
-    void uniqueFilter();
+    void RandomlyFilter();
+    void UniqueFilter();
     
   public:
     std::vector<int32_t> filteredVarState{};
@@ -69,31 +69,31 @@ namespace transformations::utils {
       nmod_init(&this->mod, mod);
     }
   
-    void interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
+    void Interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
   
-    void interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
+    void Interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
   
-    std::vector<int32_t> getPolynomial() {
+    std::vector<int32_t> GetPolynomial() {
       return std::vector(this->polynomial);
     }
   
-    std::vector<int32_t> getCoeffs() {
+    std::vector<int32_t> GetCoeffs() {
       return std::vector(this->coeffs);
     }
   
     /// Triggers an assert if the last interpolation does not correctly yield 'target' when evaluated over 'varState'
-    void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
+    void AssertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
 
     /// Triggers an assert if the last interpolation does not correctly yield 'targets' when evaluated over 'varState'
-    void assertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
+    void AssertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
 
   private:
   
     /// Find a new unused iteration according to varState
-    std::vector<int32_t> findUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState);
+    std::vector<int32_t> FindUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState);
     
     /// see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-    void shuffel(const size_t n, int32_t *arr) {
+    void Shuffel(const size_t n, int32_t *arr) {
       for (int i_ = n - 1; i_ >= 1; i_--) {
         size_t r = static_cast<size_t>(Random::Get().Uniform(0, i_)());
         size_t i = static_cast<size_t>(i_);
@@ -106,13 +106,13 @@ namespace transformations::utils {
     // This is a quite biased in its selection.
     // Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
     /// Samples a new random polynomial
-    void randomizePolynomial(
+    void RandomizePolynomial(
       const size_t nrVariables,
       const size_t nrMonomials
     );
 
     /// Returns the (mathematical) modulo of 'var' (e.g. 'var' mod 'this->mod.n')
-    ulong reduceMod(int32_t var) {
+    ulong ReduceMod(int32_t var) {
       ulong res;
       if (var < 0) {
         NMOD_RED(res, static_cast<ulong>(-static_cast<int64_t>(var)), this->mod);
@@ -149,14 +149,14 @@ namespace transformations::utils {
     void Visit(const Node &e) override;
     void Visit(const symir::Branch &b) override;
   private:
-    bool match(const Node &e) {
-      return !this->hasReplaced && this->rand() <= this->randThreshold && this->matchFunction(&e);
+    bool Match(const Node &e) {
+      return !this->hasReplaced && this->Rand() <= this->randThreshold && this->matchFunction(&e);
     }
-    ExprID replace(const Node &e) { 
+    ExprID Replace(const Node &e) { 
       this->hasReplaced = true;
       return this->replaceFunction(funBd, blockBd, e, &this->data); 
     }
-    double rand() { return this->randUniform(); }
+    double Rand() { return this->randUniform(); }
   
   public:
     void *data = nullptr;
@@ -170,13 +170,13 @@ namespace transformations::utils {
   };
 
   /// Copies the access vector of use
-  std::vector<symir::Coef *> copyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use);
+  std::vector<symir::Coef *> CopyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use);
 
   /// returns a symir CondID that corresponds to a condition that is trivially evaluates to 'condTarget' (e.g. (0) == 0 or (1) == 0)
-  symir::BlockBuilder::CondID triviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
+  symir::BlockBuilder::CondID TriviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
 
   /// returns a random valid assignment;
-  symir::BlockBuilder::StmtID trivialAssignment(
+  symir::BlockBuilder::StmtID TrivialAssignment(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
@@ -184,44 +184,43 @@ namespace transformations::utils {
   );
 
   /// returns a term that is equal to just the value in the passed variable, access
-  symir::BlockBuilder::TermID variableTerm(
+  symir::BlockBuilder::TermID VariableTerm(
     symir::FunctBuilder *funBd,
     symir::BlockBuilder *blockBd,
     const symir::VarDef *var,
     std::vector<symir::Coef *> access = {}
   );
 
-  symir::Expr::Op randomExprOp();
+  symir::Expr::Op RandomExprOp();
 
   /// Splits the given BlockBuilder into two blocks where the first (the given one mutated) contains all stmts up to and including stmt at
   /// splitIdx and the second one (the returned one) contains all after
-  symir::BlockBuilder * splitBlockAt(
-    symir::FunctBuilder * funBd,
-    symir::BlockBuilder * blockBd,
+  symir::BlockBuilder *SsplitBlockAt(
+    symir::FunctBuilder *funBd,
+    symir::BlockBuilder *blockBd,
     std::string secondLabel,
     size_t splitIdx
   );
 
-  void insertBlockBd(std::vector<symir::BlockBuilder *> &currBlockBds, std::vector<symir::BlockBuilder *> newBlocks, size_t index);
+  void InsertBlockBd(std::vector<symir::BlockBuilder *> &currBlockBds, std::vector<symir::BlockBuilder *> newBlocks, size_t index);
 
-  std::string nameLabel(const std::string functName, const std::string prefix);
+  std::string NameLabel(const std::string functName, const std::string prefix);
 
-  void clearNameLabel();
+  void ClearNameLabel();
 
-  std::string nameVariable(const std::string functName, const std::string domBlockName, const std::string prefix);
-  std::string nameVariable(const std::string functName, const std::string domBlockName, const std::string prefix, size_t size);
+  std::string NameVariable(const std::string functName, const std::string domBlockName, const std::string prefix);
+  std::string NameVariable(const std::string functName, const std::string domBlockName, const std::string prefix, size_t size);
 
-  void clearNameVariable();
+  void ClearNameVariable();
 
-  const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
-  const symir::VarDef *getVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix, size_t size);
+  const symir::VarDef *GetVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
+  const symir::VarDef *GetVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix, size_t size);
 
-  bool noAddOverflow(int32_t a, int32_t b);
-  bool noSubOverflow(int32_t a, int32_t b);
+  bool NoAddOverflow(int32_t a, int32_t b);
+  bool NoSubOverflow(int32_t a, int32_t b);
 
   using namespace patternmatch;
-  bool matchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E);
-
+  bool MatchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E);
 }
 
 #endif //REIFY_TRANSFORMATION_UTILS_HPP

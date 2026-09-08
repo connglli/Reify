@@ -339,7 +339,7 @@ bool SymExec::solve(
 
   // Extract the state of each variable along the exec path from the model
   this->varStateExtractor.push_back(VariableStateExtractor());
-  varStateExtractor.back().extract(this);
+  varStateExtractor.back().Extract(this);
 
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
@@ -540,5 +540,5 @@ std::vector<UBSite> SymExec::GetUBCandidates() const {
 }
 
 std::string SymExec::getVarStateJson() {
-  return varstate::allToJsonFile(this->varStateExtractor);
+  return varstate::AllToJsonFile(this->varStateExtractor);
 }

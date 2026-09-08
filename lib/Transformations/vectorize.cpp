@@ -37,11 +37,11 @@
 using namespace patternmatch;
 namespace transformations::vectorize {
 
-  bool DeadAssignFromCopy::match(const symir::Stmt *stmt) const {
+  bool DeadAssignFromCopy::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse*>(), m_WildCard<const symir::Expr *>()));
   }
   
-  void DeadAssignFromCopy::rewrite(
+  void DeadAssignFromCopy::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -57,20 +57,20 @@ namespace transformations::vectorize {
     auto copier = symir::StmtCopier(funBd, blockBd);
     symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
     symir::BlockBuilder::StmtID deadStmt = blockBd->SymAssStmt(
-      utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix),
+      utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix),
       copier.CopyExpr(static_cast<const symir::AssStmt *>(stmt)->GetExpr())
     );
     blockBd->ReplaceCommitStmt({ deadStmt, origStmt }, targetStmtIdx);
   }
 
-  bool Reduction::match(const symir::Stmt *stmt) const {
+  bool Reduction::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(m_WildCard<const symir::VarUse*>(), m_Expr(m_Length<const symir::Term *>(m_Range<size_t, size_t>(2, INT_MAX))))
     );
   }
 
-  void Reduction::rewrite(
+  void Reduction::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -85,7 +85,7 @@ namespace transformations::vectorize {
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
-    std::vector<symir::Coef *> access = utils::copyAccess(funBd, var);
+    std::vector<symir::Coef *> access = utils::CopyAccess(funBd, var);
     const symir::VarDef *varDef = var->GetDef();
     const symir::Expr *expr = assStmt->GetExpr();
     std::vector<const symir::Term *> terms = expr->GetTerms();
@@ -95,15 +95,15 @@ namespace transformations::vectorize {
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
 
     // create an array that can hold all terms;
-    const symir::VarDef *array = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, nrTerms);
+    const symir::VarDef *array = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, nrTerms);
     Log::Get().Out() << "Creating array " << array->GetName() << " with " << nrTerms << " elements" << std::endl;
 
 
-    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
-    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
-    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+    std::string loopCondLabel = utils::NameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::NameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
-    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+    symir::BlockBuilder *secondBlockBd = utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     auto zero = funBd->SymI32Const(0);
     auto one = funBd->SymI32Const(1);
@@ -130,7 +130,7 @@ namespace transformations::vectorize {
       access
     ));
 
-    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
+    auto indVar = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
     // indVar = 0
     firstBlockAppend.push_back(blockBd->SymAssStmt(
       indVar,
@@ -204,10 +204,10 @@ namespace transformations::vectorize {
     loopBodyBd->CommitStmt(incAss);
     loopBodyBd->SymGoto(loopCondLabel);
 
-    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
+    utils::InsertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
   }
 
-  bool Induction::match(const symir::Stmt *stmt) const {
+  bool Induction::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(
@@ -223,7 +223,7 @@ namespace transformations::vectorize {
     );
   }
 
-  void Induction::rewrite(
+  void Induction::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -238,7 +238,7 @@ namespace transformations::vectorize {
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
-    std::vector<symir::Coef *> access = utils::copyAccess(funBd, var);
+    std::vector<symir::Coef *> access = utils::CopyAccess(funBd, var);
     const symir::VarDef *varDef = var->GetDef();
     const symir::Expr *expr = assStmt->GetExpr();
     std::vector<const symir::Term *> terms = expr->GetTerms();
@@ -256,15 +256,15 @@ namespace transformations::vectorize {
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
 
     // create an array that can hold all terms;
-    const symir::VarDef *array = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, maxCstTerm + 1);
+    const symir::VarDef *array = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, maxCstTerm + 1);
     Log::Get().Out() << "Creating array " << array->GetName() << " with " << nrTerms << " elements" << std::endl;
 
 
-    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
-    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
-    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+    std::string loopCondLabel = utils::NameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::NameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
-    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+    symir::BlockBuilder *secondBlockBd = utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     auto zero = funBd->SymI32Const(0);
     auto one = funBd->SymI32Const(1);
@@ -303,7 +303,7 @@ namespace transformations::vectorize {
 
     static size_t uid = 0;
 
-    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
+    auto indVar = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
     // indVar = 0
     blockBd->ReplaceCommitStmt({
       blockBd->SymAssStmt(
@@ -376,10 +376,10 @@ namespace transformations::vectorize {
     loopBodyBd->CommitStmt(incAss);
     loopBodyBd->SymGoto(loopCondLabel);
 
-    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
+    utils::InsertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
   }
 
-  bool WithAliasCheck::match(const symir::Stmt *stmt) const {
+  bool WithAliasCheck::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(
@@ -389,7 +389,7 @@ namespace transformations::vectorize {
     );
   }
 
-  void WithAliasCheck::rewrite(
+  void WithAliasCheck::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -404,7 +404,7 @@ namespace transformations::vectorize {
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
-    std::vector<symir::Coef *> access = utils::copyAccess(funBd, var);
+    std::vector<symir::Coef *> access = utils::CopyAccess(funBd, var);
     const symir::VarDef *varDef = var->GetDef();
     const symir::Expr *expr = assStmt->GetExpr();
     std::vector<const symir::Term *> terms = expr->GetTerms();
@@ -430,14 +430,14 @@ namespace transformations::vectorize {
     }
 
     // create an array that can hold all terms
-    const symir::VarDef *array = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, randArrSize);
+    const symir::VarDef *array = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, randArrSize);
     Log::Get().Out() << "Creating array " << array->GetName() << " with " << randArrSize << " elements" << std::endl;
 
-    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
-    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
-    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+    std::string loopCondLabel = utils::NameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::NameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
-    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+    symir::BlockBuilder *secondBlockBd = utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     auto zero = funBd->SymI32Const(0);
     auto one = funBd->SymI32Const(1);
@@ -482,7 +482,7 @@ namespace transformations::vectorize {
       ));
     }
 
-    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
+    auto indVar = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->indVarPrefix);
     // indVar = 0
     firstBlockAppend.push_back(
       blockBd->SymAssStmt(
@@ -563,7 +563,7 @@ namespace transformations::vectorize {
     loopBodyBd->CommitStmt(incAss);
     loopBodyBd->SymGoto(loopCondLabel);
 
-    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
+    utils::InsertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
   }
 
 } // namespace

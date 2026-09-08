@@ -44,8 +44,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => E1 + C2 + C3 +E2
   /// where C2 + C3 = C1
   struct AdditionFromConst : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -61,8 +61,8 @@ namespace transformations::primitive {
   /// C1 + E2 => C2 + C3 +E2
   /// where C2 + C3 = C1
   struct AggressiveAdditionFromConst : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -76,8 +76,8 @@ namespace transformations::primitive {
   // E1 => C1 + C2 + E1
   // where C1 = -C2
   struct InsertConstZeroAdditions : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -91,8 +91,8 @@ namespace transformations::primitive {
   /// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; }, 
   /// where C3 * C4 + C2 = C1
   struct ForSumFromConst : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -111,8 +111,8 @@ namespace transformations::primitive {
       minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
       Assert(minBranches >= 2, "DeadCodeFromAssign must have atleast 2 branches");
     }
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -129,8 +129,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 + cpk) + E2
   /// where C3 + C2 = C1
   struct ConstPropagationViaAdd : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -145,8 +145,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 - cpk) + E2
   /// where C3 - C2 = C1
   struct ConstPropagationViaSub : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -161,8 +161,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 * cpk) + C4 + E2
   /// where C3 * C2 + C4 = C1
   struct ConstPropagationViaMul : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -177,8 +177,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 / cpk) + E2
   /// where C3 / C2 = C1
   struct ConstPropagationViaDiv : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -193,8 +193,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 % cpk) + E2
   /// where C3 % C2 = C1
   struct ConstPropagationViaRem : Rule {
-    bool match(const symir::Stmt *stmt) const override { Panic("ConstProbagationViaRem is Unimplemented"); };
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override { Panic("ConstProbagationViaRem is Unimplemented"); };
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -209,8 +209,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + ~cpk + E2
   /// where C2 = ~C1
   struct ConstPropagationViaNot : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -225,8 +225,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 & cpk) + E2
   /// where (C3 & C2) = C1
   struct ConstPropagationViaAnd : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -241,8 +241,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 ^ cpk) + E2
   /// where C3 ^ C2 = C1
   struct ConstPropagationViaXor : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -257,8 +257,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 | cpk) + E2
   /// where C3 | C2 = C1
   struct ConstPropagationViaOr : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -273,8 +273,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 << cpk) + E2
   /// where C3 << C2 = C1
   struct ConstPropagationViaShl : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -289,8 +289,8 @@ namespace transformations::primitive {
   /// E1 + C1 + E2 => cpk = C2; E1 + (C3 >> cpk) + E2
   /// where C3 >> C2 = C1
   struct ConstPropagationViaShr : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -304,8 +304,8 @@ namespace transformations::primitive {
   /// Adds an intermediate operation that moves a local to a stack ptr (array)
   /// x = E1 => y[0] = E1; x = y[0]
   struct Reg2Mem : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,

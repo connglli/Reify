@@ -33,8 +33,8 @@
 struct Rule {
   Rule() {}
   virtual ~Rule() = default;
-  virtual bool match(const symir::Stmt *stmt) const = 0;
-  virtual void rewrite(
+  virtual bool Match(const symir::Stmt *stmt) const = 0;
+  virtual void Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,

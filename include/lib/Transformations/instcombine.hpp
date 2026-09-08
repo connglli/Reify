@@ -50,8 +50,8 @@ namespace transformations::instcombine {
   // C1 + (C2 & B) => A = C1 - ~C2; (C + A) + (~C & B) + E2
   // where C = ~C2
   struct FoldAddLikeCommutative : Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -65,8 +65,8 @@ namespace transformations::instcombine {
   // targeting the LLVM transformation: (A + RHS) + RHS => A + (RHS << 1) I
   // E1 + (RHS << 1) => E1 + RHS + RHS 
   struct ShlToAddTwice: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -84,8 +84,8 @@ namespace transformations::instcombine {
   //  e.g. the actual transformation will be
   //  E1 + (C | B) + E2 => A = (C & B) + (C ^ B); E1 + A + E2
   struct OrToAddAndXor: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -101,8 +101,8 @@ namespace transformations::instcombine {
   // targeting the LLVM transformation: ((A & B) + (A | B)) --> (A + B)
   // E1 + (C + B) + E2 => A = (C & B) + (C | B); E1 + A + E2
   struct AddToAddOrAnd: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -116,8 +116,8 @@ namespace transformations::instcombine {
   // targeting the LLVM transformation: ((A | B) - (A ^ B)) --> (A & B)
   // E1 + (C & B) + E2 => A = (C | B) + (C ^ B); E1 + A + E2
   struct AndToSubOrXor: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -131,8 +131,8 @@ namespace transformations::instcombine {
   // targeting the LLVM transformation: ((A | B) - (A & B)) --> (A ^ B)
   // E1 + (C ^ B) + E2 => A = (C | B) - (C & B); E1 + A + E2
   struct XorToSubOrAnd: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,
@@ -146,8 +146,8 @@ namespace transformations::instcombine {
   // targeting the LLVM transformation: if (C1 & C2) == C2 then (X & C1) - (X & C2) -> X & (C1 ^ C2)
   // E1 + (C & X) + E2 => A = (C1 & X) - (C2 & X); E1 + A + E2
   struct AndToSubAndAnd: Rule {
-    bool match(const symir::Stmt *stmt) const override;
-    void rewrite(
+    bool Match(const symir::Stmt *stmt) const override;
+    void Rewrite(
       symir::FunctBuilder *funBd,
       std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState,

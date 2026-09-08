@@ -41,7 +41,7 @@
 #include "lib/varstate.hpp"
 
 namespace {
-  void retargetBlock(symir::FunctBuilder *funBd, const symir::Block *blk, std::map<const std::string, symir::BlockBuilder *> argBlocks) {
+  void RetargetBlock(symir::FunctBuilder *funBd, const symir::Block *blk, std::map<const std::string, symir::BlockBuilder *> argBlocks) {
     const symir::Target *target = blk->GetTarget();
     if (target == nullptr) return;
 
@@ -90,7 +90,7 @@ namespace {
 } // namespace
 
 // ==================== FCallStrategy Base Implementations ====================
-void FCallStrategy::initialize(
+void FCallStrategy::Initialize(
   const symir::Funct *guest,
   const std::vector<ArgPlus<int32_t>> *init,
   const std::vector<ArgPlus<int32_t>> *fina
@@ -100,11 +100,11 @@ void FCallStrategy::initialize(
   this->fina = fina;
 }
 
-void FCallStrategy::setTarget(const int32_t target) {
+void FCallStrategy::SetTarget(const int32_t target) {
   this->emplaceTargetValue = target;
 }
 
-void FCallStrategy::setMaxNrBlocks(size_t nrBlocks) {
+void FCallStrategy::SetMaxNrBlocks(size_t nrBlocks) {
   Log::Get().Out() << "Set max nrBlocks to " << nrBlocks << std::endl;
   this->argUsedMatrix.clear();
   this->argUsedMatrix.resize(nrBlocks);
@@ -113,7 +113,7 @@ void FCallStrategy::setMaxNrBlocks(size_t nrBlocks) {
 }
 
 
-std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) const {
+std::string FCallStrategy::WrapChecksum(int32_t checksum, std::string call) const {
   std::ostringstream res;
   res << StatelessChecksum::GetCheckChksumName()
       <<"(" 
@@ -124,7 +124,7 @@ std::string FCallStrategy::wrapChecksum(int32_t checksum, std::string call) cons
   return res.str();
 }
 
-const symir::VarDef *FCallStrategy::getUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) {
+const symir::VarDef *FCallStrategy::GetUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) {
   Assert(blockIndex < this->nrBlocks, "blockIndex must be less then the set max number of blocks");
 
   if (stmtIndex + 1 > nrStmts) {
@@ -169,10 +169,10 @@ FCallEmbedder::FCallEmbedder(symir::Funct *const host): host(host) {
     );
     this->symbols[dynamic_cast<symir::Coef *>(sym)] = false;
   }
-  this->createBuilder();
+  this->CreateBuilder();
 }
 
-bool FCallEmbedder::embedGuest(
+bool FCallEmbedder::EmbedGuest(
   symir::Funct *guest,
   const std::vector<ArgPlus<int32_t>> *init,
   const std::vector<ArgPlus<int32_t>> *fina
@@ -182,14 +182,14 @@ bool FCallEmbedder::embedGuest(
   Assert(init != nullptr, "No valid init to embed");
   Assert(fina != nullptr, "No valid fina to embed");
 
-  this->callGenStrategy->initialize(guest, init, fina);
+  this->callGenStrategy->Initialize(guest, init, fina);
   this->succeeded = false;
   this->host->Accept(*this);
 
   return this->succeeded;
 }
 
-bool FCallEmbedder::wasMutated(symir::Coef *c) {
+bool FCallEmbedder::WasMutated(symir::Coef *c) {
   auto it = symbols.find(c);
   Assert(
       it != symbols.end(),
@@ -198,7 +198,7 @@ bool FCallEmbedder::wasMutated(symir::Coef *c) {
   );
   return it->second;
 }
-void FCallEmbedder::markMutated(symir::Coef *c) {
+void FCallEmbedder::MarkMutated(symir::Coef *c) {
   auto it = symbols.find(c);
   Assert(
       it != symbols.end(),
@@ -209,7 +209,7 @@ void FCallEmbedder::markMutated(symir::Coef *c) {
 }
 
 // ==================== LiteralFCallStrategy Implementations ====================
-std::string LiteralFCallStrategy::generateCall() {
+std::string LiteralFCallStrategy::GenerateCall() {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
   Assert(this->fina, "fina is not initialized");
@@ -232,7 +232,7 @@ std::string LiteralFCallStrategy::generateCall() {
 
   // Handle checksum
   int32_t checksum = StatelessChecksum::Compute(*this->fina);
-  std::string chk_call = this->wrapChecksum(checksum, fcall.str());
+  std::string chk_call = this->WrapChecksum(checksum, fcall.str());
 
   // Correct call result such that it matches the emplacedTargetValue
   // To avoid UBs, we'd use an upper type to save the result: long long here
@@ -249,7 +249,7 @@ std::string LiteralFCallStrategy::generateCall() {
 }
 
 // ==================== PrimeInterpFCallStrategy Implementations ====================
-void AbstractArgBlockStrategy::generatePreamble(
+void AbstractArgBlockStrategy::GeneratePreamble(
   std::vector<VariableStateQuery *> varStateQueries,
   symir::FunctBuilder *funBd,
   size_t blockIndex,
@@ -260,7 +260,7 @@ void AbstractArgBlockStrategy::generatePreamble(
 
   Log::Get().OpenSection("Generating Preamble");
 
-  if (this->nrBlocks == 0) this->setMaxNrBlocks(funBd->GetBlocks().size());
+  if (this->nrBlocks == 0) this->SetMaxNrBlocks(funBd->GetBlocks().size());
 
   const symir::Block *targetBlock= funBd->GetBlocks()[blockIndex];
   const std::string targetLabel = targetBlock->GetLabel();
@@ -284,7 +284,7 @@ void AbstractArgBlockStrategy::generatePreamble(
 
       Log::Get().Out() << "Replacing the flattend " << flattIndex << "-th argument" << std::endl;
 
-      const symir::VarDef *loc = this->getUnusedAssignVar(funBd, blockIndex, 0);
+      const symir::VarDef *loc = this->GetUnusedAssignVar(funBd, blockIndex, 0);
       int val = arg.IsScalar() ? arg.GetValue() : arg.GetValue(argIdx);
 
       Log::Get().Out() << loc->GetName() << " <- " << val << std::endl;
@@ -306,7 +306,7 @@ void AbstractArgBlockStrategy::generatePreamble(
   Log::Get().CloseSection();
 }
 
-std::string AbstractArgBlockStrategy::generateCall() {
+std::string AbstractArgBlockStrategy::GenerateCall() {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
   Assert(this->fina, "fina is not initialized");
@@ -338,7 +338,7 @@ std::string AbstractArgBlockStrategy::generateCall() {
   }
   this->argVars.clear();
   fcall << ")";
-  std::string chk_call = this->wrapChecksum(checksum, fcall.str());
+  std::string chk_call = this->WrapChecksum(checksum, fcall.str());
   // To avoid UBs, we'd use an upper type to save the result: long long here
   long long diff = static_cast<long long>(this->emplaceTargetValue)
                  - static_cast<long long>(checksum);
@@ -352,7 +352,7 @@ std::string AbstractArgBlockStrategy::generateCall() {
   }
 }
 
-void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
+void PrimeInterpFCallStrategy::Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
   // needs variable state
   Log::Get().OpenSection("PrimeInterpFCallStrategy::finalize for " + funBd->GetName());
 
@@ -367,7 +367,7 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
 
   // loop through all blocks and if the target has a header change their target to the header.
   for (auto &blk : funBd->GetBlocks()) {
-    retargetBlock(funBd, blk, this->argBlocks);
+    RetargetBlock(funBd, blk, this->argBlocks);
   }
 
   std::map<std::string, size_t> labelToIdx;
@@ -392,7 +392,7 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
     struct VariableState totalVariableState;
     totalVariableState.nrVariables = 0;
     for (auto &varStateQuery : varStateQueries) {
-      struct VariableState vs = varStateQuery->query(labelToIdx[blkLabel], 0);
+      struct VariableState vs = varStateQuery->Query(labelToIdx[blkLabel], 0);
       if (totalVariableState.nrVariables == 0) {
         totalVariableState.nrVariables = vs.nrVariables;
         totalVariableState.varMap = vs.varMap;
@@ -405,7 +405,7 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
 
     std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
     transformations::obscure::PrimeInterp rule = transformations::obscure::PrimeInterp();
-    this->rewriteEngine.runAsPass(funBd, headerBlockBds, totalVariableState, rule);
+    this->rewriteEngine.RunAsPass(funBd, headerBlockBds, totalVariableState, rule);
 
     for (auto blockBd : headerBlockBds) {
       funBd->CloseBlockAt(blockBd, blk);
@@ -417,7 +417,7 @@ void PrimeInterpFCallStrategy::finalize(std::vector<VariableStateQuery *> varSta
   Log::Get().CloseSection();
 }
 
-void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
+void RewriteFCallStrategy::Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
   // needs variable state
   Log::Get().OpenSection("RewriteFCallStrategy::finalize for " + funBd->GetName());
 
@@ -432,7 +432,7 @@ void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQu
 
   // loop through all blocks and if the target has a header change their target to the header.
   for (auto &blk : funBd->GetBlocks()) {
-    retargetBlock(funBd, blk, this->argBlocks);
+    RetargetBlock(funBd, blk, this->argBlocks);
   }
 
   std::map<std::string, size_t> labelToIdx;
@@ -457,7 +457,7 @@ void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQu
     struct VariableState totalVariableState;
     totalVariableState.nrVariables = 0;
     for (auto &varStateQuery : varStateQueries) {
-      struct VariableState vs = varStateQuery->query(labelToIdx[blkLabel], 0);
+      struct VariableState vs = varStateQuery->Query(labelToIdx[blkLabel], 0);
       if (totalVariableState.nrVariables == 0) {
         totalVariableState.nrVariables = vs.nrVariables;
         totalVariableState.varMap = vs.varMap;
@@ -481,7 +481,7 @@ void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQu
       // Hence two runs of the same seed may run the engine differently (e.g. less rule applications) while not
       // changing the rest of the execution via out of sync random number generator state.
       Random::Get().PushSeed(rule_seed);
-      this->rewriteEngine.run(funBd, headerBlockBds, totalVariableState, ruleCount);
+      this->rewriteEngine.Run(funBd, headerBlockBds, totalVariableState, ruleCount);
       Random::Get().PopSeed();
     }
 
@@ -496,10 +496,10 @@ void RewriteFCallStrategy::finalize(std::vector<VariableStateQuery *> varStateQu
 }
 
 // ==================== RandomFCallEmbedder Implementations ====================
-void RandomFCallEmbedder::createPathBlockWhitelist() {
+void RandomFCallEmbedder::CreatePathBlockWhitelist() {
   this->blockIndicesWhitelist.clear();
   for (size_t i = 0; i < this->varStateQueries.size(); i++) {
-    const auto indices = this->varStateQueries[0]->getPathBlocksIndices();
+    const auto indices = this->varStateQueries[0]->GetPathBlocksIndices();
     this->blockIndicesWhitelist.resize(this->blockIndicesWhitelist.size() + indices.size());
     for (size_t j = 0; j < indices.size(); j++) {
       this->blockIndicesWhitelist.push_back(indices[j]);
@@ -526,7 +526,7 @@ void RandomFCallEmbedder::Visit(const symir::Coef &c) {
     return;
   }
   auto *pc = const_cast<symir::Coef *>(&c);
-  if (wasMutated(pc)) {
+  if (WasMutated(pc)) {
     // If the coefficient is already replaced, we do not need to do anything
     return;
   }
@@ -537,13 +537,13 @@ void RandomFCallEmbedder::Visit(const symir::Coef &c) {
     symir::SymIR::GetTypeName(pc->GetType()).c_str(), pc->GetName().c_str()
   );
 
-  this->callGenStrategy->setTarget(pc->GetI32Value());
+  this->callGenStrategy->SetTarget(pc->GetI32Value());
 
-  this->callGenStrategy->generatePreamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
-  this->hostBuilder->FindSymbol(pc->GetName())->SetValue(this->callGenStrategy->generateCall());
-  this->callGenStrategy->generatePostamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
+  this->callGenStrategy->GeneratePreamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
+  this->hostBuilder->FindSymbol(pc->GetName())->SetValue(this->callGenStrategy->GenerateCall());
+  this->callGenStrategy->GeneratePostamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
 
-  markMutated(pc);
+  MarkMutated(pc);
   this->succeeded = true;
  }
 

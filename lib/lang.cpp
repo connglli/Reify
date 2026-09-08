@@ -1366,7 +1366,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
     );
   }
 
-  size_t intSizeOfSymIRType(
+  size_t IntSizeOfSymIRType(
     std::vector<const symir::StructDef *> structs,
     symir::SymIR::Type type,
     symir::SymIR::Type baseType,
@@ -1382,7 +1382,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
       size = 1;
       for (const int32_t s: shape) size *= s;
       type = baseType;
-      size *= intSizeOfSymIRType(structs, type, baseType, {}, structName);
+      size *= IntSizeOfSymIRType(structs, type, baseType, {}, structName);
     } break;
     case symir::SymIR::STRUCT: {
       const symir::StructDef *sDef = nullptr;
@@ -1405,7 +1405,7 @@ VarUse::VarUse(const VarDef *var, std::vector<Coef *> access)
             structName = field.structName;
           }
         }
-        size += intSizeOfSymIRType(structs, type, baseType, shape, structName);
+        size += IntSizeOfSymIRType(structs, type, baseType, shape, structName);
       }
     } break;
     default: Panic("Unknown Var type");

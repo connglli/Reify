@@ -47,7 +47,7 @@ public:
   void GenerateCode(const ProgArts &arts) const;
 
 private:
-  std::vector<VariableStateQuery *> getVarStateQuerys(size_t idx) {
+  std::vector<VariableStateQuery *> GetVarStateQuerys(size_t idx) {
     Assert(this->varStates.size() > idx, "There should be atleast one Variable state Query for each function");
     std::vector<VariableStateQuery *> res;
     res.reserve(this->varStates.size());

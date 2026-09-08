@@ -38,11 +38,11 @@
 using namespace patternmatch;
 namespace transformations::primitive {
 
-  bool AdditionFromConst::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool AdditionFromConst::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
   
-  void AdditionFromConst::rewrite(
+  void AdditionFromConst::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -126,7 +126,7 @@ namespace transformations::primitive {
     
   }
 
-  bool AggressiveAdditionFromConst::match(const symir::Stmt *stmt) const {
+  bool AggressiveAdditionFromConst::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(
@@ -136,7 +136,7 @@ namespace transformations::primitive {
     );
   }
 
-  void AggressiveAdditionFromConst::rewrite(
+  void AggressiveAdditionFromConst::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -195,7 +195,7 @@ namespace transformations::primitive {
     );
   }
 
-  bool InsertConstZeroAdditions::match(const symir::Stmt *stmt) const {
+  bool InsertConstZeroAdditions::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(
@@ -205,7 +205,7 @@ namespace transformations::primitive {
     );
   }
 
-  void InsertConstZeroAdditions::rewrite(
+  void InsertConstZeroAdditions::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -248,7 +248,7 @@ namespace transformations::primitive {
   }
 
   
-  bool ForSumFromConst::match(const symir::Stmt *stmt) const {
+  bool ForSumFromConst::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(
@@ -258,7 +258,7 @@ namespace transformations::primitive {
     );
   }
   
-  void ForSumFromConst::rewrite(
+  void ForSumFromConst::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -299,15 +299,15 @@ namespace transformations::primitive {
     Log::Get().Out() << "Target: " << val << ", LoopCount: " << loopCount 
                      << ", Additive Value: " << randVal << ", Remainder: " << rest << std::endl;
   
-    auto access = utils::copyAccess(funBd, use);
+    auto access = utils::CopyAccess(funBd, use);
   
-    std::string loopCondLabel = utils::nameLabel(funBd->GetName(), "for_cond");
-    std::string loopBodyLabel = utils::nameLabel(funBd->GetName(), "for_body");
-    std::string finalLabel = utils::nameLabel(funBd->GetName(), "for_exit");
+    std::string loopCondLabel = utils::NameLabel(funBd->GetName(), "for_cond");
+    std::string loopBodyLabel = utils::NameLabel(funBd->GetName(), "for_body");
+    std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
     // Split the current block into two at targetStmtIdx while appending to the upper block
 
-    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+    symir::BlockBuilder *secondBlockBd = utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     symir::BlockBuilder::StmtID initAss = blockBd->SymAssStmt(
       def,
@@ -321,7 +321,7 @@ namespace transformations::primitive {
     );
   
 
-    auto indVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    auto indVar = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     // indVar = 0
     symir::BlockBuilder::StmtID initIndVar = blockBd->SymAssStmt(
       indVar,
@@ -389,14 +389,14 @@ namespace transformations::primitive {
     loopBodyBd->SymGoto(loopCondLabel);
 
     // insert the new blocks after the current block
-    utils::insertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
+    utils::InsertBlockBd(blockBds, { loopCondBd, loopBodyBd, secondBlockBd }, targetBlockIdx + 1);
   }
   
-  bool DeadCodeFromAssign::match(const symir::Stmt *stmt) const {
+  bool DeadCodeFromAssign::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(stmt, m_AssStmt(m_WildCard<const symir::VarUse *>(), m_WildCard<const symir::Expr *>()));
   }
   
-  void DeadCodeFromAssign::rewrite(
+  void DeadCodeFromAssign::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -412,26 +412,26 @@ namespace transformations::primitive {
     const auto use = assStmt->GetVar();
     const auto def = use->GetDef();
     const auto expr = assStmt->GetExpr();
-    auto access = utils::copyAccess(funBd, use);
+    auto access = utils::CopyAccess(funBd, use);
   
     int nrBranches = Random::Get().Uniform(this->minBranches, this->maxBranches)();
     int trueBranch = Random::Get().Uniform(0, nrBranches - 1)();
   
     Log::Get().Out() << "Building " << nrBranches << " branches, True branch: " << trueBranch << std::endl;
 
-    std::string finalLabel = utils::nameLabel(funBd->GetName(), "if_exit");
+    std::string finalLabel = utils::NameLabel(funBd->GetName(), "if_exit");
     std::vector<std::string> condLabels;
     condLabels.resize(nrBranches - 1); // else stmt has not cond and first cond is appended to blockBd, but for convinience we index from the index 1
     std::vector<std::string> bodyLabels;
     bodyLabels.resize(nrBranches);
 
     for (int i = 0; i < nrBranches; i++) {
-      bodyLabels[i] = utils::nameLabel(funBd->GetName(), "if_body_" + std::to_string(i));
+      bodyLabels[i] = utils::NameLabel(funBd->GetName(), "if_body_" + std::to_string(i));
       if (i == 0 || i == nrBranches - 1) continue;
-      condLabels[i] = utils::nameLabel(funBd->GetName(), "if_cond_" + std::to_string(i));
+      condLabels[i] = utils::NameLabel(funBd->GetName(), "if_cond_" + std::to_string(i));
     }
 
-    symir::BlockBuilder *secondBlockBd = utils::splitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+    symir::BlockBuilder *secondBlockBd = utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     std::vector<symir::BlockBuilder *> condBlockBds;
     condBlockBds.resize(nrBranches - 1); // else stmt has not cond and first cond is appended to blockBd, but for convinience we index from the index 1
@@ -449,7 +449,7 @@ namespace transformations::primitive {
         )
       );
     } else {
-      bodyBlockBds[0]->CommitStmt(utils::trivialAssignment(funBd, bodyBlockBds[0], def, access));
+      bodyBlockBds[0]->CommitStmt(utils::TrivialAssignment(funBd, bodyBlockBds[0], def, access));
     }
     bodyBlockBds[0]->SymGoto(finalLabel);
 
@@ -461,7 +461,7 @@ namespace transformations::primitive {
           bodyLabels[i],
           // last condition if false should point to the else body
           i != nrBranches - 2 ? condLabels[i + 1] : bodyLabels[nrBranches - 1], 
-          utils::triviallyCondFor(i == trueBranch , funBd, condBlockBds[i])
+          utils::TriviallyCondFor(i == trueBranch , funBd, condBlockBds[i])
         );
       }
       bodyBlockBds[i] = funBd->OpenBlock(bodyLabels[i]);
@@ -474,7 +474,7 @@ namespace transformations::primitive {
           )
         );
       } else {
-        bodyBlockBds[i]->CommitStmt(utils::trivialAssignment(funBd, bodyBlockBds[i], def, access));
+        bodyBlockBds[i]->CommitStmt(utils::TrivialAssignment(funBd, bodyBlockBds[i], def, access));
       }
       bodyBlockBds[i]->SymGoto(finalLabel);
     }
@@ -487,7 +487,7 @@ namespace transformations::primitive {
       bodyLabels[0],
       // condition if false should point to the else body if there is no else ifs
       nrBranches > 2 ? condLabels[1] : bodyLabels[1], 
-      utils::triviallyCondFor(0 == trueBranch , funBd, blockBd)
+      utils::TriviallyCondFor(0 == trueBranch , funBd, blockBd)
     ); 
 
     // interleave the blocks;
@@ -500,14 +500,14 @@ namespace transformations::primitive {
     }
     newBlocks.push_back(secondBlockBd);
   
-    utils::insertBlockBd(blockBds, newBlocks, targetBlockIdx + 1);
+    utils::InsertBlockBd(blockBds, newBlocks, targetBlockIdx + 1);
   }
 
-  bool ConstPropagationViaAdd::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool ConstPropagationViaAdd::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
   
-  void ConstPropagationViaAdd::rewrite(
+  void ConstPropagationViaAdd::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -520,7 +520,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
       varInsertFun =
@@ -565,11 +565,11 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
   
-  bool ConstPropagationViaSub::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool ConstPropagationViaSub::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
   
-  void ConstPropagationViaSub::rewrite(
+  void ConstPropagationViaSub::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -582,7 +582,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
@@ -629,14 +629,14 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
   
-  bool ConstPropagationViaMul::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(
+  bool ConstPropagationViaMul::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(
       stmt,
       m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))
     );
   }
   
-  void ConstPropagationViaMul::rewrite(
+  void ConstPropagationViaMul::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -649,7 +649,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
       varInsertFun =
@@ -722,11 +722,11 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
   
-  bool ConstPropagationViaDiv::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
+  bool ConstPropagationViaDiv::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar()))));
   }
   
-  void ConstPropagationViaDiv::rewrite(
+  void ConstPropagationViaDiv::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -739,7 +739,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -788,11 +788,11 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool ConstPropagationViaNot::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool ConstPropagationViaNot::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
 
-  void ConstPropagationViaNot::rewrite(
+  void ConstPropagationViaNot::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -805,7 +805,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -840,11 +840,11 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool ConstPropagationViaAnd::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool ConstPropagationViaAnd::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
 
-  void ConstPropagationViaAnd::rewrite(
+  void ConstPropagationViaAnd::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -857,7 +857,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -903,11 +903,11 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool ConstPropagationViaXor::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool ConstPropagationViaXor::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
 
-  void ConstPropagationViaXor::rewrite(
+  void ConstPropagationViaXor::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -920,7 +920,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -961,11 +961,11 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool ConstPropagationViaOr::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
+  bool ConstPropagationViaOr::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar()))));
   }
 
-  void ConstPropagationViaOr::rewrite(
+  void ConstPropagationViaOr::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -978,7 +978,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -1018,8 +1018,8 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool ConstPropagationViaShl::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(
+  bool ConstPropagationViaShl::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(
       stmt,
       m_Expr(m_Any(
         m_CstTerm(
@@ -1032,7 +1032,7 @@ namespace transformations::primitive {
     );
   }
 
-  void ConstPropagationViaShl::rewrite(
+  void ConstPropagationViaShl::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -1045,7 +1045,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -1086,8 +1086,8 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool ConstPropagationViaShr::match(const symir::Stmt *stmt) const {
-    return utils::matchSubExprInAnyStmt(
+  bool ConstPropagationViaShr::Match(const symir::Stmt *stmt) const {
+    return utils::MatchSubExprInAnyStmt(
       stmt,
       m_Expr(m_Any(
         m_CstTerm(
@@ -1100,7 +1100,7 @@ namespace transformations::primitive {
     );
   }
 
-  void ConstPropagationViaShr::rewrite(
+  void ConstPropagationViaShr::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -1113,7 +1113,7 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
   
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
-    const symir::VarDef *var = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
+    const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
   
   
     std::function<symir::BlockBuilder::TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
@@ -1156,14 +1156,14 @@ namespace transformations::primitive {
     blockBd->CommitStmtAt(assignStmts, targetStmtIdx);
   }
 
-  bool Reg2Mem::match(const symir::Stmt *stmt) const {
+  bool Reg2Mem::Match(const symir::Stmt *stmt) const {
     return patternmatch::match(
       stmt,
       m_AssStmt(m_And(m_WithType(symir::SymIR::Type::I32), m_ScalarVar()), m_WildCard<const symir::Expr *>())
     );
   }
 
-  void Reg2Mem::rewrite(
+  void Reg2Mem::Rewrite(
     symir::FunctBuilder *funBd,
     std::vector<symir::BlockBuilder *> &blockBds,
     VariableState &varState,
@@ -1176,13 +1176,13 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
-    const symir::VarDef *memVar = utils::getVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, 1);
+    const symir::VarDef *memVar = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix, 1);
     symir::StmtCopier c = symir::StmtCopier(funBd, blockBd);
     std::vector<symir::Coef *> memAccess = {funBd->SymI32Const(0)};
     const symir::BlockBuilder::StmtID memAssign = blockBd->SymAssStmt(memVar, c.CopyExpr(assStmt->GetExpr()), memAccess);
 
     const symir::VarUse *v = assStmt->GetVar();
-    auto access = utils::copyAccess(funBd, v);
+    auto access = utils::CopyAccess(funBd, v);
     const symir::BlockBuilder::StmtID assignBack = blockBd->SymAssStmt(
       v->GetDef(),
       blockBd->SymAddExpr({ blockBd->SymMulTerm(funBd->SymI32Const(1), memVar, memAccess) }),
