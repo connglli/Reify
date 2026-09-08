@@ -26,10 +26,10 @@
 #ifndef REIFY_RANDOM_HPP
 #define REIFY_RANDOM_HPP
 
-#include "lib/dbgutils.hpp"
 #include <functional>
 #include <random>
 #include <stack>
+#include "lib/dbgutils.hpp"
 
 class Random {
 
@@ -40,9 +40,9 @@ public:
   Random(const Random &) = delete;
   Random &operator=(const Random &) = delete;
 
-  [[nodiscard]] auto &GetRNG() { 
+  [[nodiscard]] auto &GetRNG() {
     Assert(this->rng.size() > 0, "rng stack should never be empty");
-    return rng.top(); 
+    return rng.top();
   }
 
   [[nodiscard]] int GetInitialSeed() { return this->startingSeed; };
@@ -84,9 +84,9 @@ public:
   }
 
 private:
-  Random() { 
+  Random() {
     this->startingSeed = std::random_device()();
-    rng.push(std::mt19937(startingSeed)); 
+    rng.push(std::mt19937(startingSeed));
   }
 
   std::stack<std::mt19937> rng;

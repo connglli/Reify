@@ -24,11 +24,10 @@
 // SOFTWARE.
 
 #include "lib/reduceinfo.hpp"
-#include "lib/dbgutils.hpp"
 #include <fstream>
 #include <utility>
 #include "json.hpp"
-
+#include "lib/dbgutils.hpp"
 
 ReduceInfo &ReduceInfo::Get() {
   static ReduceInfo ruleinfo;
@@ -40,19 +39,20 @@ size_t ReduceInfo::GetRuleCount(std::string functionName, std::string headBlockL
 }
 
 void ReduceInfo::FromJson(std::string path) {
-    std::ifstream filestream(path);
-    Assert(filestream.is_open(), "Error: failed to open file: %s", path.c_str());
+  std::ifstream filestream(path);
+  Assert(filestream.is_open(), "Error: failed to open file: %s", path.c_str());
 
-    std::string line;
-    // currently this is a single line json;
-    std::getline(filestream, line);
-    nlohmann::json reduceInfo = nlohmann::json::parse(line);
-    this->sno = reduceInfo["sno"];
-    for (size_t i = 0; i < reduceInfo["functions"].size(); i++) {
-      nlohmann::json functionObj = reduceInfo["functions"][i];
-      for (size_t j = 0; j < functionObj["blocks"].size(); j++) {
-        nlohmann::json blockObj = functionObj["blocks"][j];
-        this->ruleCountMap[std::make_pair(functionObj["name"], blockObj["headerLabel"])] = blockObj["targetRuleCount"];
-      }
+  std::string line;
+  // currently this is a single line json;
+  std::getline(filestream, line);
+  nlohmann::json reduceInfo = nlohmann::json::parse(line);
+  this->sno = reduceInfo["sno"];
+  for (size_t i = 0; i < reduceInfo["functions"].size(); i++) {
+    nlohmann::json functionObj = reduceInfo["functions"][i];
+    for (size_t j = 0; j < functionObj["blocks"].size(); j++) {
+      nlohmann::json blockObj = functionObj["blocks"][j];
+      this->ruleCountMap[std::make_pair(functionObj["name"], blockObj["headerLabel"])] =
+          blockObj["targetRuleCount"];
     }
+  }
 }

@@ -106,9 +106,10 @@ struct ArrayType : public ArgType<IntType> {
 
   bool IsStruct() const override { return false; }
 
-  size_t getSize() const override { 
+  size_t getSize() const override {
     size_t res = 0;
-    for (const auto& ele : elements) res += ele.getSize();
+    for (const auto &ele: elements)
+      res += ele.getSize();
     return res;
   }
 
@@ -136,7 +137,8 @@ struct StructType : public ArgType<IntType> {
 
   size_t getSize() const override {
     size_t res = 0;
-    for (const auto& field : fields) res += field.getSize();
+    for (const auto &field: fields)
+      res += field.getSize();
     return res;
   }
 
@@ -277,7 +279,9 @@ public:
 
   // Code generation
   [[nodiscard]] std::string ToCxStr() const;
-  [[nodiscard]] std::string ToCxStrWithReplaced(std::map<size_t, std::pair<std::string, int32_t> *> replacers, size_t offset = 0) const;
+  [[nodiscard]] std::string ToCxStrWithReplaced(
+      std::map<size_t, std::pair<std::string, int32_t> *> replacers, size_t offset = 0
+  ) const;
 
   [[nodiscard]] std::string GetTypeCastStr(const symir::VarDef *varDef) const {
     return type->GetTypeCastStr(varDef);
@@ -404,9 +408,9 @@ nlohmann::json StructType<IntType>::ToJson() const {
 template<typename IntType>
 ArgPlus<IntType>::ArgPlus(const ArgPlus &other) {
   if (other.IsScalar()) {
-    type =
-        std::make_unique<ScalarType<IntType>>(*static_cast<ScalarType<IntType> *>(other.type.get())
-        );
+    type = std::make_unique<ScalarType<IntType>>(
+        *static_cast<ScalarType<IntType> *>(other.type.get())
+    );
   } else if (other.IsArray()) {
     auto *arr = static_cast<ArrayType<IntType> *>(other.type.get());
     auto newArr = std::make_unique<ArrayType<IntType>>(arr->dim);
@@ -619,10 +623,12 @@ std::string ArgPlus<IntType>::ToCxStr() const {
 }
 
 template<typename IntType>
-std::string ArgPlus<IntType>::ToCxStrWithReplaced(std::map<size_t, std::pair<std::string, int32_t> *> replacers, size_t offset) const {
+std::string ArgPlus<IntType>::ToCxStrWithReplaced(
+    std::map<size_t, std::pair<std::string, int32_t> *> replacers, size_t offset
+) const {
   if (IsScalar()) {
     if (replacers.contains(offset)) {
-      const auto& replacer = *replacers[offset];
+      const auto &replacer = *replacers[offset];
       if (replacer.second == 0) {
         return replacer.first;
       } else {
@@ -639,7 +645,8 @@ std::string ArgPlus<IntType>::ToCxStrWithReplaced(std::map<size_t, std::pair<std
     oss << "(struct " << str->structName << "){";
     size_t newOffset = offset;
     for (size_t i = 0; i < str->fieldNames.size(); ++i) {
-      oss << "." << str->fieldNames[i] << " = " << str->fields[i].ToCxStrWithReplaced(replacers, newOffset);
+      oss << "." << str->fieldNames[i] << " = "
+          << str->fields[i].ToCxStrWithReplaced(replacers, newOffset);
       newOffset += str->fields[i].getSize();
       if (i != str->fieldNames.size() - 1)
         oss << ", ";

@@ -104,29 +104,30 @@ namespace symir {
     auto op = t.GetOp();
     out << "(" << Term::GetOpShort(op) << " ";
     switch (op) {
-    case Term::OP_NOT: {
-      t.GetVar()->Accept(*this);
-    } break;
+      case Term::OP_NOT: {
+        t.GetVar()->Accept(*this);
+      } break;
 
-    case Term::OP_CST: {
-      t.GetCoef()->Accept(*this);
-    } break;
+      case Term::OP_CST: {
+        t.GetCoef()->Accept(*this);
+      } break;
 
-    case Term::OP_SHL:
-    case Term::OP_SHR:
-    case Term::OP_ADD:
-    case Term::OP_SUB:
-    case Term::OP_MUL:
-    case Term::OP_DIV:
-    case Term::OP_REM:
-    case Term::OP_AND:
-    case Term::OP_XOR:
-    case Term::OP_OR: {
-      t.GetCoef()->Accept(*this);
-      out << " ";
-      t.GetVar()->Accept(*this);
-    } break;
-    default: Panic("Cannot reach here");
+      case Term::OP_SHL:
+      case Term::OP_SHR:
+      case Term::OP_ADD:
+      case Term::OP_SUB:
+      case Term::OP_MUL:
+      case Term::OP_DIV:
+      case Term::OP_REM:
+      case Term::OP_AND:
+      case Term::OP_XOR:
+      case Term::OP_OR: {
+        t.GetCoef()->Accept(*this);
+        out << " ";
+        t.GetVar()->Accept(*this);
+      } break;
+      default:
+        Panic("Cannot reach here");
     }
     out << ")";
   }
@@ -145,7 +146,7 @@ namespace symir {
       out << "(emodmul ";
       coeffs[i]->Accept(*this);
       for (size_t j = 0; j < vars.size(); ++j) {
-        for (int d = 0; d < polynomial[vars.size()* j + i]; d++) {
+        for (int d = 0; d < polynomial[vars.size() * j + i]; d++) {
           this->out << " ";
           vars[j]->Accept(*this);
         }
@@ -253,9 +254,10 @@ namespace symir {
     out << "(";
     if (l.IsVolatile()) {
       out << KW_VOL << " ";
-    } 
+    }
     out << KW_LOC << " " << l.GetName() << " ";
-    if (l.GetCoef() != nullptr) l.GetCoef()->Accept(*this);
+    if (l.GetCoef() != nullptr)
+      l.GetCoef()->Accept(*this);
     out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
@@ -471,35 +473,36 @@ namespace symir {
     out << "(";
     auto op = t.GetOp();
     switch (op) {
-    case Term::OP_NOT: {
-      out << Term::GetOpSym(Term::OP_NOT);
-      t.GetVar()->Accept(*this);
-    } break;
+      case Term::OP_NOT: {
+        out << Term::GetOpSym(Term::OP_NOT);
+        t.GetVar()->Accept(*this);
+      } break;
 
-    case Term::OP_SHL:
-    case Term::OP_SHR: {
-      t.GetVar()->Accept(*this);
-      out << " " << Term::GetOpSym(op) << " ";
-      t.GetCoef()->Accept(*this);
-    } break;
+      case Term::OP_SHL:
+      case Term::OP_SHR: {
+        t.GetVar()->Accept(*this);
+        out << " " << Term::GetOpSym(op) << " ";
+        t.GetCoef()->Accept(*this);
+      } break;
 
-    case Term::OP_CST: {
-      t.GetCoef()->Accept(*this);
-    } break;
+      case Term::OP_CST: {
+        t.GetCoef()->Accept(*this);
+      } break;
 
-    case Term::OP_ADD:
-    case Term::OP_SUB:
-    case Term::OP_MUL:
-    case Term::OP_DIV:
-    case Term::OP_REM:
-    case Term::OP_AND:
-    case Term::OP_XOR:
-    case Term::OP_OR: {
-      t.GetCoef()->Accept(*this);
-      out << " " << Term::GetOpSym(op) << " ";
-      t.GetVar()->Accept(*this);
-    } break;
-    default: Panic("Cannot reach here");
+      case Term::OP_ADD:
+      case Term::OP_SUB:
+      case Term::OP_MUL:
+      case Term::OP_DIV:
+      case Term::OP_REM:
+      case Term::OP_AND:
+      case Term::OP_XOR:
+      case Term::OP_OR: {
+        t.GetCoef()->Accept(*this);
+        out << " " << Term::GetOpSym(op) << " ";
+        t.GetVar()->Accept(*this);
+      } break;
+      default:
+        Panic("Cannot reach here");
     }
     out << ")";
   }
@@ -688,7 +691,7 @@ namespace symir {
     indent();
     if (l.IsVolatile()) {
       out << "volatile" << " ";
-    } 
+    }
     out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
     if (l.GetCoef() != nullptr) {
       out << " = ";
@@ -922,9 +925,7 @@ namespace symir {
     }
   }
 
-  void SymJavaBytecodeLower::Visit(const ModExpr &e) {
-    Panic("TODO: Implement java ModExpr");
-  }
+  void SymJavaBytecodeLower::Visit(const ModExpr &e) { Panic("TODO: Implement java ModExpr"); }
 
   void SymJavaBytecodeLower::Visit(const Expr &e) {
     if (e.GetType() != SymIR::I32) {
@@ -1045,7 +1046,8 @@ namespace symir {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
-    if (l.GetCoef() != nullptr) l.GetCoef()->Accept(*this);
+    if (l.GetCoef() != nullptr)
+      l.GetCoef()->Accept(*this);
     method->instList().addVar(jnif::Opcode::istore, locals[l.GetName()]);
   }
 
@@ -1053,7 +1055,8 @@ namespace symir {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
-    if (l.GetCoefs().size() > 0) CreateArray(*method, l, l.GetCoefs());
+    if (l.GetCoefs().size() > 0)
+      CreateArray(*method, l, l.GetCoefs());
     method->instList().addVar(jnif::Opcode::astore, locals[l.GetName()]);
   }
 

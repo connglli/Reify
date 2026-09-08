@@ -31,16 +31,15 @@ Random &Random::Get() {
 }
 
 void Random::Seed(int s) {
-	for (size_t i = 0; i < rng.size(); i++) rng.pop();
+  for (size_t i = 0; i < rng.size(); i++)
+    rng.pop();
   this->startingSeed = s;
-	rng.push(std::mt19937(s));
+  rng.push(std::mt19937(s));
 }
 
-  void Random::PushSeed(int s) {
-		rng.push(std::mt19937(s));
-  }
+void Random::PushSeed(int s) { rng.push(std::mt19937(s)); }
 
-  void Random::PopSeed() {
-		assert(rng.size() > 1);
-		rng.pop();
-  }
+void Random::PopSeed() {
+  assert(rng.size() > 1);
+  rng.pop();
+}

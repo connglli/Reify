@@ -28,6 +28,7 @@
 
 #include <map>
 #include <string>
+
 class ReduceInfo {
 
 public:
@@ -35,6 +36,7 @@ public:
 
 public:
   int Sno() { return this->sno; };
+
   size_t GetRuleCount(std::string functionName, std::string headBlockLabel);
   void FromJson(std::string path);
 
@@ -44,7 +46,6 @@ private:
 private:
   int sno = -1;
   std::map<std::pair<std::string, std::string>, size_t> ruleCountMap;
-
 };
 
 #endif // REIFY_REDUCEINFO_HPP
