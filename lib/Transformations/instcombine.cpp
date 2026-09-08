@@ -23,35 +23,33 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that do not target any specific Compiler optimization but introduce/create operations from constants
+// Contains Transformation Rules that do not target any specific Compiler optimization but
+// introduce/create operations from constants
 
-#include "lib/patternmatch.hpp"
 #include "lib/Transformations/instcombine.hpp"
-#include "lib/Transformations/utils.hpp"
-#include "lib/logger.hpp"
 #include <climits>
 #include <iostream>
+#include "lib/Transformations/utils.hpp"
+#include "lib/logger.hpp"
+#include "lib/patternmatch.hpp"
 
 
 using namespace patternmatch;
+
 namespace transformations::instcombine {
   bool FoldAddLikeCommutative::Match(const symir::Stmt *stmt) const {
     int C1, C2;
     bool match = utils::MatchSubExprInAnyStmt(
-      stmt,
-      m_AddExpr(
-        m_AnyTwoSeq(m_CstTerm(m_Value(m_Int(&C1)), m_NoVar()), m_AndTerm(m_Value(m_Int(&C2)), m_Var()))
-      )
+        stmt, m_AddExpr(m_AnyTwoSeq(
+                  m_CstTerm(m_Value(m_Int(&C1)), m_NoVar()), m_AndTerm(m_Value(m_Int(&C2)), m_Var())
+              ))
     );
     return match && utils::NoSubOverflow(C1, ~C2);
   }
 
   void FoldAddLikeCommutative::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running FoldAddLikeCommutative" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -63,9 +61,11 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
           auto terms = e.GetTerms();
           bool hasReplaced = false;
@@ -75,22 +75,22 @@ namespace transformations::instcombine {
             const symir::Term *term2 = terms[i + 1];
             const symir::VarUse *B;
             int C1, C2;
-            if (
-              !hasReplaced &&
-              patternmatch::match(term1, m_CstTerm(m_Value(m_Int(&C1)), m_NoVar())) &&
-              patternmatch::match(term2, m_AndTerm(m_Value(m_Int(&C2)), m_Var(&B))) &&
-              utils::NoSubOverflow(C1, ~C2)
-            ) {
+            if (!hasReplaced &&
+                patternmatch::match(term1, m_CstTerm(m_Value(m_Int(&C1)), m_NoVar())) &&
+                patternmatch::match(term2, m_AndTerm(m_Value(m_Int(&C2)), m_Var(&B))) &&
+                utils::NoSubOverflow(C1, ~C2)) {
               hasReplaced = true;
               int *AValPtr = static_cast<int *>(*data);
               *AValPtr = C1 - ~C2;
               auto accessB = utils::CopyAccess(thisFunBd, B);
               termIds.push_back(thisBlockBd->SymAddTerm(thisFunBd->SymI32Const(~C2), A));
-              termIds.push_back(thisBlockBd->SymAndTerm(thisFunBd->SymI32Const(C2), B->GetDef(), accessB));
+              termIds.push_back(
+                  thisBlockBd->SymAndTerm(thisFunBd->SymI32Const(C2), B->GetDef(), accessB)
+              );
               i += 1;
               if (i == terms.size() - 2)
                 termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(terms[i + 1]));
-            } else if (i == terms.size() - 2){
+            } else if (i == terms.size() - 2) {
               termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(term1));
               termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(term2));
             } else {
@@ -99,42 +99,41 @@ namespace transformations::instcombine {
           }
           return thisBlockBd->SymExpr(e.GetOp(), termIds);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      [](const symir::Expr *P) {
-        int C1, C2;
-        bool match = patternmatch::match(
-          P,
-          m_AddExpr(
-            m_AnyTwoSeq(m_CstTerm(m_Value(m_Int(&C1)), m_NoVar()), m_AndTerm(m_Value(m_Int(&C2)), m_Var()))
-          )
-        );
-        return match && utils::NoSubOverflow(C1, ~C2);
-      },
-      varInsertFun,
-      1
+        stmt,
+        [](const symir::Expr *P) {
+          int C1, C2;
+          bool match = patternmatch::match(
+              P,
+              m_AddExpr(m_AnyTwoSeq(
+                  m_CstTerm(m_Value(m_Int(&C1)), m_NoVar()), m_AndTerm(m_Value(m_Int(&C2)), m_Var())
+              ))
+          );
+          return match && utils::NoSubOverflow(C1, ~C2);
+        },
+        varInsertFun, 1
     );
 
-    blockBd->CommitStmtAt(blockBd->SymAssStmt(A, blockBd->SymExpr(
-      utils::RandomExprOp(),
-      { blockBd->SymCstTerm(funBd->SymI32Const(AVal), nullptr) }
-    )), targetStmtIdx);
+    blockBd->CommitStmtAt(
+        blockBd->SymAssStmt(
+            A, blockBd->SymExpr(
+                   utils::RandomExprOp(), {blockBd->SymCstTerm(funBd->SymI32Const(AVal), nullptr)}
+               )
+        ),
+        targetStmtIdx
+    );
   }
 
   bool ShlToAddTwice::Match(const symir::Stmt *stmt) const {
     return utils::MatchSubExprInAnyStmt(
-      stmt, 
-      m_AddExpr(m_AnyAfter(0, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var())))
+        stmt, m_AddExpr(m_AnyAfter(0, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var())))
     );
   }
 
   void ShlToAddTwice::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running AddTwiceToShl" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -142,9 +141,11 @@ namespace transformations::instcombine {
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Expr &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Expr &e, void **data) {
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
           auto terms = e.GetTerms();
           termIds.reserve(terms.size() + 1);
@@ -153,50 +154,42 @@ namespace transformations::instcombine {
           for (size_t i = 0; i < terms.size(); i++) {
             const symir::Term *term = terms[i];
             const symir::VarUse *RHS;
-            if (
-              !hasReplaced &&
-              i > 0 &&
-              patternmatch::match(term, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var(&RHS)))
-            ) {
+            if (!hasReplaced && i > 0 &&
+                patternmatch::match(
+                    term, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var(&RHS))
+                )) {
               hasReplaced = true;
               auto accessRHS = utils::CopyAccess(thisFunBd, RHS);
-              termIds.push_back(utils::VariableTerm(thisFunBd, thisBlockBd, RHS->GetDef(), accessRHS));
-              termIds.push_back(utils::VariableTerm(thisFunBd, thisBlockBd, RHS->GetDef(), accessRHS));
+              termIds.push_back(
+                  utils::VariableTerm(thisFunBd, thisBlockBd, RHS->GetDef(), accessRHS)
+              );
+              termIds.push_back(
+                  utils::VariableTerm(thisFunBd, thisBlockBd, RHS->GetDef(), accessRHS)
+              );
             } else {
               termIds.push_back(symir::StmtCopier(thisFunBd, thisBlockBd).CopyTerm(term));
             }
           }
           return thisBlockBd->SymExpr(e.GetOp(), termIds);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      make_matcher(
-        const symir::Expr *,
-        m_AddExpr(
-          m_AddExpr(m_AnyAfter(0, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var())))
-        )
-      ),
-      varInsertFun,
-      1
+        stmt,
+        make_matcher(
+            const symir::Expr *,
+            m_AddExpr(m_AddExpr(m_AnyAfter(0, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var()))))
+        ),
+        varInsertFun, 1
     );
   }
 
   bool OrToAddAndXor::Match(const symir::Stmt *stmt) const {
-    return utils::MatchSubExprInAnyStmt(
-      stmt,
-      m_Expr(
-        m_Any(m_OrTerm(m_Solved(), m_Var()))
-      )
-    );
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_OrTerm(m_Solved(), m_Var()))));
   }
 
   void OrToAddAndXor::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running OrToAddAndXor" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -208,62 +201,55 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Term &t, void **data) {
           const symir::VarUse *B;
           symir::Coef *C;
-          Assert(patternmatch::match(&t, m_OrTerm(m_Solved(&C), m_Var(&B))), "This should be guarenteed");
+          Assert(
+              patternmatch::match(&t, m_OrTerm(m_Solved(&C), m_Var(&B))),
+              "This should be guarenteed"
+          );
           auto accessB = utils::CopyAccess(thisFunBd, B);
-          symir::BlockBuilder::ExprID *AExprIdPtr = static_cast<symir::BlockBuilder::ExprID *>(*data);
+          symir::BlockBuilder::ExprID *AExprIdPtr =
+              static_cast<symir::BlockBuilder::ExprID *>(*data);
           switch (Random::Get().Uniform(0, 1)()) {
-          case 0: {
-            // xor then and version
-            *AExprIdPtr = thisBlockBd->SymAddExpr({
-              thisBlockBd->SymXorTerm(C, B->GetDef(), accessB),
-              thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)
-            });
-          } break;
-          case 1: {
-            // and then xor version
-            *AExprIdPtr = thisBlockBd->SymAddExpr({
-              thisBlockBd->SymAndTerm(C, B->GetDef(), accessB),
-              thisBlockBd->SymXorTerm(C, B->GetDef(), accessB)
-            });
-          } break;
-          default: Panic("should not reach here");
+            case 0: {
+              // xor then and version
+              *AExprIdPtr = thisBlockBd->SymAddExpr(
+                  {thisBlockBd->SymXorTerm(C, B->GetDef(), accessB),
+                   thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)}
+              );
+            } break;
+            case 1: {
+              // and then xor version
+              *AExprIdPtr = thisBlockBd->SymAddExpr(
+                  {thisBlockBd->SymAndTerm(C, B->GetDef(), accessB),
+                   thisBlockBd->SymXorTerm(C, B->GetDef(), accessB)}
+              );
+            } break;
+            default:
+              Panic("should not reach here");
           }
           return utils::VariableTerm(thisFunBd, thisBlockBd, A);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      make_matcher(
-        const symir::Term *,
-        m_OrTerm(m_Solved(), m_Var())
-      ),
-      varInsertFun,
-      1
+        stmt, make_matcher(const symir::Term *, m_OrTerm(m_Solved(), m_Var())), varInsertFun, 1
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
   }
 
   bool AddToAddOrAnd::Match(const symir::Stmt *stmt) const {
-    return utils::MatchSubExprInAnyStmt(
-      stmt,
-      m_Expr(
-        m_Any(m_AddTerm(m_Solved(), m_Var()))
-      )
-    );
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_AddTerm(m_Solved(), m_Var()))));
   }
 
   void AddToAddOrAnd::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running AddToAddOrAnd" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -275,62 +261,55 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Term &t, void **data) {
           const symir::VarUse *B;
           symir::Coef *C;
-          Assert(patternmatch::match(&t, m_AddTerm(m_Solved(&C), m_Var(&B))), "This should be guarenteed");
+          Assert(
+              patternmatch::match(&t, m_AddTerm(m_Solved(&C), m_Var(&B))),
+              "This should be guarenteed"
+          );
           auto accessB = utils::CopyAccess(thisFunBd, B);
-          symir::BlockBuilder::ExprID *AExprIdPtr = static_cast<symir::BlockBuilder::ExprID *>(*data);
+          symir::BlockBuilder::ExprID *AExprIdPtr =
+              static_cast<symir::BlockBuilder::ExprID *>(*data);
           switch (Random::Get().Uniform(0, 1)()) {
-          case 0: {
-            // or then and version
-            *AExprIdPtr = thisBlockBd->SymAddExpr({
-              thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
-              thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)
-            });
-          } break;
-          case 1: {
-            // and then or version
-            *AExprIdPtr = thisBlockBd->SymAddExpr({
-              thisBlockBd->SymAndTerm(C, B->GetDef(), accessB),
-              thisBlockBd->SymOrTerm(C, B->GetDef(), accessB)
-            });
-          } break;
-          default: Panic("should not reach here");
+            case 0: {
+              // or then and version
+              *AExprIdPtr = thisBlockBd->SymAddExpr(
+                  {thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
+                   thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)}
+              );
+            } break;
+            case 1: {
+              // and then or version
+              *AExprIdPtr = thisBlockBd->SymAddExpr(
+                  {thisBlockBd->SymAndTerm(C, B->GetDef(), accessB),
+                   thisBlockBd->SymOrTerm(C, B->GetDef(), accessB)}
+              );
+            } break;
+            default:
+              Panic("should not reach here");
           }
           return utils::VariableTerm(thisFunBd, thisBlockBd, A);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      make_matcher(
-        const symir::Term *,
-        m_AddTerm(m_Solved(), m_Var())
-      ),
-      varInsertFun,
-      1
+        stmt, make_matcher(const symir::Term *, m_AddTerm(m_Solved(), m_Var())), varInsertFun, 1
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
   }
 
   bool AndToSubOrXor::Match(const symir::Stmt *stmt) const {
-    return utils::MatchSubExprInAnyStmt(
-      stmt,
-      m_Expr(
-        m_Any(m_AndTerm(m_Solved(), m_Var()))
-      )
-    );
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_AndTerm(m_Solved(), m_Var()))));
   }
 
   void AndToSubOrXor::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running AndToSubOrXor" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -342,49 +321,41 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
-            const symir::VarUse *B;
-            symir::Coef *C;
-              Assert(patternmatch::match(&t, m_AndTerm(m_Solved(&C), m_Var(&B))), "This should be guarenteed");
-              auto accessB = utils::CopyAccess(thisFunBd, B);
-              symir::BlockBuilder::ExprID *AExprIdPtr = static_cast<symir::BlockBuilder::ExprID *>(*data);
-              *AExprIdPtr = thisBlockBd->SymSubExpr({
-                thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
-                thisBlockBd->SymXorTerm(C, B->GetDef(), accessB)
-              });
-              return utils::VariableTerm(thisFunBd, thisBlockBd, A);
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Term &t, void **data) {
+          const symir::VarUse *B;
+          symir::Coef *C;
+          Assert(
+              patternmatch::match(&t, m_AndTerm(m_Solved(&C), m_Var(&B))),
+              "This should be guarenteed"
+          );
+          auto accessB = utils::CopyAccess(thisFunBd, B);
+          symir::BlockBuilder::ExprID *AExprIdPtr =
+              static_cast<symir::BlockBuilder::ExprID *>(*data);
+          *AExprIdPtr = thisBlockBd->SymSubExpr(
+              {thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
+               thisBlockBd->SymXorTerm(C, B->GetDef(), accessB)}
+          );
+          return utils::VariableTerm(thisFunBd, thisBlockBd, A);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      make_matcher(
-        const symir::Term *,
-        m_AndTerm(m_Solved(), m_Var())
-      ),
-      varInsertFun,
-      1
+        stmt, make_matcher(const symir::Term *, m_AndTerm(m_Solved(), m_Var())), varInsertFun, 1
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
   }
 
   bool XorToSubOrAnd::Match(const symir::Stmt *stmt) const {
-    return utils::MatchSubExprInAnyStmt(
-      stmt,
-      m_Expr(
-        m_Any(m_XorTerm(m_Solved(), m_Var()))
-      )
-    );
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_XorTerm(m_Solved(), m_Var()))));
   }
 
   void XorToSubOrAnd::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running XorToSubOrAnd" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -396,49 +367,41 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Term &t, void **data) {
           const symir::VarUse *B;
           symir::Coef *C;
-          Assert(patternmatch::match(&t, m_XorTerm(m_Solved(&C), m_Var(&B))), "This should be guarenteed");
+          Assert(
+              patternmatch::match(&t, m_XorTerm(m_Solved(&C), m_Var(&B))),
+              "This should be guarenteed"
+          );
           auto accessB = utils::CopyAccess(thisFunBd, B);
-          symir::BlockBuilder::ExprID *AExprIdPtr = static_cast<symir::BlockBuilder::ExprID *>(*data);
-          *AExprIdPtr = thisBlockBd->SymSubExpr({
-            thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
-            thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)
-          });
+          symir::BlockBuilder::ExprID *AExprIdPtr =
+              static_cast<symir::BlockBuilder::ExprID *>(*data);
+          *AExprIdPtr = thisBlockBd->SymSubExpr(
+              {thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
+               thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)}
+          );
           return utils::VariableTerm(thisFunBd, thisBlockBd, A);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      make_matcher(
-        const symir::Term *,
-        m_XorTerm(m_Solved(), m_Var())
-      ),
-      varInsertFun,
-      0.25
+        stmt, make_matcher(const symir::Term *, m_XorTerm(m_Solved(), m_Var())), varInsertFun, 0.25
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
   }
 
   bool AndToSubAndAnd::Match(const symir::Stmt *stmt) const {
-    return utils::MatchSubExprInAnyStmt(
-      stmt,
-      m_Expr(
-        m_Any(m_XorTerm(m_Solved(), m_Var()))
-      )
-    );
+    return utils::MatchSubExprInAnyStmt(stmt, m_Expr(m_Any(m_XorTerm(m_Solved(), m_Var()))));
   }
 
   void AndToSubAndAnd::Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
     Log::Get().Out() << "Running AndToSubAndAnd" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
@@ -450,33 +413,33 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(symir::FunctBuilder * ,symir::BlockBuilder *, const symir::Term &, void **)>
-      varInsertFun =
-        [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd, const symir::Term &t, void **data) {
+    std::function<symir::BlockBuilder::TermID(
+        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
+    )>
+        varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
+                           const symir::Term &t, void **data) {
           const symir::VarUse *B;
           symir::Coef *C;
-          Assert(patternmatch::match(&t, m_XorTerm(m_Solved(&C), m_Var(&B))), "This should be guarenteed");
+          Assert(
+              patternmatch::match(&t, m_XorTerm(m_Solved(&C), m_Var(&B))),
+              "This should be guarenteed"
+          );
           auto accessB = utils::CopyAccess(thisFunBd, B);
-          symir::BlockBuilder::ExprID *AExprIdPtr = static_cast<symir::BlockBuilder::ExprID *>(*data);
-          *AExprIdPtr = thisBlockBd->SymSubExpr({
-            thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
-            thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)
-          });
+          symir::BlockBuilder::ExprID *AExprIdPtr =
+              static_cast<symir::BlockBuilder::ExprID *>(*data);
+          *AExprIdPtr = thisBlockBd->SymSubExpr(
+              {thisBlockBd->SymOrTerm(C, B->GetDef(), accessB),
+               thisBlockBd->SymAndTerm(C, B->GetDef(), accessB)}
+          );
           return utils::VariableTerm(thisFunBd, thisBlockBd, A);
         };
-  
+
     rep.ReplaceStmt(
-      stmt,
-      make_matcher(
-        const symir::Term *,
-        m_XorTerm(m_Solved(), m_Var())
-      ),
-      varInsertFun,
-      0.25
+        stmt, make_matcher(const symir::Term *, m_XorTerm(m_Solved(), m_Var())), varInsertFun, 0.25
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
   }
 
 
-}
+} // namespace transformations::instcombine

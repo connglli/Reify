@@ -28,14 +28,14 @@
 #include <string>
 
 #include "global.hpp"
-#include "lib/lowers.hpp"
+#include "lib/Transformations/utils.hpp"
 #include "lib/chksum.hpp"
+#include "lib/fcallembed.hpp"
+#include "lib/lowers.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
-#include "lib/fcallembed.hpp"
 #include "lib/ruleinfo.hpp"
 #include "lib/varstate.hpp"
-#include "lib/Transformations/utils.hpp"
 
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
@@ -83,24 +83,26 @@ void ProgPlus::Generate() {
     auto emb = RandomFCallEmbedder(host);
     std::unique_ptr<FCallStrategy> strat;
     switch (GlobalOptions::Get().DataflowStrategy) {
-    case GlobalOptions::Literal: {
-      strat = std::make_unique<LiteralFCallStrategy>();
-    } break;
-    case GlobalOptions::PrimeFieldInterpolation: {
-      strat = std::make_unique<PrimeInterpFCallStrategy>();
-    } break;
-    case GlobalOptions::Rewrite: {
-      strat = std::make_unique<RewriteFCallStrategy>();
-    } break;
-    default: Panic("DataflowStrategy is set to an invalid value");
+      case GlobalOptions::Literal: {
+        strat = std::make_unique<LiteralFCallStrategy>();
+      } break;
+      case GlobalOptions::PrimeFieldInterpolation: {
+        strat = std::make_unique<PrimeInterpFCallStrategy>();
+      } break;
+      case GlobalOptions::Rewrite: {
+        strat = std::make_unique<RewriteFCallStrategy>();
+      } break;
+      default:
+        Panic("DataflowStrategy is set to an invalid value");
     }
     emb.SetStrategy(std::move(strat));
 
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
     auto randU = Random::Get().UniformReal();
-    // TODO: since we are only replacing on path coeffs using numCoeffs forces ReplaceProba to be really low (e.g. 0.05)
-    // Hence we need a better way to come up with a way to generate a random number of repacements
+    // TODO: since we are only replacing on path coeffs using numCoeffs forces ReplaceProba to be
+    // really low (e.g. 0.05) Hence we need a better way to come up with a way to generate a random
+    // number of repacements
     int randNum = Random::Get().Binomial(numCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
     if (randNum == 0) {
       Log::Get().CloseSection();
@@ -122,18 +124,16 @@ void ProgPlus::Generate() {
 
       Log::Get().OpenSection("Embedding " + guest->GetName());
       Log::Get().Out() << "Initials: ";
-      for (size_t i = 0 ; i < init->size(); i++) {
+      for (size_t i = 0; i < init->size(); i++) {
         Log::Get().Out() << (*init)[i].ToCxStr() << ", ";
       }
       Log::Get().Out() << (*init).back().ToCxStr() << std::endl;
 
       if (emb.EmbedGuest(guest, init, fina)) {
-        Log::Get().Out() << "Embed: " << k << "/" << randNum 
-                         << " Success: " << "func#" << j << ": "
+        Log::Get().Out() << "Embed: " << k << "/" << randNum << " Success: " << "func#" << j << ": "
                          << guest->GetName() << std::endl;
       } else {
-        Log::Get().Out() << "Embed: " << k << "/" << randNum 
-                         << " Failed: " << "func#" << j << ": "
+        Log::Get().Out() << "Embed: " << k << "/" << randNum << " Failed: " << "func#" << j << ": "
                          << guest->GetName() << std::endl;
       }
       Log::Get().CloseSection();
@@ -142,7 +142,6 @@ void ProgPlus::Generate() {
     functions[i] = emb.Finalize();
     Log::Get().CloseSection();
   }
-
 }
 
 void ProgPlus::GenerateCode(const ProgArts &arts) const {

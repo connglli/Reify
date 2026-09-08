@@ -609,9 +609,9 @@ namespace symir {
       delete t;
     }
 
-    pushArg<SymIRBuilder::TermID>(
-      bblBd->SymTerm(op, (coefToken != nullptr ? buildCoef(coefToken, termType) : nullptr), varDef, vecAcc)
-    );
+    pushArg<SymIRBuilder::TermID>(bblBd->SymTerm(
+        op, (coefToken != nullptr ? buildCoef(coefToken, termType) : nullptr), varDef, vecAcc
+    ));
     pushArg<int>(*numTerms);
     if (varToken != nullptr) {
       delete varToken;

@@ -24,15 +24,15 @@
 // SOFTWARE.
 
 #include "lib/varstate.hpp"
-#include "lib/lang.hpp"
-#include "lib/symexec.hpp"
-#include "lib/ubfree.hpp"
 #include <bitwuzla/cpp/bitwuzla.h>
 #include <fstream>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
+#include "lib/lang.hpp"
+#include "lib/symexec.hpp"
+#include "lib/ubfree.hpp"
 
 namespace varstate {
   std::vector<std::unique_ptr<VariableStateQuery>> AllFromJsonFile(std::string filepath) {
@@ -47,7 +47,7 @@ namespace varstate {
     std::vector<std::unique_ptr<VariableStateQuery>> res;
     res.resize(mapObj.size());
     size_t i = 0;
-    for (const auto& [k, varStateJson] : mapObj.items()) {
+    for (const auto &[k, varStateJson]: mapObj.items()) {
       res[i] = std::make_unique<VariableStateQuery>();
       res[i]->FromJson(varStateJson);
       i += 1;
@@ -66,18 +66,20 @@ namespace varstate {
   void PrintState(size_t nr_variables, std::vector<int32_t> states) {
     for (size_t i = 0; i < states.size(); i++) {
       std::cout << states[i];
-      if (i != 0 && i % nr_variables == 0) std::cout << std::endl;
-      else std::cout << ", ";
+      if (i != 0 && i % nr_variables == 0)
+        std::cout << std::endl;
+      else
+        std::cout << ", ";
     }
   }
-}
+} // namespace varstate
 
 // ==================== VariableStateBase Implementation ====================
 
 std::vector<size_t> VariableStateBase::GetPathBlocksIndices() {
   std::vector<size_t> path;
   path.reserve(this->executionState.size());
-  for (const auto& es : executionState) {
+  for (const auto &es: executionState) {
     path.push_back(es.blockId.first);
   }
   return path;
@@ -86,7 +88,7 @@ std::vector<size_t> VariableStateBase::GetPathBlocksIndices() {
 std::vector<std::string> VariableStateBase::GetPathBlocksLabels() {
   std::vector<std::string> path;
   path.reserve(this->executionState.size());
-  for (const auto& es : executionState) {
+  for (const auto &es: executionState) {
     path.push_back(es.blockId.second);
   }
   return path;
@@ -100,7 +102,7 @@ nlohmann::json VariableStateExtractor::ToJson() {
     initArr[i] = this->init[i];
   }
   nlohmann::json varMap = nlohmann::json::object();
-  for (const auto& [name, idx] : this->varNamesMap) {
+  for (const auto &[name, idx]: this->varNamesMap) {
     varMap[name] = idx;
   }
   nlohmann::json pathArr = nlohmann::json::array();
@@ -165,7 +167,10 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
       // Array Access
       int32_t dimLen = currShape[currentShapeIdx];
 
-      Assert(0 <= idxVal && idxVal < dimLen, "This should have make the solver fail so something is very wrong");
+      Assert(
+          0 <= idxVal && idxVal < dimLen,
+          "This should have make the solver fail so something is very wrong"
+      );
       int32_t elLoc = idxVal;
 
       pendingArrayShape.push_back(dimLen);
@@ -176,10 +181,9 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
         const int32_t flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
         solverSuffix << "_el" << flatLoc;
         flattenedIdx += flatLoc * static_cast<int32_t>(symir::IntSizeOfSymIRType(
-          this->symexec->fun->GetStructs(),
-          currBaseType, currBaseType, {},
-          currStruct
-        ));
+                                      this->symexec->fun->GetStructs(), currBaseType, currBaseType,
+                                      {}, currStruct
+                                  ));
         pendingArrayShape.clear();
         pendingArrayIndices.clear();
 
@@ -192,7 +196,10 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
       const auto *sDef = this->symexec->fun->GetStruct(currStruct);
       int32_t numFields = sDef->GetFields().size();
 
-      Assert(0 <= idxVal && idxVal < numFields, "This should have make the solver fail so something is very wrong");
+      Assert(
+          0 <= idxVal && idxVal < numFields,
+          "This should have make the solver fail so something is very wrong"
+      );
       int32_t fIdx = idxVal;
       const auto &field = sDef->GetField(fIdx);
       solverSuffix << "_" << field.name;
@@ -201,12 +208,11 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
       for (int32_t j = 0; j < fIdx; j++) {
         const auto &field = sDef->GetField(j);
         flattenedIdx += static_cast<int32_t>(symir::IntSizeOfSymIRType(
-          this->symexec->fun->GetStructs(),
-          field.type,
-          field.baseType,
-          field.shape,
-          (field.type == symir::SymIR::Type::STRUCT || field.baseType == symir::SymIR::Type::STRUCT 
-            ? field.structName : currStruct)
+            this->symexec->fun->GetStructs(), field.type, field.baseType, field.shape,
+            (field.type == symir::SymIR::Type::STRUCT ||
+                     field.baseType == symir::SymIR::Type::STRUCT
+                 ? field.structName
+                 : currStruct)
         ));
       }
 
@@ -227,50 +233,60 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
   }
   // handling our own version to avoid messing with the one from UBSan
   std::string solverName = varDef->GetName() + solverSuffix.str();
-  Assert(versions.contains(solverName), "if the variable is used along the path is should have been initialized and hence versioned");
+  Assert(
+      versions.contains(solverName),
+      "if the variable is used along the path is should have been initialized and hence versioned"
+  );
   this->versions[solverName] += 1;
 
-  bitwuzla::Term varUseExpr = 
-    this->symexec->ubSan->CreateVersionedExpr(
+  bitwuzla::Term varUseExpr = this->symexec->ubSan->CreateVersionedExpr(
       varDef, solverSuffix.str(), this->versions[solverName]
-    );
+  );
   std::optional<int32_t> varValueOpt = this->symexec->extractTermFromModel(varUseExpr);
   Assert(varValueOpt.has_value(), "VarUse %s is onpath and unsolved!", varDef->GetName().c_str());
 
   // look for the variable index to get the correct index into init;
-  Assert(this->varNamesMap.contains(varDef->GetName()), "Tried to access a variable name that is not a param or local");
+  Assert(
+      this->varNamesMap.contains(varDef->GetName()),
+      "Tried to access a variable name that is not a param or local"
+  );
   size_t varIndex = this->varNamesMap[varDef->GetName()];
 
-  this->executionState[this->currBlock]
-    .assignments
-    .push_back(std::make_pair(
-      varIndex + flattenedIdx,
-      varValueOpt.value()
-    ));
+  this->executionState[this->currBlock].assignments.push_back(
+      std::make_pair(varIndex + flattenedIdx, varValueOpt.value())
+  );
 }
 
 void VariableStateExtractor::Visit(const symir::Coef &c) {
-  Assert(c.GetType() == symir::SymIR::I32, "Only 32-bit int32_teger variables are supported for now!");
+  Assert(
+      c.GetType() == symir::SymIR::I32, "Only 32-bit int32_teger variables are supported for now!"
+  );
   auto coefExpr = symexec->ubSan->CreateCoefExpr(c);
   PushTerm(coefExpr);
 }
 
-void VariableStateExtractor::Visit(const symir::Term &t) { /* Do Nothing */; }
+void VariableStateExtractor::Visit(const symir::Term &t) { /* Do Nothing */ ; }
+
 void VariableStateExtractor::Visit(const symir::ModExpr &e) {
   Panic("No ModExpr should exist during function creation");
 }
-void VariableStateExtractor::Visit(const symir::Expr &e) { /* Do Nothing */; }
-void VariableStateExtractor::Visit(const symir::Cond &c) { /* Do Nothing */; }
+
+void VariableStateExtractor::Visit(const symir::Expr &e) { /* Do Nothing */ ; }
+
+void VariableStateExtractor::Visit(const symir::Cond &c) { /* Do Nothing */ ; }
+
 void VariableStateExtractor::Visit(const symir::ModAssStmt &a) {
   Panic("No ModAssStmt should exist during function creation");
 }
-void VariableStateExtractor::Visit(const symir::AssStmt &a) {
-  a.GetVar()->Accept(*this);
-}
 
-void VariableStateExtractor::Visit(const symir::RetStmt &r) { /* Do Nothing */; };
-void VariableStateExtractor::Visit(const symir::Branch &b) { /* Do Nothing */; }
-void VariableStateExtractor::Visit(const symir::Goto &g) { /* Do Nothing */; }
+void VariableStateExtractor::Visit(const symir::AssStmt &a) { a.GetVar()->Accept(*this); }
+
+void VariableStateExtractor::Visit(const symir::RetStmt &r) { /* Do Nothing */ ; };
+
+void VariableStateExtractor::Visit(const symir::Branch &b) { /* Do Nothing */ ; }
+
+void VariableStateExtractor::Visit(const symir::Goto &g) { /* Do Nothing */ ; }
+
 void VariableStateExtractor::Visit(const symir::ScaParam &p) {
   bitwuzla::Term varExpr = this->symexec->ubSan->CreateScaExpr(&p, 0);
   this->versions[p.GetName()] = 0;
@@ -323,6 +339,7 @@ void VariableStateExtractor::Visit(const symir::VecLocal &l) {
     this->init.push_back(varValueOpt.value());
   }
 }
+
 void VariableStateExtractor::Visit(const symir::StructLocal &l) {
   const auto *sDef = this->symexec->fun->GetStruct(l.GetStructName());
   ubsan::IterateStructElements(*this->symexec->fun, sDef, [&](std::string elName) {
@@ -334,12 +351,15 @@ void VariableStateExtractor::Visit(const symir::StructLocal &l) {
     this->init.push_back(varValueOpt.value());
   });
 }
-void VariableStateExtractor::Visit(const symir::StructDef &s) { /* Do Nothing */; };
+
+void VariableStateExtractor::Visit(const symir::StructDef &s) { /* Do Nothing */ ; };
+
 void VariableStateExtractor::Visit(const symir::Block &b) {
   for (const auto &stmt: b.GetStmts()) {
     stmt->Accept(*this);
   }
 };
+
 void VariableStateExtractor::Visit(const symir::Funct &f) {
   for (const auto &param: f.GetParams()) {
     this->varNamesMap[param->GetName()] = this->init.size();
@@ -368,25 +388,17 @@ void VariableStateQuery::FromJson(nlohmann::json mapObj) {
   nlohmann::json initArr = mapObj["init"];
   nlohmann::json varMap = mapObj["varnames"];
   nlohmann::json pathArr = mapObj["path"];
-  Assert(
-      initArr.is_array(), "The field 'init' is not an array but a %s",
-      initArr.type_name()
-  );
-  Assert(
-      varMap.is_object(), "The field 'varnames' is not an object but a %s",
-      varMap.type_name()
-  );
-  Assert(
-      pathArr.is_array(), "The field 'path' is not an array but a %s",
-      pathArr.type_name()
-  );
+  Assert(initArr.is_array(), "The field 'init' is not an array but a %s", initArr.type_name());
+  Assert(varMap.is_object(), "The field 'varnames' is not an object but a %s", varMap.type_name());
+  Assert(pathArr.is_array(), "The field 'path' is not an array but a %s", pathArr.type_name());
 
   // read init state of the variables
   this->init.resize(initArr.size());
-  for (size_t i = 0; i < initArr.size(); i++) this->init[i] = initArr[i];
+  for (size_t i = 0; i < initArr.size(); i++)
+    this->init[i] = initArr[i];
 
   // read variable indexes
-  for (const auto& [name, idx] : varMap.items()) {
+  for (const auto &[name, idx]: varMap.items()) {
     this->varNamesMap[idx.get<int32_t>()] = name;
   }
 
@@ -394,10 +406,14 @@ void VariableStateQuery::FromJson(nlohmann::json mapObj) {
   this->executionState.resize(pathArr.size());
   for (size_t i = 0; i < pathArr.size(); i++) {
     Assert(pathArr[i].contains("block"), "varstate object does not contain an field 'block'");
-    Assert(pathArr[i].contains("blockLabel"), "varstate object does not contain an field 'blockLabel'");
-    Assert(pathArr[i].contains("assignments"), "varstate object does not contain an field 'blockLabel'");
+    Assert(
+        pathArr[i].contains("blockLabel"), "varstate object does not contain an field 'blockLabel'"
+    );
+    Assert(
+        pathArr[i].contains("assignments"), "varstate object does not contain an field 'blockLabel'"
+    );
     this->executionState[i].blockId.first = pathArr[i]["block"];
-    this->executionState[i].blockId.second= pathArr[i]["blockLabel"];
+    this->executionState[i].blockId.second = pathArr[i]["blockLabel"];
 
     nlohmann::json assignArr = pathArr[i]["assignments"];
     this->executionState[i].assignments.resize(assignArr.size());
@@ -413,29 +429,34 @@ VariableState VariableStateQuery::Query(size_t blockIndex, size_t stmtIndex) {
 
   size_t varsCount = varState.size();
   size_t currStateStartIdx = 0;
-  for (const auto &blockState : this->executionState) {
+  for (const auto &blockState: this->executionState) {
     for (size_t assignIdx = 0; assignIdx < blockState.assignments.size(); assignIdx++) {
-      // if we reached the target block and stmt save the current state at this row and move on to the next row
+      // if we reached the target block and stmt save the current state at this row and move on to
+      // the next row
       if (blockIndex == (size_t) blockState.blockId.first && assignIdx == stmtIndex) {
         varState.resize(varState.size() + varsCount);
-        for (size_t i = varState.size() - varsCount; i < varState.size() ; i++)
+        for (size_t i = varState.size() - varsCount; i < varState.size(); i++)
           varState[i] = varState[i - varsCount];
         currStateStartIdx += varsCount;
       }
       // update assigned variables state
       varState[blockState.assignments[assignIdx].first + currStateStartIdx] =
-        blockState.assignments[assignIdx].second;
+          blockState.assignments[assignIdx].second;
     }
     // if we reached the target block and stmt is after the last assignment stmt store anyway
-    if (blockIndex == (size_t) blockState.blockId.first && blockState.assignments.size() <= stmtIndex) {
+    if (blockIndex == (size_t) blockState.blockId.first &&
+        blockState.assignments.size() <= stmtIndex) {
       varState.resize(varState.size() + varsCount);
-      for (size_t i = varState.size() - varsCount; i < varState.size() ; i++)
+      for (size_t i = varState.size() - varsCount; i < varState.size(); i++)
         varState[i] = varState[i - varsCount];
       currStateStartIdx += varsCount;
     }
   }
   // cut the temporary top variable state before returning
   varState.resize(varState.size() - varsCount);
-  Assert(varState.size() != 0, "unable to find variable state at block %ld, stmt %ld", blockIndex, stmtIndex);
-  return (struct VariableState) { this->varNamesMap, varState, varsCount };
+  Assert(
+      varState.size() != 0, "unable to find variable state at block %ld, stmt %ld", blockIndex,
+      stmtIndex
+  );
+  return (struct VariableState) {this->varNamesMap, varState, varsCount};
 }

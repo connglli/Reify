@@ -23,12 +23,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <flint/ulong_extras.h>
 #include <flint/nmod.h>
 #include <flint/nmod_mat.h>
+#include <flint/ulong_extras.h>
 #include <lib/random.hpp>
-#include <lib/samputils.hpp>
 #include <lib/reduceinfo.hpp>
+#include <lib/samputils.hpp>
 #include <utility>
 
 #include "global.hpp"
@@ -41,30 +41,33 @@
 #include "lib/varstate.hpp"
 
 namespace {
-  void RetargetBlock(symir::FunctBuilder *funBd, const symir::Block *blk, std::map<const std::string, symir::BlockBuilder *> argBlocks) {
+  void RetargetBlock(
+      symir::FunctBuilder *funBd, const symir::Block *blk,
+      std::map<const std::string, symir::BlockBuilder *> argBlocks
+  ) {
     const symir::Target *target = blk->GetTarget();
-    if (target == nullptr) return;
+    if (target == nullptr)
+      return;
 
     if (target->GetIRId() == symir::SymIR::SIR_TGT_GOTO) {
       const std::string goto_target = static_cast<const symir::Goto *>(target)->GetTarget();
-      if (!argBlocks.contains(goto_target)) return;
+      if (!argBlocks.contains(goto_target))
+        return;
       const std::string targetBlkLabel = argBlocks[goto_target]->GetLabel();
       symir::BlockBuilder *blkBd = symir::BlockCopier(funBd, blk).CopyAsBuilder();
       blkBd->RemoveTarget();
 
-      Log::Get().Out() << "Setting goto target of block " << blk->GetLabel() 
-                       << " from " << goto_target
-                       << " to " << targetBlkLabel << std::endl;
+      Log::Get().Out() << "Setting goto target of block " << blk->GetLabel() << " from "
+                       << goto_target << " to " << targetBlkLabel << std::endl;
 
       blkBd->SymGoto(targetBlkLabel);
       funBd->ReplaceOrCloseBlock(blkBd);
 
     } else if (target->GetIRId() == symir::SymIR::SIR_TGT_BRA) {
       const symir::Branch *branch_target = static_cast<const symir::Branch *>(target);
-      if (
-        !argBlocks.contains(branch_target->GetTrueTarget()) 
-        && !argBlocks.contains(branch_target->GetFalseTarget())
-      ) return;
+      if (!argBlocks.contains(branch_target->GetTrueTarget()) &&
+          !argBlocks.contains(branch_target->GetFalseTarget()))
+        return;
       symir::BlockBuilder *blkBd = symir::BlockCopier(funBd, blk).CopyAsBuilder();
       blkBd->RemoveTarget();
       std::string trueLabel = branch_target->GetTrueTarget();
@@ -76,11 +79,14 @@ namespace {
         falseLabel = argBlocks[falseLabel]->GetLabel();
       }
 
-      Log::Get().Out() << "Setting goto target of block " << blk->GetLabel() 
-                       << " from true: " << branch_target->GetTrueTarget() << " false: " << branch_target->GetFalseTarget()
-                       << " to true: " << trueLabel << " false: " << falseLabel << std::endl;
+      Log::Get().Out() << "Setting goto target of block " << blk->GetLabel()
+                       << " from true: " << branch_target->GetTrueTarget()
+                       << " false: " << branch_target->GetFalseTarget() << " to true: " << trueLabel
+                       << " false: " << falseLabel << std::endl;
 
-      blkBd->SymBranch(trueLabel, falseLabel, symir::StmtCopier(funBd, blkBd).CopyCond(branch_target->GetCond()));
+      blkBd->SymBranch(
+          trueLabel, falseLabel, symir::StmtCopier(funBd, blkBd).CopyCond(branch_target->GetCond())
+      );
       funBd->ReplaceOrCloseBlock(blkBd);
 
     } else {
@@ -91,18 +97,15 @@ namespace {
 
 // ==================== FCallStrategy Base Implementations ====================
 void FCallStrategy::Initialize(
-  const symir::Funct *guest,
-  const std::vector<ArgPlus<int32_t>> *init,
-  const std::vector<ArgPlus<int32_t>> *fina
+    const symir::Funct *guest, const std::vector<ArgPlus<int32_t>> *init,
+    const std::vector<ArgPlus<int32_t>> *fina
 ) {
   this->guest = guest;
   this->init = init;
   this->fina = fina;
 }
 
-void FCallStrategy::SetTarget(const int32_t target) {
-  this->emplaceTargetValue = target;
-}
+void FCallStrategy::SetTarget(const int32_t target) { this->emplaceTargetValue = target; }
 
 void FCallStrategy::SetMaxNrBlocks(size_t nrBlocks) {
   Log::Get().Out() << "Set max nrBlocks to " << nrBlocks << std::endl;
@@ -112,19 +115,14 @@ void FCallStrategy::SetMaxNrBlocks(size_t nrBlocks) {
   this->nrBlocks = nrBlocks;
 }
 
-
 std::string FCallStrategy::WrapChecksum(int32_t checksum, std::string call) const {
   std::ostringstream res;
-  res << StatelessChecksum::GetCheckChksumName()
-      <<"(" 
-      << checksum 
-      << ", "
-      << call
-      << ")";
+  res << StatelessChecksum::GetCheckChksumName() << "(" << checksum << ", " << call << ")";
   return res.str();
 }
 
-const symir::VarDef *FCallStrategy::GetUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) {
+const symir::VarDef *
+FCallStrategy::GetUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) {
   Assert(blockIndex < this->nrBlocks, "blockIndex must be less then the set max number of blocks");
 
   if (stmtIndex + 1 > nrStmts) {
@@ -135,10 +133,10 @@ const symir::VarDef *FCallStrategy::GetUnusedAssignVar(symir::FunctBuilder *funB
   // How many argument variables are already in use at this stmt
   size_t idx = stmtIndex * this->nrBlocks + blockIndex;
   Assert(
-    idx < this->argUsedMatrix.size(),
-    "attempted to get a variable count out of bound of matrix\n" 
-    "{stmtIndex: %ld, nrBlocks: %ld, blockIndex: %ld, idx: %ld, matrixSize: %ld}",
-    stmtIndex, this->nrBlocks, blockIndex, idx, this->argUsedMatrix.size()
+      idx < this->argUsedMatrix.size(),
+      "attempted to get a variable count out of bound of matrix\n"
+      "{stmtIndex: %ld, nrBlocks: %ld, blockIndex: %ld, idx: %ld, matrixSize: %ld}",
+      stmtIndex, this->nrBlocks, blockIndex, idx, this->argUsedMatrix.size()
   );
   size_t argUsed = this->argUsedMatrix[stmtIndex * this->nrBlocks + blockIndex];
 
@@ -148,24 +146,21 @@ const symir::VarDef *FCallStrategy::GetUnusedAssignVar(symir::FunctBuilder *funB
   }
 
   Assert(loc != nullptr, "creation or search for local has failed");
-  Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;;
+  Log::Get().Out() << "AssignVariable: " << loc->GetName() << std::endl;
+  ;
 
   this->argUsedMatrix[stmtIndex * this->nrBlocks + blockIndex] += 1;
   return loc;
 }
 
 // ==================== FCallEmbedder Base Implementations ====================
-FCallEmbedder::FCallEmbedder(symir::Funct *const host): host(host) {
-  Assert(
-    host != nullptr,
-    "The host function passed to the constructur is a nullptr"
-  );
+FCallEmbedder::FCallEmbedder(symir::Funct *const host) : host(host) {
+  Assert(host != nullptr, "The host function passed to the constructur is a nullptr");
   for (auto &sym: host->GetSymbols()) {
     // Check to ensure all symbols are Coef
     Assert(
-      sym->IsSolved(),
-      "The symbol \"%s\" in the host function is not solved, cannot replace it",
-      sym->GetName().c_str()
+        sym->IsSolved(), "The symbol \"%s\" in the host function is not solved, cannot replace it",
+        sym->GetName().c_str()
     );
     this->symbols[dynamic_cast<symir::Coef *>(sym)] = false;
   }
@@ -173,9 +168,8 @@ FCallEmbedder::FCallEmbedder(symir::Funct *const host): host(host) {
 }
 
 bool FCallEmbedder::EmbedGuest(
-  symir::Funct *guest,
-  const std::vector<ArgPlus<int32_t>> *init,
-  const std::vector<ArgPlus<int32_t>> *fina
+    symir::Funct *guest, const std::vector<ArgPlus<int32_t>> *init,
+    const std::vector<ArgPlus<int32_t>> *fina
 ) {
   Assert(this->callGenStrategy != nullptr, "No embedding strategy choosen");
   Assert(guest != nullptr, "No valid guest to embed");
@@ -198,6 +192,7 @@ bool FCallEmbedder::WasMutated(symir::Coef *c) {
   );
   return it->second;
 }
+
 void FCallEmbedder::MarkMutated(symir::Coef *c) {
   auto it = symbols.find(c);
   Assert(
@@ -216,14 +211,12 @@ std::string LiteralFCallStrategy::GenerateCall() {
 
   // Build call
   std::ostringstream fcall;
-  fcall << this->guest->GetName() 
-        << "(";
+  fcall << this->guest->GetName() << "(";
   const auto &params = this->guest->GetParams();
   for (int32_t i = 0; i < static_cast<int32_t>(init->size()); ++i) {
     const auto &p = params[i];
     const auto &arg = (*init)[i];
-    fcall << arg.GetTypeCastStr(p) 
-          << arg.ToCxStr();
+    fcall << arg.GetTypeCastStr(p) << arg.ToCxStr();
     if (i < static_cast<int32_t>(init->size()) - 1) {
       fcall << ", ";
     }
@@ -236,12 +229,9 @@ std::string LiteralFCallStrategy::GenerateCall() {
 
   // Correct call result such that it matches the emplacedTargetValue
   // To avoid UBs, we'd use an upper type to save the result: long long here
-  long long diff = static_cast<long long>(this->emplaceTargetValue)
-                 - static_cast<long long>(checksum);
-  if (
-      diff >= static_cast<long long>(INT32_MIN) 
-      && diff <= static_cast<long long>(INT32_MAX)
-    ) {
+  long long diff =
+      static_cast<long long>(this->emplaceTargetValue) - static_cast<long long>(checksum);
+  if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
     return "(" + chk_call + " + " + std::to_string(diff) + ")";
   } else {
     return "(int) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
@@ -250,19 +240,18 @@ std::string LiteralFCallStrategy::GenerateCall() {
 
 // ==================== PrimeInterpFCallStrategy Implementations ====================
 void AbstractArgBlockStrategy::GeneratePreamble(
-  std::vector<VariableStateQuery *> varStateQueries,
-  symir::FunctBuilder *funBd,
-  size_t blockIndex,
-  size_t stmtIndex
+    std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+    size_t blockIndex, size_t stmtIndex
 ) {
   Assert(this->guest, "guest is not initialized");
   Assert(this->init, "init is not initialized");
 
   Log::Get().OpenSection("Generating Preamble");
 
-  if (this->nrBlocks == 0) this->SetMaxNrBlocks(funBd->GetBlocks().size());
+  if (this->nrBlocks == 0)
+    this->SetMaxNrBlocks(funBd->GetBlocks().size());
 
-  const symir::Block *targetBlock= funBd->GetBlocks()[blockIndex];
+  const symir::Block *targetBlock = funBd->GetBlocks()[blockIndex];
   const std::string targetLabel = targetBlock->GetLabel();
   Log::Get().Out() << "targeting block: " << targetLabel << "at stmt: " << stmtIndex << std::endl;
   symir::BlockBuilder *headerBlockBd;
@@ -280,7 +269,8 @@ void AbstractArgBlockStrategy::GeneratePreamble(
     const auto &arg = (*this->init)[initIdx];
     for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
       flattIndex += 1;
-      if (randDouble() <= 1 - GlobalOptions::Get().InitReplaceProba) continue;
+      if (randDouble() <= 1 - GlobalOptions::Get().InitReplaceProba)
+        continue;
 
       Log::Get().Out() << "Replacing the flattend " << flattIndex << "-th argument" << std::endl;
 
@@ -288,17 +278,10 @@ void AbstractArgBlockStrategy::GeneratePreamble(
       int val = arg.IsScalar() ? arg.GetValue() : arg.GetValue(argIdx);
 
       Log::Get().Out() << loc->GetName() << " <- " << val << std::endl;
-      headerBlockBd->CommitStmt(
-        headerBlockBd->SymAssStmt(
-          loc, 
-          headerBlockBd->SymAddExpr({
-            headerBlockBd->SymCstTerm(
-              funBd->SymI32Const(val),
-              nullptr
-            )
-          })
-        )
-      );
+      headerBlockBd->CommitStmt(headerBlockBd->SymAssStmt(
+          loc,
+          headerBlockBd->SymAddExpr({headerBlockBd->SymCstTerm(funBd->SymI32Const(val), nullptr)})
+      ));
       this->argVars[flattIndex - 1] = std::make_pair(loc->GetName(), 0);
       Log::Get().Out() << std::endl;
     }
@@ -313,8 +296,7 @@ std::string AbstractArgBlockStrategy::GenerateCall() {
 
   int32_t checksum = StatelessChecksum::Compute(*this->fina);
   std::ostringstream fcall;
-  fcall << this->guest->GetName() 
-        << "(";
+  fcall << this->guest->GetName() << "(";
 
   const auto &params = this->guest->GetParams();
   size_t flattenedIndex = 0;
@@ -329,8 +311,7 @@ std::string AbstractArgBlockStrategy::GenerateCall() {
       }
       flattenedIndex += 1;
     }
-    fcall << arg.GetTypeCastStr(p) 
-          << arg.ToCxStrWithReplaced(replacers);
+    fcall << arg.GetTypeCastStr(p) << arg.ToCxStrWithReplaced(replacers);
 
     if (i < static_cast<int32_t>(this->init->size()) - 1) {
       fcall << ", ";
@@ -340,19 +321,18 @@ std::string AbstractArgBlockStrategy::GenerateCall() {
   fcall << ")";
   std::string chk_call = this->WrapChecksum(checksum, fcall.str());
   // To avoid UBs, we'd use an upper type to save the result: long long here
-  long long diff = static_cast<long long>(this->emplaceTargetValue)
-                 - static_cast<long long>(checksum);
-  if (
-      diff >= static_cast<long long>(INT32_MIN) 
-      && diff <= static_cast<long long>(INT32_MAX)
-    ) {
+  long long diff =
+      static_cast<long long>(this->emplaceTargetValue) - static_cast<long long>(checksum);
+  if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
     return "(" + chk_call + " + " + std::to_string(diff) + ")";
   } else {
     return "(int) ((long long)" + chk_call + " + " + std::to_string(diff) + "L)";
   }
 }
 
-void PrimeInterpFCallStrategy::Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
+void PrimeInterpFCallStrategy::Finalize(
+    std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd
+) {
   // needs variable state
   Log::Get().OpenSection("PrimeInterpFCallStrategy::finalize for " + funBd->GetName());
 
@@ -366,48 +346,56 @@ void PrimeInterpFCallStrategy::Finalize(std::vector<VariableStateQuery *> varSta
   }
 
   // loop through all blocks and if the target has a header change their target to the header.
-  for (auto &blk : funBd->GetBlocks()) {
+  for (auto &blk: funBd->GetBlocks()) {
     RetargetBlock(funBd, blk, this->argBlocks);
   }
 
   std::map<std::string, size_t> labelToIdx;
   size_t idx = 0;
-  for (auto &blk : funBd->GetBlocks()) {
+  for (auto &blk: funBd->GetBlocks()) {
     labelToIdx[blk->GetLabel()] = idx++;
   }
 
   Assert(varStateQueries.size() > 0, "must have atleast on Variable State Query");
 
-  for (auto const &[blkLabel, headerBlockBd] : this->argBlocks) {
+  for (auto const &[blkLabel, headerBlockBd]: this->argBlocks) {
 
     // set the target of the header to the block
-    const symir::Block* blk = funBd->FindBlock(blkLabel);
-    Assert(blk != nullptr, "Unable to find block %s in %s", blkLabel.c_str(), funBd->GetName().c_str());
-    Assert(blk->GetLabel() == blkLabel, "function builders internal Map must be broken (%s != %s)", blk->GetLabel().c_str(), blkLabel.c_str());
+    const symir::Block *blk = funBd->FindBlock(blkLabel);
+    Assert(
+        blk != nullptr, "Unable to find block %s in %s", blkLabel.c_str(), funBd->GetName().c_str()
+    );
+    Assert(
+        blk->GetLabel() == blkLabel, "function builders internal Map must be broken (%s != %s)",
+        blk->GetLabel().c_str(), blkLabel.c_str()
+    );
     headerBlockBd->SymGoto(blkLabel);
-    Log::Get().Out() << "Setting target of header block " << headerBlockBd->GetLabel()
-                     << " to " << blkLabel << std::endl;
-    
+    Log::Get().Out() << "Setting target of header block " << headerBlockBd->GetLabel() << " to "
+                     << blkLabel << std::endl;
+
     // Get the Variable State or the original function
     struct VariableState totalVariableState;
     totalVariableState.nrVariables = 0;
-    for (auto &varStateQuery : varStateQueries) {
+    for (auto &varStateQuery: varStateQueries) {
       struct VariableState vs = varStateQuery->Query(labelToIdx[blkLabel], 0);
       if (totalVariableState.nrVariables == 0) {
         totalVariableState.nrVariables = vs.nrVariables;
         totalVariableState.varMap = vs.varMap;
       }
-      Assert(totalVariableState.nrVariables == vs.nrVariables, "Query returns more or less variables then there are in varMap");
+      Assert(
+          totalVariableState.nrVariables == vs.nrVariables,
+          "Query returns more or less variables then there are in varMap"
+      );
       for (size_t i = 0; i < vs.varState.size(); i++) {
         totalVariableState.varState.push_back(vs.varState[i]);
       }
     }
 
-    std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
+    std::vector<symir::BlockBuilder *> headerBlockBds = {headerBlockBd};
     transformations::obscure::PrimeInterp rule = transformations::obscure::PrimeInterp();
     this->rewriteEngine.RunAsPass(funBd, headerBlockBds, totalVariableState, rule);
 
-    for (auto blockBd : headerBlockBds) {
+    for (auto blockBd: headerBlockBds) {
       funBd->CloseBlockAt(blockBd, blk);
     }
   }
@@ -417,7 +405,9 @@ void PrimeInterpFCallStrategy::Finalize(std::vector<VariableStateQuery *> varSta
   Log::Get().CloseSection();
 }
 
-void RewriteFCallStrategy::Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) {
+void RewriteFCallStrategy::Finalize(
+    std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd
+) {
   // needs variable state
   Log::Get().OpenSection("RewriteFCallStrategy::finalize for " + funBd->GetName());
 
@@ -431,61 +421,71 @@ void RewriteFCallStrategy::Finalize(std::vector<VariableStateQuery *> varStateQu
   }
 
   // loop through all blocks and if the target has a header change their target to the header.
-  for (auto &blk : funBd->GetBlocks()) {
+  for (auto &blk: funBd->GetBlocks()) {
     RetargetBlock(funBd, blk, this->argBlocks);
   }
 
   std::map<std::string, size_t> labelToIdx;
   size_t idx = 0;
-  for (auto &blk : funBd->GetBlocks()) {
+  for (auto &blk: funBd->GetBlocks()) {
     labelToIdx[blk->GetLabel()] = idx++;
   }
 
   Assert(varStateQueries.size() > 0, "must have atleast on Variable State Query");
 
-  for (auto const &[blkLabel, headerBlockBd] : this->argBlocks) {
+  for (auto const &[blkLabel, headerBlockBd]: this->argBlocks) {
 
     // set the target of the header to the block
-    const symir::Block* blk = funBd->FindBlock(blkLabel);
-    Assert(blk != nullptr, "Unable to find block %s in %s", blkLabel.c_str(), funBd->GetName().c_str());
-    Assert(blk->GetLabel() == blkLabel, "function builders internal Map must be broken (%s != %s)", blk->GetLabel().c_str(), blkLabel.c_str());
+    const symir::Block *blk = funBd->FindBlock(blkLabel);
+    Assert(
+        blk != nullptr, "Unable to find block %s in %s", blkLabel.c_str(), funBd->GetName().c_str()
+    );
+    Assert(
+        blk->GetLabel() == blkLabel, "function builders internal Map must be broken (%s != %s)",
+        blk->GetLabel().c_str(), blkLabel.c_str()
+    );
     headerBlockBd->SymGoto(blkLabel);
-    Log::Get().Out() << "Setting target of header block " << headerBlockBd->GetLabel()
-                     << " to " << blkLabel << std::endl;
+    Log::Get().Out() << "Setting target of header block " << headerBlockBd->GetLabel() << " to "
+                     << blkLabel << std::endl;
 
     // Get the Variable State of the original function
     struct VariableState totalVariableState;
     totalVariableState.nrVariables = 0;
-    for (auto &varStateQuery : varStateQueries) {
+    for (auto &varStateQuery: varStateQueries) {
       struct VariableState vs = varStateQuery->Query(labelToIdx[blkLabel], 0);
       if (totalVariableState.nrVariables == 0) {
         totalVariableState.nrVariables = vs.nrVariables;
         totalVariableState.varMap = vs.varMap;
       }
-      Assert(totalVariableState.nrVariables == vs.nrVariables, "Query returns more or less variables then there are in varMap");
+      Assert(
+          totalVariableState.nrVariables == vs.nrVariables,
+          "Query returns more or less variables then there are in varMap"
+      );
       for (size_t i = 0; i < vs.varState.size(); i++) {
         totalVariableState.varState.push_back(vs.varState[i]);
       }
     }
 
-    std::vector<symir::BlockBuilder *> headerBlockBds = { headerBlockBd };
+    std::vector<symir::BlockBuilder *> headerBlockBds = {headerBlockBd};
     int rule_seed = Random::Get().Uniform()();
 
-    size_t ruleCount = GlobalOptions::Get().reduceMode
-      ? ReduceInfo::Get().GetRuleCount(funBd->GetName(), headerBlockBd->GetLabel()) 
-      : GlobalOptions::Get().ruleCount;
+    size_t ruleCount =
+        GlobalOptions::Get().reduceMode
+            ? ReduceInfo::Get().GetRuleCount(funBd->GetName(), headerBlockBd->GetLabel())
+            : GlobalOptions::Get().ruleCount;
 
     RuleInfo::Get().NewBlock(headerBlockBd->GetLabel(), rule_seed, ruleCount);
     if (ruleCount > 0) {
-      // We choose a separate seed for each engine run. This makes each run truly independent of the others.
-      // Hence two runs of the same seed may run the engine differently (e.g. less rule applications) while not
-      // changing the rest of the execution via out of sync random number generator state.
+      // We choose a separate seed for each engine run. This makes each run truly independent of the
+      // others. Hence two runs of the same seed may run the engine differently (e.g. less rule
+      // applications) while not changing the rest of the execution via out of sync random number
+      // generator state.
       Random::Get().PushSeed(rule_seed);
       this->rewriteEngine.Run(funBd, headerBlockBds, totalVariableState, ruleCount);
       Random::Get().PopSeed();
     }
 
-    for (auto blockBd : headerBlockBds) {
+    for (auto blockBd: headerBlockBds) {
       funBd->CloseBlockAt(blockBd, blk);
     }
   }
@@ -532,26 +532,31 @@ void RandomFCallEmbedder::Visit(const symir::Coef &c) {
   }
   // Replace the coefficient with a call to the function
   Assert(
-    pc->GetType() == symir::SymIR::I32,
-    "Unsupported type %s for the coefficient with name \"%s\"",
-    symir::SymIR::GetTypeName(pc->GetType()).c_str(), pc->GetName().c_str()
+      pc->GetType() == symir::SymIR::I32,
+      "Unsupported type %s for the coefficient with name \"%s\"",
+      symir::SymIR::GetTypeName(pc->GetType()).c_str(), pc->GetName().c_str()
   );
 
   this->callGenStrategy->SetTarget(pc->GetI32Value());
 
-  this->callGenStrategy->GeneratePreamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
+  this->callGenStrategy->GeneratePreamble(
+      this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt
+  );
   this->hostBuilder->FindSymbol(pc->GetName())->SetValue(this->callGenStrategy->GenerateCall());
-  this->callGenStrategy->GeneratePostamble(this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt);
+  this->callGenStrategy->GeneratePostamble(
+      this->varStateQueries, this->hostBuilder.get(), this->current_block, this->current_stmt
+  );
 
   MarkMutated(pc);
   this->succeeded = true;
- }
+}
 
- void RandomFCallEmbedder::Visit(const symir::Term &t) {
+void RandomFCallEmbedder::Visit(const symir::Term &t) {
   if (this->succeeded) {
     return;
   }
-  if (t.GetCoef() != nullptr) t.GetCoef()->Accept(*this);
+  if (t.GetCoef() != nullptr)
+    t.GetCoef()->Accept(*this);
   if (this->succeeded) {
     return;
   }
@@ -561,6 +566,7 @@ void RandomFCallEmbedder::Visit(const symir::Coef &c) {
 }
 
 void RandomFCallEmbedder::Visit(const symir::ModExpr &e) { /* Do Nothing */ }
+
 void RandomFCallEmbedder::Visit(const symir::Expr &e) {
   if (this->succeeded) {
     return;
@@ -574,12 +580,16 @@ void RandomFCallEmbedder::Visit(const symir::Expr &e) {
 }
 
 void RandomFCallEmbedder::Visit(const symir::Cond &c) {
- if (this->succeeded) {
-   return;
- }
- c.GetExpr()->Accept(*this);
+  if (this->succeeded) {
+    return;
+  }
+  c.GetExpr()->Accept(*this);
 }
-void RandomFCallEmbedder::Visit(const symir::ModAssStmt &a) { Panic("Should not travel through an already linked function"); }
+
+void RandomFCallEmbedder::Visit(const symir::ModAssStmt &a) {
+  Panic("Should not travel through an already linked function");
+}
+
 void RandomFCallEmbedder::Visit(const symir::AssStmt &a) {
   if (this->succeeded) {
     return;
@@ -590,22 +600,31 @@ void RandomFCallEmbedder::Visit(const symir::AssStmt &a) {
   }
   a.GetVar()->Accept(*this);
 }
+
 void RandomFCallEmbedder::Visit(const symir::RetStmt &r) { /* Do Nothing */ }
 
 void RandomFCallEmbedder::Visit(const symir::Branch &b) {
- if (this->succeeded) {
-   return;
- }
- b.GetCond()->Accept(*this);
+  if (this->succeeded) {
+    return;
+  }
+  b.GetCond()->Accept(*this);
 }
-void RandomFCallEmbedder::Visit(const symir::Goto &g)        { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::ScaParam &p)    { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::VecParam &p)    { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::Goto &g) { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::ScaParam &p) { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::VecParam &p) { /* Do Nothing */ }
+
 void RandomFCallEmbedder::Visit(const symir::StructParam &p) { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::ScaLocal &l)    { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::VecLocal &l)    { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::ScaLocal &l) { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::VecLocal &l) { /* Do Nothing */ }
+
 void RandomFCallEmbedder::Visit(const symir::StructLocal &l) { /* Do Nothing */ }
-void RandomFCallEmbedder::Visit(const symir::StructDef &s)   { /* Do Nothing */ }
+
+void RandomFCallEmbedder::Visit(const symir::StructDef &s) { /* Do Nothing */ }
 
 void RandomFCallEmbedder::Visit(const symir::Block &b) {
   const auto stmts = b.GetStmts();
@@ -641,8 +660,10 @@ void RandomFCallEmbedder::Visit(const symir::Block &b) {
 
 void RandomFCallEmbedder::Visit(const symir::Funct &f) {
   const auto blocks = f.GetBlocks();
-  // We could remove duplicates from the path but not doing so gives a bias to blocks inside loops which is not totally undesirable.
-  const auto rand = Random::Get().Uniform(0, static_cast<int32_t>(this->blockIndicesWhitelist.size()) - 1);
+  // We could remove duplicates from the path but not doing so gives a bias to blocks inside loops
+  // which is not totally undesirable.
+  const auto rand =
+      Random::Get().Uniform(0, static_cast<int32_t>(this->blockIndicesWhitelist.size()) - 1);
   // Sample a statement from the list of statements for replacement
   for (int32_t tries = 0; tries < 100; tries++) {
     const size_t index = this->blockIndicesWhitelist[rand()];

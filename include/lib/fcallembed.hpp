@@ -26,19 +26,18 @@
 #ifndef REIFY_FCALLEMBED_HPP
 #define REIFY_FCALLEMBED_HPP
 
-#include "lib/lang.hpp"
 #include "lib/argument.hpp"
-#include "lib/varstate.hpp"
+#include "lib/lang.hpp"
 #include "lib/logger.hpp"
 #include "lib/transformations.hpp"
+#include "lib/varstate.hpp"
 
 class FCallStrategy {
-public: 
+public:
   virtual ~FCallStrategy() = default;
   void Initialize(
-    const symir::Funct *guest,
-    const std::vector<ArgPlus<int32_t>> *init,
-    const std::vector<ArgPlus<int32_t>> *fina
+      const symir::Funct *guest, const std::vector<ArgPlus<int32_t>> *init,
+      const std::vector<ArgPlus<int32_t>> *fina
   );
   void SetTarget(const int32_t target);
 
@@ -46,11 +45,19 @@ public:
   /// generate the string representing the call
   virtual std::string GenerateCall() = 0;
   /// generates the nessessary preamble that create the function arguments
-  virtual void GeneratePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
-  /// generates the nessessary postamble that map the function call's return value back to the replaced coeff
-  virtual void GeneratePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) = 0;
+  virtual void GeneratePreamble(
+      std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+      size_t blockIndex, size_t stmtIndex
+  ) = 0;
+  /// generates the nessessary postamble that map the function call's return value back to the
+  /// replaced coeff
+  virtual void GeneratePostamble(
+      std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+      size_t blockIndex, size_t stmtIndex
+  ) = 0;
   /// Any post processing that needs to be done
-  virtual void Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) = 0;
+  virtual void
+  Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) = 0;
 
 protected:
   /// wrap checksum function/macro around the function call string
@@ -58,7 +65,8 @@ protected:
 
   void SetMaxNrBlocks(size_t nrBlocks);
 
-  const symir::VarDef *GetUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex);
+  const symir::VarDef *
+  GetUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex);
 
 protected:
   const symir::Funct *guest = nullptr;
@@ -78,30 +86,29 @@ public:
 
   void SetStrategy(std::unique_ptr<FCallStrategy> callGenStrategy) {
     Assert(
-      callGenStrategy != nullptr,
-      "The callGenStrategy passed to the setStragegy method is a nullptr"
+        callGenStrategy != nullptr,
+        "The callGenStrategy passed to the setStragegy method is a nullptr"
     );
     this->callGenStrategy = std::move(callGenStrategy);
     Log::Get().Out() << "Embed Strategy: " << this->callGenStrategy->GetStrategyName() << std::endl;
   }
 
-  void SetVarStateQueries(std::vector<VariableStateQuery *> varStateQueries) { this->varStateQueries = varStateQueries; }
+  void SetVarStateQueries(std::vector<VariableStateQuery *> varStateQueries) {
+    this->varStateQueries = varStateQueries;
+  }
 
   /// embeds the guest function with a coeff
   bool EmbedGuest(
-    symir::Funct *guest,
-    const std::vector<ArgPlus<int32_t>> *init,
-    const std::vector<ArgPlus<int32_t>> *fina
+      symir::Funct *guest, const std::vector<ArgPlus<int32_t>> *init,
+      const std::vector<ArgPlus<int32_t>> *fina
   );
 
   std::unique_ptr<symir::Funct> Finalize() {
     this->callGenStrategy->Finalize(this->varStateQueries, this->hostBuilder.get());
-    return hostBuilder->Build(); 
+    return hostBuilder->Build();
   }
 
-  void CreateBuilder() {
-    this->hostBuilder = symir::FunctCopier(this->host).CopyAsBuilder();
-  }
+  void CreateBuilder() { this->hostBuilder = symir::FunctCopier(this->host).CopyAsBuilder(); }
 
 protected:
   bool WasMutated(symir::Coef *c);
@@ -122,19 +129,36 @@ protected:
 class LiteralFCallStrategy : public FCallStrategy {
 public:
   explicit LiteralFCallStrategy() {};
-  void GeneratePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
-  void GeneratePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
+  void GeneratePreamble(
+      std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+      size_t blockIndex, size_t stmtIndex
+  ) override {};
+  void GeneratePostamble(
+      std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+      size_t blockIndex, size_t stmtIndex
+  ) override {};
   std::string GenerateCall() override;
-  void Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override {};
-  std::string GetStrategyName() const override {return "Literal Strategy"; }
+  void
+  Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override {
+  };
+
+  std::string GetStrategyName() const override { return "Literal Strategy"; }
 };
 
-// Abstract Strategy That embedds function calls with random variable that are assigned in a block prior e.g. foo(1, arg_0, 3);
-// How that block is handles is decided by inheritors of this class in the finalize method
+// Abstract Strategy That embedds function calls with random variable that are assigned in a block
+// prior e.g. foo(1, arg_0, 3); How that block is handles is decided by inheritors of this class in
+// the finalize method
 class AbstractArgBlockStrategy : public FCallStrategy {
-  void GeneratePreamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override;
-  void GeneratePostamble(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd, size_t blockIndex, size_t stmtIndex) override {};
+  void GeneratePreamble(
+      std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+      size_t blockIndex, size_t stmtIndex
+  ) override;
+  void GeneratePostamble(
+      std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
+      size_t blockIndex, size_t stmtIndex
+  ) override {};
   std::string GenerateCall() override;
+
 protected:
   // maps variable index to UnInitVar name and correction value
   std::map<const std::string, symir::BlockBuilder *> argBlocks{};
@@ -143,10 +167,13 @@ protected:
 
 class PrimeInterpFCallStrategy : public AbstractArgBlockStrategy {
 public:
-  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()){};
+  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()) {};
 
-  void Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
-  std::string GetStrategyName() const override {return "PrimeInterpolation Stratgey"; }
+  void
+  Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
+
+  std::string GetStrategyName() const override { return "PrimeInterpolation Stratgey"; }
+
 private:
   RewriteEngine rewriteEngine;
 };
@@ -155,8 +182,11 @@ class RewriteFCallStrategy : public AbstractArgBlockStrategy {
 public:
   explicit RewriteFCallStrategy() : rewriteEngine(RewriteEngine::Default()) {}
 
-  void Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
-  std::string GetStrategyName() const override {return "RewriteFCallStrategy Stratgey"; }
+  void
+  Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
+
+  std::string GetStrategyName() const override { return "RewriteFCallStrategy Stratgey"; }
+
 private:
   // maps variable index to UnInitVar name and correction value
   RewriteEngine rewriteEngine;
@@ -164,10 +194,12 @@ private:
 
 class RandomFCallEmbedder : public FCallEmbedder {
 public:
-  explicit RandomFCallEmbedder(symir::Funct *const host):
-    FCallEmbedder(host) {};
+  explicit RandomFCallEmbedder(symir::Funct *const host) : FCallEmbedder(host) {};
+
   void SetBlockWhitelist(std::vector<size_t> indices) { this->blockIndicesWhitelist = indices; };
+
   void CreatePathBlockWhitelist();
+
 private:
   void Visit(const symir::VarUse &v) override;
   void Visit(const symir::Coef &c) override;

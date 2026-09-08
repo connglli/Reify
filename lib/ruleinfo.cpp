@@ -32,37 +32,32 @@ RuleInfo &RuleInfo::Get() {
   return ruleinfo;
 }
 
-void RuleInfo::GlobalSeed(int seed) {
-  this->globalSeed = seed;
-}
+void RuleInfo::GlobalSeed(int seed) { this->globalSeed = seed; }
 
-void RuleInfo::ProgSeed(int seed) {
-  this->progSeed = seed;
-}
+void RuleInfo::ProgSeed(int seed) { this->progSeed = seed; }
 
-void RuleInfo::Clear() {
-  this->functions.clear();
-}
+void RuleInfo::Clear() { this->functions.clear(); }
 
-void RuleInfo::Sno(int sno) {
-  this->sno = sno;
-}
+void RuleInfo::Sno(int sno) { this->sno = sno; }
 
 void RuleInfo::NewFunction(std::string functionName) {
-  if (!GlobalOptions::Get().ruleInfo) return;
+  if (!GlobalOptions::Get().ruleInfo)
+    return;
 
   this->functions.push_back(Function{functionName, {}});
 }
 
 void RuleInfo::NewBlock(std::string headerblockLabel, int seed, size_t targetRuleCount) {
-  if (!GlobalOptions::Get().ruleInfo) return;
+  if (!GlobalOptions::Get().ruleInfo)
+    return;
 
   Function &currFunction = *(this->functions.end() - 1);
   currFunction.blocks.push_back(Block{headerblockLabel, seed, targetRuleCount, {}});
 };
 
 void RuleInfo::AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIndex) {
-  if (!GlobalOptions::Get().ruleInfo) return;
+  if (!GlobalOptions::Get().ruleInfo)
+    return;
 
   Function &currFunction = *(this->functions.end() - 1);
   Block &currBlock = *(currFunction.blocks.end() - 1);

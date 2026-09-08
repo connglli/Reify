@@ -28,6 +28,7 @@
 
 #include <string>
 #include <vector>
+
 class RuleInfo {
 
 public:
@@ -70,7 +71,6 @@ private:
   int progSeed;
   int sno;
   std::vector<Function> functions;
-
 };
 
 #endif // REIFY_RULEINFO_HPP
