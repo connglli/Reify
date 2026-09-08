@@ -522,7 +522,7 @@ namespace symir {
   XX(XOR, Xor, xor, ^)                                                                             \
   XX(OR, Or, or, |)                                                                                \
   XX(SHL, Shl, shl, <<)                                                                            \
-  XX(SHR, Shr, shr, >>)                                                                            \
+  XX(SHR, Shr, shr, >>)
 
     enum Op {
 
@@ -688,22 +688,21 @@ namespace symir {
     std::vector<std::unique_ptr<Term>> terms;
   };
 
-  // A ModExpr represents a Multi-Variable Polynomial over modular arithmetic, used exclusively during linking for interprocedural dataflow
+  // A ModExpr represents a Multi-Variable Polynomial over modular arithmetic, used exclusively
+  // during linking for interprocedural dataflow
   class ModExpr : public SymIR, public WithType {
   public:
     ModExpr(
-      const std::vector<Coef *> coeffs,
-      std::vector<std::unique_ptr<VarUse>> variables,
-      const std::vector<int> polynomial,
-      const int mod
+        const std::vector<Coef *> coeffs, std::vector<std::unique_ptr<VarUse>> variables,
+        const std::vector<int> polynomial, const int mod
     ) :
-        SymIR(SIR_MODEXPR), WithType(),
-        coeffs(std::move(coeffs)), variables(std::move(variables)), polynomial(std::move(polynomial)), mod(mod) {
+        SymIR(SIR_MODEXPR), WithType(), coeffs(std::move(coeffs)), variables(std::move(variables)),
+        polynomial(std::move(polynomial)), mod(mod) {
       Assert(
-        (this->coeffs.size() - 1) * this->variables.size() == this->polynomial.size(),
-        "polynomial does not fit handed coeffs and variables"
+          (this->coeffs.size() - 1) * this->variables.size() == this->polynomial.size(),
+          "polynomial does not fit handed coeffs and variables"
       );
-      for (const auto& coeff: this->coeffs) {
+      for (const auto &coeff: this->coeffs) {
         int val = std::stoi(coeff->GetValue()); // Coeff must not be unsolved.
         Assert(0 <= val && val < mod, "Coeffs should be in Z_%d", mod);
       }
@@ -712,22 +711,20 @@ namespace symir {
       }
     }
 
-    [[nodiscard]] std::vector<Coef*> GetCoeffs() const {
-      std::vector<Coef*> r;
+    [[nodiscard]] std::vector<Coef *> GetCoeffs() const {
+      std::vector<Coef *> r;
       for (const auto &c: this->coeffs) {
         r.push_back(c);
       }
       return r;
     }
 
-    [[nodiscard]] std::vector<int> GetPolynomial() const {
-      return std::vector<int>(polynomial);
-    }
+    [[nodiscard]] std::vector<int> GetPolynomial() const { return std::vector<int>(polynomial); }
 
     [[nodiscard]] int GetMod() const { return mod; }
 
     [[nodiscard]] std::vector<const VarUse *> GetVars() const {
-      std::vector<const VarUse*> r;
+      std::vector<const VarUse *> r;
       for (const auto &v: this->variables) {
         r.push_back(v.get());
       }
@@ -743,6 +740,7 @@ namespace symir {
     }
 
     void Accept(SymIRVisitor &v) const override { return v.Visit(*this); }
+
   private:
     std::vector<Coef *> coeffs;
     std::vector<std::unique_ptr<VarUse>> variables;
@@ -865,7 +863,9 @@ namespace symir {
 
     [[nodiscard]] const ModExpr *GetExpr() const { return expr.get(); }
 
-    [[nodiscard]] std::vector<const VarUse *> GetUses() const override { Panic("ModExpr does not support GetUses()"); }
+    [[nodiscard]] std::vector<const VarUse *> GetUses() const override {
+      Panic("ModExpr does not support GetUses()");
+    }
 
     [[nodiscard]] const VarDef *GetDefinition() const override { return var.get()->GetDef(); }
 
@@ -1108,8 +1108,8 @@ namespace symir {
         SetVolatile();
       }
       Assert(
-          this->coef == nullptr ||
-          type == this->coef->GetType(), "The coef (%s) and the var (%s) are of different types",
+          this->coef == nullptr || type == this->coef->GetType(),
+          "The coef (%s) and the var (%s) are of different types",
           GetTypeSName(this->coef->GetType()).c_str(), GetTypeSName(type).c_str()
       );
     }
@@ -1625,11 +1625,9 @@ namespace symir {
 #undef XX
 
     ModExprID SymModExpr(
-      const std::vector<Coef *> coeffs,
-      const std::vector<const VarDef *> variables,
-      const std::vector<std::vector<Coef *>> accesses,
-      const std::vector<int> polynomial,
-      const int mod
+        const std::vector<Coef *> coeffs, const std::vector<const VarDef *> variables,
+        const std::vector<std::vector<Coef *>> accesses, const std::vector<int> polynomial,
+        const int mod
     );
 
     /// Create a Cond and return the ID to use it. The cond can be used only once.
@@ -1698,9 +1696,7 @@ namespace symir {
       return Block::GetDefinitions(stmts);
     }
 
-    [[nodiscard]] size_t GetNumberOfCommitedStmt() {
-      return this->stmts.size();
-    }
+    [[nodiscard]] size_t GetNumberOfCommitedStmt() { return this->stmts.size(); }
 
     [[nodiscard]] const Stmt *GetCommitedStmt(size_t idx) {
       Assert(idx < this->stmts.size(), "Attempting to access out ouf bound commited stmt");
@@ -1709,8 +1705,8 @@ namespace symir {
 
     [[nodiscard]] const Stmt *GetCommitedStmtOrTarget(size_t idx) {
       Assert(
-        idx <= this->stmts.size() && (this->target != nullptr || idx < this->stmts.size()),
-        "Attempting to access out ouf bound commited stmt"
+          idx <= this->stmts.size() && (this->target != nullptr || idx < this->stmts.size()),
+          "Attempting to access out ouf bound commited stmt"
       );
       return idx < this->stmts.size() ? this->stmts[idx].get() : this->target.get();
     }
@@ -1757,7 +1753,7 @@ namespace symir {
     virtual T Copy() = 0;
     virtual TBuilder CopyAsBuilder() = 0;
 
-protected:
+  protected:
     void pushCoef(Coef *c) { coefStack.push(c); }
 
     Coef *popCoef() {
@@ -1777,6 +1773,7 @@ protected:
     }
 
     void pushModExpr(ExprID eid) { this->modExprStack.push(eid); }
+
     ModExprID popModExpr() {
       Assert(this->modExprStack.size() != 0, "modExprStack is empty");
       ModExprID eid = this->modExprStack.top();
@@ -1820,14 +1817,10 @@ protected:
     std::stack<StmtID> stmtStack{};
   };
 
-
   /// Utility to deep-copy a built Block.
   class BlockCopier : protected SymIRVisitor, SymIRCopier<const Block *, BlockBuilder *> {
   public:
-    explicit BlockCopier(
-        FunctBuilder *funBd,
-        const Block *src
-    ) : funBd(funBd), src(src) {
+    explicit BlockCopier(FunctBuilder *funBd, const Block *src) : funBd(funBd), src(src) {
       Assert(src != nullptr, "The source function is a nullptr");
     }
 
@@ -1849,15 +1842,24 @@ protected:
     void Visit(const RetStmt &r) override;
     void Visit(const Branch &b) override;
     void Visit(const Goto &g) override;
-    void Visit(const ScaParam &p) override    { Panic("Not a subnode of Block"); }
-    void Visit(const VecParam &p) override    { Panic("Not a subnode of Block"); }
+
+    void Visit(const ScaParam &p) override { Panic("Not a subnode of Block"); }
+
+    void Visit(const VecParam &p) override { Panic("Not a subnode of Block"); }
+
     void Visit(const StructParam &p) override { Panic("Not a subnode of Block"); }
-    void Visit(const ScaLocal &l) override    { Panic("Not a subnode of Block"); }
-    void Visit(const VecLocal &l) override    { Panic("Not a subnode of Block"); }
+
+    void Visit(const ScaLocal &l) override { Panic("Not a subnode of Block"); }
+
+    void Visit(const VecLocal &l) override { Panic("Not a subnode of Block"); }
+
     void Visit(const StructLocal &l) override { Panic("Not a subnode of Block"); }
-    void Visit(const StructDef &s) override   { Panic("Not a subnode of Block"); }
+
+    void Visit(const StructDef &s) override { Panic("Not a subnode of Block"); }
+
     void Visit(const Block &b) override;
-    void Visit(const Funct &f) override       { Panic("Not a subnode of Block"); }
+
+    void Visit(const Funct &f) override { Panic("Not a subnode of Block"); }
 
   private:
     FunctBuilder *funBd;
@@ -1866,12 +1868,9 @@ protected:
   };
 
   class StmtCopier : protected SymIRVisitor, public SymIRCopier<void, void> {
-  public :
-    explicit StmtCopier(
-      symir::FunctBuilder *funBd,
-      symir::BlockBuilder *blockBd
-    ) : funBd(funBd), blockBd(blockBd) {}
-
+  public:
+    explicit StmtCopier(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) :
+        funBd(funBd), blockBd(blockBd) {}
 
     /// Copies a Stmt inside this blockblock
     StmtID CopyStmt(const Stmt *s);
@@ -1880,16 +1879,17 @@ protected:
     TermID CopyTerm(const Term *t);
 
     /// Copies a Expr inside this block
-    ExprID CopyExpr(const Expr* e);
+    ExprID CopyExpr(const Expr *e);
 
     /// Copies a Cond inside this block
-    CondID CopyCond(const Cond* c);
+    CondID CopyCond(const Cond *c);
 
     /// Copies a ModExpr inside this block
     ModExprID CopyModExpr(const ModExpr *e);
 
     /// Ugly hack to not use this virtual functions
     void Copy() override { Panic("Use the specialized functions (CopyStmt, CopyTerm, etc)"); };
+
     void CopyAsBuilder() override { Panic("Stmts have no builder class"); };
 
   protected:
@@ -1901,25 +1901,37 @@ protected:
     void Visit(const Cond &c) override;
     void Visit(const AssStmt &a) override;
     void Visit(const ModAssStmt &a) override;
-    void Visit(const RetStmt &r) override     { Panic("Not a valid Stmt to be copied"); }
-    void Visit(const Branch &b) override      { Panic("Not a valid Stmt to be copied"); }
-    void Visit(const Goto &g) override        { Panic("Not a valid Stmt to be copied"); }
-    void Visit(const ScaParam &p) override    { Panic("Not a valid Stmt to be copied"); }
-    void Visit(const VecParam &p) override    { Panic("Not a subnode of a Stmt"); }
+
+    void Visit(const RetStmt &r) override { Panic("Not a valid Stmt to be copied"); }
+
+    void Visit(const Branch &b) override { Panic("Not a valid Stmt to be copied"); }
+
+    void Visit(const Goto &g) override { Panic("Not a valid Stmt to be copied"); }
+
+    void Visit(const ScaParam &p) override { Panic("Not a valid Stmt to be copied"); }
+
+    void Visit(const VecParam &p) override { Panic("Not a subnode of a Stmt"); }
+
     void Visit(const StructParam &p) override { Panic("Not a subnode of a Stmt"); }
-    void Visit(const ScaLocal &l) override    { Panic("Not a subnode of a Stmt"); }
-    void Visit(const VecLocal &l) override    { Panic("Not a subnode of a Stmt"); }
+
+    void Visit(const ScaLocal &l) override { Panic("Not a subnode of a Stmt"); }
+
+    void Visit(const VecLocal &l) override { Panic("Not a subnode of a Stmt"); }
+
     void Visit(const StructLocal &l) override { Panic("Not a subnode of a Stmt"); }
-    void Visit(const StructDef &s) override   { Panic("Not a subnode of a Stmt"); }
-    void Visit(const Block &b) override       { Panic("Not a subnode of a Stmt"); }
-    void Visit(const Funct &f) override       { Panic("Not a subnode of a Stmt"); }
+
+    void Visit(const StructDef &s) override { Panic("Not a subnode of a Stmt"); }
+
+    void Visit(const Block &b) override { Panic("Not a subnode of a Stmt"); }
+
+    void Visit(const Funct &f) override { Panic("Not a subnode of a Stmt"); }
 
 
   protected:
     symir::FunctBuilder *funBd;
     symir::BlockBuilder *blockBd;
   };
-  
+
   /// Builder to facilitate building a function
   ///
   /// Example:
@@ -2114,8 +2126,9 @@ protected:
     /// Close an existing basic block and append it into the current end of function.
     const Block *CloseBlock(BlockBuilder *bbl);
 
-    /// Close an existing basic block and append it into the current end of function. Unless a block with the same label
-    /// exists then it replaces that block with the new one generated by the builder
+    /// Close an existing basic block and append it into the current end of function. Unless a block
+    /// with the same label exists then it replaces that block with the new one generated by the
+    /// builder
     const Block *ReplaceOrCloseBlock(BlockBuilder *builder);
 
     /// Close an existing basic block and insert it before the given block.
@@ -2146,9 +2159,9 @@ protected:
     std::map<std::string, std::unique_ptr<BlockBuilder>> createdBlocks{};
   };
 
-
   /// Utility to deep-copy a built function.
-  class FunctCopier : protected SymIRVisitor, SymIRCopier<std::unique_ptr<Funct>, std::unique_ptr<FunctBuilder>>{
+  class FunctCopier : protected SymIRVisitor,
+                      SymIRCopier<std::unique_ptr<Funct>, std::unique_ptr<FunctBuilder>> {
   public:
     // Hooks right before opening a new block. The input is the label of the new block.
     using BeforeBlockOpenHook = std::function<void(FunctBuilder *, const std::string &)>;
@@ -2222,13 +2235,10 @@ protected:
   // Helper Function
 
   size_t IntSizeOfSymIRType(
-    std::vector<const symir::StructDef *> structs,
-    symir::SymIR::Type type,
-    symir::SymIR::Type baseType,
-    std::vector<int32_t> shape,
-    std::string structName
+      std::vector<const symir::StructDef *> structs, symir::SymIR::Type type,
+      symir::SymIR::Type baseType, std::vector<int32_t> shape, std::string structName
   );
- 
+
 } // namespace symir
 
 #endif // REIFY_LANG_HPP

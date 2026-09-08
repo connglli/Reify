@@ -260,8 +260,8 @@ namespace symir {
         jnif::ConstPool::NULLENTRY;            // The method index in the constant pool
     const Funct *fun = nullptr;                // The function that we're currently lowering
     std::map<const std::string, int> locals{}; // Map from variable names to local variable indices
-    std::map<const std::string, jnif::LabelInst *> labels{
-    }; // Map from block labels to bytecode labels
+    std::map<const std::string, jnif::LabelInst *>
+        labels{}; // Map from block labels to bytecode labels
   };
 } // namespace symir
 

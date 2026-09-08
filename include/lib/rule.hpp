@@ -27,19 +27,17 @@
 #define REIFY_RULE_HPP
 
 #include "lib/lang.hpp"
-#include "lib/varstate.hpp"
 #include "lib/strutils.hpp"
+#include "lib/varstate.hpp"
 
 struct Rule {
   Rule() {}
+
   virtual ~Rule() = default;
   virtual bool Match(const symir::Stmt *stmt) const = 0;
   virtual void Rewrite(
-    symir::FunctBuilder *funBd,
-    std::vector<symir::BlockBuilder *> &blockBds,
-    VariableState &varState,
-    size_t targetBlockIdx,
-    size_t targetStmtIdx
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const = 0;
   virtual std::string RuleName() = 0;
 };
