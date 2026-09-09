@@ -198,6 +198,17 @@ public:
 
   void SetBlockWhitelist(std::vector<size_t> indices) { this->blockIndicesWhitelist = indices; };
 
+  size_t GetNumBlockOnWhitelist(size_t numBlocks) {
+    std::vector<bool> blkSeenMap = std::vector(numBlocks, false);
+    for (size_t i = 0; i < this->blockIndicesWhitelist.size(); i++) {
+      blkSeenMap[this->blockIndicesWhitelist[i]] = true;
+    }
+    size_t count = 0;
+    for (size_t i = 0; i < blkSeenMap.size(); i++)
+      if (blkSeenMap[i]) count++;
+    return count;
+  }
+
   void CreatePathBlockWhitelist();
 
 private:
