@@ -499,7 +499,7 @@ void RewriteFCallStrategy::Finalize(
 void RandomFCallEmbedder::CreatePathBlockWhitelist() {
   this->blockIndicesWhitelist.clear();
   for (size_t i = 0; i < this->varStateQueries.size(); i++) {
-    const auto indices = this->varStateQueries[0]->GetPathBlocksIndices();
+    const auto indices = this->varStateQueries[i]->GetPathBlocksIndices();
     this->blockIndicesWhitelist.resize(this->blockIndicesWhitelist.size() + indices.size());
     for (size_t j = 0; j < indices.size(); j++) {
       this->blockIndicesWhitelist.push_back(indices[j]);
