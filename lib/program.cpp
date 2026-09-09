@@ -30,6 +30,7 @@
 #include "global.hpp"
 #include "lib/Transformations/utils.hpp"
 #include "lib/chksum.hpp"
+#include "lib/dbgutils.hpp"
 #include "lib/fcallembed.hpp"
 #include "lib/lowers.hpp"
 #include "lib/program.hpp"
@@ -96,14 +97,16 @@ void ProgPlus::Generate() {
         Panic("DataflowStrategy is set to an invalid value");
     }
     emb.SetStrategy(std::move(strat));
+    emb.SetVarStateQueries(this->GetVarStateQuerys(i));
+    emb.CreatePathBlockWhitelist();
 
+    // roughtly adjust the number of coeffs to appox numCoeffs on the live path.
+    int adjNumCoeffs = numCoeffs * ((double) emb.GetNumBlockOnWhitelist(host->NumBlocks()) / host->NumBlocks());
+    Assert(adjNumCoeffs <= numCoeffs, "adjNumCoeffs should never grow");
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
     auto randU = Random::Get().UniformReal();
-    // TODO: since we are only replacing on path coeffs using numCoeffs forces ReplaceProba to be
-    // really low (e.g. 0.05) Hence we need a better way to come up with a way to generate a random
-    // number of repacements
-    int randNum = Random::Get().Binomial(numCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
+    int randNum = Random::Get().Binomial(adjNumCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
     if (randNum == 0) {
       Log::Get().CloseSection();
       continue;
@@ -119,8 +122,6 @@ void ProgPlus::Generate() {
       int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
-      emb.SetVarStateQueries(this->GetVarStateQuerys(i));
-      emb.CreatePathBlockWhitelist();
 
       Log::Get().OpenSection("Embedding " + guest->GetName());
       Log::Get().Out() << "Initials: ";
