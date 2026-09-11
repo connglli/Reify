@@ -132,43 +132,7 @@ namespace symir {
     out << ")";
   }
 
-  void SymSexpLower::Visit(const ModExpr &e) {
-    Panic("Rethink and implement the symir lower for ModExpr");
-    auto coeffs = e.GetCoeffs();
-    auto vars = e.GetVars();
-    auto polynomial = e.GetPolynomial();
-    int mod = e.GetMod();
-    out << "(emodadd ";
-    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
-      this->out << "(";
-    }
-    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
-      out << "(emodmul ";
-      coeffs[i]->Accept(*this);
-      for (size_t j = 0; j < vars.size(); ++j) {
-        for (int d = 0; d < polynomial[vars.size() * j + i]; d++) {
-          this->out << " ";
-          vars[j]->Accept(*this);
-        }
-      }
-      this->out << "#" << mod << ")";
-      this->out << " ";
-    }
-    coeffs.back()->Accept(*this);
-    this->out << "#" << mod << ")";
-  }
-
-  void SymSexpLower::Visit(const Expr &e) {
-    out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
-    auto terms = e.GetTerms();
-    for (size_t i = 0; i < terms.size(); i++) {
-      terms[i]->Accept(*this);
-      if (i != terms.size() - 1) {
-        out << " ";
-      }
-    }
-    out << ")";
-  }
+  void SymSexpLower::Visit(const ModExpr &e) { Panic("ModAssStmt is whole program exclusive"); }
 
   void SymSexpLower::Visit(const Cond &c) {
     out << "(" << Cond::GetOpShort(c.GetOp()) << " ";
@@ -176,17 +140,7 @@ namespace symir {
     out << ")";
   }
 
-  void SymSexpLower::Visit(const ModAssStmt &a) {
-    Panic("Rethink and implement the symir lower for ModAssStmt");
-    indent();
-    out << "(" << KW_ASS << " ";
-    a.GetVar()->Accept(*this);
-    out << " ";
-    incIndent();
-    a.GetExpr()->Accept(*this);
-    decIndent();
-    out << ")" << std::endl;
-  }
+  void SymSexpLower::Visit(const ModAssStmt &a) { Panic("ModAssStmt is whole program exclusive"); }
 
   void SymSexpLower::Visit(const AssStmt &a) {
     indent();
