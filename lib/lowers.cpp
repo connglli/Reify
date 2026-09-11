@@ -158,6 +158,18 @@ namespace symir {
     out << "(" << KW_RET << ")" << std::endl;
   }
 
+  void SymSexpLower::Visit(const Expr &e) {
+    out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
+    auto terms = e.GetTerms();
+    for (size_t i = 0; i < terms.size(); i++) {
+      terms[i]->Accept(*this);
+      if (i != terms.size() - 1) {
+        out << " ";
+      }
+    }
+    out << ")";
+  }
+
   void SymSexpLower::Visit(const Branch &b) {
     indent();
     out << "(" << KW_BRH << " " << b.GetTrueTarget() << " " << b.GetFalseTarget() << " ";
