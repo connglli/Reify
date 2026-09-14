@@ -535,49 +535,29 @@ namespace transformations::utils {
   template class StmtReplacer<symir::Cond>;
 
   template<typename Node>
-  void StmtReplacer<Node>::Visit(const Node &n) {
-    StmtCopier::Visit(n);
-  }
-
-  template<typename Node>
   void StmtReplacer<Node>::ReplaceStmt(
       const symir::Stmt *s, std::function<bool(const Node *)> matchFunction,
-      std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)>
-          replaceFunction,
-      double randThreshold
+      std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction
   ) {
     this->matchFunction = matchFunction;
     this->replaceFunction = replaceFunction;
-    this->randThreshold = randThreshold;
     this->randUniform = Random::Get().UniformReal();
-    this->hasReplaced = false;
-    bool wasTarget =
-        s->GetIRId() == symir::SymIR::SIR_TGT_GOTO || s->GetIRId() == symir::SymIR::SIR_TGT_BRA;
-    size_t idx;
-    for (idx = 0; idx < this->blockBd->GetNumberOfCommitedStmt(); idx++) {
-      if (this->blockBd->GetCommitedStmt(idx) == s)
-        break;
-    }
+    this->doSelection = true;
+    this->selection = nullptr;
+    bool wasTarget = s->GetIRId() == symir::SymIR::SIR_TGT_GOTO || s->GetIRId() == symir::SymIR::SIR_TGT_BRA;
 
+    // accept the first time to select a node
     s->Accept(*this);
-    // update stmt ptr since it has been replaced
-    s = this->blockBd->GetCommitedStmtOrTarget(idx);
-
-    if (!this->hasReplaced) {
-      // if by change (e.g. randTheshold) we have not replaced anything we run it again with a
-      // threshold of 1 to guarentee a replacement
-      if (!wasTarget)
-        popStmt();
-      this->randThreshold = 1;
-      s->Accept(*this);
-    }
-
-    Assert(
-        this->hasReplaced,
-        "StmtReplacer should only be called on stmt that are guaranteed to be able to be replaced"
-    );
+    this->doSelection = false;
+    // accept a second time now to actually copy the statement
+    s->Accept(*this);
 
     if (!wasTarget) {
+      size_t idx;
+      for (idx = 0; idx < this->blockBd->GetNumberOfCommitedStmt(); idx++) {
+        if (this->blockBd->GetCommitedStmt(idx) == s)
+          break;
+      }
       // If s is not a target we want to Replace s with our new Stmt manually
       this->blockBd->ReplaceCommitStmt({popStmt()}, idx);
     }
@@ -586,36 +566,118 @@ namespace transformations::utils {
   }
 
   template<typename Node>
-  void StmtReplacer<Node>::Visit(const symir::Branch &b) {
-    b.GetCond()->Accept(*this);
-    auto condId = popCond();
-    std::string tt = b.GetTrueTarget();
-    std::string ft = b.GetFalseTarget();
-    this->blockBd->RemoveTarget();
-    this->blockBd->SymBranch(tt, ft, condId);
+  void StmtReplacer<Node>::Visit(const symir::AssStmt &a) {
+    if (this->doSelection) {
+      a.GetExpr()->Accept(*this);
+    } else {
+      StmtCopier::Visit(a);
+    }
   }
 
-  template<>
-  void StmtReplacer<symir::Expr>::Visit(const symir::Expr &e) {
-    if (this->Match(e)) {
-      pushExpr(this->Replace(e));
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::ModAssStmt &a) {
+    if (this->doSelection) {
+      return;
+    } else {
+      StmtCopier::Visit(a);
+    }
+  }
+
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::Branch &b) {
+    if (this->doSelection) {
+      b.GetCond()->Accept(*this);
+    } else {
+      b.GetCond()->Accept(*this);
+      auto condId = popCond();
+      std::string tt = b.GetTrueTarget();
+      std::string ft = b.GetFalseTarget();
+      this->blockBd->RemoveTarget();
+      this->blockBd->SymBranch(tt, ft, condId);
+    }
+  }
+
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::RetStmt &r) {
+    if (this->doSelection) {
+      return;
+    } else {
+      StmtCopier::Visit(r);
+    }
+  }
+
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::Goto &g) {
+    if (this->doSelection) {
+      return;
+    } else {
+      StmtCopier::Visit(g);
+    }
+  }
+
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::Expr &e) {
+    if (this->doSelection) {
+      const auto &terms = e.GetTerms();
+      for (const auto &t: terms) {
+        t->Accept(*this);
+      }
     } else {
       StmtCopier::Visit(e);
     }
   }
 
   template<>
-  void StmtReplacer<symir::Term>::Visit(const symir::Term &t) {
-    if (this->Match(t)) {
-      pushTerm(this->Replace(t));
+  void StmtReplacer<symir::Expr>::Visit(const symir::Expr &e) {
+    if (this->doSelection && this->Match(e) && this->doSelect()) {
+      this->selection = &e;
+    } else if (this->doSelection) {
+      return;
+    } else if (!this->doSelection && &e == this->selection) {
+      pushExpr(this->Replace(e));
+    } else {
+      StmtCopier::Visit(e);
+    }
+  }
+
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::Term &t) {
+    if (this->doSelection) {
+      return;
     } else {
       StmtCopier::Visit(t);
     }
   }
 
   template<>
+  void StmtReplacer<symir::Term>::Visit(const symir::Term &t) {
+    if (this->doSelection && this->Match(t) && this->doSelect()) {
+      this->selection = &t;
+    } else if (this->doSelection) {
+      return;
+    } else if (!this->doSelection && &t == this->selection) {
+      pushTerm(this->Replace(t));
+    } else {
+      StmtCopier::Visit(t);
+    }
+  }
+
+  template<typename Node>
+  void StmtReplacer<Node>::Visit(const symir::Cond &c) {
+    if (this->doSelection) {
+      c.GetExpr()->Accept(*this);
+    } else {
+      StmtCopier::Visit(c);
+    }
+  }
+
+  template<>
   void StmtReplacer<symir::Cond>::Visit(const symir::Cond &c) {
-    if (this->Match(c)) {
+    if (this->doSelection && this->Match(c) && this->doSelect()) {
+      this->selection = &c;
+    } else if (this->doSelection) {
+      return;
+    } else if (!this->doSelection && &c == this->selection) {
       pushCond(this->Replace(c));
     } else {
       StmtCopier::Visit(c);

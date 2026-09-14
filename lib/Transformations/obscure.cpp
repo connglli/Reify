@@ -67,8 +67,7 @@ namespace transformations::obscure {
           return utils::VariableTerm(funBd, blockBd, var);
         };
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
@@ -238,8 +237,7 @@ namespace transformations::obscure {
           return thisBlockBd->SymAddTerm(funBd->SymI32Const(target - interpolTarget), var);
         };
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
 
     int32_t interpolTarget = targetPair.second;
