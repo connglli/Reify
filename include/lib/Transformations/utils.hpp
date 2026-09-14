@@ -141,22 +141,30 @@ namespace transformations::utils {
     void ReplaceStmt(
       const symir::Stmt *s, 
       std::function<bool(const Node *)> matchFunction,
-      std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction,
-      double randThreshold = 1
+      std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction
     );
   
   protected:
-    void Visit(const Node &e) override;
+    void Visit(const symir::AssStmt &a) override;
+    void Visit(const symir::ModAssStmt &a) override;
     void Visit(const symir::Branch &b) override;
+    void Visit(const symir::RetStmt &r) override;
+    void Visit(const symir::Goto &g) override;
+    void Visit(const symir::Expr &e) override;
+    void Visit(const symir::Term &t) override;
+    void Visit(const symir::Cond &c) override;
   private:
-    bool Match(const Node &e) {
-      return !this->hasReplaced && this->Rand() <= this->randThreshold && this->matchFunction(&e);
-    }
+    bool Match(const Node &e) { return this->matchFunction(&e); }
     ExprID Replace(const Node &e) { 
-      this->hasReplaced = true;
       return this->replaceFunction(funBd, blockBd, e, &this->data); 
     }
-    double Rand() { return this->randUniform(); }
+    bool doSelect() {
+      if (this->randUniform() <= 1.0 / this->selectedCount) {
+        this->selectedCount += 1;
+        return true;
+      }
+      return false;
+    }
   
   public:
     void *data = nullptr;
@@ -165,8 +173,9 @@ namespace transformations::utils {
     std::function<bool(const Node *)> matchFunction;
     std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
     std::function<double()> randUniform;
-    double randThreshold = 1;
-    bool hasReplaced = false;
+    double selectedCount = 1;
+    bool doSelection = false;
+    const Node *selection = nullptr;
   };
 
   /// Copies the access vector of use

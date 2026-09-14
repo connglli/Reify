@@ -112,7 +112,7 @@ namespace transformations::instcombine {
           );
           return match && utils::NoSubOverflow(C1, ~C2);
         },
-        varInsertFun, 1
+        varInsertFun
     );
 
     blockBd->CommitStmtAt(
@@ -179,7 +179,7 @@ namespace transformations::instcombine {
             const symir::Expr *,
             m_AddExpr(m_AddExpr(m_AnyAfter(0, m_ShlTerm(m_Eq<symir::Coef *, int32_t>(1), m_Var()))))
         ),
-        varInsertFun, 1
+        varInsertFun
     );
   }
 
@@ -237,7 +237,7 @@ namespace transformations::instcombine {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_OrTerm(m_Solved(), m_Var())), varInsertFun, 1
+        stmt, make_matcher(const symir::Term *, m_OrTerm(m_Solved(), m_Var())), varInsertFun
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
@@ -297,7 +297,7 @@ namespace transformations::instcombine {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_AddTerm(m_Solved(), m_Var())), varInsertFun, 1
+        stmt, make_matcher(const symir::Term *, m_AddTerm(m_Solved(), m_Var())), varInsertFun
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
@@ -343,7 +343,7 @@ namespace transformations::instcombine {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_AndTerm(m_Solved(), m_Var())), varInsertFun, 1
+        stmt, make_matcher(const symir::Term *, m_AndTerm(m_Solved(), m_Var())), varInsertFun
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
@@ -389,7 +389,7 @@ namespace transformations::instcombine {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_XorTerm(m_Solved(), m_Var())), varInsertFun, 0.25
+        stmt, make_matcher(const symir::Term *, m_XorTerm(m_Solved(), m_Var())), varInsertFun
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);
@@ -435,7 +435,7 @@ namespace transformations::instcombine {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_XorTerm(m_Solved(), m_Var())), varInsertFun, 0.25
+        stmt, make_matcher(const symir::Term *, m_XorTerm(m_Solved(), m_Var())), varInsertFun
     );
 
     blockBd->CommitStmtAt(blockBd->SymAssStmt(A, AExprId), targetStmtIdx);

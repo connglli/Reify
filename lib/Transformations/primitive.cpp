@@ -116,7 +116,7 @@ namespace transformations::primitive {
         };
     rep.ReplaceStmt(
         stmt, make_matcher(const symir::Expr *, m_Expr(m_Any(m_CstTerm(m_Solved(), m_NoVar())))),
-        varInsertFun, 0.25
+        varInsertFun
     );
 
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
@@ -184,7 +184,7 @@ namespace transformations::primitive {
     rep.ReplaceStmt(
         stmt,
         make_matcher(const symir::Expr *, m_Expr(m_FirstN(1, m_CstTerm(m_Solved(), m_NoVar())))),
-        varInsertFun, 1
+        varInsertFun
     );
   }
 
@@ -231,7 +231,7 @@ namespace transformations::primitive {
         make_matcher(
             const symir::Expr *, m_AddExpr(m_WildCard<std::vector<const symir::Term *>>())
         ),
-        varInsertFun, 1
+        varInsertFun
     );
   }
 
@@ -499,8 +499,7 @@ namespace transformations::primitive {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -555,8 +554,7 @@ namespace transformations::primitive {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -647,7 +645,7 @@ namespace transformations::primitive {
             const symir::Expr *,
             m_Expr(m_Any(m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar())))
         ),
-        varInsertFun, 0.25
+        varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -710,7 +708,7 @@ namespace transformations::primitive {
         make_matcher(
             const symir::Term *, m_CstTerm(m_Not(m_Eq<symir::Coef *, int32_t>(INT_MIN)), m_NoVar())
         ),
-        varInsertFun, 0.25
+        varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -752,8 +750,7 @@ namespace transformations::primitive {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -807,8 +804,7 @@ namespace transformations::primitive {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -857,8 +853,7 @@ namespace transformations::primitive {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -905,8 +900,7 @@ namespace transformations::primitive {
         };
 
     rep.ReplaceStmt(
-        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun,
-        0.25
+        stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -964,7 +958,7 @@ namespace transformations::primitive {
     rep.ReplaceStmt(
         stmt,
         make_matcher(const symir::Term *, m_CstTerm(m_Value(m_UnsetBits(~0x7FFFFFFE)), m_NoVar())),
-        varInsertFun, 0.25
+        varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
@@ -1022,7 +1016,7 @@ namespace transformations::primitive {
     rep.ReplaceStmt(
         stmt,
         make_matcher(const symir::Term *, m_CstTerm(m_Value(m_UnsetBits(~0x3FFFFFFE)), m_NoVar())),
-        varInsertFun, 0.25
+        varInsertFun
     );
     symir::Coef *replacedCoef = static_cast<symir::Coef *>(rep.data);
     Assert(replacedCoef != nullptr, "replacedCoef should never be nullptr");
