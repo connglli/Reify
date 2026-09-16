@@ -45,7 +45,8 @@ void FunPlus::Generate(bool allowDeadCode) {
 
   // Generate the sketch of our control flow graph
   cfg.Generate(allowDeadCode);
-  for (int i = 0; i < Random::Get().Uniform(0, maxNumLoops)(); i++) {
+  int numLoops = Random::Get().Uniform(0, maxNumLoops)();
+  for (int i = 0; i < numLoops; i++) {
     cfg.GenerateReduLoop(maxNumBblsPerLoop, allowDeadCode);
   }
   cfg.Print();
@@ -84,7 +85,8 @@ void FunPlus::Generate(bool allowDeadCode) {
       }
     } else if (isArray) {
       std::vector<int> shape;
-      for (int j = 0; j < randArrayDim(); j++) {
+      int dim = randArrayDim();
+      for (int j = 0; j < dim; j++) {
         shape.push_back(randArrayLen());
       }
       builder->SymVecParam(NameVar(i), shape, symir::SymIR::Type::I32, "", isVolatile);
@@ -155,7 +157,8 @@ void FunPlus::Generate(bool allowDeadCode) {
       }
     } else if (isArray) {
       std::vector<int> shape;
-      for (int j = 0; j < randArrayDim(); j++) {
+      int dim = randArrayDim();
+      for (int j = 0; j < dim; j++) {
         shape.push_back(randArrayLen());
       }
       std::vector<symir::Coef *> inits;
@@ -321,9 +324,9 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
 
     // Create the assignment statement with a random expression
     std::vector<symir::Coef *> assAcc = generateVarAccess(funBd, var, bblId, stmtIndex, 0);
-    bblBd->SymAssign(
+    bblBd->CommitStmt(bblBd->SymAssStmt(
         var, bblBd->SymExpr(static_cast<symir::Expr::Op>(randExprOp()), terms), assAcc
-    );
+    ));
   }
 
   // Define a specific target that our conditional/unconditional controls
@@ -388,7 +391,7 @@ void FunPlus::generateBasicBlock(symir::FunctBuilder *funBd, int bblId, const Bb
     bblBd->SymGoto(NameLabel(bblSkt.GetSuccessors()[0]));
   } else {
     // Return the function if there is no successor
-    bblBd->SymReturn();
+    bblBd->CommitStmt(bblBd->SymReturn());
   }
 
   // Now we build our basic block

@@ -23,23 +23,54 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "lib/random.hpp"
+#ifndef REIFY_RULEINFO_HPP
+#define REIFY_RULEINFO_HPP
 
-Random &Random::Get() {
-  static Random random_;
-  return random_;
-}
+#include <string>
+#include <vector>
 
-void Random::Seed(int s) {
-  for (size_t i = 0; i < rng.size(); i++)
-    rng.pop();
-  this->startingSeed = s;
-  rng.push(std::mt19937(s));
-}
+class RuleInfo {
 
-void Random::PushSeed(int s) { rng.push(std::mt19937(s)); }
+public:
+  static RuleInfo &Get();
 
-void Random::PopSeed() {
-  assert(rng.size() > 1);
-  rng.pop();
-}
+public:
+  void GlobalSeed(int seed);
+  void ProgSeed(int seed);
+  void Clear();
+  void Sno(int sno);
+  void NewFunction(std::string functionName);
+  void NewBlock(std::string headerBlockLabel, int seed, size_t targetRuleCount);
+  void AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIndex);
+  std::string ToJson();
+
+private:
+  struct Rule {
+    size_t blockIndex;
+    size_t stmtIndex;
+    std::string ruleName;
+  };
+
+  struct Block {
+    std::string headerBlockLabel;
+    int blockSeed;
+    size_t targetRuleCount;
+    std::vector<Rule> rules;
+  };
+
+  struct Function {
+    std::string functionName;
+    std::vector<Block> blocks;
+  };
+
+private:
+  RuleInfo() : functions({}) {}
+
+private:
+  int globalSeed;
+  int progSeed;
+  int sno;
+  std::vector<Function> functions;
+};
+
+#endif // REIFY_RULEINFO_HPP

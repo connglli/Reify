@@ -23,23 +23,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "lib/random.hpp"
+#ifndef REIFY_REDUCEINFO_HPP
+#define REIFY_REDUCEINFO_HPP
 
-Random &Random::Get() {
-  static Random random_;
-  return random_;
-}
+#include <map>
+#include <string>
 
-void Random::Seed(int s) {
-  for (size_t i = 0; i < rng.size(); i++)
-    rng.pop();
-  this->startingSeed = s;
-  rng.push(std::mt19937(s));
-}
+class ReduceInfo {
 
-void Random::PushSeed(int s) { rng.push(std::mt19937(s)); }
+public:
+  static ReduceInfo &Get();
 
-void Random::PopSeed() {
-  assert(rng.size() > 1);
-  rng.pop();
-}
+public:
+  int Sno() { return this->sno; };
+
+  size_t GetRuleCount(std::string functionName, std::string headBlockLabel);
+  void FromJson(std::string path);
+
+private:
+  ReduceInfo() : ruleCountMap({}) {}
+
+private:
+  int sno = -1;
+  std::map<std::pair<std::string, std::string>, size_t> ruleCountMap;
+};
+
+#endif // REIFY_REDUCEINFO_HPP

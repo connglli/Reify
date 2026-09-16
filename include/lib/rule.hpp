@@ -23,23 +23,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "lib/random.hpp"
+#ifndef REIFY_RULE_HPP
+#define REIFY_RULE_HPP
 
-Random &Random::Get() {
-  static Random random_;
-  return random_;
-}
+#include "lib/lang.hpp"
+#include "lib/strutils.hpp"
+#include "lib/varstate.hpp"
 
-void Random::Seed(int s) {
-  for (size_t i = 0; i < rng.size(); i++)
-    rng.pop();
-  this->startingSeed = s;
-  rng.push(std::mt19937(s));
-}
+struct Rule {
+  Rule() {}
 
-void Random::PushSeed(int s) { rng.push(std::mt19937(s)); }
+  virtual ~Rule() = default;
+  virtual bool Match(const symir::Stmt *stmt) const = 0;
+  virtual void Rewrite(
+      symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+      VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
+  ) const = 0;
+  virtual std::string RuleName() = 0;
+};
 
-void Random::PopSeed() {
-  assert(rng.size() > 1);
-  rng.pop();
-}
+#endif // REIFY_RULE_HPP

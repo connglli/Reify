@@ -36,8 +36,11 @@
 #define FILENAME_FUNCTION_C "func.c"
 #define FILENAME_MAIN_C "main.c"
 #define FILENAME_MAPPING_JSONL "inout.jsonl"
+#define FILENAME_VARSTATE_JSONL "varstate.jsonl"
+#define FILENAME_RULEINFO_C "ruleinfo.jsonl"
 #define FILENAME_SEXPRESSION "func.sexp"
-#define FILENAME_LOGGING "func.log"
+#define FILENAME_FUNC_LOGGING "func.log"
+#define FILENAME_PROG_LOGGING "prog.log"
 #define FILENAME_CHECKSUM_C "chksum.c"
 #define FILENAME_PROTOTYPES_H "proto.h"
 
@@ -99,13 +102,15 @@ struct FunArts {
 
   fs::path GetMapPath() const { return GetTestDir() / FILENAME_MAPPING_JSONL; }
 
+  fs::path GetVarStatePath() const { return GetTestDir() / FILENAME_VARSTATE_JSONL; }
+
   fs::path GetMainPath() const { return GetTestDir() / FILENAME_MAIN_C; }
 
   fs::path GetLogPath(bool devnull = true) const {
     if (devnull) {
       return {"/dev/null"};
     } else {
-      return GetTestDir() / FILENAME_LOGGING;
+      return GetTestDir() / FILENAME_FUNC_LOGGING;
     }
   }
 };
@@ -140,6 +145,16 @@ struct ProgArts {
   fs::path GetChksumPath() const { return GetTestDir() / FILENAME_CHECKSUM_C; }
 
   fs::path GetProtoPath() const { return GetTestDir() / FILENAME_PROTOTYPES_H; }
+
+  fs::path GetLogPath(bool devnull = true) const {
+    if (devnull) {
+      return {"/dev/null"};
+    } else {
+      return this->GetTestDir() / FILENAME_PROG_LOGGING;
+    }
+  }
+
+  fs::path GetRuleInfoPath() const { return GetTestDir() / FILENAME_RULEINFO_C; }
 };
 
 #endif // REIFY_ARTIFACTS_HPP

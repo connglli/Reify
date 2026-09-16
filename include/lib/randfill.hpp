@@ -23,54 +23,47 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef REIFY_RANDFILL_HPP
+#define REIFY_RANDFILL_HPP
+
+#include <bitwuzla/cpp/bitwuzla.h>
+#include <climits>
+#include "lib/lang.hpp"
 #include "lib/logger.hpp"
 
-#include <fstream>
-#include <iostream>
+class RandFill : public symir::SymIRVisitor {
+public:
+  RandFill(const symir::Funct *fun, int min = INT_MIN, int max = INT_MAX) :
+      fun(fun), min(min), max(max) {}
 
-#include "lib/dbgutils.hpp"
+  void Fill();
 
-Log::Log() : fout_(new std::ofstream("/dev/null")) { out = fout_; }
+private:
+  void Visit(const symir::VarUse &v);
+  void Visit(const symir::Coef &c);
+  void Visit(const symir::Term &t);
+  void Visit(const symir::Expr &e);
+  void Visit(const symir::ModExpr &e);
+  void Visit(const symir::Cond &c);
+  void Visit(const symir::AssStmt &a);
+  void Visit(const symir::ModAssStmt &a);
+  void Visit(const symir::RetStmt &r);
+  void Visit(const symir::Branch &b);
+  void Visit(const symir::Goto &g);
+  void Visit(const symir::ScaParam &p);
+  void Visit(const symir::VecParam &p);
+  void Visit(const symir::StructParam &p);
+  void Visit(const symir::ScaLocal &l);
+  void Visit(const symir::VecLocal &l);
+  void Visit(const symir::StructLocal &l);
+  void Visit(const symir::StructDef &s);
+  void Visit(const symir::Block &b);
+  void Visit(const symir::Funct &f);
 
-Log::~Log() { deleteFoutSafely(); }
+private:
+  const symir::Funct *fun;
+  int min;
+  int max;
+};
 
-Log &Log::Get() {
-  static Log logger;
-  return logger;
-}
-
-std::basic_ostream<char> &Log::Out() const { return *out; }
-
-void Log::SetCout() {
-  deleteFoutSafely();
-  out = &std::cout;
-}
-
-void Log::SetFout(const std::string &file) {
-  deleteFoutSafely();
-  fout_ = new std::ofstream(file);
-  if (!fout_->is_open()) {
-    std::cerr << "Failed to open file: " << file << std::endl;
-  }
-  out = fout_;
-}
-
-void Log::OpenSection(const std::string &name) {
-  section++;
-  Out() << std::string((section + 1) * 2, '-') << name << std::string(50 - section * 2, '-')
-        << std::endl
-        << std::flush;
-}
-
-void Log::CloseSection() {
-  section--;
-  Assert(section >= 0, "More close sections than open sections");
-}
-
-void Log::deleteFoutSafely() {
-  if (fout_ != nullptr) {
-    fout_->close();
-    delete fout_;
-    fout_ = nullptr;
-  }
-}
+#endif

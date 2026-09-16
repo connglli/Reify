@@ -23,6 +23,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <flint/flint.h>
+#include <fstream>
 #include <set>
 #include <string>
 
@@ -32,6 +34,8 @@
 #include "lib/logger.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
+#include "lib/reduceinfo.hpp"
+#include "lib/ruleinfo.hpp"
 
 namespace fs = std::filesystem;
 
@@ -39,7 +43,9 @@ struct ProgGenOpts {
   std::string uuid;
   std::string input;
   int limits;
+  int sno;
   bool debug;
+  bool verbose;
 
   static ProgGenOpts Parse(int argc, char **argv) {
     cxxopts::Options options("rylink", "rylink: Reify for whole program generation\n");
@@ -48,7 +54,9 @@ struct ProgGenOpts {
       ("uuid", "An UUID identifier", cxxopts::value<std::string>())
       ("i,input", "The directory saving the seed functions and mappings", cxxopts::value<std::string>())
       ("l,limit", "The number of new programs to generate (0 for unlimited generation)", cxxopts::value<int>()->default_value("0"))
+      ("n,sno", "The desired sample number must be less then limit", cxxopts::value<int>()->default_value("-1"))
       ("s,seed", "The seed for random sampling (negative values for truly random)", cxxopts::value<int>()->default_value("-1"))
+      ("v,verbose", "Enable verbose output", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("debug", "Enable debugging mode which add checksum check assertions", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
       ("h,help", "Print help message", cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
     options.parse_positional("uuid");
@@ -101,15 +109,26 @@ struct ProgGenOpts {
       exit(1);
     }
 
+    const int sno = args["sno"].as<int>();
+
     if (const int seed = args["seed"].as<int>(); seed >= 0) {
       Random::Get().Seed(seed);
     }
 
     const bool debug = args["debug"].as<bool>();
 
+    const bool verbose = args["verbose"].as<bool>();
+
     GlobalOptions::Get().HandleProgArgs(args);
 
-    return {.uuid = uuid, .input = input, .limits = limit, .debug = debug};
+    return {
+        .uuid = uuid,
+        .input = input,
+        .limits = limit,
+        .sno = sno,
+        .debug = debug,
+        .verbose = verbose
+    };
   }
 };
 
@@ -122,14 +141,22 @@ int main(int argc, char *argv[]) {
 
   int genLimit = cliOpts.limits;
   bool enableDebug = cliOpts.debug;
+  bool verbose = cliOpts.verbose;
   if (enableDebug) {
     Log::Get().SetCout();
   }
 
+  if (GlobalOptions::Get().reduceMode) {
+    ReduceInfo::Get().FromJson(GlobalOptions::Get().reduceModePath);
+  }
+
+  RuleInfo::Get().GlobalSeed(Random::Get().GetInitialSeed());
+  Log::Get().Out() << "Seed: " << Random::Get().GetInitialSeed() << std::endl;
+
   // Read all function files from the input directory
   std::vector<std::string> allFunPaths;
   // Open the directory and read all files
-  for (const auto &entry: fs::recursive_directory_iterator(inputDir)) {
+  for (const auto &entry: fs::directory_iterator(inputDir)) {
     if (FunArts::IsTestDir(entry.path())) {
       allFunPaths.push_back(entry.path());
     }
@@ -143,7 +170,23 @@ int main(int argc, char *argv[]) {
   std::sort(allFunPaths.begin(), allFunPaths.end());
 
   for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
+    int prog_seed = Random::Get().Uniform()();
+    // we skip this sampNo if its not our target inside the ReduceInfo
+    if (GlobalOptions::Get().reduceMode && ReduceInfo::Get().Sno() != sampNo)
+      continue;
+    // we skip this sampNo if its not our target passed by cli
+    if (!GlobalOptions::Get().reduceMode && cliOpts.sno != -1 && cliOpts.sno != sampNo)
+      continue;
+
+    // Independend RNG for each program otherwise we could not skip sampNo's
+    Random::Get().PushSeed(prog_seed);
+
+    ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
+
     Log::Get().Out() << "[" << sampNo << "] Generating ... " << std::endl;
+    RuleInfo::Get().Clear();
+    RuleInfo::Get().Sno(sampNo);
+    RuleInfo::Get().ProgSeed(prog_seed);
 
     // Randomly select FUNCTION_DEPTH functions for the new program
     std::set<int> selFunInds;
@@ -165,14 +208,38 @@ int main(int argc, char *argv[]) {
       selFunPaths.push_back(allFunPaths[index]);
     }
 
+    fs::create_directories(arts.GetTestDir());
+    // set logger to log file for prog generation
+    if (verbose) {
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/false));
+    } else {
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
+    }
+
+
     // Now we construct our new program
     auto prog = std::make_unique<ProgPlus>(progUuid, sampNo, selFunPaths);
     prog->Generate();
 
+    // reset logger back to
+    if (enableDebug) {
+      Log::Get().SetCout();
+    } else {
+      Log::Get().SetFout(arts.GetLogPath(/*devnull=*/true));
+    }
+    Log::Get().Out() << "[" << sampNo << "] Done" << std::endl;
     Log::Get().Out() << "[" << sampNo << "] Storing" << std::endl;
 
-    ProgArts arts(progUuid, std::to_string(sampNo), cliOpts.input);
-    fs::create_directories(arts.GetTestDir());
     prog->GenerateCode(arts);
+
+    if (GlobalOptions::Get().ruleInfo) {
+      std::ofstream ruleInfoFile = std::ofstream(arts.GetRuleInfoPath());
+      ruleInfoFile << RuleInfo::Get().ToJson() << std::endl;
+      ruleInfoFile.close();
+    }
+
+    Random::Get().PopSeed();
   }
+  // clean up flints global cache (To avoid valgrind errors)
+  flint_cleanup_master();
 }

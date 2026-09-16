@@ -151,6 +151,9 @@ void IntUBInject::Visit(const symir::Term &t) {
     t.GetVar()->Accept(*this);
     varExpr = popExpression();
   }
+
+  auto zero = tm->mk_bv_zero(bvSort);
+  auto thirtyTwo = tm->mk_bv_value(bvSort, "32", 10);
   switch (t.GetOp()) {
     case symir::Term::OP_CST:
       pushExpression(coefExpr);
@@ -169,23 +172,59 @@ void IntUBInject::Visit(const symir::Term &t) {
       break;
 
     case symir::Term::OP_DIV:
-      constraints.push_back(
-          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
+      constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
       ); // We disallow division by zero
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_REM:
-      constraints.push_back(
-          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, tm->mk_bv_value_int64(bvSort, 0)})
+      constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
       ); // We disallow division by zero
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_NOT:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_NEG, {varExpr}));
+      break;
+
+    case symir::Term::OP_AND:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_AND, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_XOR:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_XOR, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_OR:
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_OR, {coefExpr, varExpr}));
+      break;
+
+    case symir::Term::OP_SHL:
+      // 0 <= coefExpr && coefExpr < 32
+      constraints.push_back(tm->mk_term(
+          bitwuzla::Kind::AND, {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+                                tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})}
+      ));
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SHL, {varExpr, coefExpr}));
+      break;
+
+    case symir::Term::OP_SHR:
+      // 0 <= coefExpr && coefExpr < 32
+      constraints.push_back(tm->mk_term(
+          bitwuzla::Kind::AND, {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+                                tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})}
+      ));
+      pushExpression(tm->mk_term(bitwuzla::Kind::BV_SHR, {varExpr, coefExpr}));
       break;
 
     default:
       Panic("Unknown term operation: %s", symir::Term::GetOpName(t.GetOp()).c_str());
       break;
   }
+}
+
+void IntUBInject::Visit(const symir::ModExpr &e) {
+  Panic("No ModExpr should exist during function creation");
 }
 
 void IntUBInject::Visit(const symir::Expr &e) {
@@ -243,6 +282,10 @@ void IntUBInject::Visit(const symir::Cond &c) {
     default:
       break;
   }
+}
+
+void IntUBInject::Visit(const symir::ModAssStmt &a) {
+  Panic("No ModAssStmt should exist during function creation");
 }
 
 void IntUBInject::Visit(const symir::AssStmt &a) {
@@ -466,35 +509,35 @@ void IntUBInject::extractAndInitializeUses(
           }
         }
 
-        blkBd->SymAssign(
+        blkBd->CommitStmt(blkBd->SymAssStmt(
             nuvd,
             blkBd->SymAddExpr(
                 {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd, access),
                  blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
             ),
             access
-        );
+        ));
       } else {
-        blkBd->SymAssign(
+        blkBd->CommitStmt(blkBd->SymAssStmt(
             nuvd, blkBd->SymAddExpr(
                       {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd),
                        blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
                   )
-        );
+        ));
       }
     } else {
       std::vector<symir::Coef *> access;
       for (int d = 0; d < uv->GetVecNumDims(); d++) {
         access.push_back(funBd->SymI32Const(uv->GetVecDimLen(d) - 1));
       }
-      blkBd->SymAssign(
+      blkBd->CommitStmt(blkBd->SymAssStmt(
           nuvd,
           blkBd->SymAddExpr(
               {blkBd->SymMulTerm(funBd->SymI32Const(0), nuvd, access),
                blkBd->SymCstTerm(funBd->SymI32Const(varInitVal), nullptr)}
           ),
           access
-      );
+      ));
     }
   }
 }

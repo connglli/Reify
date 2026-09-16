@@ -24,16 +24,23 @@
 // SOFTWARE.
 
 #include <fstream>
+#include <memory>
+#include <string>
 
+#include "global.hpp"
+#include "lib/Transformations/utils.hpp"
 #include "lib/chksum.hpp"
-#include "lib/parsers.hpp"
+#include "lib/dbgutils.hpp"
+#include "lib/fcallembed.hpp"
+#include "lib/lowers.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
+#include "lib/ruleinfo.hpp"
+#include "lib/varstate.hpp"
 
 ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::string> &funPaths) :
     uuid(std::move(uuid)), sno(std::to_string(sno)) {
   // Parse all selected function files
-  int idx = 0;
   std::set<std::string> funNames;
   for (const auto &funPath: funPaths) {
     FunArts arts(funPath);
@@ -50,278 +57,93 @@ ProgPlus::ProgPlus(std::string uuid, const int sno, const std::vector<std::strin
         !funNames.contains(func->GetName()), "Function name conflict: %s", func->GetName().c_str()
     );
     funNames.insert(func->GetName());
-    functions.push_back(std::move(func));
+    this->functions.push_back(std::move(func));
     auto mapping = FunPlus::ParseMappingCode(arts.GetMapPath());
-    mappings.push_back(std::move(mapping));
+    this->mappings.push_back(std::move(mapping));
+    this->varStates.push_back(varstate::AllFromJsonFile(arts.GetVarStatePath()));
+
     Assert(functions.back() != nullptr, "The function for \"%s\" is nullptr", funPath.c_str());
-    idx++;
   }
 }
 
-class CoefRepl : protected symir::SymIRVisitor {
-public:
-  explicit CoefRepl(symir::Funct *const host) : host(host) {
-    Assert(host != nullptr, "The host function is given a nullptr");
-    for (auto &sym: host->GetSymbols()) {
-      // TODO: Check to ensure all symbols are Coef
-      Assert(
-          sym->IsSolved(),
-          "The symbol \"%s\" in the host function is not solved, cannot replace it",
-          sym->GetName().c_str()
-      );
-      symbols[dynamic_cast<symir::Coef *>(sym)] = false;
-    }
-  }
-
-  [[nodiscard]] int GetNumCoefs() const { return static_cast<int>(symbols.size()); }
-
-  bool ReplaceFirstCoef(
-      const symir::Funct *guest, const std::vector<ArgPlus<int>> *init,
-      const std::vector<ArgPlus<int>> *fina
-  ) {
-    this->succeeded = false;
-    this->guest = guest;
-    this->init = init;
-    this->fina = fina;
-    this->host->Accept(*this);
-    this->guest = nullptr;
-    this->init = nullptr;
-    this->fina = nullptr;
-    return this->succeeded;
-  }
-
-protected:
-  void Visit(const symir::VarUse &v) override {
-    if (succeeded) {
-      return;
-    }
-    if (v.IsVector()) {
-      for (const auto *c: v.GetAccess()) {
-        c->Accept(*this);
-        if (succeeded) {
-          return;
-        }
-      }
-    }
-  }
-
-  void Visit(const symir::Coef &c) override {
-    if (succeeded) {
-      return;
-    }
-    auto *pc = const_cast<symir::Coef *>(&c);
-    if (wasMutated(pc)) {
-      // If the coefficient is already replaced, we do not need to do anything
-      return;
-    }
-    // Replace the coefficient with a call to the function
-    Assert(
-        pc->GetType() == symir::SymIR::I32,
-        "Unsupported type %s for the coefficient with name \"%s\"",
-        symir::SymIR::GetTypeName(pc->GetType()).c_str(), pc->GetName().c_str()
-    );
-
-    int coefVal = pc->GetI32Value();
-    int chkVal = StatelessChecksum::Compute(*fina);
-    std::ostringstream chkOss;
-    chkOss << StatelessChecksum::GetCheckChksumName() << "(" << chkVal << ", " << guest->GetName()
-           << "(";
-
-    const auto &params = guest->GetParams();
-    for (int i = 0; i < static_cast<int>(init->size()); ++i) {
-      const auto &p = params[i];
-      const auto &arg = (*init)[i];
-      // Use the new type-safe GetTypeCastStr method
-      chkOss << arg.GetTypeCastStr(p) << arg.ToCxStr();
-      if (i < static_cast<int>(init->size()) - 1) {
-        chkOss << ", ";
-      }
-    }
-    chkOss << "))";
-    // To avoid UBs, we'd use an upper type to save the result: long long here
-    long long diff = static_cast<long long>(coefVal) - static_cast<long long>(chkVal);
-    if (diff >= static_cast<long long>(INT32_MIN) && diff <= static_cast<long long>(INT32_MAX)) {
-      pc->SetValue("(" + chkOss.str() + " + " + std::to_string(diff) + ")");
-    } else {
-      pc->SetValue("(int) ((long long)" + chkOss.str() + " + " + std::to_string(diff) + "L)");
-    }
-    markMutated(pc);
-    succeeded = true;
-  }
-
-  void Visit(const symir::Term &t) override {
-    if (succeeded) {
-      return;
-    }
-    t.GetCoef()->Accept(*this);
-    if (succeeded) {
-      return;
-    }
-    if (t.GetVar() != nullptr) {
-      t.GetVar()->Accept(*this);
-    }
-  }
-
-  void Visit(const symir::Expr &e) override {
-    if (succeeded) {
-      return;
-    }
-    for (const auto *term: e.GetTerms()) {
-      if (succeeded) {
-        return;
-      }
-      term->Accept(*this);
-    }
-  }
-
-  void Visit(const symir::Cond &c) override {
-    if (succeeded) {
-      return;
-    }
-    c.GetExpr()->Accept(*this);
-  }
-
-  void Visit(const symir::AssStmt &a) override {
-    if (succeeded) {
-      return;
-    }
-    a.GetExpr()->Accept(*this);
-    if (succeeded) {
-      return;
-    }
-    a.GetVar()->Accept(*this);
-  }
-
-  void Visit(const symir::RetStmt &r) override { /* Do Nothing */ }
-
-  void Visit(const symir::Branch &b) override {
-    if (succeeded) {
-      return;
-    }
-    b.GetCond()->Accept(*this);
-  }
-
-  void Visit(const symir::Goto &g) override { /* Do Nothing */ }
-
-  void Visit(const symir::ScaParam &p) override { /* Do Nothing */ }
-
-  void Visit(const symir::VecParam &p) override { /* Do Nothing */ }
-
-  void Visit(const symir::StructParam &p) override { /* Do Nothing */ }
-
-  void Visit(const symir::ScaLocal &l) override { /* Do Nothing */ }
-
-  void Visit(const symir::VecLocal &l) override { /* Do Nothing */ }
-
-  void Visit(const symir::StructLocal &l) override { /* Do Nothing */ }
-
-  void Visit(const symir::StructDef &s) override { /* Do Nothing */ }
-
-  void Visit(const symir::Block &b) override {
-    Panic("Cannot reach here: We directly manipulate statements when visiting a function");
-  }
-
-  void Visit(const symir::Funct &f) override {
-    const auto statements = f.GetStmts();
-    const auto rand = Random::Get().Uniform(0, static_cast<int>(statements.size()) - 1);
-    const auto probability = Random::Get().UniformReal()();
-    // Sample a statement from the list of statements for replacement
-    for (int tries = 0; tries < 1000; tries++) {
-      const int index = rand();
-      const auto &stmt = statements[index];
-      // Idea: 80% of the replacements should be in the conditional statements,
-      // and the rest 20% in those assignment statements.
-      double threshold;
-      switch (stmt->GetIRId()) {
-        case symir::SymIR::SIR_TGT_BRA:
-          threshold = 0.8;
-          break;
-        case symir::SymIR::SIR_STMT_ASS:
-          threshold = 0.2;
-          break;
-        default:
-          threshold = 0;
-          break;
-      }
-      if (probability < threshold) {
-        stmt->Accept(*this);
-        if (succeeded) {
-          return;
-        }
-      }
-    }
-  }
-
-private:
-  bool wasMutated(symir::Coef *c) {
-    auto it = symbols.find(c);
-    Assert(
-        it != symbols.end(),
-        "The coefficient with name \"%s\" is not found in the host function's symbols",
-        it->first->GetName().c_str()
-    );
-    return it->second;
-  }
-
-  void markMutated(symir::Coef *c) {
-    auto it = symbols.find(c);
-    Assert(
-        it != symbols.end(),
-        "The coefficient with name \"%s\" is not found in the host function's symbols",
-        it->first->GetName().c_str()
-    );
-    it->second = true;
-  }
-
-private:
-  symir::Funct *const host;
-  // A map of symbols in the host function, where the key is the symbol pointer
-  // and the value is a boolean indicating whether it is replaced or not.
-  std::map<symir::Coef *, bool> symbols;
-
-  // The result of the replacement for the guest function
-  bool succeeded = false;
-  const symir::Funct *guest = nullptr;
-  const std::vector<ArgPlus<int>> *init = nullptr;
-  const std::vector<ArgPlus<int>> *fina = nullptr;
-};
-
-void ProgPlus::Generate() const {
+void ProgPlus::Generate() {
   const int numFuns = static_cast<int>(functions.size());
+  transformations::utils::ClearNameLabel();
+  transformations::utils::ClearNameVariable();
 
   // Now replace the mappings in the functions with the calls to the other functions
   for (int i = 0; i < numFuns - 1; ++i) {
     auto host = functions[i].get();
-    CoefRepl repl(host);
-    int numRepCoeffs = repl.GetNumCoefs();
+    int numCoeffs = host->GetSymbols().size();
 
-    Log::Get().Out() << "[" << sno << "] Replacing function" << ": index=" << i
-                     << ", name=" << host->GetName() << ", num_replaceable=" << numRepCoeffs
-                     << std::endl;
+    Log::Get().OpenSection("Host function (" + std::to_string(i) + "): " + host->GetName());
+    Log::Get().Out() << "num_replaceable=" << numCoeffs << std::endl;
 
-    // Sample a function from i + 1 to the end
+    RuleInfo::Get().NewFunction(host->GetName());
+
+    auto emb = RandomFCallEmbedder(host);
+    std::unique_ptr<FCallStrategy> strat;
+    switch (GlobalOptions::Get().DataflowStrategy) {
+      case GlobalOptions::Literal: {
+        strat = std::make_unique<LiteralFCallStrategy>();
+      } break;
+      case GlobalOptions::PrimeFieldInterpolation: {
+        strat = std::make_unique<PrimeInterpFCallStrategy>();
+      } break;
+      case GlobalOptions::Rewrite: {
+        strat = std::make_unique<RewriteFCallStrategy>();
+      } break;
+      default:
+        Panic("DataflowStrategy is set to an invalid value");
+    }
+    emb.SetStrategy(std::move(strat));
+    emb.SetVarStateQueries(this->GetVarStateQuerys(i));
+    emb.CreatePathBlockWhitelist();
+
+    // roughtly adjust the number of coeffs to appox numCoeffs on the live path.
+    int adjNumCoeffs =
+        numCoeffs * ((double) emb.GetNumBlockOnWhitelist(host->NumBlocks()) / host->NumBlocks());
+    Assert(adjNumCoeffs <= numCoeffs, "adjNumCoeffs should never grow");
+    // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
     auto randU = Random::Get().UniformReal();
+    int randNum =
+        Random::Get().Binomial(adjNumCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
+    if (randNum == 0) {
+      Log::Get().CloseSection();
+      continue;
+    }
 
-    // For each coefficient that can be replaced, we find a function to replace it
-    for (int k = 0; k < numRepCoeffs; ++k) {
-      if (randU() >= GlobalOptions::Get().ReplaceProba) {
-        continue; // Skip this coefficient replacement with a probability
-      }
+    // we replace randNum coeffs with function calls
+    for (int k = 0; k < randNum; ++k) {
       int j = rand();
       auto guest = functions[j].get();
       Assert(guest != nullptr, "The guest function is nullptr for index %d", j);
       auto guestMap = mappings[j];
+
       int index = Random::Get().Uniform(0, static_cast<int>(guestMap.first.size()) - 1)();
       std::vector<ArgPlus<int>> *init = &guestMap.first[index];
       std::vector<ArgPlus<int>> *fina = &guestMap.second[index];
-      if (repl.ReplaceFirstCoef(guest, init, fina)) {
-        Log::Get().Out() << "[" << sno << "]   var#" << k << " -> func#" << j << ": "
+
+      Log::Get().OpenSection("Embedding " + guest->GetName());
+      Log::Get().Out() << "Initials: ";
+      for (size_t i = 0; i < init->size(); i++) {
+        Log::Get().Out() << (*init)[i].ToCxStr() << ", ";
+      }
+      Log::Get().Out() << (*init).back().ToCxStr() << std::endl;
+
+      if (emb.EmbedGuest(guest, init, fina)) {
+        Log::Get().Out() << "Embed: " << k << "/" << randNum << " Success: " << "func#" << j << ": "
+                         << guest->GetName() << std::endl;
+      } else {
+        Log::Get().Out() << "Embed: " << k << "/" << randNum << " Failed: " << "func#" << j << ": "
                          << guest->GetName() << std::endl;
       }
+      Log::Get().CloseSection();
     }
 
-    Log::Get().Out() << "[" << sno << "]   Done" << std::endl;
+    functions[i] = emb.Finalize();
+    Log::Get().CloseSection();
   }
 }
 
@@ -335,6 +157,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts) const {
   std::ofstream protoFile(arts.GetProtoPath());
   protoFile << "#ifndef PROTOTYPES_H" << std::endl;
   protoFile << "#define PROTOTYPES_H" << std::endl << std::endl;
+  protoFile << "#define RM(var, mod) ((var % mod + mod) % mod)" << std::endl << std::endl;
   protoFile << StatelessChecksum::GetCheckChksumCode(/*debug=*/true) << std::endl;
   protoFile << "extern " << StatelessChecksum::GetCrc32InitPrototype() << ";" << std::endl;
   protoFile << "extern " << StatelessChecksum::GetComputePrototype() << ";" << std::endl;
@@ -355,6 +178,7 @@ void ProgPlus::GenerateCode(const ProgArts &arts) const {
 
   // Generate the main function
   std::ofstream mainFile(arts.GetMainPath());
+  mainFile << "// " << Random::Get().GetInitialSeed() << std::endl;
   mainFile << "#include <stdio.h>" << std::endl;
   mainFile << "#include \"" << FILENAME_PROTOTYPES_H << "\"" << std::endl;
   mainFile << "int main() {" << std::endl;

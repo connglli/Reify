@@ -26,14 +26,17 @@
 #include "lib/symexec.hpp"
 
 #include <cstring>
+#include <optional>
 #include <ranges>
 #include "global.hpp"
 #include "lib/logger.hpp"
+#include "lib/randfill.hpp"
 #include "lib/random.hpp"
 #include "lib/samputils.hpp"
 #include "lib/strutils.hpp"
 #include "lib/ubcomm.hpp"
 #include "lib/ubinject.hpp"
+#include "lib/varstate.hpp"
 
 #include <chrono>
 
@@ -98,12 +101,12 @@ SymExec::SymExec(const FunPlus &fun, const std::vector<int> &execution) {
     // Insert a basic block to count and check the pass counter right before the stop block
     auto passCounterBlockBd = funBd->OpenBlock(PassCounterBblLabel);
     auto passCounter = funBd->SymScaLocal("passCounterLocal", funBd->SymCoef("zero", "0"));
-    passCounterBlockBd->SymAssign(
+    passCounterBlockBd->CommitStmt(passCounterBlockBd->SymAssStmt(
         passCounter, passCounterBlockBd->SymAddExpr(
                          {passCounterBlockBd->SymMulTerm(funBd->SymCoef("one1", "1"), passCounter),
                           passCounterBlockBd->SymCstTerm(funBd->SymCoef("one2", "1"), nullptr)}
                      )
-    );
+    ));
     // Jump to the exit block if the pass counter is greater than the value
     passCounterBlockBd->SymBranch(
         exitBlock->GetLabel(), stopBlock->GetLabel(),
@@ -333,6 +336,11 @@ bool SymExec::solve(
 
   // Extract values for the resolved symbols to facilitate subsequent solving
   extractSymbolsFromModel();
+
+  // Extract the state of each variable along the exec path from the model
+  this->varStateExtractor.push_back(VariableStateExtractor());
+  varStateExtractor.back().Extract(this);
+
   // Insert values for unresolved symbols in unexecuted blocks
   // We only do this for the first initialization, as afterward, all symbols should be resolved
   if (inits.empty()) {
@@ -358,6 +366,20 @@ bool SymExec::solve(
   return true;
 }
 
+std::optional<int32_t> SymExec::extractTermFromModel(bitwuzla::Term t) {
+  bitwuzla::Term symValue = solver->get_value(t);
+  std::string binaryStr = symValue.value<std::string>(2);
+  if (binaryStr.empty())
+    return {};
+  // Convert binary string to signed integer (32-bit)
+  int32_t symVal = 0;
+  // Parse as unsigned first, then reinterpret as signed
+  uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
+  uint32_t u32 = static_cast<uint32_t>(unsigned_val);
+  std::memcpy(&symVal, &u32, sizeof(int32_t));
+  return symVal;
+}
+
 void SymExec::extractSymbolsFromModel() {
   for (auto symbol: fun->GetSymbols()) {
     if (symbol->IsSolved()) {
@@ -372,15 +394,10 @@ void SymExec::extractSymbolsFromModel() {
 
     // Currently, we only support coefficients
     const auto symKey = ubSan->CreateCoefExpr(*dynamic_cast<const symir::Coef *>(symbol));
-    bitwuzla::Term symValue = solver->get_value(symKey);
-    std::string binaryStr = symValue.value<std::string>(2);
-    // Convert binary string to signed integer (32-bit)
-    Assert(!binaryStr.empty(), "The symbol value of symbol %s is empty", symName.c_str());
-    int32_t symVal = 0;
-    // Parse as unsigned first, then reinterpret as signed
-    uint64_t unsigned_val = std::stoull(binaryStr, nullptr, 2);
-    uint32_t u32 = static_cast<uint32_t>(unsigned_val);
-    std::memcpy(&symVal, &u32, sizeof(int32_t));
+    std::optional<int32_t> symValOpt = extractTermFromModel(symKey);
+    Assert(symValOpt.has_value(), "The symbol value of symbol %s is empty", symName.c_str());
+    int32_t symVal = symValOpt.value();
+
     symbol->SetValue(std::to_string(symVal));
     Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
   }
@@ -515,20 +532,12 @@ void SymExec::insertUBsIntoUnexecutedBbls() {
 
 void SymExec::insertRandomValueIntoUnsolvedSymbols() {
   // For now, we just define all symbols in the function with a random value
-  const auto rand =
-      Random::Get().Uniform(GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound);
-  for (const auto &sym: fun->GetSymbols()) {
-    if (sym->IsSolved()) {
-      continue; // If the symbol is already defined, we don't need to smash it
-    }
-    const int val = rand();
-    sym->SetValue(std::to_string(val));
-    Log::Get().Out() << "Define symbols: sym=" << sym->GetName() << ", val=" << val
-                     << " (for unexecuted basic blocks)" << std::endl;
-  }
+  RandFill(fun, GlobalOptions::Get().LowerBound, GlobalOptions::Get().UpperBound).Fill();
 }
 
 std::vector<UBSite> SymExec::GetUBCandidates() const {
   UBCandCollector collector(*fun, executionByLabels);
   return collector.Collect();
 }
+
+std::string SymExec::getVarStateJson() { return varstate::AllToJsonFile(this->varStateExtractor); }

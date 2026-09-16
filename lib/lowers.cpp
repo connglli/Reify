@@ -25,8 +25,9 @@
 
 #include "lib/lowers.hpp"
 #include "lib/chksum.hpp"
+#include "lib/dbgutils.hpp"
 #include "lib/jnifutils.hpp"
-#include "lib/logger.hpp"
+#include "lib/lang.hpp"
 
 namespace symir {
   std::ostream SymIRLower::devNull(nullptr);
@@ -100,32 +101,46 @@ namespace symir {
   }
 
   void SymSexpLower::Visit(const Term &t) {
-    out << "(" << Term::GetOpShort(t.GetOp()) << " ";
-    t.GetCoef()->Accept(*this);
-    if (t.GetOp() != Term::Op::OP_CST) {
-      out << " ";
-      t.GetVar()->Accept(*this);
+    auto op = t.GetOp();
+    out << "(" << Term::GetOpShort(op) << " ";
+    switch (op) {
+      case Term::OP_NOT: {
+        t.GetVar()->Accept(*this);
+      } break;
+
+      case Term::OP_CST: {
+        t.GetCoef()->Accept(*this);
+      } break;
+
+      case Term::OP_SHL:
+      case Term::OP_SHR:
+      case Term::OP_ADD:
+      case Term::OP_SUB:
+      case Term::OP_MUL:
+      case Term::OP_DIV:
+      case Term::OP_REM:
+      case Term::OP_AND:
+      case Term::OP_XOR:
+      case Term::OP_OR: {
+        t.GetCoef()->Accept(*this);
+        out << " ";
+        t.GetVar()->Accept(*this);
+      } break;
+      default:
+        Panic("Cannot reach here");
     }
     out << ")";
   }
 
-  void SymSexpLower::Visit(const Expr &e) {
-    out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
-    auto terms = e.GetTerms();
-    for (size_t i = 0; i < terms.size(); i++) {
-      terms[i]->Accept(*this);
-      if (i != terms.size() - 1) {
-        out << " ";
-      }
-    }
-    out << ")";
-  }
+  void SymSexpLower::Visit(const ModExpr &e) { Panic("ModAssStmt is whole program exclusive"); }
 
   void SymSexpLower::Visit(const Cond &c) {
     out << "(" << Cond::GetOpShort(c.GetOp()) << " ";
     c.GetExpr()->Accept(*this);
     out << ")";
   }
+
+  void SymSexpLower::Visit(const ModAssStmt &a) { Panic("ModAssStmt is whole program exclusive"); }
 
   void SymSexpLower::Visit(const AssStmt &a) {
     indent();
@@ -141,6 +156,18 @@ namespace symir {
   void SymSexpLower::Visit(const RetStmt &r) {
     indent();
     out << "(" << KW_RET << ")" << std::endl;
+  }
+
+  void SymSexpLower::Visit(const Expr &e) {
+    out << "(e" << Expr::GetOpShort(e.GetOp()) << " ";
+    auto terms = e.GetTerms();
+    for (size_t i = 0; i < terms.size(); i++) {
+      terms[i]->Accept(*this);
+      if (i != terms.size() - 1) {
+        out << " ";
+      }
+    }
+    out << ")";
   }
 
   void SymSexpLower::Visit(const Branch &b) {
@@ -190,12 +217,13 @@ namespace symir {
 
   void SymSexpLower::Visit(const ScaLocal &l) {
     indent();
+    out << "(";
     if (l.IsVolatile()) {
-      out << "(" << KW_VOL << " " << KW_LOC << " " << l.GetName() << " ";
-    } else {
-      out << "(" << KW_LOC << " " << l.GetName() << " ";
+      out << KW_VOL << " ";
     }
-    l.GetCoef()->Accept(*this);
+    out << KW_LOC << " " << l.GetName() << " ";
+    if (l.GetCoef() != nullptr)
+      l.GetCoef()->Accept(*this);
     out << " " << SymIR::GetTypeSName(l.GetType()) << ")" << std::endl;
   }
 
@@ -343,6 +371,7 @@ namespace symir {
   }
 
   void SymCxLower::Visit(const VarUse &v) {
+    Assert(v.GetName() != "", "Empty string as a name is not allowed");
     out << v.GetName();
 
     const VarDef *currVar = v.GetDef();
@@ -408,12 +437,68 @@ namespace symir {
 
   void SymCxLower::Visit(const Term &t) {
     out << "(";
-    t.GetCoef()->Accept(*this);
-    if (t.GetOp() != Term::Op::OP_CST) {
-      out << " " << Term::GetOpSym(t.GetOp()) << " ";
-      t.GetVar()->Accept(*this);
+    auto op = t.GetOp();
+    switch (op) {
+      case Term::OP_NOT: {
+        out << Term::GetOpSym(Term::OP_NOT);
+        t.GetVar()->Accept(*this);
+      } break;
+
+      case Term::OP_SHL:
+      case Term::OP_SHR: {
+        t.GetVar()->Accept(*this);
+        out << " " << Term::GetOpSym(op) << " ";
+        t.GetCoef()->Accept(*this);
+      } break;
+
+      case Term::OP_CST: {
+        t.GetCoef()->Accept(*this);
+      } break;
+
+      case Term::OP_ADD:
+      case Term::OP_SUB:
+      case Term::OP_MUL:
+      case Term::OP_DIV:
+      case Term::OP_REM:
+      case Term::OP_AND:
+      case Term::OP_XOR:
+      case Term::OP_OR: {
+        t.GetCoef()->Accept(*this);
+        out << " " << Term::GetOpSym(op) << " ";
+        t.GetVar()->Accept(*this);
+      } break;
+      default:
+        Panic("Cannot reach here");
     }
     out << ")";
+  }
+
+  void SymCxLower::Visit(const ModExpr &e) {
+    auto coeffs = e.GetCoeffs();
+    auto vars = e.GetVars();
+    auto polynomial = e.GetPolynomial();
+    int mod = e.GetMod();
+    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
+      // by precidence we must wrap each addition of a monomial in a bracket
+      this->out << "(";
+    }
+    for (size_t i = 0; i < coeffs.size() - 1; ++i) {
+      coeffs[i]->Accept(*this);
+      for (size_t j = 0; j < vars.size(); ++j) {
+        Assert(vars.size() * i + j < polynomial.size(), "polynomial array out of bounds");
+        for (int d = 0; d < polynomial[vars.size() * i + j]; d++) {
+          this->out << " * RM(";
+          vars[j]->Accept(*this);
+          this->out << ", " << mod << ")";
+          this->out << " % " << mod;
+        }
+      }
+      if (i >= 1)
+        this->out << ") % " << mod;
+      this->out << " + ";
+    }
+    coeffs.back()->Accept(*this);
+    this->out << ") % " << mod;
   }
 
   void SymCxLower::Visit(const Expr &e) {
@@ -429,6 +514,14 @@ namespace symir {
   void SymCxLower::Visit(const Cond &c) {
     c.GetExpr()->Accept(*this);
     out << " " << Cond::GetOpSym(c.GetOp()) << " 0";
+  }
+
+  void SymCxLower::Visit(const ModAssStmt &a) {
+    indent();
+    a.GetVar()->Accept(*this);
+    out << " = ";
+    a.GetExpr()->Accept(*this);
+    out << ";" << std::endl;
   }
 
   void SymCxLower::Visit(const AssStmt &a) {
@@ -563,11 +656,13 @@ namespace symir {
   void SymCxLower::Visit(const ScaLocal &l) {
     indent();
     if (l.IsVolatile()) {
-      out << "volatile" << " " << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
-    } else {
-      out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName() << " = ";
+      out << "volatile" << " ";
     }
-    l.GetCoef()->Accept(*this);
+    out << SymIR::GetTypeCName(l.GetType()) << " " << l.GetName();
+    if (l.GetCoef() != nullptr) {
+      out << " = ";
+      l.GetCoef()->Accept(*this);
+    }
     out << ";" << std::endl;
   }
 
@@ -584,6 +679,10 @@ namespace symir {
     }
     for (auto len: l.GetVecShape()) {
       out << "[" << len << "]";
+    }
+    if (l.GetCoefs().size() == 0) {
+      out << ";" << std::endl;
+      return;
     }
     out << " = {";
     const auto &cs = l.GetCoefs();
@@ -607,8 +706,13 @@ namespace symir {
 
   void SymCxLower::Visit(const StructLocal &l) {
     indent();
-    out << "struct " << l.GetStructName() << " " << l.GetName() << " = {";
+    out << "struct " << l.GetStructName() << " " << l.GetName();
     const auto &cs = l.GetCoefs();
+    if (l.GetCoefs().size() == 0) {
+      out << ";" << std::endl;
+      return;
+    }
+    out << " = {";
     for (size_t i = 0; i < cs.size(); ++i) {
       cs[i]->Accept(*this);
       if (i != cs.size() - 1)
@@ -787,6 +891,8 @@ namespace symir {
     }
   }
 
+  void SymJavaBytecodeLower::Visit(const ModExpr &e) { Panic("TODO: Implement java ModExpr"); }
+
   void SymJavaBytecodeLower::Visit(const Expr &e) {
     if (e.GetType() != SymIR::I32) {
       Panic("Unsupported expression for type %s", SymIR::GetTypeName(e.GetType()).c_str());
@@ -815,6 +921,10 @@ namespace symir {
       Panic("Unsupported condition for type %s", SymIR::GetTypeName(c.GetType()).c_str());
     }
     c.GetExpr()->Accept(*this);
+  }
+
+  void SymJavaBytecodeLower::Visit(const ModAssStmt &a) {
+    Panic("TODO: Implement java ModAssStmt");
   }
 
   void SymJavaBytecodeLower::Visit(const AssStmt &a) {
@@ -902,7 +1012,8 @@ namespace symir {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
-    l.GetCoef()->Accept(*this);
+    if (l.GetCoef() != nullptr)
+      l.GetCoef()->Accept(*this);
     method->instList().addVar(jnif::Opcode::istore, locals[l.GetName()]);
   }
 
@@ -910,7 +1021,8 @@ namespace symir {
     if (l.GetType() != SymIR::Type::I32) {
       Panic("Unsupported local variable type %s", SymIR::GetTypeName(l.GetType()).c_str());
     }
-    CreateArray(*method, l, l.GetCoefs());
+    if (l.GetCoefs().size() > 0)
+      CreateArray(*method, l, l.GetCoefs());
     method->instList().addVar(jnif::Opcode::astore, locals[l.GetName()]);
   }
 

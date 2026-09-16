@@ -23,23 +23,36 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "lib/random.hpp"
+#include "lib/reduceinfo.hpp"
+#include <fstream>
+#include <utility>
+#include "json.hpp"
+#include "lib/dbgutils.hpp"
 
-Random &Random::Get() {
-  static Random random_;
-  return random_;
+ReduceInfo &ReduceInfo::Get() {
+  static ReduceInfo ruleinfo;
+  return ruleinfo;
 }
 
-void Random::Seed(int s) {
-  for (size_t i = 0; i < rng.size(); i++)
-    rng.pop();
-  this->startingSeed = s;
-  rng.push(std::mt19937(s));
+size_t ReduceInfo::GetRuleCount(std::string functionName, std::string headBlockLabel) {
+  return this->ruleCountMap[std::make_pair(functionName, headBlockLabel)];
 }
 
-void Random::PushSeed(int s) { rng.push(std::mt19937(s)); }
+void ReduceInfo::FromJson(std::string path) {
+  std::ifstream filestream(path);
+  Assert(filestream.is_open(), "Error: failed to open file: %s", path.c_str());
 
-void Random::PopSeed() {
-  assert(rng.size() > 1);
-  rng.pop();
+  std::string line;
+  // currently this is a single line json;
+  std::getline(filestream, line);
+  nlohmann::json reduceInfo = nlohmann::json::parse(line);
+  this->sno = reduceInfo["sno"];
+  for (size_t i = 0; i < reduceInfo["functions"].size(); i++) {
+    nlohmann::json functionObj = reduceInfo["functions"][i];
+    for (size_t j = 0; j < functionObj["blocks"].size(); j++) {
+      nlohmann::json blockObj = functionObj["blocks"][j];
+      this->ruleCountMap[std::make_pair(functionObj["name"], blockObj["headerLabel"])] =
+          blockObj["targetRuleCount"];
+    }
+  }
 }

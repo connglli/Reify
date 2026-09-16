@@ -29,6 +29,7 @@
 #include <cstring>
 #include <limits>
 
+#include "lib/lang.hpp"
 #include "lib/samputils.hpp"
 
 namespace {
@@ -44,10 +45,12 @@ namespace {
     std::memcpy(&s32, &u32, sizeof(int32_t));
     return s32;
   }
+} // namespace
 
+namespace ubsan {
   void IterateStructElements(
       const symir::Funct &fun, const symir::StructDef *sDef,
-      const std::function<void(std::string)> &callback, std::string prefix = ""
+      const std::function<void(std::string)> &callback, std::string prefix
   ) {
     for (const auto &field: sDef->GetFields()) {
       int numEls = 1;
@@ -91,7 +94,7 @@ namespace {
     }
     return flat;
   }
-} // namespace
+} // namespace ubsan
 
 void UBSan::addConstraint(const bitwuzla::Term &c) {
   ++addCalls_;
@@ -180,7 +183,7 @@ void UBSan::MakeInitInteresting() {
     if (param->IsScalar()) {
       if (param->GetType() == symir::SymIR::Type::STRUCT) {
         const auto *sDef = fun.GetStruct(param->GetStructName());
-        IterateStructElements(fun, sDef, [&](std::string elName) {
+        ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
           params.push_back(CreateStructFieldExpr(param, elName, 0));
         });
       } else {
@@ -202,7 +205,7 @@ void UBSan::MakeInitWithRandomValue() {
     if (param->IsScalar()) {
       if (param->GetType() == symir::SymIR::Type::STRUCT) {
         const auto *sDef = fun.GetStruct(param->GetStructName());
-        IterateStructElements(fun, sDef, [&](std::string elName) {
+        ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
           auto val = tm->mk_bv_value_int64(bvSort, rand());
           addConstraint(
               tm->mk_term(bitwuzla::Kind::EQUAL, {CreateStructFieldExpr(param, elName, 0), val})
@@ -235,7 +238,7 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
         if (p->GetType() == symir::SymIR::Type::STRUCT) {
           const auto *sDef = fun.GetStruct(p->GetStructName());
           int k = 0;
-          IterateStructElements(fun, sDef, [&](std::string elName) {
+          ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
             bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
             auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
             diffTerms.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal}));
@@ -276,7 +279,7 @@ void UBSan::MakeInitDifferentFrom(const std::vector<ArgPlus<int>> &init) {
         if (p->GetType() == symir::SymIR::Type::STRUCT) {
           const auto *sDef = fun.GetStruct(p->GetStructName());
           int k = 0;
-          IterateStructElements(fun, sDef, [&](std::string elName) {
+          ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
             bitwuzla::Term newValue = CreateStructFieldExpr(p, elName, 0);
             auto oldVal = tm->mk_bv_value_int64(bvSort, oldValue.GetValue(k));
             auto isNotEqual = tm->mk_term(bitwuzla::Kind::DISTINCT, {newValue, oldVal});
@@ -370,7 +373,7 @@ void UBSan::Visit(const symir::VarUse &v) {
       currentShapeIdx++;
 
       if (currentShapeIdx == currShape.size()) {
-        const int flatLoc = FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
+        const int flatLoc = ubsan::FlattenRowMajorIndex(pendingArrayShape, pendingArrayIndices);
         suffix += "_el" + std::to_string(flatLoc);
         pendingArrayShape.clear();
         pendingArrayIndices.clear();
@@ -449,6 +452,7 @@ void UBSan::Visit(const symir::Term &t) {
 
   bitwuzla::Term termExpr = tm->mk_bv_zero(bvSort);
   auto zero = tm->mk_bv_zero(bvSort);
+  auto one = tm->mk_bv_one(bvSort);
 
   switch (t.GetOp()) {
     case symir::Term::Op::OP_ADD:
@@ -464,6 +468,7 @@ void UBSan::Visit(const symir::Term &t) {
       }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_ADD, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_SUB:
       // Prevent signed subtraction overflow, or require it if we target this site
       if (shouldInject(UBKind::SIGNED_SUB_OVERFLOW) && !ubInjectedInCurrentStmt) {
@@ -477,6 +482,7 @@ void UBSan::Visit(const symir::Term &t) {
       }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SUB, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_MUL:
       // Prevent signed multiplication overflow, or require it if we target this site
       if (shouldInject(UBKind::SIGNED_MUL_OVERFLOW) && !ubInjectedInCurrentStmt) {
@@ -490,6 +496,7 @@ void UBSan::Visit(const symir::Term &t) {
       }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_MUL, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_DIV:
       // Division by zero
       if (shouldInject(UBKind::DIVISION_BY_ZERO) && !ubInjectedInCurrentStmt) {
@@ -510,6 +517,7 @@ void UBSan::Visit(const symir::Term &t) {
       }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr});
       break;
+
     case symir::Term::Op::OP_REM:
       // Remainder by zero
       if (shouldInject(UBKind::REMAINDER_BY_ZERO) && !ubInjectedInCurrentStmt) {
@@ -532,14 +540,76 @@ void UBSan::Visit(const symir::Term &t) {
       }
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr});
       break;
+
+    case symir::Term::Op::OP_AND:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_AND, {coefExpr, varExpr});
+      break;
+
+    case symir::Term::Op::OP_XOR:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_XOR, {coefExpr, varExpr});
+      break;
+
+    case symir::Term::Op::OP_OR:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_OR, {coefExpr, varExpr});
+      break;
+
+    case symir::Term::Op::OP_SHL:
+      // 0 <= coefExpr && coefExpr < 31 (since we are signed shifting by 31 exactly will lead to an
+      // overflow for all lhs values other then 0, for now we ban 31 outright)
+      addConstraint(tm->mk_term(
+          bitwuzla::Kind::AND,
+          {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+           tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "31", 10)})}
+      ));
+      // In C11: 6.5.7p4 declares for E1 << E2: If E1 is signed and nonnegative,
+      // and E1 * 2 ^ E2 is representable, then that is the resulting value;
+      // otherwise its UB
+
+      // Non-Negative
+      addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
+      // E1 * (1 << E2) does not overflow
+      addConstraint(tm->mk_term(
+          bitwuzla::Kind::NOT, {tm->mk_term(
+                                   bitwuzla::Kind::BV_SMUL_OVERFLOW,
+                                   {varExpr, tm->mk_term(bitwuzla::Kind::BV_SHL, {one, coefExpr})}
+                               )}
+      ));
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_SHL, {varExpr, coefExpr});
+      break;
+
+    case symir::Term::Op::OP_SHR:
+      // 0 <= coefExpr && coefExpr < 32
+      addConstraint(tm->mk_term(
+          bitwuzla::Kind::AND,
+          {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+           tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "32", 10)})}
+      ));
+      // In C11: 6.5.7p5: declars for E1 >> E2: If E1 is signed and nonnegative,
+      // the value of the result is the integral part of the quorient of E1 / 2 ^ E2.
+      // If it is negative its implementation-defined (Hence we avoid negative also for now)
+
+      // Non-Negative
+      addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_SHR, {varExpr, coefExpr});
+      break;
+
+    case symir::Term::Op::OP_NOT:
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_NOT, {varExpr});
+      break;
+
     case symir::Term::Op::OP_CST:
       termExpr = coefExpr;
       break;
+
     default:
       Panic("Cannot reach here");
   }
 
   pushExpression(termExpr);
+}
+
+void UBSan::Visit(const symir::ModExpr &e) {
+  Panic("No ModAssStmt should exist during function creation");
 }
 
 void UBSan::Visit(const symir::Expr &e) {
@@ -608,6 +678,10 @@ void UBSan::Visit(const symir::Cond &c) {
     default:
       Panic("Cannot reach here");
   }
+}
+
+void UBSan::Visit(const symir::ModAssStmt &a) {
+  Panic("No ModAssStmt should exist during function creation");
 }
 
 void UBSan::Visit(const symir::AssStmt &a) {
@@ -718,7 +792,7 @@ void UBSan::Visit(const symir::StructParam &p) {
       sDef != nullptr, "Struct definition %s not found for param %s", p.GetStructName().c_str(),
       p.GetName().c_str()
   );
-  IterateStructElements(fun, sDef, [&](std::string elName) {
+  ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
     auto fieldExpr = CreateStructFieldExpr(&p, elName, 0);
     std::string fullFieldName = GetStructFieldName(&p, elName);
     versions[fullFieldName] = 0;
@@ -759,7 +833,7 @@ void UBSan::Visit(const symir::StructLocal &l) {
   const auto &inits = l.GetCoefs();
 
   size_t initIdx = 0;
-  IterateStructElements(fun, sDef, [&](std::string elName) {
+  ubsan::IterateStructElements(fun, sDef, [&](std::string elName) {
     Assert(initIdx < inits.size(), "Mismatch init size for struct local %s", l.GetName().c_str());
     inits[initIdx]->Accept(*this);
     auto coefExpr = popExpression();
