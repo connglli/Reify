@@ -369,7 +369,8 @@ bool SymExec::solve(
 std::optional<int32_t> SymExec::extractTermFromModel(bitwuzla::Term t) {
   bitwuzla::Term symValue = solver->get_value(t);
   std::string binaryStr = symValue.value<std::string>(2);
-  if (binaryStr.empty()) return {};
+  if (binaryStr.empty())
+    return {};
   // Convert binary string to signed integer (32-bit)
   int32_t symVal = 0;
   // Parse as unsigned first, then reinterpret as signed
@@ -396,7 +397,7 @@ void SymExec::extractSymbolsFromModel() {
     std::optional<int32_t> symValOpt = extractTermFromModel(symKey);
     Assert(symValOpt.has_value(), "The symbol value of symbol %s is empty", symName.c_str());
     int32_t symVal = symValOpt.value();
-    
+
     symbol->SetValue(std::to_string(symVal));
     Log::Get().Out() << "Extract symbols: sym=" << symName << ", value=" << symVal << std::endl;
   }
@@ -539,6 +540,4 @@ std::vector<UBSite> SymExec::GetUBCandidates() const {
   return collector.Collect();
 }
 
-std::string SymExec::getVarStateJson() {
-  return varstate::AllToJsonFile(this->varStateExtractor);
-}
+std::string SymExec::getVarStateJson() { return varstate::AllToJsonFile(this->varStateExtractor); }

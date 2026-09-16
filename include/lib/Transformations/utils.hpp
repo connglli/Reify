@@ -25,31 +25,31 @@
 
 // Contains Utilitys used by transformation rules;
 
-#include "lib/patternmatch.hpp"
 #include "lib/lang.hpp"
-#include "lib/varstate.hpp"
+#include "lib/patternmatch.hpp"
 #include "lib/random.hpp"
+#include "lib/varstate.hpp"
 
-#include <flint/ulong_extras.h>
 #include <flint/nmod.h>
 #include <flint/nmod_mat.h>
+#include <flint/ulong_extras.h>
 
 #ifndef REIFY_TRANSFORMATION_UTILS_HPP
 #define REIFY_TRANSFORMATION_UTILS_HPP
 
 namespace transformations::utils {
 
-  std::vector<symir::Coef *> UnflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex);
+  std::vector<symir::Coef *>
+  UnflattenAccess(symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex);
 
   class VarFilter {
   public:
-    VarFilter(
-      symir::FunctBuilder *funBd,
-      VariableState &varState
-    ): funBd(funBd), varState(varState) {}
+    VarFilter(symir::FunctBuilder *funBd, VariableState &varState) :
+        funBd(funBd), varState(varState) {}
+
     void RandomlyFilter();
     void UniqueFilter();
-    
+
   public:
     std::vector<int32_t> filteredVarState{};
     std::vector<const symir::VarDef *> filteredVars{};
@@ -58,7 +58,6 @@ namespace transformations::utils {
   private:
     symir::FunctBuilder *funBd;
     VariableState &varState;
-
   };
 
   class PrimeInterpolation {
@@ -68,30 +67,38 @@ namespace transformations::utils {
       Assert(n_is_prime(mod), "PrimeInterpolation requires that mod is prime");
       nmod_init(&this->mod, mod);
     }
-  
-    void Interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
-  
-    void Interpolate(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
-  
-    std::vector<int32_t> GetPolynomial() {
-      return std::vector(this->polynomial);
-    }
-  
-    std::vector<int32_t> GetCoeffs() {
-      return std::vector(this->coeffs);
-    }
-  
-    /// Triggers an assert if the last interpolation does not correctly yield 'target' when evaluated over 'varState'
-    void AssertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target);
 
-    /// Triggers an assert if the last interpolation does not correctly yield 'targets' when evaluated over 'varState'
-    void AssertCorrectness(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, std::vector<int32_t> targets);
+    void Interpolate(
+        size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target
+    );
+
+    void Interpolate(
+        size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState,
+        std::vector<int32_t> targets
+    );
+
+    std::vector<int32_t> GetPolynomial() { return std::vector(this->polynomial); }
+
+    std::vector<int32_t> GetCoeffs() { return std::vector(this->coeffs); }
+
+    /// Triggers an assert if the last interpolation does not correctly yield 'target' when
+    /// evaluated over 'varState'
+    void AssertCorrectness(
+        size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState, int32_t target
+    );
+
+    /// Triggers an assert if the last interpolation does not correctly yield 'targets' when
+    /// evaluated over 'varState'
+    void AssertCorrectness(
+        size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState,
+        std::vector<int32_t> targets
+    );
 
   private:
-  
     /// Find a new unused iteration according to varState
-    std::vector<int32_t> FindUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState);
-    
+    std::vector<int32_t>
+    FindUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState);
+
     /// see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
     void Shuffel(const size_t n, int32_t *arr) {
       for (int i_ = n - 1; i_ >= 1; i_--) {
@@ -102,14 +109,11 @@ namespace transformations::utils {
         arr[i] = temp;
       }
     }
-    
+
     // This is a quite biased in its selection.
     // Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
     /// Samples a new random polynomial
-    void RandomizePolynomial(
-      const size_t nrVariables,
-      const size_t nrMonomials
-    );
+    void RandomizePolynomial(const size_t nrVariables, const size_t nrMonomials);
 
     /// Returns the (mathematical) modulo of 'var' (e.g. 'var' mod 'this->mod.n')
     ulong ReduceMod(int32_t var) {
@@ -134,16 +138,15 @@ namespace transformations::utils {
   template<typename Node>
   class StmtReplacer : public symir::StmtCopier {
   public:
-    StmtReplacer(
-     symir::FunctBuilder *funBd,
-     symir::BlockBuilder *blockBd
-    ) : symir::StmtCopier(funBd, blockBd) {}
+    StmtReplacer(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) :
+        symir::StmtCopier(funBd, blockBd) {}
+
     void ReplaceStmt(
-      const symir::Stmt *s, 
-      std::function<bool(const Node *)> matchFunction,
-      std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction
+        const symir::Stmt *s, std::function<bool(const Node *)> matchFunction,
+        std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)>
+            replaceFunction
     );
-  
+
   protected:
     void Visit(const symir::AssStmt &a) override;
     void Visit(const symir::ModAssStmt &a) override;
@@ -153,11 +156,12 @@ namespace transformations::utils {
     void Visit(const symir::Expr &e) override;
     void Visit(const symir::Term &t) override;
     void Visit(const symir::Cond &c) override;
+
   private:
     bool Match(const Node &e) { return this->matchFunction(&e); }
-    ExprID Replace(const Node &e) { 
-      return this->replaceFunction(funBd, blockBd, e, &this->data); 
-    }
+
+    ExprID Replace(const Node &e) { return this->replaceFunction(funBd, blockBd, e, &this->data); }
+
     bool doSelect() {
       if (this->randUniform() <= 1.0 / this->selectedCount) {
         this->selectedCount += 1;
@@ -165,13 +169,14 @@ namespace transformations::utils {
       }
       return false;
     }
-  
+
   public:
     void *data = nullptr;
 
   private:
     std::function<bool(const Node *)> matchFunction;
-    std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction;
+    std::function<size_t(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)>
+        replaceFunction;
     std::function<double()> randUniform;
     double selectedCount = 1;
     bool doSelection = false;
@@ -181,55 +186,64 @@ namespace transformations::utils {
   /// Copies the access vector of use
   std::vector<symir::Coef *> CopyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use);
 
-  /// returns a symir CondID that corresponds to a condition that is trivially evaluates to 'condTarget' (e.g. (0) == 0 or (1) == 0)
-  symir::BlockBuilder::CondID TriviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
+  /// returns a symir CondID that corresponds to a condition that is trivially evaluates to
+  /// 'condTarget' (e.g. (0) == 0 or (1) == 0)
+  symir::BlockBuilder::CondID
+  TriviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
 
   /// returns a random valid assignment;
   symir::BlockBuilder::StmtID TrivialAssignment(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::VarDef *var,
-    std::vector<symir::Coef *> access = {}
+      symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, const symir::VarDef *var,
+      std::vector<symir::Coef *> access = {}
   );
 
   /// returns a term that is equal to just the value in the passed variable, access
   symir::BlockBuilder::TermID VariableTerm(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    const symir::VarDef *var,
-    std::vector<symir::Coef *> access = {}
+      symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, const symir::VarDef *var,
+      std::vector<symir::Coef *> access = {}
   );
 
   symir::Expr::Op RandomExprOp();
 
-  /// Splits the given BlockBuilder into two blocks where the first (the given one mutated) contains all stmts up to and including stmt at
-  /// splitIdx and the second one (the returned one) contains all after
+  /// Splits the given BlockBuilder into two blocks where the first (the given one mutated) contains
+  /// all stmts up to and including stmt at splitIdx and the second one (the returned one) contains
+  /// all after
   symir::BlockBuilder *SsplitBlockAt(
-    symir::FunctBuilder *funBd,
-    symir::BlockBuilder *blockBd,
-    std::string secondLabel,
-    size_t splitIdx
+      symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::string secondLabel,
+      size_t splitIdx
   );
 
-  void InsertBlockBd(std::vector<symir::BlockBuilder *> &currBlockBds, std::vector<symir::BlockBuilder *> newBlocks, size_t index);
+  void InsertBlockBd(
+      std::vector<symir::BlockBuilder *> &currBlockBds,
+      std::vector<symir::BlockBuilder *> newBlocks, size_t index
+  );
 
   std::string NameLabel(const std::string functName, const std::string prefix);
 
   void ClearNameLabel();
 
-  std::string NameVariable(const std::string functName, const std::string domBlockName, const std::string prefix);
-  std::string NameVariable(const std::string functName, const std::string domBlockName, const std::string prefix, size_t size);
+  std::string NameVariable(
+      const std::string functName, const std::string domBlockName, const std::string prefix
+  );
+  std::string NameVariable(
+      const std::string functName, const std::string domBlockName, const std::string prefix,
+      size_t size
+  );
 
   void ClearNameVariable();
 
-  const symir::VarDef *GetVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
-  const symir::VarDef *GetVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix, size_t size);
+  const symir::VarDef *
+  GetVariable(symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix);
+  const symir::VarDef *GetVariable(
+      symir::FunctBuilder *funBd, const std::string domBlockName, const std::string prefix,
+      size_t size
+  );
 
   bool NoAddOverflow(int32_t a, int32_t b);
   bool NoSubOverflow(int32_t a, int32_t b);
 
   using namespace patternmatch;
   bool MatchSubExprInAnyStmt(const symir::Stmt *stmt, const Pattern<const symir::Expr *> &E);
-}
+} // namespace transformations::utils
 
-#endif //REIFY_TRANSFORMATION_UTILS_HPP
+#endif // REIFY_TRANSFORMATION_UTILS_HPP

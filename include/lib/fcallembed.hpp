@@ -128,7 +128,7 @@ protected:
 // Strategy That embedds function calls with Literal Arguments e.g. foo(1, 2, 3);
 class LiteralFCallStrategy : public FCallStrategy {
 public:
-  explicit LiteralFCallStrategy() {};
+  explicit LiteralFCallStrategy(){};
   void GeneratePreamble(
       std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
       size_t blockIndex, size_t stmtIndex
@@ -167,7 +167,7 @@ protected:
 
 class PrimeInterpFCallStrategy : public AbstractArgBlockStrategy {
 public:
-  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()) {};
+  explicit PrimeInterpFCallStrategy() : rewriteEngine(RewriteEngine::Empty()){};
 
   void
   Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
@@ -194,7 +194,7 @@ private:
 
 class RandomFCallEmbedder : public FCallEmbedder {
 public:
-  explicit RandomFCallEmbedder(symir::Funct *const host) : FCallEmbedder(host) {};
+  explicit RandomFCallEmbedder(symir::Funct *const host) : FCallEmbedder(host){};
 
   void SetBlockWhitelist(std::vector<size_t> indices) { this->blockIndicesWhitelist = indices; };
 
@@ -205,7 +205,8 @@ public:
     }
     size_t count = 0;
     for (size_t i = 0; i < blkSeenMap.size(); i++)
-      if (blkSeenMap[i]) count++;
+      if (blkSeenMap[i])
+        count++;
     return count;
   }
 

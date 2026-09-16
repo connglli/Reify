@@ -132,7 +132,7 @@ rylink: $(BIN_DIR)/rylink
 
 symircc: $(BIN_DIR)/symircc
 
-bins: rysmith rylink symircc 
+bins: rysmith rylink symircc
 
 
 ########################################################################

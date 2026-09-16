@@ -23,10 +23,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <flint/flint.h>
 #include <fstream>
 #include <set>
 #include <string>
-#include <flint/flint.h>
 
 #include "artifacts.hpp"
 #include "cxxopts.hpp"
@@ -34,8 +34,8 @@
 #include "lib/logger.hpp"
 #include "lib/program.hpp"
 #include "lib/random.hpp"
-#include "lib/ruleinfo.hpp"
 #include "lib/reduceinfo.hpp"
+#include "lib/ruleinfo.hpp"
 
 namespace fs = std::filesystem;
 
@@ -116,12 +116,19 @@ struct ProgGenOpts {
     }
 
     const bool debug = args["debug"].as<bool>();
-    
+
     const bool verbose = args["verbose"].as<bool>();
 
     GlobalOptions::Get().HandleProgArgs(args);
 
-    return { .uuid = uuid, .input = input, .limits = limit, .sno = sno, .debug = debug, .verbose = verbose };
+    return {
+        .uuid = uuid,
+        .input = input,
+        .limits = limit,
+        .sno = sno,
+        .debug = debug,
+        .verbose = verbose
+    };
   }
 };
 
@@ -165,9 +172,11 @@ int main(int argc, char *argv[]) {
   for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
     int prog_seed = Random::Get().Uniform()();
     // we skip this sampNo if its not our target inside the ReduceInfo
-    if (GlobalOptions::Get().reduceMode && ReduceInfo::Get().Sno() != sampNo) continue;
+    if (GlobalOptions::Get().reduceMode && ReduceInfo::Get().Sno() != sampNo)
+      continue;
     // we skip this sampNo if its not our target passed by cli
-    if (!GlobalOptions::Get().reduceMode && cliOpts.sno != -1 && cliOpts.sno != sampNo) continue;
+    if (!GlobalOptions::Get().reduceMode && cliOpts.sno != -1 && cliOpts.sno != sampNo)
+      continue;
 
     // Independend RNG for each program otherwise we could not skip sampNo's
     Random::Get().PushSeed(prog_seed);
@@ -212,7 +221,7 @@ int main(int argc, char *argv[]) {
     auto prog = std::make_unique<ProgPlus>(progUuid, sampNo, selFunPaths);
     prog->Generate();
 
-    // reset logger back to 
+    // reset logger back to
     if (enableDebug) {
       Log::Get().SetCout();
     } else {

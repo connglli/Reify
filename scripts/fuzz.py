@@ -634,7 +634,7 @@ class Worker:
       indir=self.wconf.wdir,
       limit=self.wconf.prog_limit,
       config=PGEN_SUGGESTED_CONFIGS[0],
-      #extra="--Xcoeff-replace-proba 0.05",
+      # extra="--Xcoeff-replace-proba 0.05",
     )
     start_msg = (
       f"Worker started successfully: workdir={self.wconf.wdir}, "
@@ -708,7 +708,9 @@ class Worker:
         ignore_errors=True,
       )
 
-  def test(self, test_dir: Path, *, binary: Path, timeout: int, fopts: Optional[FuncGenOptions] = None):
+  def test(
+    self, test_dir: Path, *, binary: Path, timeout: int, fopts: Optional[FuncGenOptions] = None
+  ):
     extra_cc_opts = ""
     if self.wconf.cflag_pool:
       num_flags = random.randint(1, 5)
@@ -762,16 +764,12 @@ class Worker:
     shutil.move(str(test_dir), str(bug_dir / test_dir.name))
     with (bug_dir / "result.jsonl").open("a") as fou:
       fou.write(json.dumps(res.to_dict(), ensure_ascii=False) + "\n")
-    if (self.wconf.save_funcs and fopts != None):
+    if self.wconf.save_funcs and fopts != None:
       for i in range(fopts.sno + 1):
-        fdir: Path = configs.FunArts(fopts.uuid, i, gen_dir=fopts.outdir).get_test_dir();
-        if not fdir.exists(): continue;
-        shutil.copytree(
-          fdir,
-          str(bug_dir / test_dir.name / "leaf_funcs" / fdir.name)
-        )
-
-
+        fdir: Path = configs.FunArts(fopts.uuid, i, gen_dir=fopts.outdir).get_test_dir()
+        if not fdir.exists():
+          continue
+        shutil.copytree(fdir, str(bug_dir / test_dir.name / "leaf_funcs" / fdir.name))
 
   def notify(self, msg: str):
     self.msgq.put(f"Worker@{self.wid}: {msg}")

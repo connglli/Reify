@@ -101,12 +101,14 @@ void ProgPlus::Generate() {
     emb.CreatePathBlockWhitelist();
 
     // roughtly adjust the number of coeffs to appox numCoeffs on the live path.
-    int adjNumCoeffs = numCoeffs * ((double) emb.GetNumBlockOnWhitelist(host->NumBlocks()) / host->NumBlocks());
+    int adjNumCoeffs =
+        numCoeffs * ((double) emb.GetNumBlockOnWhitelist(host->NumBlocks()) / host->NumBlocks());
     Assert(adjNumCoeffs <= numCoeffs, "adjNumCoeffs should never grow");
     // Random Generator to sample a function from i + 1 to the end
     auto rand = Random::Get().Uniform(i + 1, numFuns - 1);
     auto randU = Random::Get().UniformReal();
-    int randNum = Random::Get().Binomial(adjNumCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
+    int randNum =
+        Random::Get().Binomial(adjNumCoeffs - 1, GlobalOptions::Get().CoeffReplaceProba)();
     if (randNum == 0) {
       Log::Get().CloseSection();
       continue;
