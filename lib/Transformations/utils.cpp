@@ -537,14 +537,16 @@ namespace transformations::utils {
   template<typename Node>
   void StmtReplacer<Node>::ReplaceStmt(
       const symir::Stmt *s, std::function<bool(const Node *)> matchFunction,
-      std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)> replaceFunction
+      std::function<ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const Node &, void **)>
+          replaceFunction
   ) {
     this->matchFunction = matchFunction;
     this->replaceFunction = replaceFunction;
     this->randUniform = Random::Get().UniformReal();
     this->doSelection = true;
     this->selection = nullptr;
-    bool wasTarget = s->GetIRId() == symir::SymIR::SIR_TGT_GOTO || s->GetIRId() == symir::SymIR::SIR_TGT_BRA;
+    bool wasTarget =
+        s->GetIRId() == symir::SymIR::SIR_TGT_GOTO || s->GetIRId() == symir::SymIR::SIR_TGT_BRA;
 
     // accept the first time to select a node
     s->Accept(*this);

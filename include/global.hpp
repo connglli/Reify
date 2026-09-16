@@ -497,15 +497,17 @@ struct GlobalOptions {
     if (args.count("Xcoeff-replace-proba")) {
       CoeffReplaceProba = args["Xcoeff-replace-proba"].as<double>();
       if (CoeffReplaceProba <= 0) {
-        std::cerr << "Error: The probability for replacing (--Xcoeff-replace-proba) a coefficient cannot "
-                     "be less than or equal to 0. It should be within 0 to 1."
-                  << std::endl;
+        std::cerr
+            << "Error: The probability for replacing (--Xcoeff-replace-proba) a coefficient cannot "
+               "be less than or equal to 0. It should be within 0 to 1."
+            << std::endl;
         exit(1);
       }
       if (CoeffReplaceProba > 1) {
-        std::cerr << "Error: The probability for replacing (--Xcoeff-replace-proba) a coefficient cannot "
-                     "be larger than 1. It should be within 0 to 1."
-                  << std::endl;
+        std::cerr
+            << "Error: The probability for replacing (--Xcoeff-replace-proba) a coefficient cannot "
+               "be larger than 1. It should be within 0 to 1."
+            << std::endl;
         exit(1);
       }
     }
@@ -516,14 +518,21 @@ struct GlobalOptions {
 
     if (args.count("Xdataflow-strategy")) {
       switch (args["Xdataflow-strategy"].as<int>()) {
-      case 0: DataflowStrategy = Literal; break;
-      case 1: DataflowStrategy = PrimeFieldInterpolation; break;
-      case 2: DataflowStrategy = Rewrite; break;
-      default: {
-        std::cerr << "Error: Invalid DataflowStrategy. It must be one of {0=literal, 1=Prime interpolating}"
-                  << std::endl;
-        exit(1);
-      }
+        case 0:
+          DataflowStrategy = Literal;
+          break;
+        case 1:
+          DataflowStrategy = PrimeFieldInterpolation;
+          break;
+        case 2:
+          DataflowStrategy = Rewrite;
+          break;
+        default: {
+          std::cerr << "Error: Invalid DataflowStrategy. It must be one of {0=literal, 1=Prime "
+                       "interpolating}"
+                    << std::endl;
+          exit(1);
+        }
       }
     }
 
@@ -537,9 +546,10 @@ struct GlobalOptions {
     if (args.count("Xinit-replace-proba")) {
       InitReplaceProba = args["Xinit-replace-proba"].as<double>();
       if (!(0 <= InitReplaceProba && InitReplaceProba <= 1)) {
-        std::cerr << "Error: The probability for replacing (--Xinit-replace-proba) a initials cannot "
-                     "be less than or equal to 0. It should be within 0 to 1."
-                  << std::endl;
+        std::cerr
+            << "Error: The probability for replacing (--Xinit-replace-proba) a initials cannot "
+               "be less than or equal to 0. It should be within 0 to 1."
+            << std::endl;
         exit(1);
       }
     }

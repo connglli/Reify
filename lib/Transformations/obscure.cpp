@@ -54,9 +54,9 @@ namespace transformations::obscure {
     int32_t target;
     rep.data = &target;
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int32_t target = t.GetCoef()->GetI32Value();
@@ -211,9 +211,9 @@ namespace transformations::obscure {
     std::pair<int32_t, int32_t> targetPair;
     rep.data = &targetPair;
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           auto randTarget = Random::Get().Uniform(0, prime - 1);

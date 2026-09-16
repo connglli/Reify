@@ -39,14 +39,13 @@
 #include "lib/ubbase.hpp"
 #include "lib/ubcomm.hpp"
 
-
 namespace ubsan {
   int FlattenRowMajorIndex(const std::vector<int> &shape, const std::vector<int> &indices);
   void IterateStructElements(
       const symir::Funct &fun, const symir::StructDef *sDef,
       const std::function<void(std::string)> &callback, std::string prefix = ""
   );
-}
+} // namespace ubsan
 
 /// UBSan is a visitor that collects constraints to ensure that the
 /// execution of a function is free of undefined behavior like overflow .

@@ -172,15 +172,13 @@ void IntUBInject::Visit(const symir::Term &t) {
       break;
 
     case symir::Term::OP_DIV:
-      constraints.push_back(
-          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
+      constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
       ); // We disallow division by zero
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SDIV, {coefExpr, varExpr}));
       break;
 
     case symir::Term::OP_REM:
-      constraints.push_back(
-          tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
+      constraints.push_back(tm->mk_term(bitwuzla::Kind::DISTINCT, {varExpr, zero})
       ); // We disallow division by zero
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SREM, {coefExpr, varExpr}));
       break;
@@ -203,27 +201,19 @@ void IntUBInject::Visit(const symir::Term &t) {
 
     case symir::Term::OP_SHL:
       // 0 <= coefExpr && coefExpr < 32
-      constraints.push_back(
-        tm->mk_term(
-          bitwuzla::Kind::AND, {
-            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
-            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})
-          }
-        )
-      );
+      constraints.push_back(tm->mk_term(
+          bitwuzla::Kind::AND, {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+                                tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})}
+      ));
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SHL, {varExpr, coefExpr}));
       break;
 
     case symir::Term::OP_SHR:
       // 0 <= coefExpr && coefExpr < 32
-      constraints.push_back(
-        tm->mk_term(
-          bitwuzla::Kind::AND, {
-            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
-            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})
-          }
-        )
-      );
+      constraints.push_back(tm->mk_term(
+          bitwuzla::Kind::AND, {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+                                tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, thirtyTwo})}
+      ));
       pushExpression(tm->mk_term(bitwuzla::Kind::BV_SHR, {varExpr, coefExpr}));
       break;
 

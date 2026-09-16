@@ -85,15 +85,14 @@ std::string StatelessChecksum::GetCheckChksumCode(bool debug) {
   if (debug) {
     oss << "#include <assert.h>" << std::endl;
     oss << "#include <stdio.h>" << std::endl << std::endl;
-    oss << "#define " << GetCheckChksumName() << "(expected, actual) "
-        << GetCheckChksumName() << "_func(expected, actual, __LINE__, __func__)" << std::endl;
-    oss << "static inline int " << GetCheckChksumName() 
+    oss << "#define " << GetCheckChksumName() << "(expected, actual) " << GetCheckChksumName()
+        << "_func(expected, actual, __LINE__, __func__)" << std::endl;
+    oss << "static inline int " << GetCheckChksumName()
         << "_func(int expected, int actual, int line, const char *const fname)" << std::endl;
     oss << "{" << std::endl;
     oss << "  if (expected != actual) {" << std::endl;
     oss << "    fprintf(stderr, \"[%s:%d] Checksum not equal: expected=%d actual=%d\\n\", "
-        << "fname, line, expected, actual);"
-        << std::endl;
+        << "fname, line, expected, actual);" << std::endl;
     oss << "  }" << std::endl;
     oss << "  assert(expected == actual && \"Checksum not equal\");" << std::endl;
     oss << "  return actual;" << std::endl;

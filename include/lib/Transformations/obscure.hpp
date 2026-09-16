@@ -23,16 +23,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that do not target any specific Compiler optimization but introduce/create operations from constants
+// Contains Transformation Rules that do not target any specific Compiler optimization but
+// introduce/create operations from constants
 
-#include "lib/rule.hpp"
 #include "lib/lang.hpp"
+#include "lib/rule.hpp"
 
 #ifndef REIFY_OBSCURE_HPP
 #define REIFY_OBSCURE_HPP
 
 namespace transformations::obscure {
-  
+
   // Notation:
   // C1, C2, ... := constants/Literals
   // E1, E2, ... := (Sub)Expression
@@ -42,34 +43,29 @@ namespace transformations::obscure {
 
   struct PrimeInterp : Rule {
     PrimeInterp(int32_t prime = 46337) : prime(prime) {}
+
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
+        symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+        VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
     ) const override;
     std::string RuleName() override { return __CLASS_NAME__ };
     int32_t prime;
     const std::string varPrefix = "prime_interpol_guard";
   };
 
-
   struct Conditional : Rule {
     Conditional() {}
+
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
+        symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+        VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
     ) const override;
     std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "conditional_guard";
   };
 
-}
+} // namespace transformations::obscure
 
 #endif

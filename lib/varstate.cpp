@@ -458,5 +458,5 @@ VariableState VariableStateQuery::Query(size_t blockIndex, size_t stmtIndex) {
       varState.size() != 0, "unable to find variable state at block %ld, stmt %ld", blockIndex,
       stmtIndex
   );
-  return (struct VariableState) {this->varNamesMap, varState, varsCount};
+  return (struct VariableState){this->varNamesMap, varState, varsCount};
 }

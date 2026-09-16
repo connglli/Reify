@@ -33,7 +33,8 @@
 
 constexpr std::string ClassName(const std::string &prettyFunction) {
   size_t colons = prettyFunction.rfind("::");
-  if (colons == std::string::npos) return "::";
+  if (colons == std::string::npos)
+    return "::";
   size_t begin = prettyFunction.substr(0, colons).rfind(" ") + 1;
   size_t end = colons - begin;
 

@@ -408,9 +408,9 @@ nlohmann::json StructType<IntType>::ToJson() const {
 template<typename IntType>
 ArgPlus<IntType>::ArgPlus(const ArgPlus &other) {
   if (other.IsScalar()) {
-    type = std::make_unique<ScalarType<IntType>>(
-        *static_cast<ScalarType<IntType> *>(other.type.get())
-    );
+    type =
+        std::make_unique<ScalarType<IntType>>(*static_cast<ScalarType<IntType> *>(other.type.get())
+        );
   } else if (other.IsArray()) {
     auto *arr = static_cast<ArrayType<IntType> *>(other.type.get());
     auto newArr = std::make_unique<ArrayType<IntType>>(arr->dim);

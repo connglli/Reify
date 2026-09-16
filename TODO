@@ -11,7 +11,7 @@ Java:
 1. rylink for java
 2. separation compilation units
 
-Interprocedural Dataflow: 
+Interprocedural Dataflow:
 1. More Vectorization, LoopUnrolling, licm, InstCombine, ... Rules
 2. Fuzzer could auto reduce bugs it finds or copy the original functions also into the bug dir.
    => The main issue is that regenerating functions is performance dependend (bitwuzla thread timeout)

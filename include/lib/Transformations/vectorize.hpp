@@ -25,8 +25,8 @@
 
 // Contains Transformation Rules that attempt to cause Vectorizations in the compiler
 
-#include "lib/rule.hpp"
 #include "lib/lang.hpp"
+#include "lib/rule.hpp"
 
 #ifndef REIFY_VECTORIZE_HPP
 #define REIFY_VECTORIZE_HPP
@@ -45,27 +45,19 @@ namespace transformations::vectorize {
   struct DeadAssignFromCopy : Rule {
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
+        symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+        VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
     ) const override;
     std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "dead_assign";
   };
 
-
-
   /// https://llvm.org/docs/Vectorizers.html#reductions
   struct Reduction : Rule {
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
+        symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+        VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
     ) const override;
     std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "reduc";
@@ -73,14 +65,11 @@ namespace transformations::vectorize {
   };
 
   /// https://llvm.org/docs/Vectorizers.html#inductions
-  struct Induction: Rule {
+  struct Induction : Rule {
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
+        symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+        VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
     ) const override;
     std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "induc";
@@ -99,16 +88,13 @@ namespace transformations::vectorize {
   struct WithAliasCheck : Rule {
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
-      symir::FunctBuilder *funBd,
-      std::vector<symir::BlockBuilder *> &blockBds,
-      VariableState &varState,
-      size_t targetBlockIdx,
-      size_t targetStmtIdx
+        symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
+        VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
     ) const override;
     std::string RuleName() override { return __CLASS_NAME__ };
     const std::string varPrefix = "aliasCheck";
     const std::string indVarPrefix = "i";
   };
-}
+} // namespace transformations::vectorize
 
-#endif //REIFY_VECTORIZE_HPP
+#endif // REIFY_VECTORIZE_HPP
