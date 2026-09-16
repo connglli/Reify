@@ -12,13 +12,16 @@ from dataclasses import dataclass, replace
 from typing import Optional, TextIO, Tuple, Dict
 from enum import Enum
 
+
 class Logger:
   verbose: bool
   outFile: TextIO = sys.stderr
 
-  
-  def setVerbose(self: Logger, verbose: bool): self.verbose = verbose
-  def setOut(self: Logger, outFile: TextIO): self.outFile = outFile
+  def setVerbose(self: Logger, verbose: bool):
+    self.verbose = verbose
+
+  def setOut(self: Logger, outFile: TextIO):
+    self.outFile = outFile
 
   def __print(
     self: Logger,
@@ -52,8 +55,10 @@ class Logger:
     self.__print(title="Warning", msg=msg, color="yellow")
 
   def logInfo(self: Logger, msg: str):
-    if (not self.verbose): return
+    if not self.verbose:
+      return
     self.__print(title="Info", msg=msg, color="blue")
+
 
 @dataclass
 class ProgGenOptions:
@@ -61,12 +66,13 @@ class ProgGenOptions:
   uuid: str  # Primary ID for the newly generated program
   indir: Path  # Directory to read the input function files
   limit: int  # The maximum number of programs to generate (0 means unlimited)
-  sno: int # Target Sample Number
+  sno: int  # Target Sample Number
   seed: int  # Seed for the random number generator
   ruleInfo: bool = False  # Whenever to output the rule info json
-  reduceMode: Optional[Path] = None # path to the reduce mode file
-  rule: Optional[int] = None # Number of Rules applied in each block
+  reduceMode: Optional[Path] = None  # path to the reduce mode file
+  rule: Optional[int] = None  # Number of Rules applied in each block
   extra: Optional[str] = None  # Extra options to control the program generation process
+
 
 class ReduceInfo:
   sno: int
@@ -78,10 +84,11 @@ class ReduceInfo:
     self.__bitvec = 0
     self.sno = sno
 
-  def items(self: ReduceInfo): return self.info
+  def items(self: ReduceInfo):
+    return self.info
 
   def add(self: ReduceInfo, functionName: str, headerBlock: str, ruleCount: int):
-    self.__bitvec |= (1 << len(self.info))
+    self.__bitvec |= 1 << len(self.info)
     self.info.append((functionName, headerBlock, ruleCount))
 
   def copy(self: ReduceInfo) -> ReduceInfo:
@@ -97,7 +104,7 @@ class ReduceInfo:
   @staticmethod
   def fromJson(file: Path) -> ReduceInfo:
     reduceInfoJson: Dict = json.load(file.open())
-    reduceInfo: ReduceInfo = ReduceInfo(reduceInfoJson["sno"]);
+    reduceInfo: ReduceInfo = ReduceInfo(reduceInfoJson["sno"])
     for function in reduceInfoJson["functions"]:
       functionName: str = function["name"]
       for block in function["blocks"]:
@@ -112,13 +119,17 @@ class ReduceInfo:
     count: int = 0
     reduceInfoJson["sno"] = self.sno
     for [function, headerBlock, ruleCount] in self.info:
-      if (seenFunctions.__contains__(function)):
-        reduceInfoJson["functions"][seenFunctions[function]]["blocks"].append({ "headerLabel": headerBlock, "targetRuleCount": ruleCount })
+      if seenFunctions.__contains__(function):
+        reduceInfoJson["functions"][seenFunctions[function]]["blocks"].append(
+          {"headerLabel": headerBlock, "targetRuleCount": ruleCount}
+        )
       else:
         seenFunctions[function] = count
         count += 1
-        reduceInfoJson["functions"].append({ "name": function, "blocks": [{ "headerLabel": headerBlock, "targetRuleCount": ruleCount}]})
-    json.dump(reduceInfoJson, open(path, "w"));
+        reduceInfoJson["functions"].append(
+          {"name": function, "blocks": [{"headerLabel": headerBlock, "targetRuleCount": ruleCount}]}
+        )
+    json.dump(reduceInfoJson, open(path, "w"))
 
   # Bitvec is unique for all ReduceInfos r1, r2 s.t. r1 != r2, see __eq__
   # and conversly ofcourse r1 == r2 => __hash__(r1) == __hash__(r2)__
@@ -128,22 +139,22 @@ class ReduceInfo:
   def __getitem__(self: ReduceInfo, key: Tuple[str, str]):
     [functionName, headerBlock] = key
     for item in self.info:
-      if (functionName == item[0] and headerBlock == item[1]):
+      if functionName == item[0] and headerBlock == item[1]:
         return item[2]
 
   def __setitem__(self: ReduceInfo, key: Tuple[str, str], ruleCount: int):
     [functionName, headerBlock] = key
     for i in range(len(self.info)):
-      if (functionName == self.info[i][0] and headerBlock == self.info[i][1]):
+      if functionName == self.info[i][0] and headerBlock == self.info[i][1]:
         self.info[i] = (self.info[i][0], self.info[i][1], ruleCount)
-        if (ruleCount == 0):
+        if ruleCount == 0:
           self.__bitvec &= ~(1 << i)
         else:
           self.__bitvec |= 1 << i
-        break;
-    else: 
+        break
+    else:
       self.add(functionName, headerBlock, ruleCount)
-      self.__bitvec |= (1 << len(self.info))
+      self.__bitvec |= 1 << len(self.info)
       self.info.append((functionName, headerBlock, ruleCount))
 
   def __delitem__(self: ReduceInfo, _key: Tuple[str, str]):
@@ -151,25 +162,34 @@ class ReduceInfo:
 
   # This is a shallow equallity e.g. only over if a block has ruleCount == 0 or not
   def __eq__(self: ReduceInfo, otherObj: object):
-    if not isinstance(otherObj, ReduceInfo): return False
+    if not isinstance(otherObj, ReduceInfo):
+      return False
     other: ReduceInfo = otherObj
     return self.__bitvec == other.__bitvec
+
 
 def nextUuid():
   keywords = "0123456789abcdefghijklmnopqrstuvwxyz"
   return "".join(random.choices(keywords, k=6))
 
+
 def makeFileName(prefix: str):
   import os
+
   return prefix + str(os.getpid())
+
 
 def runRyLink(popts: ProgGenOptions):
   cmd: list[str] = [
     popts.bin,
-    "-i", str(popts.indir),
-    "-l", str(popts.limit),
-    "-s", str(popts.seed),
-    "-n", str(popts.sno),
+    "-i",
+    str(popts.indir),
+    "-l",
+    str(popts.limit),
+    "-s",
+    str(popts.seed),
+    "-n",
+    str(popts.sno),
   ]
   cmd += [popts.uuid]
   if popts.rule:
@@ -183,105 +203,119 @@ def runRyLink(popts: ProgGenOptions):
 
   cmdline.check_run(cmd)
 
-def getReduceInfo(popts: ProgGenOptions, outdir: Path, sno: int) -> ReduceInfo:
-  reduceInfoOpts: ProgGenOptions = replace(popts, ruleInfo=True, reduceMode=None);
 
-  try: runRyLink(reduceInfoOpts)
-  except: 
+def getReduceInfo(popts: ProgGenOptions, outdir: Path, sno: int) -> ReduceInfo:
+  reduceInfoOpts: ProgGenOptions = replace(popts, ruleInfo=True, reduceMode=None)
+  try:
+    runRyLink(reduceInfoOpts)
+  except:
     logger.logError("Failed to get Reduce Info")
     exit(1)
 
-
-  reduceInfoFile : Path = popts.indir / ("prog_" + popts.uuid + "_" + str(sno)) / "ruleinfo.jsonl"
+  reduceInfoFile: Path = popts.indir / ("prog_" + popts.uuid + "_" + str(sno)) / "ruleinfo.jsonl"
   reduceInfo = ReduceInfo.fromJson(reduceInfoFile)
 
-  progDir: str = ("prog_" + popts.uuid + "_" + str(popts.sno));
+  progDir: str = "prog_" + popts.uuid + "_" + str(popts.sno)
   shutil.rmtree(str(popts.indir / progDir))
 
   return reduceInfo
 
-def getFinalReduction(popts : ProgGenOptions, outdir: Path, reduceInfo: ReduceInfo):
-  reduceModePath: Path = Path("/tmp/" + makeFileName("reduce_file.jsonl"));
+
+def getFinalReduction(popts: ProgGenOptions, outdir: Path, reduceInfo: ReduceInfo):
+  reduceModePath: Path = Path("/tmp/" + makeFileName("reduce_file.jsonl"))
   reduceInfo.toJson(reduceModePath)
 
-  reduceInfoOpts: ProgGenOptions = replace(popts, ruleInfo=True, reduceMode=reduceModePath);
-  try: runRyLink(reduceInfoOpts)
-  except: 
+  reduceInfoOpts: ProgGenOptions = replace(popts, ruleInfo=True, reduceMode=reduceModePath)
+  try:
+    runRyLink(reduceInfoOpts)
+  except:
     logger.logError("Failed to get final Reduction")
     exit(1)
 
-  progDir: str = ("prog_" + popts.uuid + "_" + str(popts.sno));
+  progDir: str = "prog_" + popts.uuid + "_" + str(popts.sno)
   shutil.move(str(popts.indir / progDir), str(outdir / progDir))
+
 
 class TestResult(Enum):
   BUGGY = True
   FIXED = False
 
+
 @dataclass
 class TestOpts:
-  popts: ProgGenOptions;
-  outdir: Path;
-  reduceInfo: ReduceInfo;
-  test: str;
-  args: Optional[str] = None;
+  popts: ProgGenOptions
+  outdir: Path
+  reduceInfo: ReduceInfo
+  test: str
+  args: Optional[str] = None
+
 
 def Test(opts: TestOpts) -> TestResult:
-  reduceModePath: Path = Path("/tmp/" + makeFileName("reduce_file.jsonl"));
+  reduceModePath: Path = Path("/tmp/" + makeFileName("reduce_file.jsonl"))
   opts.reduceInfo.toJson(reduceModePath)
 
-  reduceModeOpts: ProgGenOptions = replace(opts.popts, ruleInfo=False, reduceMode=str(reduceModePath))
-  try: runRyLink(reduceModeOpts)
-  except: 
+  reduceModeOpts: ProgGenOptions = replace(
+    opts.popts, ruleInfo=False, reduceMode=str(reduceModePath)
+  )
+  try:
+    runRyLink(reduceModeOpts)
+  except:
     logger.logError("Failed to run Test")
     exit(1)
 
   progDirName: str = "prog_" + opts.popts.uuid + "_" + str(opts.popts.sno)
-  progPath: Path = opts.popts.indir / progDirName;
+  progPath: Path = opts.popts.indir / progDirName
   cmd: list[str] = [opts.test, str(progPath)]
   if opts.args:
     cmd += shlex.split(opts.args)
-  
-  ret: int = cmdline.get_ret(cmd);
 
+  ret: int = cmdline.get_ret(cmd)
   shutil.rmtree(progPath)
 
   return TestResult(ret == 0)
 
+
 # DeltaDebug Helpers:
+
 
 @dataclass(eq=True, frozen=True)
 class AtomicDelta:
-  functionName: str;
-  headerLabel: str;
-  ruleCount: int;
+  functionName: str
+  headerLabel: str
+  ruleCount: int
 
   def apply(self: AtomicDelta, reduceInfo: ReduceInfo):
     reduceInfo[self.functionName, self.headerLabel] = self.ruleCount
 
+
 Delta = set[AtomicDelta]
 
+
 def applyDelta(delta: Delta, reduceInfo: ReduceInfo) -> ReduceInfo:
-  res : ReduceInfo = reduceInfo.copy()
+  res: ReduceInfo = reduceInfo.copy()
   for c in delta:
-      c.apply(res)
-  return res;
+    c.apply(res)
+  return res
+
 
 def splitDelta(delta: Delta, n: int) -> list[Delta]:
   deltas: list[set[AtomicDelta]] = []
   currDelta: list[AtomicDelta] = list(delta)
   start = 0
   for i in range(n):
-    newDelta: list[AtomicDelta] = currDelta[start:int(start + (len(delta) - start) / (n - i))]
+    newDelta: list[AtomicDelta] = currDelta[start : int(start + (len(delta) - start) / (n - i))]
     deltas.append(Delta(set(newDelta)))
     start = start + len(newDelta)
   return deltas
 
+
 def getDeltaFromReduceInfo(reduceInfo: ReduceInfo) -> Delta:
   d: set[AtomicDelta] = set()
   for [functionName, headerLabel, ruleCount] in reduceInfo.items():
-    if (ruleCount > 0):
+    if ruleCount > 0:
       d.add(AtomicDelta(functionName, headerLabel, ruleCount))
   return d
+
 
 # TODO: This could be speed up with caching
 # Apply Delta Debugging to the program generation. An Atomic Change here is "for function f and block b apply all transformations"
@@ -294,63 +328,74 @@ def getDeltaFromReduceInfo(reduceInfo: ReduceInfo) -> Delta:
 #   c. No test causes failure:
 # If granularity can be refined: Go to step (1) with Δ = Δ and n = n * 2
 # Otherwise: Done, found the 1-minimal subset
-def DeltaDebug(
-  opts: TestOpts
-) -> ReduceInfo:
-  emptyReduceInfo: ReduceInfo = opts.reduceInfo.getEmpty();
-  entireDelta: Delta = getDeltaFromReduceInfo(opts.reduceInfo);
-  assert applyDelta(entireDelta, emptyReduceInfo) == opts.reduceInfo, "entireDelta is not the entire difference between empty- and initReduceInfo"
+def DeltaDebug(opts: TestOpts) -> ReduceInfo:
+  emptyReduceInfo: ReduceInfo = opts.reduceInfo.getEmpty()
+  entireDelta: Delta = getDeltaFromReduceInfo(opts.reduceInfo)
+  assert (
+    applyDelta(entireDelta, emptyReduceInfo) == opts.reduceInfo
+  ), "entireDelta is not the entire difference between empty- and initReduceInfo"
 
   resultCache: Dict[ReduceInfo, TestResult] = {}
 
   # 1.
   n: int = 2
-  currentDelta: Delta = entireDelta;
+  currentDelta: Delta = entireDelta
   logger.logInfo(f"Start DD with n = { n } and Δ = { len(currentDelta) } AtomicDeltas")
 
   while True:
-    logger.logInfo(f"New DD Iter with n = { n } and Δ = { len(currentDelta) } AtomicDeltas remaining")
+    logger.logInfo(
+      f"New DD Iter with n = { n } and Δ = { len(currentDelta) } AtomicDeltas remaining"
+    )
 
-    if (len(currentDelta) == 1): break
+    if len(currentDelta) == 1:
+      break
 
     # 2.
     deltas: list[Delta] = splitDelta(currentDelta, n)
     compliments: list[Delta] = list(map(lambda d: currentDelta.difference(d), deltas))
-    logger.logInfo(f"Splitting Δ to Δi: { list(map(lambda d: len(d), deltas)) } and ∇i: { list(map(lambda d: len(d), compliments)) }")
+    logger.logInfo(
+      f"Splitting Δ to Δi: { list(map(lambda d: len(d), deltas)) } and ∇i: { list(map(lambda d: len(d), compliments)) }"
+    )
     foundBuggy: bool = False
 
     for delta in deltas:
-      if len(delta) == 0: continue
+      if len(delta) == 0:
+        continue
       reduceInfo = applyDelta(delta, emptyReduceInfo)
       if not (reduceInfo in resultCache):
         resultCache[reduceInfo] = Test(replace(opts, reduceInfo=reduceInfo))
-      if (resultCache[reduceInfo] == TestResult.BUGGY):
+      if resultCache[reduceInfo] == TestResult.BUGGY:
         # 3.a.
         currentDelta = delta
         n = 2
         foundBuggy = True
         break
-    if foundBuggy: continue
+    if foundBuggy:
+      continue
 
     for delta in compliments:
-      if len(delta) == 0: continue
+      if len(delta) == 0:
+        continue
       reduceInfo = applyDelta(delta, emptyReduceInfo)
       if not (reduceInfo in resultCache):
         resultCache[reduceInfo] = Test(replace(opts, reduceInfo=reduceInfo))
-      if (resultCache[reduceInfo] == TestResult.BUGGY):
+      if resultCache[reduceInfo] == TestResult.BUGGY:
         # 3.b.
         currentDelta = delta
         n = n - 1
         foundBuggy = True
         break
-    if foundBuggy: continue
+    if foundBuggy:
+      continue
 
     # 3.c
-    if (all(map(lambda d: len(d) <= 1, deltas)) and all(map(lambda d: len(d) <= 1, compliments))): break;
+    if all(map(lambda d: len(d) <= 1, deltas)) and all(map(lambda d: len(d) <= 1, compliments)):
+      break
     n = n * 2
 
   logger.logInfo(f"Finished DD with Δ = { len(currentDelta) }")
-  return applyDelta(currentDelta, emptyReduceInfo);
+  return applyDelta(currentDelta, emptyReduceInfo)
+
 
 # Applyu Bisection to the program generation. For each function and each block independintly bisect rule application
 def Bisect(topts: TestOpts) -> ReduceInfo:
@@ -358,16 +403,19 @@ def Bisect(topts: TestOpts) -> ReduceInfo:
 
   currReduceInfo: ReduceInfo = initReduceInfo.copy()
   for functionName, headerLabel, ruleCount in initReduceInfo.items():
-    if ruleCount <= 0: continue
+    if ruleCount <= 0:
+      continue
 
     currBisect: int = ruleCount // 2
     lastBuggySize = ruleCount
     while currBisect != lastBuggySize:
-      logger.logInfo(f"Bisecting [{functionName}, {headerLabel}] To: {currBisect}, Candidate {lastBuggySize}")
+      logger.logInfo(
+        f"Bisecting [{functionName}, {headerLabel}] To: {currBisect}, Candidate {lastBuggySize}"
+      )
       currBisectSize = max(1, (lastBuggySize - currBisect) // 2)
       currReduceInfo[(functionName, headerLabel)] = currBisect
-      testResult : TestResult = Test(replace(topts, reduceInfo=currReduceInfo))
-      if (testResult == TestResult.BUGGY):
+      testResult: TestResult = Test(replace(topts, reduceInfo=currReduceInfo))
+      if testResult == TestResult.BUGGY:
         lastBuggySize = currBisect
         currBisect -= currBisectSize
       else:
@@ -378,8 +426,11 @@ def Bisect(topts: TestOpts) -> ReduceInfo:
 
   return currReduceInfo
 
-def main(): 
-  parser: ArgumentParser = ArgumentParser("ryreduce", description="Tool for reducing whole programs generated by RyLink, based on a seed")
+
+def main():
+  parser: ArgumentParser = ArgumentParser(
+    "ryreduce", description="Tool for reducing whole programs generated by RyLink, based on a seed"
+  )
 
   parser.add_argument(
     "test",
@@ -462,7 +513,7 @@ def main():
   parser.add_argument(
     "-v",
     "--verbose",
-    action='store_true',
+    action="store_true",
     default=False,
     help="Enables Info level Logging (default: False)",
   )
@@ -477,30 +528,30 @@ def main():
   args = parser.parse_args()
   assert args.seed >= 0, "A seed must be provided"
 
-  if (args.verbose):
+  if args.verbose:
     logger.setVerbose(True)
 
-  if (args.logger == "stdout"):
+  if args.logger == "stdout":
     logger.setOut(sys.stdout)
-  elif (args.logger == "stderr"):
+  elif args.logger == "stderr":
     logger.setOut(sys.stderr)
   else:
     logger.setOut(Path(args.logger).open())
 
-  if (args.rule >= 0):
-    rule: Optional[int] = args.rule;
+  if args.rule >= 0:
+    rule: Optional[int] = args.rule
   else:
-    rule: Optional[int] = None;
+    rule: Optional[int] = None
 
-  if (args.extra != ""):
-    extra: Optional[str] = args.extra;
+  if args.extra != "":
+    extra: Optional[str] = args.extra
   else:
-    extra: Optional[str] = None;
+    extra: Optional[str] = None
 
-  if (args.args!= ""):
-    testArgs: Optional[str] = args.args;
+  if args.args != "":
+    testArgs: Optional[str] = args.args
   else:
-    testArgs: Optional[str] = None;
+    testArgs: Optional[str] = None
 
   indir: Path = Path(args.input).resolve().absolute()
   popts: ProgGenOptions = ProgGenOptions(
@@ -519,13 +570,13 @@ def main():
   outdir: Path = Path(args.outdir).resolve().absolute()
 
   logger.logInfo("===== Getting RuleInfo output =====")
-  reduceInfo: ReduceInfo = getReduceInfo(popts, outdir, args.sno);
+  reduceInfo: ReduceInfo = getReduceInfo(popts, outdir, args.sno)
   logger.logInfo("Success")
 
   # validate likeness test
   logger.logInfo("===== Validating likeness test =====")
-  topts: TestOpts = TestOpts(popts, outdir, reduceInfo, args.test, testArgs);
-  if (Test(topts) != TestResult.BUGGY):
+  topts: TestOpts = TestOpts(popts, outdir, reduceInfo, args.test, testArgs)
+  if Test(topts) != TestResult.BUGGY:
     logger.logWarning("Likeness Test returns 1 on unreduced Program")
     getFinalReduction(popts, outdir, reduceInfo)
     return 1
@@ -533,20 +584,19 @@ def main():
 
   # validate bug freeness without any rule application
   logger.logInfo("===== Checking Empty Reduce Info =====")
-  emptyReduceInfo: ReduceInfo = reduceInfo.getEmpty();
-  if (Test(replace(topts, reduceInfo=emptyReduceInfo)) == TestResult.BUGGY):
+  emptyReduceInfo: ReduceInfo = reduceInfo.getEmpty()
+  if Test(replace(topts, reduceInfo=emptyReduceInfo)) == TestResult.BUGGY:
     logger.logWarning("Likeness Test returns 0 on fully reduced Program")
     getFinalReduction(popts, outdir, emptyReduceInfo)
     return 0
   logger.logInfo("Passed")
 
   logger.logInfo("===== Delta Debugging: =====")
-  reduceInfo = DeltaDebug(topts);
-
+  reduceInfo = DeltaDebug(topts)
   logger.logInfo("===== Bisecting: =====")
-  reduceInfo = Bisect(replace(topts, reduceInfo=reduceInfo));
-
+  reduceInfo = Bisect(replace(topts, reduceInfo=reduceInfo))
   getFinalReduction(popts, outdir, reduceInfo)
+
 
 logger: Logger = Logger()
 if __name__ == "__main__":

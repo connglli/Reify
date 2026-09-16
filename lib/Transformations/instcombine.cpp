@@ -61,9 +61,9 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -141,9 +141,9 @@ namespace transformations::instcombine {
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -201,9 +201,9 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           const symir::VarUse *B;
@@ -261,9 +261,9 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           const symir::VarUse *B;
@@ -321,9 +321,9 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           const symir::VarUse *B;
@@ -367,9 +367,9 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           const symir::VarUse *B;
@@ -413,9 +413,9 @@ namespace transformations::instcombine {
 
     const symir::VarDef *A = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           const symir::VarUse *B;

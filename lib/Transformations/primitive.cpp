@@ -54,9 +54,9 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    std::function<symir::BlockBuilder::ExprID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -144,9 +144,9 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    std::function<symir::BlockBuilder::ExprID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -207,9 +207,9 @@ namespace transformations::primitive {
     const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
-    std::function<symir::BlockBuilder::ExprID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            ExprID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -400,11 +400,9 @@ namespace transformations::primitive {
     // Build First Block
     bodyBlockBds[0] = funBd->OpenBlock(bodyLabels[0]);
     if (0 == trueBranch) {
-      bodyBlockBds[0]->CommitStmt(
-          bodyBlockBds[0]->SymAssStmt(
-              def, symir::StmtCopier(funBd, bodyBlockBds[0]).CopyExpr(expr), access
-          )
-      );
+      bodyBlockBds[0]->CommitStmt(bodyBlockBds[0]->SymAssStmt(
+          def, symir::StmtCopier(funBd, bodyBlockBds[0]).CopyExpr(expr), access
+      ));
     } else {
       bodyBlockBds[0]->CommitStmt(utils::TrivialAssignment(funBd, bodyBlockBds[0], def, access));
     }
@@ -423,11 +421,9 @@ namespace transformations::primitive {
       }
       bodyBlockBds[i] = funBd->OpenBlock(bodyLabels[i]);
       if (i == trueBranch) {
-        bodyBlockBds[i]->CommitStmt(
-            bodyBlockBds[i]->SymAssStmt(
-                def, symir::StmtCopier(funBd, bodyBlockBds[i]).CopyExpr(expr), access
-            )
-        );
+        bodyBlockBds[i]->CommitStmt(bodyBlockBds[i]->SymAssStmt(
+            def, symir::StmtCopier(funBd, bodyBlockBds[i]).CopyExpr(expr), access
+        ));
       } else {
         bodyBlockBds[i]->CommitStmt(utils::TrivialAssignment(funBd, bodyBlockBds[i], def, access));
       }
@@ -475,9 +471,9 @@ namespace transformations::primitive {
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -529,9 +525,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -585,9 +581,9 @@ namespace transformations::primitive {
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Expr &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Expr &e, void **data) {
           std::vector<symir::BlockBuilder::TermID> termIds;
@@ -677,9 +673,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -738,9 +734,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -780,9 +776,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -834,9 +830,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -883,9 +879,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -938,9 +934,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
@@ -995,9 +991,9 @@ namespace transformations::primitive {
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
 
 
-    std::function<symir::BlockBuilder::TermID(
-        symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **
-    )>
+    std::function<
+        symir::BlockBuilder::
+            TermID(symir::FunctBuilder *, symir::BlockBuilder *, const symir::Term &, void **)>
         varInsertFun = [&](symir::FunctBuilder *thisFunBd, symir::BlockBuilder *thisBlockBd,
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();

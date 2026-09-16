@@ -45,7 +45,7 @@ namespace {
     std::memcpy(&s32, &u32, sizeof(int32_t));
     return s32;
   }
-}
+} // namespace
 
 namespace ubsan {
   void IterateStructElements(
@@ -94,7 +94,7 @@ namespace ubsan {
     }
     return flat;
   }
-} // namespace
+} // namespace ubsan
 
 void UBSan::addConstraint(const bitwuzla::Term &c) {
   ++addCalls_;
@@ -548,61 +548,53 @@ void UBSan::Visit(const symir::Term &t) {
     case symir::Term::Op::OP_XOR:
       termExpr = tm->mk_term(bitwuzla::Kind::BV_XOR, {coefExpr, varExpr});
       break;
-      
+
     case symir::Term::Op::OP_OR:
       termExpr = tm->mk_term(bitwuzla::Kind::BV_OR, {coefExpr, varExpr});
       break;
 
     case symir::Term::Op::OP_SHL:
-      // 0 <= coefExpr && coefExpr < 31 (since we are signed shifting by 31 exactly will lead to an overflow for
-      // all lhs values other then 0, for now we ban 31 outright)
-      addConstraint(
-        tm->mk_term(
-          bitwuzla::Kind::AND, {
-            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
-            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "31", 10)})
-          }
-        )
-      );
-      // In C11: 6.5.7p4 declares for E1 << E2: If E1 is signed and nonnegative, 
+      // 0 <= coefExpr && coefExpr < 31 (since we are signed shifting by 31 exactly will lead to an
+      // overflow for all lhs values other then 0, for now we ban 31 outright)
+      addConstraint(tm->mk_term(
+          bitwuzla::Kind::AND,
+          {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+           tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "31", 10)})}
+      ));
+      // In C11: 6.5.7p4 declares for E1 << E2: If E1 is signed and nonnegative,
       // and E1 * 2 ^ E2 is representable, then that is the resulting value;
       // otherwise its UB
-      
+
       // Non-Negative
       addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
       // E1 * (1 << E2) does not overflow
-      addConstraint(
-        tm->mk_term(bitwuzla::Kind::NOT, {
-          tm->mk_term(bitwuzla::Kind::BV_SMUL_OVERFLOW, {
-            varExpr,
-            tm->mk_term(bitwuzla::Kind::BV_SHL, { one, coefExpr })
-          })
-        })
-      );
+      addConstraint(tm->mk_term(
+          bitwuzla::Kind::NOT, {tm->mk_term(
+                                   bitwuzla::Kind::BV_SMUL_OVERFLOW,
+                                   {varExpr, tm->mk_term(bitwuzla::Kind::BV_SHL, {one, coefExpr})}
+                               )}
+      ));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SHL, {varExpr, coefExpr});
       break;
-      
+
     case symir::Term::Op::OP_SHR:
       // 0 <= coefExpr && coefExpr < 32
-      addConstraint(
-        tm->mk_term(
-          bitwuzla::Kind::AND, {
-            tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
-            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "32", 10)})
-          }
-        )
-      );
+      addConstraint(tm->mk_term(
+          bitwuzla::Kind::AND,
+          {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
+           tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "32", 10)})}
+      ));
       // In C11: 6.5.7p5: declars for E1 >> E2: If E1 is signed and nonnegative,
       // the value of the result is the integral part of the quorient of E1 / 2 ^ E2.
       // If it is negative its implementation-defined (Hence we avoid negative also for now)
-      
+
       // Non-Negative
       addConstraint(tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, varExpr}));
       termExpr = tm->mk_term(bitwuzla::Kind::BV_SHR, {varExpr, coefExpr});
       break;
 
     case symir::Term::Op::OP_NOT:
-      termExpr = tm->mk_term(bitwuzla::Kind::BV_NOT, { varExpr });
+      termExpr = tm->mk_term(bitwuzla::Kind::BV_NOT, {varExpr});
       break;
 
     case symir::Term::Op::OP_CST:
