@@ -32,8 +32,8 @@ But Reify is a random program generator. If we only do what makes the solver hap
 
 ### SymIR: pick operations the solver can handle fast
 
-- **Keep expressions in a form the solver finds cheap.** Linear shapes (sums of small terms) solve fastest. Don't push toward richer expression forms just to look more interesting — richness should come from longer paths and bigger CFGs.
-- **Ration non-linearity between program variables.** The existing `coef * var` term form (where `coef` is itself a symbol the solver picks) already puts a product of two unknowns into every query — that's the baseline, not a violation. The rule is about *adding more*: operations like `var * var`, `var / var`, `var % var`, and symbolic shifts should be used sparingly when introduced. Prefer one symbolic side and a small constant on the other. Don't put them in every expression.
+- **Keep expressions in a form the solver finds cheap.** Linear shapes (sums of small terms) solve fastest. Don't push toward richer expression forms just to look more interesting; richness should come from longer paths and bigger CFGs.
+- **Ration non-linearity between program variables.** The existing `coef * var` term form (where `coef` is itself a symbol the solver picks) already puts a product of two unknowns into every query; that's the baseline, not a violation. The rule is about *adding more*: operations like `var * var`, `var / var`, `var % var`, and symbolic shifts should be used sparingly when introduced. Prefer one symbolic side and a small constant on the other. Don't put them in every expression.
 - **Keep symbolic shift amounts in a small set of values.** The bigger the set, the more the solver has to try.
 - **Keep symbolic indexing as simple as possible.** Prefer concrete indices, or pin a symbolic index to a single value. Avoid general array-theory reasoning unless we really need it.
 - **Don't widen bit-widths without a reason.** A wider type makes every operation cost more inside the solver. Use the smallest width that still triggers the bug class we care about.
@@ -66,7 +66,7 @@ Concrete reminders:
 
 ### One rule that covers both parts
 
-- **Measure before you believe.** Always check perf changes with `scripts/rysmith.py --limit N --disable-shuffle`. Past intuition has been wrong here — don't trust a change until the numbers say so.
+- **Measure before you believe.** Always check perf changes with `scripts/rysmith.py --limit N --disable-shuffle`. Past intuition has been wrong here; don't trust a change until the numbers say so.
 
 ## Project Structure
 
@@ -74,39 +74,15 @@ Concrete reminders:
 .
 ├── Makefile
 ├── include/
-│   ├── cxxopts.hpp
-│   ├── global.hpp               # Global variables and options
-│   ├── json.hpp
-│   ├── jnif/
-│   ├── zip/
-│   └── lib/                     # Reify's headers (.hpp)
-├── lib/
-│   ├── lang.cpp                 # SymIR's implementation
-│   ├── lowers.cpp               # SymIR's lowers: SymIR to S expressions, C, Java bytecode, etc.
-│   ├── parsers.cpp              # SymIR's parser: parsing S expressions into SymIR
-│   ├── graph.cpp                # Modeling and generating a graph
-│   ├── ctrlflow.cpp             # Modeling and generating a CFG and its EPs
-│   ├── function.cpp             # Modeling and generating a leaf function
-│   ├── program.cpp              # Modeling and generating a whole program
-│   ├── symexec.cpp              # Symbolically executing a SymIR program following an EP
-│   ├── ubfree.cpp               # Collecting UB-free constraints
-│   ├── ubinject.cpp             # Injecting UB into unreachable basic blocks
-│   ├── ubbase.cpp
-│   ├── random.cpp
-│   ├── cchksum.c
-│   ├── chksum.cpp
-│   ├── logger.cpp
+│   ├── global.hpp               # Global options shared by all entry points
+│   └── lib/                     # Reify's headers (.hpp, SymIR and utilities)
+├── lib/                         # Reify's implementation (SymIR, CFG, symbolic execution, UB, generation)
 │   └── third/                   # Third-party dependencies
 ├── src/
 │   ├── symircc.cpp              # CLI entry to compile a SymIR program into a C program
 │   ├── rysmith.cpp              # CLI entry to generate a leaf function
 │   └── rylink.cpp               # CLI entry to generate a set of whole programs
-├── scripts/
-│   ├── rysmith.py               # Script to generate a set of leaf functions
-│   ├── rylink.py                # Script to generate a set of whole functions
-│   ├── fuzz.py                  # Script to fuzz GCC or LLVM
-│   ├── fuzz_jvm.sh              # Script to fuzzing HotSpot or OpenJ9
-│   └── ...
+├── scripts/                     # Python tooling (generation, fuzzing, UB checking, reduction)
 └── ...
 ```
 
