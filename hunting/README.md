@@ -46,6 +46,8 @@
 | 121756 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=121756 | FIXE | P3 normal | Internal Compiler Error | Tree Sink | Middle-end |
 | 121852 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=121852 | NEW | P3 normal | Wrong Code (SIGFPE) | RTL Optimization | Backend |
 | 122079 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=122079 | FIXE | P3 normal | Internal Compiler Error | Partial Redundancy Elimination | Middle-end |
+| 126008 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=126008 | FIXE | P1 normal | Internal Compiler Error (SIGSEGV) | Induction Variable Optimization | Middle-end |
+| 126171 | https://gcc.gnu.org/bugzilla/show_bug.cgi?id=126171 | FIXE | P2 normal | Wrong Code | Scalar Evolution | Middle-end |
 
 ## LLVM
 
@@ -69,6 +71,18 @@
 | 155161 | https://github.com/llvm/llvm-project/issues/155161 | Fixed | - | Internal Compiler Error (assertion) | Loop Invariant Code Motion | Middle-end |
 | 155162 | https://github.com/llvm/llvm-project/issues/155162 | Fixed | - | Wrong Code | Loop Vectorization | Middle-end |
 | 155184 | https://github.com/llvm/llvm-project/issues/155184 | Fixed | - | Internal Compiler Error (assertion) | Loop Invariant Code Motion | Middle-end |
+| 192607 | https://github.com/llvm/llvm-project/issues/192607 | Fixed | - | Wrong Code | Vector Combine | Middle-end |
+| 193919 | https://github.com/llvm/llvm-project/issues/193919 | Fixed | - | Internal Compiler Error | SLP Vectorization | Middle-end |
+| 194191 | https://github.com/llvm/llvm-project/issues/194191 | Fixed | - | Wrong Code | SLP Vectorization | Middle-end |
+| 195310 | https://github.com/llvm/llvm-project/issues/195310 | Confirmed | - | Wrong Code | Instruction Selection | Backend |
+| 197765 | https://github.com/llvm/llvm-project/issues/197765 | Fixed | - | Wrong Code | SLP Vectorization | Middle-end |
+| 198364 | https://github.com/llvm/llvm-project/issues/198364 | Fixed | - | Internal Compiler Error | SLP Vectorization | Middle-end |
+| 204799 | https://github.com/llvm/llvm-project/issues/204799 | Fixed | - | Compiler Hang | Scalar Replacement of Aggregates | Middle-end |
+| 204814 | https://github.com/llvm/llvm-project/issues/204814 | Fixed | - | Internal Compiler Error (assertion) | SLP Vectorization | Middle-end |
+| 205252 | https://github.com/llvm/llvm-project/issues/205252 | Fixed | - | Wrong Code | Loop Vectorization | Middle-end |
+| 205614 | https://github.com/llvm/llvm-project/issues/205614 | Fixed | - | Wrong Code | SLP Vectorization | Middle-end |
+| 205886 | https://github.com/llvm/llvm-project/issues/205886 | Fixed | - | Internal Compiler Error (assertion) | SLP Vectorization | Middle-end |
+| 206476 | https://github.com/llvm/llvm-project/issues/206476 | Fixed | - | Wrong Code | SLP Vectorization | Middle-end |
 
 ## OpenJ9
 
