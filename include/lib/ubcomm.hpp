@@ -156,6 +156,10 @@ public:
     }
   }
 
+  void Visit(const symir::ModExpr &e) override {
+    Panic("No ModExpr should exist during function creation");
+  }
+
   void Visit(const symir::Expr &e) override {
     if (e.GetOp() == symir::Expr::Op::OP_ADD && e.NumTerms() > 1) {
       hasAdd = true;
@@ -171,6 +175,10 @@ public:
     if (c.GetExpr() != nullptr) {
       c.GetExpr()->Accept(*this);
     }
+  }
+
+  void Visit(const symir::ModAssStmt &a) override {
+    Panic("No ModAssStmt should exist during function creation");
   }
 
   void Visit(const symir::AssStmt &a) override {
