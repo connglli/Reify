@@ -164,6 +164,14 @@ If you found this work helpful, please consider citing our work:
   series={PLDI '26},
   doi={10.1145/3808268},
 }
+
+@thesis{brunoreify,
+  title={Semantic Reification with Interprocedural Dataflow},
+  author={Florian Bruno},
+  type={Bachelor's thesis},
+  year={2026},
+  school={ETH Zurich},
+}
 ```
 
 ## 🧾 License
@@ -175,6 +183,7 @@ Copyright (c) 2025
 
 Kavya Chopra (chopra.kavya04@gmail.com)
 Cong Li (cong.li@inf.ethz.ch)
+Florian Bruno (schwinix@proton.me)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
