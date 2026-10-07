@@ -149,7 +149,8 @@ The generated Java class is placed inside the `javaclasses` subdirectory.
 
 ## 🐞 Bug Showcases
 
-Navigate to [bugs](./hunting).
+Please refer to [LLVM](https://github.com/llvm/llvm-project/issues?q=is%3Aissue+author%3Azhendongsu+created%3A%3E2025-04-15+created%3A%3C2026-06-01) and [GCC](https://gcc.gnu.org/bugzilla/buglist.cgi?email1=zhendong&emailreporter1=1&emailtype1=substring&f1=creation_ts&o1=lessthan&v1=2026-06-01&f2=creation_ts&o2=greaterthan&v2=2025-04-15&product=gcc&query_format=advanced).
+A subset is saved in [bugs](./hunting).
 
 ## ✏️ Citing Us
 
