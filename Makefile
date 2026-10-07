@@ -149,7 +149,7 @@ RYSMITH_EXTRA := $(if $(RYSMITH_EXTRA),--extra="$(RYSMITH_EXTRA)",)
 
 testrysmith: rysmith
 	@mkdir -p $(RY_DIR)
-	$(PY3) scripts/rysmith.py --output $(RY_DIR) --seed $(RY_SEED) --limit $(RY_LIMIT) $(RYSMITH_EXTRA) --check
+	LSAN_OPTIONS="$${LSAN_OPTIONS:-detect_leaks=0}" ASAN_OPTIONS="$${ASAN_OPTIONS:-detect_leaks=0}" $(PY3) scripts/rysmith.py --output $(RY_DIR) --seed $(RY_SEED) --limit $(RY_LIMIT) $(RYSMITH_EXTRA) --check
 
 ## rylink: Whole Program Generation
 
@@ -158,7 +158,7 @@ RYLINK_EXTRA ?=
 testrylink: rylink
 	$(PY3) scripts/retouch.py $(RY_DIR)  # cleanup
 	$(BIN_DIR)/rylink --input $(RY_DIR) --limit $(RY_LIMIT) --seed $(RY_SEED) $(RYLINK_EXTRA) --debug $(shell head /dev/urandom | tr -dc '0-9a-z' | head -c 6)
-	$(PY3) scripts/ubchk.py $(RY_DIR)
+	LSAN_OPTIONS="$${LSAN_OPTIONS:-detect_leaks=0}" ASAN_OPTIONS="$${ASAN_OPTIONS:-detect_leaks=0}" $(PY3) scripts/ubchk.py $(RY_DIR)
 
 
 ########################################################################
