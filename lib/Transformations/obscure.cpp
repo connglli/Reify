@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that obscure the transformation from the compiler using functions
+// Contains transformation rules that obscure the transformation from the compiler using functions
 // locals
 
 #include "lib/Transformations/obscure.hpp"
@@ -47,8 +47,8 @@ namespace transformations::obscure {
     if (varState.nrVariables == 0)
       return;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
-    bool isTarget = blockBd->GetNumberOfCommitedStmt() == targetStmtIdx;
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
+    bool isTarget = blockBd->GetNumberOfCommittedStmt() == targetStmtIdx;
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     int32_t target;
@@ -69,7 +69,7 @@ namespace transformations::obscure {
     rep.ReplaceStmt(
         stmt, make_matcher(const symir::Term *, m_CstTerm(m_Solved(), m_NoVar())), varInsertFun
     );
-    stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     size_t randVariableIdx = Random::Get().Uniform(0, static_cast<int>(varState.nrVariables) - 1)();
     // find last index that is the start of a variable
@@ -127,7 +127,7 @@ namespace transformations::obscure {
     std::string exitLabel = utils::NameLabel(funBd->GetName(), "if_exit_" + this->varPrefix);
 
     symir::BlockBuilder *secondBlockBd =
-        utils::SsplitBlockAt(funBd, blockBd, exitLabel, targetStmtIdx);
+        utils::SplitBlockAt(funBd, blockBd, exitLabel, targetStmtIdx);
     symir::StmtCopier secondCopier = symir::StmtCopier(funBd, secondBlockBd);
     if (!isTarget) {
       secondBlockBd->CommitStmtAt(secondCopier.CopyStmt(stmt), 0);
@@ -204,7 +204,7 @@ namespace transformations::obscure {
     if (varState.nrVariables == 0)
       return;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);

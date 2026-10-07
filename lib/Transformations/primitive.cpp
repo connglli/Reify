@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that do not target any specific Compiler optimization but
+// Contains transformation rules that do not target any specific Compiler optimization but
 // introduce/create operations from constants
 
 #include "lib/Transformations/primitive.hpp"
@@ -51,7 +51,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running AdditionFromConst" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     std::function<
@@ -69,7 +69,7 @@ namespace transformations::primitive {
               hasReplaced = true;
               *data = term->GetCoef();
               int target = term->GetCoef()->GetI32Value();
-              // v1 must be choosen s.t. |v1| < |target| and sign(v1) == sign(target)
+              // v1 must be chosen s.t. |v1| < |target| and sign(v1) == sign(target)
               // this ensures a UB free transformation since:
               // if Sk is the prefix sum up to the target Term then
               // |Sk op v1| < |Sk op target| and since Sk op target does not overflow neither does
@@ -141,7 +141,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running AdditionFromConst" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     std::function<
@@ -204,7 +204,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running AdditionFromConst" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     std::function<
@@ -251,7 +251,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ForSumFromConst" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const auto use = assStmt->GetVar();
@@ -260,7 +260,7 @@ namespace transformations::primitive {
 
     Assert(
         expr->GetTerms().size() == 1 && expr->GetTerm(0)->GetOp() == symir::Term::OP_CST,
-        "match function for ConstToForSum failed to uphold its promisses"
+        "match function for ConstToForSum failed to uphold its promises"
     );
 
     int32_t val = expr->GetTerm(0)->GetCoef()->GetI32Value();
@@ -291,7 +291,7 @@ namespace transformations::primitive {
     // Split the current block into two at targetStmtIdx while appending to the upper block
 
     symir::BlockBuilder *secondBlockBd =
-        utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+        utils::SplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     symir::BlockBuilder::StmtID initAss = blockBd->SymAssStmt(
         def, blockBd->SymAddExpr({blockBd->SymCstTerm(funBd->SymI32Const(rest), nullptr, {})}),
@@ -360,7 +360,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running AssToDeadCode" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const auto use = assStmt->GetVar();
@@ -377,7 +377,7 @@ namespace transformations::primitive {
     std::string finalLabel = utils::NameLabel(funBd->GetName(), "if_exit");
     std::vector<std::string> condLabels;
     condLabels.resize(nrBranches - 1); // else stmt has not cond and first cond is appended to
-                                       // blockBd, but for convinience we index from the index 1
+                                       // blockBd, but for convenience we index from the index 1
     std::vector<std::string> bodyLabels;
     bodyLabels.resize(nrBranches);
 
@@ -389,11 +389,11 @@ namespace transformations::primitive {
     }
 
     symir::BlockBuilder *secondBlockBd =
-        utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+        utils::SplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     std::vector<symir::BlockBuilder *> condBlockBds;
     condBlockBds.resize(nrBranches - 1); // else stmt has not cond and first cond is appended to
-                                         // blockBd, but for convinience we index from the index 1
+                                         // blockBd, but for convenience we index from the index 1
     std::vector<symir::BlockBuilder *> bodyBlockBds;
     bodyBlockBds.resize(nrBranches);
 
@@ -408,7 +408,7 @@ namespace transformations::primitive {
     }
     bodyBlockBds[0]->SymGoto(finalLabel);
 
-    // Then iterativly create all conditions and bodies excluding the last
+    // Then iteratively create all conditions and bodies excluding the last
     for (int i = 1; i < nrBranches; i++) {
       if (i != nrBranches - 1) {
         condBlockBds[i] = funBd->OpenBlock(condLabels[i]);
@@ -463,10 +463,10 @@ namespace transformations::primitive {
       symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,
       VariableState &varState, size_t targetBlockIdx, size_t targetStmtIdx
   ) const {
-    Log::Get().Out() << "Running ConstProbaagationViaAdd" << std::endl;
+    Log::Get().Out() << "Running ConstPropagationViaAdd" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -519,7 +519,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstProba" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -576,7 +576,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaMul" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -667,7 +667,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaDiv" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -728,7 +728,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaNot" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -770,7 +770,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaAnd" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -824,7 +824,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaXor" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -873,7 +873,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaOr" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -914,8 +914,8 @@ namespace transformations::primitive {
     return utils::MatchSubExprInAnyStmt(
         stmt,
         m_Expr(m_Any(m_CstTerm(
-            // Ensure atleast one left shift is possible
-            // (e.g. target should not be negative and have atleast one bit 0 to be right shifted)
+            // Ensure at least one left shift is possible
+            // (e.g. target should not be negative and have at least one bit 0 to be right shifted)
             m_Value(m_UnsetBits(~0x7FFFFFFE)), m_NoVar()
         )))
     );
@@ -928,7 +928,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaShl" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -941,9 +941,9 @@ namespace transformations::primitive {
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
           int v1, v2;
-          // TODO: __buildin_ctz is compiler specific
+          // TODO: __builtin_ctz is compiler specific
           v2 = Random::Get().Uniform(1, target == 0 ? 31 : __builtin_ctz(target))();
-          // Since target is non negative right shift is fully defined by the standart to be a
+          // Since target is non negative right shift is fully defined by the standard to be a
           // logical shift e.g. the v2 + 1 most significant bits are now 0
           v1 = target;
           v1 >>= v2;
@@ -970,8 +970,8 @@ namespace transformations::primitive {
   bool ConstPropagationViaShr::Match(const symir::Stmt *stmt) const {
     return utils::MatchSubExprInAnyStmt(
         stmt, m_Expr(m_Any(m_CstTerm(
-                  // Ensure atleast one right shift is possible
-                  // (e.g. target should have atleast one most sig. bit free to shift left and 1 to
+                  // Ensure at least one right shift is possible
+                  // (e.g. target should have at least one most sig. bit free to shift left and 1 to
                   // shift back right)
                   m_Value(m_UnsetBits(~0x3FFFFFFE)), m_NoVar()
               )))
@@ -985,7 +985,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running ConstPropagationViaShr" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     const symir::VarDef *var = utils::GetVariable(funBd, blockBds[0]->GetLabel(), this->varPrefix);
@@ -998,10 +998,10 @@ namespace transformations::primitive {
                            const symir::Term &t, void **data) {
           int target = t.GetCoef()->GetI32Value();
           int v1, v2;
-          // TODO: __buildin_ctz is compiler specific
+          // TODO: __builtin_ctz is compiler specific
           v2 = Random::Get().Uniform(1, target == 0 ? 31 : __builtin_clz(target))() - 1;
           // Since target is non negative that does not overflow on a left shift of v2
-          // it is fully defined by the standart and not UB
+          // it is fully defined by the standard and not UB
           // e.g. the v2 least significant bits are now 0
           v1 = target;
           v1 <<= v2;
@@ -1041,7 +1041,7 @@ namespace transformations::primitive {
     Log::Get().Out() << "Running Reg2Mem" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarDef *memVar =

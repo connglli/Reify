@@ -204,8 +204,8 @@ namespace patternmatch {
   };
 
   template<typename Node>
-  struct m_AtleastN : Pattern<std::vector<Node>> {
-    m_AtleastN(const Pattern<Node> &P, size_t N) : P(P), N(N) {}
+  struct m_AtLeastN : Pattern<std::vector<Node>> {
+    m_AtLeastN(const Pattern<Node> &P, size_t N) : P(P), N(N) {}
 
     inline bool match(std::vector<Node> Vs) const override {
       size_t count = 0;
@@ -398,7 +398,7 @@ namespace patternmatch {
 
   // ==================== Funct ====================
 
-  // TODO: If nessessary add Param, Local and StructDef Matchers
+  // TODO: If necessary add Param, Local and StructDef Matchers
   struct m_Funct : Pattern<const symir::Funct *> {
     m_Funct(
         const Pattern<const std::string> &N, const Pattern<std::vector<const symir::Block *>> &B
@@ -595,7 +595,7 @@ namespace patternmatch {
     const Pattern<const symir::VarUse *> &V;
   };
 
-  /// checks if a term trivially just contains the variable (e.g. 1 * x or 0 +- x etc)
+  /// Checks if a term trivially just contains the variable (e.g. 1 * x or 0 +- x etc)
   struct m_VarTerm : Pattern<const symir::Term *> {
     m_VarTerm(const symir::VarUse **v = nullptr) : v(v) {}
 

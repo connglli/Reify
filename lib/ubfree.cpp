@@ -584,8 +584,8 @@ void UBSan::Visit(const symir::Term &t) {
           {tm->mk_term(bitwuzla::Kind::BV_SLE, {zero, coefExpr}),
            tm->mk_term(bitwuzla::Kind::BV_SLT, {coefExpr, tm->mk_bv_value(bvSort, "32", 10)})}
       ));
-      // In C11: 6.5.7p5: declars for E1 >> E2: If E1 is signed and nonnegative,
-      // the value of the result is the integral part of the quorient of E1 / 2 ^ E2.
+      // In C11: 6.5.7p5: declares for E1 >> E2: If E1 is signed and nonnegative,
+      // the value of the result is the integral part of the quotient of E1 / 2 ^ E2.
       // If it is negative its implementation-defined (Hence we avoid negative also for now)
 
       // Non-Negative

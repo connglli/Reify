@@ -34,7 +34,7 @@
 #include "lib/random.hpp"
 
 namespace transformations::utils {
-  /// given a flattend intex recover the access vector needed to create a VarUse Object
+  /// Given a flattened intex recover the access vector needed to create a VarUse Object
   std::vector<symir::Coef *> UnflattenAccess(
       symir::FunctBuilder *funBuilder, const symir::VarDef *var, size_t flattenedIndex
   ) {
@@ -112,7 +112,8 @@ namespace transformations::utils {
     }
     Assert(
         remainingIndex == 0,
-        "Var Access has overflown with remainingIndex: %ld, on var: %s, struct: %s, flattendIndex: "
+        "Var Access has overflown with remainingIndex: %ld, on var: %s, struct: %s, "
+        "flattenedIndex: "
         "%ld",
         remainingIndex, var->GetName().c_str(), var->GetStructName().c_str(), flattenedIndex
     );
@@ -199,7 +200,7 @@ namespace transformations::utils {
         target, this->mod.n
     );
     Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
-    Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
+    Assert(nrVariables > 0 && nrIterations > 0, "must at least have one variable and one monomial");
 
     Log::Get().OpenSection("Interpolation");
 
@@ -221,7 +222,7 @@ namespace transformations::utils {
 
     int32_t res;
     for (size_t i = 0; i < 5;
-         i++) { // retry up to 5 times incase the system is unsolvable should rarly happen
+         i++) { // retry up to 5 times in case the system is unsolvable should rarely happen
       this->RandomizePolynomial(nrVariables, nrIterations);
 
       Log::Get().Out() << "Polynomial (" << this->polynomial.size() << "): ";
@@ -305,7 +306,7 @@ namespace transformations::utils {
       std::vector<int32_t> targets
   ) {
     Assert(targets.size() == nrIterations, "Must have a target value for each iteration");
-    Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
+    Assert(nrVariables > 0 && nrIterations > 0, "must at least have one variable and one monomial");
 
     bool has_unique = false;
     for (const int32_t target: targets) {
@@ -315,7 +316,7 @@ namespace transformations::utils {
       );
       has_unique |= targets[0] != target;
     }
-    Assert(has_unique, "target must have atleast on unique element");
+    Assert(has_unique, "target must have at least one unique element");
 
     this->RandomizePolynomial(nrVariables, nrIterations - 1);
 
@@ -369,7 +370,7 @@ namespace transformations::utils {
         target, this->mod.n
     );
     Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
-    Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
+    Assert(nrVariables > 0 && nrIterations > 0, "must at least have one variable and one monomial");
 
     Assert(this->polynomial.size() == nrVariables * nrIterations, "Interpolation not solved");
     Assert(
@@ -424,9 +425,9 @@ namespace transformations::utils {
       );
       has_unique |= targets[0] != target;
     }
-    Assert(has_unique, "target must have atleast on unique element");
+    Assert(has_unique, "target must have at least one unique element");
     Assert(nrVariables * nrIterations == varState.size(), "varState is the wrong size");
-    Assert(nrVariables > 0 && nrIterations > 0, "must atleast have one variable and one monomial");
+    Assert(nrVariables > 0 && nrIterations > 0, "must at least have one variable and one monomial");
 
     Assert(this->polynomial.size() == nrVariables * (nrIterations - 1), "Interpolation not solved");
     Assert(this->coeffs.size() == nrIterations, "Interpolation not solved or does not match input");
@@ -489,7 +490,7 @@ namespace transformations::utils {
       int32_t candidate = -1;
       for (size_t k = 0; k < nrIterations; k++) {
         // if the next value is not the successor of - or equal to the last one there must be a
-        // unique value inbetween
+        // unique value in between
         if (currVarState[k] != static_cast<int32_t>((last + 1) % mod.n) &&
             currVarState[k] - 1 - (last + 1) >= largest_range) {
           largest_range = currVarState[k] - 1 - (last + 1);
@@ -512,7 +513,7 @@ namespace transformations::utils {
   }
 
   void PrimeInterpolation::RandomizePolynomial(const size_t nrVariables, const size_t nrMonomials) {
-    Assert(nrVariables > 0 && nrMonomials > 0, "must atleast have one variable and one monomial");
+    Assert(nrVariables > 0 && nrMonomials > 0, "must at least have one variable and one monomial");
     this->polynomial.clear();
     this->polynomial.resize(nrVariables * nrMonomials);
     for (size_t d = nrMonomials; d > 0; d--) {
@@ -526,7 +527,7 @@ namespace transformations::utils {
           break;
       }
       monomial[nrVariables - 1] = upper;
-      this->Shuffel(nrVariables, monomial);
+      this->Shuffle(nrVariables, monomial);
     }
   }
 
@@ -556,8 +557,8 @@ namespace transformations::utils {
 
     if (!wasTarget) {
       size_t idx;
-      for (idx = 0; idx < this->blockBd->GetNumberOfCommitedStmt(); idx++) {
-        if (this->blockBd->GetCommitedStmt(idx) == s)
+      for (idx = 0; idx < this->blockBd->GetNumberOfCommittedStmt(); idx++) {
+        if (this->blockBd->GetCommittedStmt(idx) == s)
           break;
       }
       // If s is not a target we want to Replace s with our new Stmt manually
@@ -754,20 +755,20 @@ namespace transformations::utils {
     return static_cast<symir::Expr::Op>(r());
   }
 
-  symir::BlockBuilder *SsplitBlockAt(
+  symir::BlockBuilder *SplitBlockAt(
       symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, ::std::string secondLabel,
       size_t splitIdx
   ) {
     Assert(
-        splitIdx <= blockBd->GetNumberOfCommitedStmt(), "splitIdx out of bounds for block %s",
+        splitIdx <= blockBd->GetNumberOfCommittedStmt(), "splitIdx out of bounds for block %s",
         blockBd->GetLabel().c_str()
     );
 
     symir::BlockBuilder *secondBlockBd = funBd->OpenBlock(secondLabel);
     symir::StmtCopier secondCopier = symir::StmtCopier(funBd, secondBlockBd);
 
-    for (size_t i = splitIdx + 1; i < blockBd->GetNumberOfCommitedStmt(); i++) {
-      secondBlockBd->CommitStmt(secondCopier.CopyStmt(blockBd->GetCommitedStmt(i)));
+    for (size_t i = splitIdx + 1; i < blockBd->GetNumberOfCommittedStmt(); i++) {
+      secondBlockBd->CommitStmt(secondCopier.CopyStmt(blockBd->GetCommittedStmt(i)));
     }
 
     symir::Target *target = blockBd->GetTarget();
@@ -784,9 +785,9 @@ namespace transformations::utils {
       blockBd->RemoveTarget();
     }
 
-    if (splitIdx < blockBd->GetNumberOfCommitedStmt() - 1 &&
-        blockBd->GetNumberOfCommitedStmt() != 0) {
-      blockBd->RemoveCommittedStmts(splitIdx + 1, blockBd->GetNumberOfCommitedStmt());
+    if (splitIdx < blockBd->GetNumberOfCommittedStmt() - 1 &&
+        blockBd->GetNumberOfCommittedStmt() != 0) {
+      blockBd->RemoveCommittedStmts(splitIdx + 1, blockBd->GetNumberOfCommittedStmt());
     }
 
     return secondBlockBd;

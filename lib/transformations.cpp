@@ -58,7 +58,7 @@ void RewriteEngine::Run(
       {
         size_t nrStmts = 0;
         for (size_t i = 0; i < blockBds.size(); i++) {
-          nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
+          nrStmts += blockBds[i]->GetNumberOfCommittedStmt();
           if (blockBds[i]->HasTarget())
             nrStmts += 1;
         }
@@ -68,7 +68,7 @@ void RewriteEngine::Run(
         size_t i;
         for (i = 0; i < blockBds.size(); i++) {
           size_t nrStmts = 0;
-          nrStmts += blockBds[i]->GetNumberOfCommitedStmt();
+          nrStmts += blockBds[i]->GetNumberOfCommittedStmt();
           if (blockBds[i]->HasTarget())
             nrStmts += 1;
           if (nrStmts > randStmt)
@@ -80,7 +80,7 @@ void RewriteEngine::Run(
         stmtIdx = randStmt;
       }
 
-      const symir::Stmt *stmt = blockBds[blockIdx]->GetCommitedStmtOrTarget(stmtIdx);
+      const symir::Stmt *stmt = blockBds[blockIdx]->GetCommittedStmtOrTarget(stmtIdx);
       // TODO: Allow Rules/Matching over multiple Stmts
       std::optional rule = this->GetRandomMatchingRule(stmt);
       if (rule.has_value()) {
@@ -103,11 +103,11 @@ void RewriteEngine::RunAsPass(
   size_t nrBlocks = blockBds.size();
   for (int j = nrBlocks - 1; j >= 0; j--) {
     auto blockBd = blockBds[j];
-    size_t nrStmt = blockBd->GetNumberOfCommitedStmt();
+    size_t nrStmt = blockBd->GetNumberOfCommittedStmt();
     if (blockBd->HasTarget())
       nrStmt += 1;
     for (int i = nrStmt - 1; i >= 0; i--) {
-      if (rule.Match(blockBd->GetCommitedStmtOrTarget(i))) {
+      if (rule.Match(blockBd->GetCommittedStmtOrTarget(i))) {
         rule.Rewrite(funBd, blockBds, varState, j, i);
       }
     }

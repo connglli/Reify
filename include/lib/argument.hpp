@@ -57,7 +57,7 @@ struct ArgType {
   virtual bool IsScalar() const = 0;
   virtual bool IsArray() const = 0;
   virtual bool IsStruct() const = 0;
-  virtual size_t getSize() const = 0;
+  virtual size_t GetSize() const = 0;
   virtual std::string GetTypeCastStr(const symir::VarDef *varDef) const = 0;
   virtual int GetNumLeaves() const = 0;
   virtual nlohmann::json ToJson() const = 0;
@@ -76,7 +76,7 @@ struct ScalarType : public ArgType<IntType> {
 
   bool IsStruct() const override { return false; }
 
-  size_t getSize() const override { return 1; }
+  size_t GetSize() const override { return 1; }
 
   std::string GetTypeCastStr(const symir::VarDef *varDef) const override { return ""; }
 
@@ -106,10 +106,10 @@ struct ArrayType : public ArgType<IntType> {
 
   bool IsStruct() const override { return false; }
 
-  size_t getSize() const override {
+  size_t GetSize() const override {
     size_t res = 0;
     for (const auto &ele: elements)
-      res += ele.getSize();
+      res += ele.GetSize();
     return res;
   }
 
@@ -135,10 +135,10 @@ struct StructType : public ArgType<IntType> {
 
   bool IsStruct() const override { return true; }
 
-  size_t getSize() const override {
+  size_t GetSize() const override {
     size_t res = 0;
     for (const auto &field: fields)
-      res += field.getSize();
+      res += field.GetSize();
     return res;
   }
 
@@ -191,7 +191,7 @@ public:
 
   [[nodiscard]] bool IsStruct() const { return type->IsStruct(); }
 
-  [[nodiscard]] bool getSize() const { return type->getSize(); }
+  [[nodiscard]] bool GetSize() const { return type->GetSize(); }
 
   // Backward compatibility alias
   [[nodiscard]] bool IsVector() const { return IsArray(); }
@@ -647,7 +647,7 @@ std::string ArgPlus<IntType>::ToCxStrWithReplaced(
     for (size_t i = 0; i < str->fieldNames.size(); ++i) {
       oss << "." << str->fieldNames[i] << " = "
           << str->fields[i].ToCxStrWithReplaced(replacers, newOffset);
-      newOffset += str->fields[i].getSize();
+      newOffset += str->fields[i].GetSize();
       if (i != str->fieldNames.size() - 1)
         oss << ", ";
     }
@@ -658,7 +658,7 @@ std::string ArgPlus<IntType>::ToCxStrWithReplaced(
     size_t newOffset = offset;
     for (size_t i = 0; i < arr->elements.size(); i++) {
       oss << arr->elements[i].ToCxStrWithReplaced(replacers, newOffset);
-      newOffset += arr->elements[i].getSize();
+      newOffset += arr->elements[i].GetSize();
       if (i != arr->elements.size() - 1)
         oss << ", ";
     }

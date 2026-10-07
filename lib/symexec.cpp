@@ -540,4 +540,4 @@ std::vector<UBSite> SymExec::GetUBCandidates() const {
   return collector.Collect();
 }
 
-std::string SymExec::getVarStateJson() { return varstate::AllToJsonFile(this->varStateExtractor); }
+std::string SymExec::GetVarStateJson() { return varstate::AllToJsonFile(this->varStateExtractor); }

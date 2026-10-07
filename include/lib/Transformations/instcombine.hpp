@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that attempt to cause InstCombine passes in the compiler
+// Contains transformation rules that attempt to cause InstCombine passes in the compiler
 
 
 #ifndef REIFY_INSTCOMBINE_HPP
@@ -40,7 +40,7 @@
 
 namespace transformations::instcombine {
 
-  // targeting the LLVM transformation: (A + C) + (B & ~C) => A + (B | C)
+  // Targeting the LLVM transformation: (A + C) + (B & ~C) => A + (B | C)
   // Note A + (B | C) => (A + C) + (B & ~C) may be unsafe with counter example:
   // A = -999955844
   // B = 1073766401
@@ -59,7 +59,7 @@ namespace transformations::instcombine {
     std::string varPrefix = "fold_add_like_commutative";
   };
 
-  // targeting the LLVM transformation: (A + RHS) + RHS => A + (RHS << 1) I
+  // Targeting the LLVM transformation: (A + RHS) + RHS => A + (RHS << 1) I
   // E1 + (RHS << 1) => E1 + RHS + RHS
   struct ShlToAddTwice : Rule {
     bool Match(const symir::Stmt *stmt) const override;
@@ -71,10 +71,10 @@ namespace transformations::instcombine {
     std::string varPrefix = "factorize_math_with_shl";
   };
 
-  // targeting the LLVM transformation: ((A ^ B) + (A & B)) => (A | B)
-  // And
-  // targeting the LLVM transformation: ((A & B) + (A ^ B)) => (A | B)
-  //  Here to conform with SymIR A is const and deal with precidence
+  // Targeting the LLVM transformation: ((A ^ B) + (A & B)) => (A | B)
+  //  and
+  // Targeting the LLVM transformation: ((A & B) + (A ^ B)) => (A | B)
+  //  Here to conform with SymIR A is const and deal with precedence
   //  e.g. the actual transformation will be
   //  E1 + (C | B) + E2 => A = (C & B) + (C ^ B); E1 + A + E2
   struct OrToAddAndXor : Rule {
@@ -87,9 +87,9 @@ namespace transformations::instcombine {
     std::string varPrefix = "or_to_add_and_xor";
   };
 
-  // targeting the LLVM transformation: ((A | B) + (A & B)) --> (A + B)
-  // And
-  // targeting the LLVM transformation: ((A & B) + (A | B)) --> (A + B)
+  // Targeting the LLVM transformation: ((A | B) + (A & B)) --> (A + B)
+  //  and
+  // Targeting the LLVM transformation: ((A & B) + (A | B)) --> (A + B)
   // E1 + (C + B) + E2 => A = (C & B) + (C | B); E1 + A + E2
   struct AddToAddOrAnd : Rule {
     bool Match(const symir::Stmt *stmt) const override;
@@ -101,7 +101,7 @@ namespace transformations::instcombine {
     std::string varPrefix = "add_to_add_or_and";
   };
 
-  // targeting the LLVM transformation: ((A | B) - (A ^ B)) --> (A & B)
+  // Targeting the LLVM transformation: ((A | B) - (A ^ B)) --> (A & B)
   // E1 + (C & B) + E2 => A = (C | B) + (C ^ B); E1 + A + E2
   struct AndToSubOrXor : Rule {
     bool Match(const symir::Stmt *stmt) const override;
@@ -113,7 +113,7 @@ namespace transformations::instcombine {
     std::string varPrefix = "add_to_add_or_and";
   };
 
-  // targeting the LLVM transformation: ((A | B) - (A & B)) --> (A ^ B)
+  // Targeting the LLVM transformation: ((A | B) - (A & B)) --> (A ^ B)
   // E1 + (C ^ B) + E2 => A = (C | B) - (C & B); E1 + A + E2
   struct XorToSubOrAnd : Rule {
     bool Match(const symir::Stmt *stmt) const override;
@@ -125,7 +125,7 @@ namespace transformations::instcombine {
     std::string varPrefix = "add_to_add_or_and";
   };
 
-  // targeting the LLVM transformation: if (C1 & C2) == C2 then (X & C1) - (X & C2) -> X & (C1 ^ C2)
+  // Targeting the LLVM transformation: if (C1 & C2) == C2 then (X & C1) - (X & C2) -> X & (C1 ^ C2)
   // E1 + (C & X) + E2 => A = (C1 & X) - (C2 & X); E1 + A + E2
   struct AndToSubAndAnd : Rule {
     bool Match(const symir::Stmt *stmt) const override;

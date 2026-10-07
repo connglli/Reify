@@ -204,7 +204,7 @@ void VariableStateExtractor::Visit(const symir::VarUse &v) {
       const auto &field = sDef->GetField(fIdx);
       solverSuffix << "_" << field.name;
 
-      // adding the size of all fields < fIdx to flattIndex
+      // adding the size of all fields < fIdx to flatIndex
       for (int32_t j = 0; j < fIdx; j++) {
         const auto &field = sDef->GetField(j);
         flattenedIdx += static_cast<int32_t>(symir::IntSizeOfSymIRType(

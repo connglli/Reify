@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that do not target any specific Compiler optimization but
+// Contains transformation rules that do not target any specific Compiler optimization but
 // introduce/create operations from constants
 
 #include "lib/lang.hpp"

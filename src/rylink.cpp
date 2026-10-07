@@ -146,8 +146,8 @@ int main(int argc, char *argv[]) {
     Log::Get().SetCout();
   }
 
-  if (GlobalOptions::Get().reduceMode) {
-    ReduceInfo::Get().FromJson(GlobalOptions::Get().reduceModePath);
+  if (GlobalOptions::Get().ReduceMode) {
+    ReduceInfo::Get().FromJson(GlobalOptions::Get().ReduceModePath);
   }
 
   RuleInfo::Get().GlobalSeed(Random::Get().GetInitialSeed());
@@ -172,10 +172,10 @@ int main(int argc, char *argv[]) {
   for (int sampNo = 0; genLimit == 0 || sampNo < genLimit; ++sampNo) {
     int prog_seed = Random::Get().Uniform()();
     // we skip this sampNo if its not our target inside the ReduceInfo
-    if (GlobalOptions::Get().reduceMode && ReduceInfo::Get().Sno() != sampNo)
+    if (GlobalOptions::Get().ReduceMode && ReduceInfo::Get().Sno() != sampNo)
       continue;
     // we skip this sampNo if its not our target passed by cli
-    if (!GlobalOptions::Get().reduceMode && cliOpts.sno != -1 && cliOpts.sno != sampNo)
+    if (!GlobalOptions::Get().ReduceMode && cliOpts.sno != -1 && cliOpts.sno != sampNo)
       continue;
 
     // Independend RNG for each program otherwise we could not skip sampNo's
@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 
     prog->GenerateCode(arts);
 
-    if (GlobalOptions::Get().ruleInfo) {
+    if (GlobalOptions::Get().RuleInfo) {
       std::ofstream ruleInfoFile = std::ofstream(arts.GetRuleInfoPath());
       ruleInfoFile << RuleInfo::Get().ToJson() << std::endl;
       ruleInfoFile.close();

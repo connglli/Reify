@@ -144,24 +144,24 @@ struct GlobalOptions {
     Rewrite,
   };
 
-  // Probability of replacing a coefficient with a call to another function
-  double CoeffReplaceProba = 0.2;
   // Number of functions we want to knit together
   // Fix: Large values would make the generated programs too slow due to bad LTO
   int FunctionDepth = 5;
+  // Probability of replacing a coefficient with a call to another function
+  double CoeffReplaceProba = 0.2;
   // Probablility of replacing an argument literal with a variable for dataflow
   double InitReplaceProba = 0.5;
   // Probablility of including a variable in the dataflow expression
   double VariableTakeProba = 0.7;
-  // strategy to introduce dataflow between function
+  // Strategy to introduce dataflow between function
   enum DataflowStrategy DataflowStrategy = Rewrite;
-  // Outputs a json file with detailed information about all Transformation Rules that are run
-  bool ruleInfo;
-  // Number of Rules to apply to each block in the Rewrite stragety
-  int ruleCount;
-  // Path to the ReduceMode file is active if path != "". See ryreduce
-  bool reduceMode;
-  std::string reduceModePath;
+  // Outputs a json file with detailed information about all transformation rules that are run
+  bool RuleInfo;
+  // Number of Rules to apply to each block in the rewrite stragety
+  int RuleCount;
+  // Path to the reduce-mode file is active if path is not empty. See ryreduce.
+  bool ReduceMode;
+  std::string ReduceModePath;
 
   ////////////////////////////////////////////////////////////
   ////// Solver Parameters
@@ -240,12 +240,12 @@ struct GlobalOptions {
       // Program generation
       ("Xcoeff-replace-proba", "Probability of replacing a coefficient with a function call", cxxopts::value<double>())
       ("Xfunction-depth", "The number of functions to knit together per program", cxxopts::value<int>())
-      ("Xdataflow-strategy", "strategy to introduce dataflow between function {0=literal, 1=Prime interpolating, 2=Rewrite}", cxxopts::value<int>())
+      ("Xdataflow-strategy", "Strategy to introduce dataflow between function {0=literal, 1=primeinterpolation, 2=rewrite}", cxxopts::value<int>())
       ("Xinit-replace-proba", "Probablility of replacing an argument literal with a variable for dataflow", cxxopts::value<double>())
       ("Xvar-take-proba", "Probablility of including a variable in the dataflow expression", cxxopts::value<double>())
-      ("Xrule-count", "Number of Rules to apply to each block in the Rewrite stragety", cxxopts::value<int>()->default_value("100"))
-      ("Xrule-info", "Outputs a json file with detailed information about all Transformation Rules that are run", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
-      ("Xreduce-mode", "Path to the ReduceMode file is active if path != "". See ryreduce", cxxopts::value<std::string>()->default_value(""));
+      ("Xrule-count", "Number of Rules to apply to each block in the rewrite stragety", cxxopts::value<int>()->default_value("100"))
+      ("Xrule-info", "Outputs a json file with detailed information about all transformation rules that are run", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+      ("Xreduce-mode", "Path to the reduce-mode file is active if path is not emtpy. See ryreduce.", cxxopts::value<std::string>()->default_value(""));
     // clang-format on
   }
 
@@ -536,12 +536,12 @@ struct GlobalOptions {
       }
     }
 
-    ruleInfo = args["Xrule-info"].as<bool>();
+    RuleInfo = args["Xrule-info"].as<bool>();
 
-    ruleCount = args["Xrule-count"].as<int>();
+    RuleCount = args["Xrule-count"].as<int>();
 
-    reduceMode = args.count("Xreduce-mode") > 0;
-    reduceModePath = args["Xreduce-mode"].as<std::string>();
+    ReduceMode = args.count("Xreduce-mode") > 0;
+    ReduceModePath = args["Xreduce-mode"].as<std::string>();
 
     if (args.count("Xinit-replace-proba")) {
       InitReplaceProba = args["Xinit-replace-proba"].as<double>();

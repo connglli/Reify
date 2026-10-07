@@ -261,7 +261,7 @@ int main(int argc, char **argv) {
 
   // Generate the VariableStateFile
   std::ofstream varStateFile(arts.GetVarStatePath());
-  varStateFile << exec->getVarStateJson();
+  varStateFile << exec->GetVarStateJson();
   varStateFile.close();
 
   // Generate the initialization-finalization mapping

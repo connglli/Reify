@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that attempt to cause Vectorizations in the compiler
+// Contains transformation rules that attempt to cause Vectorizations in the compiler
 
 #include "lib/Transformations/vectorize.hpp"
 #include <algorithm>
@@ -52,7 +52,7 @@ namespace transformations::vectorize {
     Log::Get().Out() << "Running DeadAssignFromCopy" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     auto copier = symir::StmtCopier(funBd, blockBd);
     symir::BlockBuilder::StmtID origStmt = copier.CopyStmt(stmt);
@@ -80,7 +80,7 @@ namespace transformations::vectorize {
     Log::Get().Out() << "Running Reduction" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
@@ -105,7 +105,7 @@ namespace transformations::vectorize {
     std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
     symir::BlockBuilder *secondBlockBd =
-        utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+        utils::SplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     auto zero = funBd->SymI32Const(0);
     auto one = funBd->SymI32Const(1);
@@ -114,7 +114,7 @@ namespace transformations::vectorize {
     std::vector<symir::BlockBuilder::StmtID> firstBlockAppend;
     firstBlockAppend.reserve(1 + nrTerms);
     for (size_t i = 1; i < nrTerms; i++) {
-      Log::Get().Out() << "Initalizing element " << i - 1 << " of " << array->GetName()
+      Log::Get().Out() << "Initializing element " << i - 1 << " of " << array->GetName()
                        << std::endl;
       firstBlockAppend.push_back(blockBd->SymAssStmt(
           array, blockBd->SymAddExpr({c.CopyTerm(terms[i])}), {funBd->SymI32Const(i - 1)}
@@ -122,7 +122,7 @@ namespace transformations::vectorize {
     }
 
     // Init original value to the first term
-    Log::Get().Out() << "Initalizing " << var->GetName() << std::endl;
+    Log::Get().Out() << "Initializing " << var->GetName() << std::endl;
     firstBlockAppend.push_back(
         blockBd->SymAssStmt(var->GetDef(), blockBd->SymExpr(exprOp, {c.CopyTerm(terms[0])}), access)
     );
@@ -195,7 +195,7 @@ namespace transformations::vectorize {
     return patternmatch::match(
         stmt, m_AssStmt(
                   m_WildCard<const symir::VarUse *>(),
-                  m_Expr(m_AtleastN(
+                  m_Expr(m_AtLeastN(
                       m_CstTerm(
                           m_And(
                               m_Range<symir::Coef *, int32_t>(-1024, 1024),
@@ -217,7 +217,7 @@ namespace transformations::vectorize {
     Log::Get().Out() << "Running Induction" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
@@ -253,7 +253,7 @@ namespace transformations::vectorize {
     std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
     symir::BlockBuilder *secondBlockBd =
-        utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+        utils::SplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     auto zero = funBd->SymI32Const(0);
     auto one = funBd->SymI32Const(1);
@@ -355,7 +355,7 @@ namespace transformations::vectorize {
     Log::Get().Out() << "Running WithAliasCheck" << std::endl;
 
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmt(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmt(targetStmtIdx);
 
     const symir::AssStmt *assStmt = static_cast<const symir::AssStmt *>(stmt);
     const symir::VarUse *var = assStmt->GetVar();
@@ -366,7 +366,7 @@ namespace transformations::vectorize {
     symir::Expr::Op exprOp = expr->GetOp();
     size_t nrTerms = expr->NumTerms();
 
-    // Choosing Array size to be atleast 16 to ensure enought size for most systems to actually
+    // Choosing Array size to be at least 16 to ensure enough size for most systems to actually
     // perform vectorizations
     size_t randArrSize = Random::Get().Uniform(16, 64)();
 
@@ -374,16 +374,16 @@ namespace transformations::vectorize {
     size_t copySize = Random::Get().Uniform(7, (int) randArrSize - 1)();
     size_t offset = Random::Get().Uniform(1, (int) (randArrSize - copySize))();
 
-    std::map<size_t, int> choosenTerms;
-    std::map<int, size_t> choosenArrayIdx;
+    std::map<size_t, int> chosenTerms;
+    std::map<int, size_t> chosenArrayIdx;
     int arrIdx = offset;
     for (int i = nrTerms - 1; i >= 0; i--) {
-      if (choosenTerms.size() >= copySize)
+      if (chosenTerms.size() >= copySize)
         break;
       if (terms[i]->GetOp() != symir::Term::OP_CST)
         continue;
-      choosenTerms[i] = arrIdx;
-      choosenArrayIdx[arrIdx] = i;
+      chosenTerms[i] = arrIdx;
+      chosenArrayIdx[arrIdx] = i;
       arrIdx += 1;
     }
 
@@ -398,7 +398,7 @@ namespace transformations::vectorize {
     std::string finalLabel = utils::NameLabel(funBd->GetName(), "for_exit");
 
     symir::BlockBuilder *secondBlockBd =
-        utils::SsplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
+        utils::SplitBlockAt(funBd, blockBd, finalLabel, targetStmtIdx);
 
     auto zero = funBd->SymI32Const(0);
     auto one = funBd->SymI32Const(1);
@@ -408,9 +408,9 @@ namespace transformations::vectorize {
     std::vector<symir::BlockBuilder::TermID> newTerms;
     newTerms.reserve(nrTerms);
     for (size_t i = 0; i < nrTerms; i++) {
-      if (choosenTerms.contains(i)) {
+      if (chosenTerms.contains(i)) {
         newTerms.push_back(
-            secondBlockBd->SymMulTerm(one, array, {funBd->SymI32Const(choosenTerms[i] - offset)})
+            secondBlockBd->SymMulTerm(one, array, {funBd->SymI32Const(chosenTerms[i] - offset)})
         );
       } else {
         newTerms.push_back(sc.CopyTerm(terms[i]));
@@ -427,11 +427,11 @@ namespace transformations::vectorize {
     std::vector<symir::BlockBuilder::StmtID> firstBlockAppend;
     firstBlockAppend.reserve(randArrSize);
     for (size_t i = offset; i < randArrSize; i++) {
-      // the first few array elemenets past offset are the actual used values while everything else
+      // the first few array elements past offset are the actual used values while everything else
       // is nonsense
       symir::BlockBuilder::TermID term;
-      if (choosenArrayIdx.contains(i)) {
-        term = c.CopyTerm(terms[choosenArrayIdx[i]]);
+      if (chosenArrayIdx.contains(i)) {
+        term = c.CopyTerm(terms[chosenArrayIdx[i]]);
       } else {
         term = blockBd->SymCstTerm(funBd->SymI32Const(randInt()), nullptr);
       }
