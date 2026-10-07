@@ -35,7 +35,6 @@ import shutil
 import signal
 import sys
 import time
-
 from argparse import ArgumentParser
 from collections import namedtuple
 from dataclasses import dataclass
@@ -169,16 +168,20 @@ def generate_function(
   return result
 
 
-# Configuration tuple for function generation
+# Configuration tuple for program generation
 ProgGenConfig = namedtuple(
   "ProgGenConfig",
   [
     "funs",  # Number of functions per program
+    "dataflow",  # Dataflow strategy: 0=literal, 1=primeinterpolation, 2=rewrite
   ],
 )
 
-# List of suggested program generation configurations
-PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [ProgGenConfig(n) for n in range(3, 15)]
+# List of suggested program generation configurations: rewrite first, literal second
+PGEN_SUGGESTED_CONFIGS: List[ProgGenConfig] = [
+  *[ProgGenConfig(n, 2) for n in range(3, 15)],  # Rewrite
+  *[ProgGenConfig(n, 0) for n in range(3, 15)],  # Literal
+]
 
 
 @dataclass
@@ -217,6 +220,8 @@ def generate_programs(
       str(opts.limit),
       "--Xfunction-depth",
       str(opts.config.funs),
+      "--Xdataflow-strategy",
+      str(opts.config.dataflow),
     ]
     if opts.seed:
       cmd += ["-s", str(opts.seed)]
@@ -765,7 +770,7 @@ class Worker:
     shutil.move(str(test_dir), str(bug_dir / test_dir.name))
     with (bug_dir / "result.jsonl").open("a") as fou:
       fou.write(json.dumps(res.to_dict(), ensure_ascii=False) + "\n")
-    if self.wconf.save_funcs and fopts != None:
+    if self.wconf.save_funcs and fopts is not None:
       for i in range(fopts.sno + 1):
         fdir: Path = configs.FunArts(fopts.uuid, i, gen_dir=fopts.outdir).get_test_dir()
         if not fdir.exists():
