@@ -26,6 +26,9 @@
 
 // Contains utilities used by transformation rules;
 
+#ifndef REIFY_TRANSFORMATION_UTILS_HPP
+#define REIFY_TRANSFORMATION_UTILS_HPP
+
 #include "lib/lang.hpp"
 #include "lib/patternmatch.hpp"
 #include "lib/random.hpp"
@@ -34,9 +37,6 @@
 #include <flint/nmod.h>
 #include <flint/nmod_mat.h>
 #include <flint/ulong_extras.h>
-
-#ifndef REIFY_TRANSFORMATION_UTILS_HPP
-#define REIFY_TRANSFORMATION_UTILS_HPP
 
 namespace transformations::utils {
 

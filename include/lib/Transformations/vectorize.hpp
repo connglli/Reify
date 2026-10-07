@@ -26,11 +26,11 @@
 
 // Contains transformation rules that attempt to cause Vectorizations in the compiler
 
-#include "lib/lang.hpp"
-#include "lib/rule.hpp"
-
 #ifndef REIFY_VECTORIZE_HPP
 #define REIFY_VECTORIZE_HPP
+
+#include "lib/lang.hpp"
+#include "lib/rule.hpp"
 
 namespace transformations::vectorize {
 

@@ -27,11 +27,11 @@
 // Contains transformation rules that do not target any specific Compiler optimization but
 // introduce/create operations from constants
 
-#include "lib/lang.hpp"
-#include "lib/rule.hpp"
-
 #ifndef REIFY_OBSCURE_HPP
 #define REIFY_OBSCURE_HPP
+
+#include "lib/lang.hpp"
+#include "lib/rule.hpp"
 
 namespace transformations::obscure {
 
