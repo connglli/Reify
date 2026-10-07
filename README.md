@@ -171,6 +171,7 @@ If you found this work helpful, please consider citing our work:
   type={Bachelor's thesis},
   year={2026},
   school={ETH Zurich},
+  note={Supervised by Levin Winter and Cong Li and Zhendong Su},
 }
 ```
 
