@@ -82,25 +82,25 @@ void ProgPlus::Generate() {
     RuleInfo::Get().NewFunction(host->GetName());
 
     auto emb = RandomFCallEmbedder(host);
-    std::unique_ptr<FCallStrategy> strat;
+    std::unique_ptr<FCallStrategy> strategy;
     switch (GlobalOptions::Get().DataflowStrategy) {
       case GlobalOptions::Literal: {
-        strat = std::make_unique<LiteralFCallStrategy>();
+        strategy = std::make_unique<LiteralFCallStrategy>();
       } break;
       case GlobalOptions::PrimeFieldInterpolation: {
-        strat = std::make_unique<PrimeInterpFCallStrategy>();
+        strategy = std::make_unique<PrimeInterpFCallStrategy>();
       } break;
       case GlobalOptions::Rewrite: {
-        strat = std::make_unique<RewriteFCallStrategy>();
+        strategy = std::make_unique<RewriteFCallStrategy>();
       } break;
       default:
         Panic("DataflowStrategy is set to an invalid value");
     }
-    emb.SetStrategy(std::move(strat));
-    emb.SetVarStateQueries(this->GetVarStateQuerys(i));
+    emb.SetStrategy(std::move(strategy));
+    emb.SetVarStateQueries(this->getVarStateQueries(i));
     emb.CreatePathBlockWhitelist();
 
-    // roughtly adjust the number of coeffs to appox numCoeffs on the live path.
+    // roughly adjust the number of coeffs to approx numCoeffs on the live path.
     int adjNumCoeffs =
         numCoeffs * ((double) emb.GetNumBlockOnWhitelist(host->NumBlocks()) / host->NumBlocks());
     Assert(adjNumCoeffs <= numCoeffs, "adjNumCoeffs should never grow");

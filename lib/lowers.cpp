@@ -479,7 +479,7 @@ namespace symir {
     auto polynomial = e.GetPolynomial();
     int mod = e.GetMod();
     for (size_t i = 0; i < coeffs.size() - 1; ++i) {
-      // by precidence we must wrap each addition of a monomial in a bracket
+      // by precedence we must wrap each addition of a monomial in a bracket
       this->out << "(";
     }
     for (size_t i = 0; i < coeffs.size() - 1; ++i) {

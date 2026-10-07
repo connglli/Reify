@@ -77,7 +77,8 @@ public:
   }
 
   void AddRule(std::unique_ptr<Rule> rule, int weight);
-  /// normal run method used for random selection of rules based on the passed weight, attempts to
+
+  /// Normal run method used for random selection of rules based on the passed weight, attempts to
   /// runs `times` rules in total
   void
   Run(symir::FunctBuilder *funBd, std::vector<symir::BlockBuilder *> &blockBds,

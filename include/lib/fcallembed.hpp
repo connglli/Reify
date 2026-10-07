@@ -42,25 +42,29 @@ public:
   void SetTarget(const int32_t target);
 
   virtual std::string GetStrategyName() const = 0;
-  /// generate the string representing the call
+
+  /// Generate the string representing the call
   virtual std::string GenerateCall() = 0;
-  /// generates the nessessary preamble that create the function arguments
+
+  /// Generate the necessary preamble that create the function arguments
   virtual void GeneratePreamble(
       std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
       size_t blockIndex, size_t stmtIndex
   ) = 0;
-  /// generates the nessessary postamble that map the function call's return value back to the
+
+  /// Generate the necessary postamble that map the function call's return value back to the
   /// replaced coeff
   virtual void GeneratePostamble(
       std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd,
       size_t blockIndex, size_t stmtIndex
   ) = 0;
+
   /// Any post processing that needs to be done
   virtual void
   Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) = 0;
 
 protected:
-  /// wrap checksum function/macro around the function call string
+  /// Wrap checksum function/macro around the function call string
   std::string WrapChecksum(int32_t checksum, std::string call) const;
 
   void SetMaxNrBlocks(size_t nrBlocks);
@@ -87,7 +91,7 @@ public:
   void SetStrategy(std::unique_ptr<FCallStrategy> callGenStrategy) {
     Assert(
         callGenStrategy != nullptr,
-        "The callGenStrategy passed to the setStragegy method is a nullptr"
+        "The callGenStrategy passed to the setStrategy method is a nullptr"
     );
     this->callGenStrategy = std::move(callGenStrategy);
     Log::Get().Out() << "Embed Strategy: " << this->callGenStrategy->GetStrategyName() << std::endl;
@@ -97,7 +101,7 @@ public:
     this->varStateQueries = varStateQueries;
   }
 
-  /// embeds the guest function with a coeff
+  /// Embeds the guest function with a coeff
   bool EmbedGuest(
       symir::Funct *guest, const std::vector<ArgPlus<int32_t>> *init,
       const std::vector<ArgPlus<int32_t>> *fina
@@ -125,7 +129,7 @@ protected:
   size_t current_block, current_stmt;
 };
 
-// Strategy That embedds function calls with Literal Arguments e.g. foo(1, 2, 3);
+// Strategy That embeds function calls with Literal Arguments e.g. foo(1, 2, 3);
 class LiteralFCallStrategy : public FCallStrategy {
 public:
   explicit LiteralFCallStrategy(){};
@@ -145,7 +149,7 @@ public:
   std::string GetStrategyName() const override { return "Literal Strategy"; }
 };
 
-// Abstract Strategy That embedds function calls with random variable that are assigned in a block
+// Abstract Strategy That embeds function calls with random variable that are assigned in a block
 // prior e.g. foo(1, arg_0, 3); How that block is handles is decided by inheritors of this class in
 // the finalize method
 class AbstractArgBlockStrategy : public FCallStrategy {
@@ -172,7 +176,7 @@ public:
   void
   Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
 
-  std::string GetStrategyName() const override { return "PrimeInterpolation Stratgey"; }
+  std::string GetStrategyName() const override { return "PrimeInterpolation Strategy"; }
 
 private:
   RewriteEngine rewriteEngine;
@@ -185,10 +189,10 @@ public:
   void
   Finalize(std::vector<VariableStateQuery *> varStateQueries, symir::FunctBuilder *funBd) override;
 
-  std::string GetStrategyName() const override { return "RewriteFCallStrategy Stratgey"; }
+  std::string GetStrategyName() const override { return "RewriteFCallStrategy Strategy"; }
 
 private:
-  // maps variable index to UnInitVar name and correction value
+  // Maps variable index to UnInitVar name and correction value
   RewriteEngine rewriteEngine;
 };
 

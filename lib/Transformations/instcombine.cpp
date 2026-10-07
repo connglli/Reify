@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that do not target any specific Compiler optimization but
+// Contains transformation rules that do not target any specific Compiler optimization but
 // introduce/create operations from constants
 
 #include "lib/Transformations/instcombine.hpp"
@@ -53,7 +53,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running FoldAddLikeCommutative" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
     int AVal;
@@ -137,7 +137,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running AddTwiceToShl" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Expr>(funBd, blockBd);
 
@@ -193,7 +193,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running OrToAddAndXor" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     symir::BlockBuilder::ExprID AExprId;
@@ -210,7 +210,7 @@ namespace transformations::instcombine {
           symir::Coef *C;
           Assert(
               patternmatch::match(&t, m_OrTerm(m_Solved(&C), m_Var(&B))),
-              "This should be guarenteed"
+              "This should be guaranteed"
           );
           auto accessB = utils::CopyAccess(thisFunBd, B);
           symir::BlockBuilder::ExprID *AExprIdPtr =
@@ -253,7 +253,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running AddToAddOrAnd" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     symir::BlockBuilder::ExprID AExprId;
@@ -270,7 +270,7 @@ namespace transformations::instcombine {
           symir::Coef *C;
           Assert(
               patternmatch::match(&t, m_AddTerm(m_Solved(&C), m_Var(&B))),
-              "This should be guarenteed"
+              "This should be guaranteed"
           );
           auto accessB = utils::CopyAccess(thisFunBd, B);
           symir::BlockBuilder::ExprID *AExprIdPtr =
@@ -313,7 +313,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running AndToSubOrXor" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     symir::BlockBuilder::ExprID AExprId;
@@ -330,7 +330,7 @@ namespace transformations::instcombine {
           symir::Coef *C;
           Assert(
               patternmatch::match(&t, m_AndTerm(m_Solved(&C), m_Var(&B))),
-              "This should be guarenteed"
+              "This should be guaranteed"
           );
           auto accessB = utils::CopyAccess(thisFunBd, B);
           symir::BlockBuilder::ExprID *AExprIdPtr =
@@ -359,7 +359,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running XorToSubOrAnd" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     symir::BlockBuilder::ExprID AExprId;
@@ -376,7 +376,7 @@ namespace transformations::instcombine {
           symir::Coef *C;
           Assert(
               patternmatch::match(&t, m_XorTerm(m_Solved(&C), m_Var(&B))),
-              "This should be guarenteed"
+              "This should be guaranteed"
           );
           auto accessB = utils::CopyAccess(thisFunBd, B);
           symir::BlockBuilder::ExprID *AExprIdPtr =
@@ -405,7 +405,7 @@ namespace transformations::instcombine {
   ) const {
     Log::Get().Out() << "Running AndToSubAndAnd" << std::endl;
     symir::BlockBuilder *blockBd = blockBds[targetBlockIdx];
-    const symir::Stmt *stmt = blockBd->GetCommitedStmtOrTarget(targetStmtIdx);
+    const symir::Stmt *stmt = blockBd->GetCommittedStmtOrTarget(targetStmtIdx);
 
     auto rep = utils::StmtReplacer<symir::Term>(funBd, blockBd);
     symir::BlockBuilder::ExprID AExprId;
@@ -422,7 +422,7 @@ namespace transformations::instcombine {
           symir::Coef *C;
           Assert(
               patternmatch::match(&t, m_XorTerm(m_Solved(&C), m_Var(&B))),
-              "This should be guarenteed"
+              "This should be guaranteed"
           );
           auto accessB = utils::CopyAccess(thisFunBd, B);
           symir::BlockBuilder::ExprID *AExprIdPtr =

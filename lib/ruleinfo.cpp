@@ -41,14 +41,14 @@ void RuleInfo::Clear() { this->functions.clear(); }
 void RuleInfo::Sno(int sno) { this->sno = sno; }
 
 void RuleInfo::NewFunction(std::string functionName) {
-  if (!GlobalOptions::Get().ruleInfo)
+  if (!GlobalOptions::Get().RuleInfo)
     return;
 
   this->functions.push_back(Function{functionName, {}});
 }
 
 void RuleInfo::NewBlock(std::string headerblockLabel, int seed, size_t targetRuleCount) {
-  if (!GlobalOptions::Get().ruleInfo)
+  if (!GlobalOptions::Get().RuleInfo)
     return;
 
   Function &currFunction = *(this->functions.end() - 1);
@@ -56,7 +56,7 @@ void RuleInfo::NewBlock(std::string headerblockLabel, int seed, size_t targetRul
 };
 
 void RuleInfo::AppendRule(std::string ruleName, size_t blockIndex, size_t stmtIndex) {
-  if (!GlobalOptions::Get().ruleInfo)
+  if (!GlobalOptions::Get().RuleInfo)
     return;
 
   Function &currFunction = *(this->functions.end() - 1);

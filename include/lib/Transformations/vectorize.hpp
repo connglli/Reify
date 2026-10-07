@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that attempt to cause Vectorizations in the compiler
+// Contains transformation rules that attempt to cause Vectorizations in the compiler
 
 #include "lib/lang.hpp"
 #include "lib/rule.hpp"
@@ -52,7 +52,7 @@ namespace transformations::vectorize {
     const std::string varPrefix = "dead_assign";
   };
 
-  /// https://llvm.org/docs/Vectorizers.html#reductions
+  /// See https://llvm.org/docs/Vectorizers.html#reductions
   struct Reduction : Rule {
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(
@@ -64,7 +64,7 @@ namespace transformations::vectorize {
     const std::string indVarPrefix = "i";
   };
 
-  /// https://llvm.org/docs/Vectorizers.html#inductions
+  /// See https://llvm.org/docs/Vectorizers.html#inductions
   struct Induction : Rule {
     bool Match(const symir::Stmt *stmt) const override;
     void Rewrite(

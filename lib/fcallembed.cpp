@@ -155,7 +155,7 @@ FCallStrategy::GetUnusedAssignVar(symir::FunctBuilder *funBd, size_t blockIndex,
 
 // ==================== FCallEmbedder Base Implementations ====================
 FCallEmbedder::FCallEmbedder(symir::Funct *const host) : host(host) {
-  Assert(host != nullptr, "The host function passed to the constructur is a nullptr");
+  Assert(host != nullptr, "The host function passed to the constructor is a nullptr");
   for (auto &sym: host->GetSymbols()) {
     // Check to ensure all symbols are Coef
     Assert(
@@ -171,7 +171,7 @@ bool FCallEmbedder::EmbedGuest(
     symir::Funct *guest, const std::vector<ArgPlus<int32_t>> *init,
     const std::vector<ArgPlus<int32_t>> *fina
 ) {
-  Assert(this->callGenStrategy != nullptr, "No embedding strategy choosen");
+  Assert(this->callGenStrategy != nullptr, "No embedding strategy chosen");
   Assert(guest != nullptr, "No valid guest to embed");
   Assert(init != nullptr, "No valid init to embed");
   Assert(fina != nullptr, "No valid fina to embed");
@@ -264,15 +264,15 @@ void AbstractArgBlockStrategy::GeneratePreamble(
   headerBlockBd = this->argBlocks[targetBlock->GetLabel()];
 
   auto randDouble = Random::Get().UniformReal();
-  size_t flattIndex = 0;
+  size_t flatIndex = 0;
   for (size_t initIdx = 0; initIdx < this->init->size(); initIdx++) {
     const auto &arg = (*this->init)[initIdx];
-    for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
-      flattIndex += 1;
+    for (size_t argIdx = 0; argIdx < arg.GetSize(); argIdx++) {
+      flatIndex += 1;
       if (randDouble() <= 1 - GlobalOptions::Get().InitReplaceProba)
         continue;
 
-      Log::Get().Out() << "Replacing the flattend " << flattIndex << "-th argument" << std::endl;
+      Log::Get().Out() << "Replacing the flattened " << flatIndex << "-th argument" << std::endl;
 
       const symir::VarDef *loc = this->GetUnusedAssignVar(funBd, blockIndex, 0);
       int val = arg.IsScalar() ? arg.GetValue() : arg.GetValue(argIdx);
@@ -282,7 +282,7 @@ void AbstractArgBlockStrategy::GeneratePreamble(
           loc,
           headerBlockBd->SymAddExpr({headerBlockBd->SymCstTerm(funBd->SymI32Const(val), nullptr)})
       ));
-      this->argVars[flattIndex - 1] = std::make_pair(loc->GetName(), 0);
+      this->argVars[flatIndex - 1] = std::make_pair(loc->GetName(), 0);
       Log::Get().Out() << std::endl;
     }
   }
@@ -305,7 +305,7 @@ std::string AbstractArgBlockStrategy::GenerateCall() {
     const auto &arg = (*this->init)[i];
 
     std::map<size_t, std::pair<std::string, int32_t> *> replacers;
-    for (size_t argIdx = 0; argIdx < arg.getSize(); argIdx++) {
+    for (size_t argIdx = 0; argIdx < arg.GetSize(); argIdx++) {
       if (this->argVars.contains(flattenedIndex)) {
         replacers[argIdx] = &this->argVars[i];
       }
@@ -338,7 +338,7 @@ void PrimeInterpFCallStrategy::Finalize(
 
   // delete all header blocks that do not contain any stmt
   for (auto it = this->argBlocks.cbegin(); it != this->argBlocks.cend();) {
-    if (it->second->GetNumberOfCommitedStmt() == 0) {
+    if (it->second->GetNumberOfCommittedStmt() == 0) {
       it = this->argBlocks.erase(it);
     } else {
       ++it;
@@ -356,7 +356,7 @@ void PrimeInterpFCallStrategy::Finalize(
     labelToIdx[blk->GetLabel()] = idx++;
   }
 
-  Assert(varStateQueries.size() > 0, "must have atleast on Variable State Query");
+  Assert(varStateQueries.size() > 0, "must have at least one Variable State Query");
 
   for (auto const &[blkLabel, headerBlockBd]: this->argBlocks) {
 
@@ -413,7 +413,7 @@ void RewriteFCallStrategy::Finalize(
 
   // delete all header blocks that do not contain any stmt
   for (auto it = this->argBlocks.cbegin(); it != this->argBlocks.cend();) {
-    if (it->second->GetNumberOfCommitedStmt() == 0) {
+    if (it->second->GetNumberOfCommittedStmt() == 0) {
       it = this->argBlocks.erase(it);
     } else {
       ++it;
@@ -431,7 +431,7 @@ void RewriteFCallStrategy::Finalize(
     labelToIdx[blk->GetLabel()] = idx++;
   }
 
-  Assert(varStateQueries.size() > 0, "must have atleast on Variable State Query");
+  Assert(varStateQueries.size() > 0, "must have at least one Variable State Query");
 
   for (auto const &[blkLabel, headerBlockBd]: this->argBlocks) {
 
@@ -470,9 +470,9 @@ void RewriteFCallStrategy::Finalize(
     int rule_seed = Random::Get().Uniform()();
 
     size_t ruleCount =
-        GlobalOptions::Get().reduceMode
+        GlobalOptions::Get().ReduceMode
             ? ReduceInfo::Get().GetRuleCount(funBd->GetName(), headerBlockBd->GetLabel())
-            : GlobalOptions::Get().ruleCount;
+            : GlobalOptions::Get().RuleCount;
 
     RuleInfo::Get().NewBlock(headerBlockBd->GetLabel(), rule_seed, ruleCount);
     if (ruleCount > 0) {

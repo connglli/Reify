@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Transformation Rules that do not target any specific Compiler optimization but
+// Contains transformation rules that do not target any specific Compiler optimization but
 // introduce/create operations from constants
 
 #include "lib/lang.hpp"
@@ -41,7 +41,7 @@ namespace transformations::primitive {
   // B1, B2, ... := Conditional Stmt
   // {A, ..., Z, a, ..., z} Variables
 
-  /// Additivly expands an expression with one more element
+  /// Additively expands an expression with one more element
   /// E1 + C1 + E2 => E1 + C2 + C3 +E2
   /// where C2 + C3 = C1
   struct AdditionFromConst : Rule {
@@ -53,9 +53,9 @@ namespace transformations::primitive {
     std::string RuleName() override { return __CLASS_NAME__ };
   };
 
-  /// Additivly expands an expression with one more element
+  /// Additively expands an expression with one more element
   /// but only for expressions that have some number of Const additions as prefix
-  /// This allows for a larger range of random values to be choosen since we are aware of the
+  /// This allows for a larger range of random values to be chosen since we are aware of the
   /// intermediate state. C1 + E2 => C2 + C3 +E2 where C2 + C3 = C1
   struct AggressiveAdditionFromConst : Rule {
     bool Match(const symir::Stmt *stmt) const override;
@@ -78,7 +78,7 @@ namespace transformations::primitive {
     std::string RuleName() override { return __CLASS_NAME__ };
   };
 
-  /// create a For Loop from an assignment of a Const
+  /// Create a For Loop from an assignment of a Const
   /// x = C1 => x = C2; for (i = 0; i < C3; i += 1) { x = C4 + x; },
   /// where C3 * C4 + C2 = C1
   struct ForSumFromConst : Rule {
@@ -98,7 +98,7 @@ namespace transformations::primitive {
   struct DeadCodeFromAssign : Rule {
     DeadCodeFromAssign(int minBranches = 2, int maxBranches = 4, bool allowUB = false) :
         minBranches(minBranches), maxBranches(maxBranches), allowUB(allowUB) {
-      Assert(minBranches >= 2, "DeadCodeFromAssign must have atleast 2 branches");
+      Assert(minBranches >= 2, "DeadCodeFromAssign must have at least 2 branches");
     }
 
     bool Match(const symir::Stmt *stmt) const override;

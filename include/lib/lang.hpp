@@ -1662,7 +1662,7 @@ namespace symir {
     /// Commits a Stmt to the builder before the 'stmtIndex'th position
     Stmt *CommitStmtAt(StmtID sid, int stmtIndex);
 
-    /// Removes a range of commited Stmts
+    /// Removes a range of committed Stmts
     void RemoveCommittedStmts(size_t low, size_t upp) {
       Assert(low <= upp && upp <= this->stmts.size(), "low or upp are out of bounds");
       if (upp != 0) {
@@ -1676,7 +1676,7 @@ namespace symir {
     /// Commits a Stmt to the builder by replacing 'stmtIndex'
     std::vector<Stmt *> ReplaceCommitStmt(std::vector<StmtID> sids, int stmtIndex);
 
-    /// Commits a Stmt to the builder before the 'stmtIndex'th assignmet
+    /// Commits a Stmt to the builder before the 'stmtIndex'th assignment
     Stmt *CommitStmtAtAssign(StmtID sid, int assignStmtIndex);
 
     /// Removes the target. This essentially resets the BlockBuilder to before SymGoto was called;
@@ -1696,22 +1696,22 @@ namespace symir {
       return Block::GetDefinitions(stmts);
     }
 
-    [[nodiscard]] size_t GetNumberOfCommitedStmt() { return this->stmts.size(); }
+    [[nodiscard]] size_t GetNumberOfCommittedStmt() { return this->stmts.size(); }
 
-    [[nodiscard]] const Stmt *GetCommitedStmt(size_t idx) {
-      Assert(idx < this->stmts.size(), "Attempting to access out ouf bound commited stmt");
+    [[nodiscard]] const Stmt *GetCommittedStmt(size_t idx) {
+      Assert(idx < this->stmts.size(), "Attempting to access out of bound committed stmt");
       return this->stmts[idx].get();
     }
 
-    [[nodiscard]] const Stmt *GetCommitedStmtOrTarget(size_t idx) {
+    [[nodiscard]] const Stmt *GetCommittedStmtOrTarget(size_t idx) {
       Assert(
           idx <= this->stmts.size() && (this->target != nullptr || idx < this->stmts.size()),
-          "Attempting to access out ouf bound commited stmt"
+          "Attempting to access out of bound committed stmt"
       );
       return idx < this->stmts.size() ? this->stmts[idx].get() : this->target.get();
     }
 
-    [[nodiscard]] const Stmt *GetUncommitedStmt(StmtID id) {
+    [[nodiscard]] const Stmt *GetUncommittedStmt(StmtID id) {
       Assert(createdStmts.contains(id), "Stmt either never existed or is already committed");
       return createdStmts[id].get();
     }
@@ -1750,6 +1750,7 @@ namespace symir {
 
   template<typename T, typename TBuilder>
   class SymIRCopier : protected SymIRBuilder {
+  public:
     virtual T Copy() = 0;
     virtual TBuilder CopyAsBuilder() = 0;
 
@@ -1872,7 +1873,7 @@ namespace symir {
     explicit StmtCopier(symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd) :
         funBd(funBd), blockBd(blockBd) {}
 
-    /// Copies a Stmt inside this blockblock
+    /// Copies a Stmt inside this block
     StmtID CopyStmt(const Stmt *s);
 
     /// Copies a Term inside this block

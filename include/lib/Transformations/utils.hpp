@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Contains Utilitys used by transformation rules;
+// Contains utilities used by transformation rules;
 
 #include "lib/lang.hpp"
 #include "lib/patternmatch.hpp"
@@ -99,8 +99,8 @@ namespace transformations::utils {
     std::vector<int32_t>
     FindUniqueIteration(size_t nrVariables, size_t nrIterations, std::vector<int32_t> varState);
 
-    /// see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-    void Shuffel(const size_t n, int32_t *arr) {
+    /// See https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+    void Shuffle(const size_t n, int32_t *arr) {
       for (int i_ = n - 1; i_ >= 1; i_--) {
         size_t r = static_cast<size_t>(Random::Get().Uniform(0, i_)());
         size_t i = static_cast<size_t>(i_);
@@ -110,8 +110,8 @@ namespace transformations::utils {
       }
     }
 
-    // This is a quite biased in its selection.
-    // Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
+    /// This is a quite biased in its selection.
+    /// Monomial ordering: https://people.math.sc.edu/Burkardt/c_src/monomial/monomial.html
     /// Samples a new random polynomial
     void RandomizePolynomial(const size_t nrVariables, const size_t nrMonomials);
 
@@ -186,18 +186,18 @@ namespace transformations::utils {
   /// Copies the access vector of use
   std::vector<symir::Coef *> CopyAccess(symir::FunctBuilder *funBd, const symir::VarUse *use);
 
-  /// returns a symir CondID that corresponds to a condition that is trivially evaluates to
+  /// Returns a symir CondID that corresponds to a condition that is trivially evaluates to
   /// 'condTarget' (e.g. (0) == 0 or (1) == 0)
   symir::BlockBuilder::CondID
   TriviallyCondFor(bool condTarget, symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd);
 
-  /// returns a random valid assignment;
+  /// Returns a random valid assignment;
   symir::BlockBuilder::StmtID TrivialAssignment(
       symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, const symir::VarDef *var,
       std::vector<symir::Coef *> access = {}
   );
 
-  /// returns a term that is equal to just the value in the passed variable, access
+  /// Returns a term that is equal to just the value in the passed variable, access
   symir::BlockBuilder::TermID VariableTerm(
       symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, const symir::VarDef *var,
       std::vector<symir::Coef *> access = {}
@@ -208,7 +208,7 @@ namespace transformations::utils {
   /// Splits the given BlockBuilder into two blocks where the first (the given one mutated) contains
   /// all stmts up to and including stmt at splitIdx and the second one (the returned one) contains
   /// all after
-  symir::BlockBuilder *SsplitBlockAt(
+  symir::BlockBuilder *SplitBlockAt(
       symir::FunctBuilder *funBd, symir::BlockBuilder *blockBd, std::string secondLabel,
       size_t splitIdx
   );

@@ -81,7 +81,8 @@ public:
       bool debug = false
       // clang-format on
   );
-  std::string getVarStateJson();
+
+  std::string GetVarStateJson();
 
 private:
   // Generate constraints, solve them, and instantiate resolved symbols.
